@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary-50: #fdf8f6;
+  --color-primary-100: #f2e8e5;
+  --color-primary-200: #eaddd7;
+  --color-primary-300: #e0cec7;
+  --color-primary-400: #d2bab0;
+  --color-primary-500: #a08072;
+  --color-primary-600: #8a6a5c;
+  --color-primary-700: #745446;
+  --color-primary-800: #5e4034;
+  --color-primary-900: #483026;
+
+  --color-bg-light: #FDF6F0;
+  --color-bg-paper: #FFFFFF;
+  --color-accent: #C8A288;
+  --color-accent-hover: #B08B72;
+
+  --font-sans: "Outfit", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-[#FDF6F0] text-[#4A3B32] font-sans antialiased;
+  }
+}
+
+@layer utilities {
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #E6D5CC;
+    border-radius: 3px;
+    transition: background 0.3s;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #C8A288;
+  }
+
+  /* Skeleton Loading Utility */
+  .skeleton {
+    @apply bg-gray-200 animate-pulse rounded-md;
+  }
+}

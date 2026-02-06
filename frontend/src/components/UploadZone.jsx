@@ -1,0 +1,141 @@
+import React, { useState, useCallback } from 'react';
+import { Upload, X, File, Check } from 'lucide-react';
+
+const UploadZone = ({ onFilesSelected, uploading }) => {
+    const [selectedFiles, setSelectedFiles] = useState([]);
+    const [isDragging, setIsDragging] = useState(false);
+
+    const handleDrop = useCallback((e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+
+        const files = Array.from(e.dataTransfer.files).filter(file =>
+            file.type === 'application/pdf' ||
+            file.name.endsWith('.pdf') ||
+            file.name.endsWith('.txt') ||
+            file.name.endsWith('.docx')
+        );
+
+        if (files.length > 0) {
+            setSelectedFiles(files);
+        }
+    }, []);
+
+    const handleDragOver = useCallback((e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(true);
+    }, []);
+
+    const handleDragLeave = useCallback((e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+    }, []);
+
+    const handleFileSelect = (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length > 0) {
+            setSelectedFiles(files);
+        }
+    };
+
+    const removeFile = (index) => {
+        setSelectedFiles(files => files.filter((_, i) => i !== index));
+    };
+
+    const handleUpload = () => {
+        if (selectedFiles.length > 0) {
+            onFilesSelected(selectedFiles);
+        }
+    };
+
+    return (
+        <div className="space-y-4">
+            {/* Drag & Drop Zone */}
+            <div
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                className={`border-2 border-dashed rounded-xl p-12 text-center transition-colors ${isDragging
+                        ? 'border-[#C8A288] bg-[#FDF6F0]'
+                        : 'border-[#E6D5CC] hover:border-[#C8A288]'
+                    }`}
+            >
+                <Upload className={`h-16 w-16 mx-auto mb-4 ${isDragging ? 'text-[#C8A288]' : 'text-[#8a6a5c]'}`} />
+                <p className="text-lg font-medium text-[#4A3B32] mb-2">
+                    Drag and drop your files here
+                </p>
+                <p className="text-sm text-[#8a6a5c] mb-4">or</p>
+                <label className="inline-block px-6 py-3 bg-[#C8A288] text-white rounded-lg hover:bg-[#B08B72] cursor-pointer transition-colors">
+                    Browse Files
+                    <input
+                        type="file"
+                        multiple
+                        accept=".pdf,.txt,.docx"
+                        onChange={handleFileSelect}
+                        className="hidden"
+                    />
+                </label>
+                <p className="text-xs text-[#8a6a5c] mt-4">Supported: PDF, TXT, DOCX</p>
+            </div>
+
+            {/* Selected Files List */}
+            {selectedFiles.length > 0 && (
+                <div className="space-y-2">
+                    <h3 className="text-sm font-bold text-[#4A3B32]">
+                        Selected Files ({selectedFiles.length})
+                    </h3>
+                    <div className="max-h-48 overflow-y-auto space-y-2">
+                        {selectedFiles.map((file, index) => (
+                            <div
+                                key={index}
+                                className="flex items-center gap-3 p-3 bg-[#FDF6F0] rounded-lg border border-[#E6D5CC]"
+                            >
+                                <File className="h-5 w-5 text-[#C8A288] shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-[#4A3B32] truncate">
+                                        {file.name}
+                                    </p>
+                                    <p className="text-xs text-[#8a6a5c]">
+                                        {(file.size / 1024 / 1024).toFixed(2)} MB
+                                    </p>
+                                </div>
+                                {!uploading && (
+                                    <button
+                                        onClick={() => removeFile(index)}
+                                        className="p-1 hover:bg-red-100 rounded transition-colors"
+                                    >
+                                        <X className="h-4 w-4 text-red-600" />
+                                    </button>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Upload Button */}
+                    <button
+                        onClick={handleUpload}
+                        disabled={uploading || selectedFiles.length === 0}
+                        className="w-full py-3 bg-[#C8A288] text-white rounded-xl hover:bg-[#B08B72] font-medium disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                    >
+                        {uploading ? (
+                            <>
+                                <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                Uploading...
+                            </>
+                        ) : (
+                            <>
+                                <Check className="h-5 w-5" />
+                                Upload {selectedFiles.length} File{selectedFiles.length !== 1 ? 's' : ''}
+                            </>
+                        )}
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default UploadZone;

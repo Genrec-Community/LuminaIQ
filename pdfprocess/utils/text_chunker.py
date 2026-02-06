@@ -1,0 +1,32 @@
+from typing import List
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+class TextChunker:
+    def __init__(self, chunk_size: int = 500, overlap: int = 50):
+        self.splitter = RecursiveCharacterTextSplitter(
+            chunk_size=chunk_size,
+            chunk_overlap=overlap,
+            length_function=len,
+            is_separator_regex=False,
+            separators=["\n\n", "\n", " ", ""]
+        )
+
+    def chunk_text(self, text: str, chunk_size: int = None, overlap: int = None) -> List[str]:
+        """
+        Split text using LangChain's RecursiveCharacterTextSplitter.
+        If chunk_size/overlap provided here, they override init values.
+        """
+        if not text:
+            return []
+            
+        # If overrides are provided and different, create a temporary splitter
+        current_splitter = self.splitter
+        if (chunk_size is not None and chunk_size != self.splitter._chunk_size) or \
+           (overlap is not None and overlap != self.splitter._chunk_overlap):
+            current_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=chunk_size or self.splitter._chunk_size,
+                chunk_overlap=overlap or self.splitter._chunk_overlap,
+                separators=["\n\n", "\n", " ", ""]
+            )
+            
+        return current_splitter.split_text(text)
