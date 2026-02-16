@@ -4,6 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { generateNotes } from '../../api';
 import { useToast } from '../../context/ToastContext';
+import { recordActivity } from '../../utils/studyActivity';
 
 const NotesView = ({ projectId, availableTopics, selectedDocuments }) => {
     const toast = useToast();
@@ -38,6 +39,9 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments }) => {
             // If the backend returns "content", we use data.
             // API returns { content: "..." } based on user report
             setNotesContent(typeof data === 'string' ? data : (data.notes || data.content || JSON.stringify(data)));
+            
+            // Track notes generation activity for heatmap
+            recordActivity(projectId, 'notes');
         } catch (error) {
             console.error("Notes gen error", error);
             toast.error('Failed to generate notes');

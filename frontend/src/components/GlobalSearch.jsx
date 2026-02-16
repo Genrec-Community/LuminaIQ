@@ -4,7 +4,7 @@ import {
     Clock, ArrowRight, Loader2, Tag, ChevronRight,
     Sparkles, Filter
 } from 'lucide-react';
-import { searchDocuments } from '../api';
+import { searchDocuments, getRecentSearches, saveRecentSearch as saveRecentSearchApi, clearRecentSearches as clearRecentSearchesApi } from '../api';
 
 // Simple debounce helper (no lodash dependency)
 const debounce = (fn, ms) => {
@@ -40,12 +40,17 @@ const GlobalSearch = ({
         return Array.from(topicsSet);
     }, [documentTopics]);
 
-    // Load recent searches
+    // Load recent searches from API
     useEffect(() => {
-        const saved = localStorage.getItem(`recent_searches_${projectId}`);
-        if (saved) {
-            setRecentSearches(JSON.parse(saved));
-        }
+        const load = async () => {
+            try {
+                const data = await getRecentSearches(projectId);
+                setRecentSearches(data.searches || []);
+            } catch (err) {
+                console.warn('Failed to load recent searches:', err);
+            }
+        };
+        load();
     }, [projectId]);
 
     // Focus input when opened
@@ -103,7 +108,9 @@ const GlobalSearch = ({
         if (!searchQuery.trim()) return;
         const updated = [searchQuery, ...recentSearches.filter(s => s !== searchQuery)].slice(0, 5);
         setRecentSearches(updated);
-        localStorage.setItem(`recent_searches_${projectId}`, JSON.stringify(updated));
+        saveRecentSearchApi(projectId, searchQuery).catch(err =>
+            console.warn('Failed to save recent search:', err)
+        );
     };
 
     const handleSelect = (type, item) => {
@@ -121,7 +128,9 @@ const GlobalSearch = ({
 
     const clearRecentSearches = () => {
         setRecentSearches([]);
-        localStorage.removeItem(`recent_searches_${projectId}`);
+        clearRecentSearchesApi(projectId).catch(err =>
+            console.warn('Failed to clear recent searches:', err)
+        );
     };
 
     const totalResults = results.documents.length + results.topics.length + results.semantic.length;

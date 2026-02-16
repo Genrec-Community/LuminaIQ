@@ -13,6 +13,7 @@ import {
     getWeakTopics
 } from '../../api';
 import { useToast } from '../../context/ToastContext';
+import { recordActivity } from '../../utils/studyActivity';
 
 const StudyDashboard = ({ projectId, availableTopics }) => {
     const toast = useToast();
@@ -70,6 +71,9 @@ const StudyDashboard = ({ projectId, availableTopics }) => {
         setSubmittingReview(true);
         try {
             await recordReview(currentCard.id, quality);
+            
+            // Track review activity for heatmap
+            recordActivity(projectId, 'review');
             
             // Move to next card
             const nextIndex = reviewIndex + 1;

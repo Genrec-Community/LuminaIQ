@@ -6,6 +6,8 @@ import {
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { recordActivity } from '../utils/studyActivity';
+import { useSettings } from '../context/SettingsContext';
 
 const AITutorChat = ({
     projectId,
@@ -15,16 +17,12 @@ const AITutorChat = ({
     onClose,
     selectedDocuments = []
 }) => {
-    // Get tutor style from settings
-    const getSettings = () => {
-        const saved = localStorage.getItem('lumina_settings');
-        return saved ? JSON.parse(saved) : { tutorStyle: 'balanced' };
-    };
+    const { settings } = useSettings();
 
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
-    const [tutorStyle, setTutorStyle] = useState(getSettings().tutorStyle);
+    const [tutorStyle, setTutorStyle] = useState(settings.tutorStyle || 'balanced');
     const [showStylePicker, setShowStylePicker] = useState(false);
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
@@ -148,6 +146,9 @@ Guidelines:
                     return updated;
                 });
             }
+            
+            // Track chat activity for heatmap
+            recordActivity(projectId, 'chat');
         } catch (error) {
             console.error('Tutor error:', error);
             setMessages(prev => [...prev, {

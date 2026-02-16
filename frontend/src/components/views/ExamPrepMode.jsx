@@ -5,7 +5,7 @@ import {
     RotateCcw, ChevronRight, Zap, Award, Timer,
     FileText, TrendingUp, X, Plus, Trash2, Settings
 } from 'lucide-react';
-import { generateMCQ, generateSubjectiveTest } from '../../api';
+import { generateMCQ, generateSubjectiveTest, getExams, saveExam as saveExamApi, deleteExam as deleteExamApi } from '../../api';
 
 const ExamPrepMode = ({
     projectId,
@@ -29,20 +29,26 @@ const ExamPrepMode = ({
     const [mockTest, setMockTest] = useState(null);
     const [countdown, setCountdown] = useState(null);
 
-    // Load saved exams
+    // Load saved exams from API
     useEffect(() => {
-        const saved = localStorage.getItem(`exams_${projectId}`);
-        if (saved) {
-            setSavedExams(JSON.parse(saved));
-        }
+        const load = async () => {
+            try {
+                const data = await getExams(projectId);
+                setSavedExams(data.exams || []);
+            } catch (err) {
+                console.error('Failed to load exams:', err);
+            }
+        };
+        load();
     }, [projectId]);
 
     // Countdown timer
     useEffect(() => {
-        if (activeExam?.date) {
+        const examDateValue = activeExam?.date || activeExam?.exam_date;
+        if (examDateValue) {
             const updateCountdown = () => {
                 const now = new Date();
-                const examDateTime = new Date(activeExam.date);
+                const examDateTime = new Date(examDateValue);
                 const diff = examDateTime - now;
 
                 if (diff > 0) {
@@ -61,39 +67,36 @@ const ExamPrepMode = ({
         }
     }, [activeExam]);
 
-    const saveExam = () => {
+    const saveExam = async () => {
         if (!examName || !examDate) return;
 
-        const newExam = {
-            id: Date.now().toString(),
-            name: examName,
-            date: examDate,
-            topics: selectedTopics,
-            difficulty,
-            created: new Date().toISOString(),
-            progress: {
-                topicsReviewed: [],
-                quizzesTaken: 0,
-                mockExamsTaken: 0,
-                averageScore: 0,
-            },
-        };
-
-        const updated = [...savedExams, newExam];
-        setSavedExams(updated);
-        localStorage.setItem(`exams_${projectId}`, JSON.stringify(updated));
-        setActiveExam(newExam);
-        setExamName('');
-        setExamDate('');
-        setSelectedTopics([]);
+        try {
+            const result = await saveExamApi(projectId, examName, examDate, selectedTopics, difficulty);
+            const newExam = {
+                ...result,
+                date: result.exam_date || examDate,
+                name: result.name || examName,
+            };
+            setSavedExams([...savedExams, newExam]);
+            setActiveExam(newExam);
+            setExamName('');
+            setExamDate('');
+            setSelectedTopics([]);
+        } catch (err) {
+            console.error('Failed to save exam:', err);
+        }
     };
 
-    const deleteExam = (examId) => {
-        const updated = savedExams.filter(e => e.id !== examId);
-        setSavedExams(updated);
-        localStorage.setItem(`exams_${projectId}`, JSON.stringify(updated));
-        if (activeExam?.id === examId) {
-            setActiveExam(null);
+    const deleteExam = async (examId) => {
+        try {
+            await deleteExamApi(examId);
+            const updated = savedExams.filter(e => e.id !== examId);
+            setSavedExams(updated);
+            if (activeExam?.id === examId) {
+                setActiveExam(null);
+            }
+        } catch (err) {
+            console.error('Failed to delete exam:', err);
         }
     };
 

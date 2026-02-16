@@ -42,10 +42,13 @@ import {
     generateSubjectiveTest,
     submitSubjectiveTest,
     deleteDocument,
-    generateNotes
+    generateNotes,
+    getLearningProgress,
+    saveLearningProgress
 } from '../api';
 import { useToast } from '../context/ToastContext';
 import { useSettings } from '../context/SettingsContext';
+import { recordActivity } from '../utils/studyActivity';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import UploadZone from '../components/UploadZone';
@@ -58,7 +61,6 @@ import StudyDashboard from '../components/views/StudyDashboard';
 import LearningPathView from '../components/views/LearningPathView';
 import AdvancedAnalytics from '../components/views/AdvancedAnalytics';
 import ExamPrepMode from '../components/views/ExamPrepMode';
-import VisualLearning from '../components/views/VisualLearning';
 import KnowledgeGraphView from '../components/views/KnowledgeGraphView';
 
 // Utility Components
@@ -103,15 +105,23 @@ const ProjectView = () => {
     const [preSelectedQuizMode, setPreSelectedQuizMode] = useState(null);
     const [cameFromPath, setCameFromPath] = useState(false);
     
-    // Learning Progress (persisted in localStorage)
-    const [learningProgress, setLearningProgress] = useState(() => {
-        try {
-            const saved = localStorage.getItem(`lumina_path_progress_${projectId}`);
-            return saved ? new Set(JSON.parse(saved)) : new Set();
-        } catch {
-            return new Set();
-        }
-    });
+    // Learning Progress (persisted in Supabase)
+    const [learningProgress, setLearningProgress] = useState(new Set());
+    
+    // Load learning progress from API
+    useEffect(() => {
+        const loadProgress = async () => {
+            try {
+                const data = await getLearningProgress(projectId);
+                if (data.completed_topics && data.completed_topics.length > 0) {
+                    setLearningProgress(new Set(data.completed_topics));
+                }
+            } catch (err) {
+                console.warn('Failed to load learning progress:', err);
+            }
+        };
+        loadProgress();
+    }, [projectId]);
     
     // Quiz/Q&A Active State (hides sidebars during generation/active)
     const [isQuizActive, setIsQuizActive] = useState(false);
@@ -197,7 +207,7 @@ const ProjectView = () => {
     };
 
     useEffect(() => {
-        if (activeTab === 'quiz' || activeTab === 'qa' || activeTab === 'notes' || activeTab === 'path') {
+        if (activeTab === 'quiz' || activeTab === 'qa' || activeTab === 'notes' || activeTab === 'path' || activeTab === 'exam') {
             fetchTopics();
         }
     }, [activeTab, projectId]);
@@ -367,6 +377,9 @@ const ProjectView = () => {
                         }
                         return updated;
                     });
+                    
+                    // Track chat activity for heatmap
+                    recordActivity(projectId, 'chat');
                     setLoading(false);
                 }
             );
@@ -506,7 +519,6 @@ const ProjectView = () => {
                         <NavItem id="study" icon={Brain} label="Study Dashboard" />
                         <NavItem id="analytics" icon={BarChart3} label="Analytics" />
                         <NavItem id="exam" icon={GraduationCap} label="Exam Prep" />
-                        <NavItem id="visual" icon={Network} label="Mind Map" />
                         <NavItem id="knowledge" icon={Network} label="Knowledge Graph" />
                     </nav>
                 </div>
@@ -571,7 +583,6 @@ const ProjectView = () => {
                                     {activeTab === 'study' && 'Study'}
                                     {activeTab === 'analytics' && 'Analytics'}
                                     {activeTab === 'exam' && 'Exam Prep'}
-                                    {activeTab === 'visual' && 'Mind Map'}
                                     {activeTab === 'knowledge' && 'Knowledge Graph'}
                                 </h2>
                                 <p className="text-xs text-[#8a6a5c] truncate hidden sm:block">
@@ -792,9 +803,8 @@ const ProjectView = () => {
                                     const newProgress = new Set(learningProgress);
                                     newProgress.add(topic);
                                     setLearningProgress(newProgress);
-                                    localStorage.setItem(
-                                        `lumina_path_progress_${projectId}`,
-                                        JSON.stringify([...newProgress])
+                                    saveLearningProgress(projectId, [...newProgress]).catch(err =>
+                                        console.warn('Failed to save progress:', err)
                                     );
                                 }
                                 // Clear pre-selection after quiz complete
@@ -858,9 +868,8 @@ const ProjectView = () => {
                                 const newProgress = new Set(learningProgress);
                                 newProgress.add(topic);
                                 setLearningProgress(newProgress);
-                                localStorage.setItem(
-                                    `lumina_path_progress_${projectId}`,
-                                    JSON.stringify([...newProgress])
+                                saveLearningProgress(projectId, [...newProgress]).catch(err =>
+                                    console.warn('Failed to save progress:', err)
                                 );
                             }}
                         />
@@ -882,25 +891,11 @@ const ProjectView = () => {
                             projectId={projectId}
                             documents={documents}
                             selectedDocuments={selectedDocuments}
-                            availableTopics={availableTopics}
+                            topics={availableTopics}
                             onStartQuiz={(topic, mode) => {
                                 setPreSelectedTopic(topic);
                                 setPreSelectedQuizMode(mode || 'both');
                                 setActiveTab('quiz');
-                            }}
-                        />
-                    )}
-
-                    {/* Visual Learning / Mind Map View */}
-                    {activeTab === 'visual' && (
-                        <VisualLearning
-                            projectId={projectId}
-                            documents={documents}
-                            selectedDocuments={selectedDocuments}
-                            documentTopics={documentTopics}
-                            onTopicSelect={(topic) => {
-                                setTutorTopic(topic);
-                                setShowAITutor(true);
                             }}
                         />
                     )}

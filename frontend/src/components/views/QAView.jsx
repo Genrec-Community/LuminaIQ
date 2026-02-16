@@ -4,6 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { generateSubjectiveTest } from '../../api';
 import { useToast } from '../../context/ToastContext';
+import { recordActivity } from '../../utils/studyActivity';
 
 const QAView = ({ projectId, availableTopics, selectedDocuments, onQAActiveChange = null }) => {
     const toast = useToast();
@@ -65,6 +66,9 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, onQAActiveChang
             // Pass answer size to backend
             const data = await generateSubjectiveTest(projectId, qaTopic, qaNumQuestions, selectedDocuments, answerSize);
             setQaTest(data);
+            
+            // Track Q&A generation activity for heatmap
+            recordActivity(projectId, 'qa');
         } catch (error) {
             console.error("QA gen error", error);
             toast.error('Failed to generate Q&A');

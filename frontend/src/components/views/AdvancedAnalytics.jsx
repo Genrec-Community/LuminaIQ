@@ -5,7 +5,8 @@ import {
     ChevronUp, Zap, CheckCircle, XCircle, Activity,
     PieChart, Timer, Star, Trophy, ArrowUp, ArrowDown
 } from 'lucide-react';
-import { getPerformance, getLearningDashboard, getWeakTopics } from '../../api';
+import { getPerformance, getLearningDashboard, getWeakTopics, getPomodoro, getStreak } from '../../api';
+import { getActivityHeatmap, getAccuracyTrend, getMaxDailyActivity, fetchActivity } from '../../utils/studyActivity';
 
 const AdvancedAnalytics = ({ projectId, documents = [], bookIsolation = true }) => {
     const [selectedBook, setSelectedBook] = useState('all');
@@ -13,6 +14,7 @@ const AdvancedAnalytics = ({ projectId, documents = [], bookIsolation = true }) 
     const [analytics, setAnalytics] = useState(null);
     const [timeRange, setTimeRange] = useState('week'); // 'today', 'week', 'month', 'all'
     const [expandedSection, setExpandedSection] = useState('overview');
+    const [activityData, setActivityData] = useState({});
 
     useEffect(() => {
         loadAnalytics();
@@ -26,15 +28,16 @@ const AdvancedAnalytics = ({ projectId, documents = [], bookIsolation = true }) 
             const dashData = await getLearningDashboard(projectId);
             const weakData = await getWeakTopics(projectId, 10, 0.2);
 
-            // Load local study time data
-            const studyTimeKey = bookIsolation && selectedBook !== 'all'
-                ? `pomodoro_${selectedBook}`
-                : `pomodoro_${projectId}`;
-            const studyTime = JSON.parse(localStorage.getItem(studyTimeKey) || '{}');
+            // Load pomodoro data from API
+            const docId = bookIsolation && selectedBook !== 'all' ? selectedBook : null;
+            const studyTime = await getPomodoro(projectId, docId);
 
-            // Load streak data
-            const streakKey = `streak_${projectId}`;
-            const streakData = JSON.parse(localStorage.getItem(streakKey) || '{"current": 0, "longest": 0}');
+            // Load streak data from API
+            const streakData = await getStreak(projectId);
+
+            // Load activity data for accuracy trend
+            const actData = await fetchActivity(projectId, 90);
+            setActivityData(actData);
 
             // Process performance by book if isolation enabled
             let bookPerformance = {};
@@ -212,7 +215,7 @@ const AdvancedAnalytics = ({ projectId, documents = [], bookIsolation = true }) 
                     value={`${stats?.accuracy || 0}%`}
                     subValue={`${stats?.totalCorrect || 0} correct answers`}
                     color="bg-green-500"
-                    trend={5}
+                    trend={getAccuracyTrend(activityData, 7)}
                 />
                 <StatCard
                     icon={BookOpen}
@@ -358,47 +361,127 @@ const AdvancedAnalytics = ({ projectId, documents = [], bookIsolation = true }) 
                 )}
             </div>
 
-            {/* Study Calendar Heatmap (placeholder) */}
-            <div className="bg-white rounded-2xl border border-[#E6D5CC] p-4">
-                <div className="flex items-center gap-3 mb-4">
+            {/* Study Calendar Heatmap — real activity data */}
+            <StudyActivityHeatmap projectId={projectId} />
+        </div>
+    );
+};
+
+/**
+ * StudyActivityHeatmap — Renders real activity data from API
+ */
+const StudyActivityHeatmap = ({ projectId }) => {
+    const [heatmapRange, setHeatmapRange] = useState(7); // 7, 14, or 30 days
+    const [activityData, setActivityData] = useState({});
+
+    useEffect(() => {
+        const load = async () => {
+            try {
+                const data = await fetchActivity(projectId, 90);
+                setActivityData(data);
+            } catch (err) {
+                console.warn('Failed to load activity data:', err);
+            }
+        };
+        load();
+    }, [projectId]);
+
+    const heatmapData = getActivityHeatmap(activityData, heatmapRange);
+    const maxActivity = getMaxDailyActivity(activityData);
+
+    const getIntensityClass = (total) => {
+        if (total === 0) return 'bg-[#E6D5CC]';
+        const ratio = total / maxActivity;
+        if (ratio > 0.7) return 'bg-green-500';
+        if (ratio > 0.4) return 'bg-green-300';
+        return 'bg-green-100';
+    };
+
+    const totalActivities = heatmapData.reduce((s, d) => s + d.total, 0);
+    const activeDays = heatmapData.filter(d => d.total > 0).length;
+
+    return (
+        <div className="bg-white rounded-2xl border border-[#E6D5CC] p-4">
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
                     <div className="h-10 w-10 bg-[#C8A288]/20 rounded-xl flex items-center justify-center">
                         <Calendar className="h-5 w-5 text-[#C8A288]" />
                     </div>
                     <div>
                         <h3 className="font-bold text-[#4A3B32]">Study Activity</h3>
-                        <p className="text-sm text-[#8a6a5c]">Your learning consistency this week</p>
+                        <p className="text-sm text-[#8a6a5c]">
+                            {totalActivities > 0
+                                ? `${totalActivities} activities across ${activeDays} day${activeDays !== 1 ? 's' : ''}`
+                                : 'No activity recorded yet'}
+                        </p>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-7 gap-2">
-                    {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, idx) => {
-                        // Simulated activity data
-                        const activity = Math.random();
-                        return (
-                            <div key={day} className="text-center">
-                                <p className="text-xs text-[#8a6a5c] mb-1">{day}</p>
-                                <div
-                                    className={`h-8 rounded-lg ${
-                                        activity > 0.7 ? 'bg-green-500' :
-                                        activity > 0.4 ? 'bg-green-300' :
-                                        activity > 0.1 ? 'bg-green-100' : 'bg-[#E6D5CC]'
-                                    }`}
-                                />
+                {/* Range selector */}
+                <div className="flex gap-1">
+                    {[
+                        { label: '7d', value: 7 },
+                        { label: '14d', value: 14 },
+                        { label: '30d', value: 30 },
+                    ].map(({ label, value }) => (
+                        <button
+                            key={value}
+                            onClick={() => setHeatmapRange(value)}
+                            className={`px-2.5 py-1 text-xs font-medium rounded-lg transition-colors ${
+                                heatmapRange === value
+                                    ? 'bg-[#C8A288] text-white'
+                                    : 'text-[#8a6a5c] hover:bg-[#FDF6F0]'
+                            }`}
+                        >
+                            {label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* Heatmap grid */}
+            <div className={`grid gap-2 ${
+                heatmapRange <= 7 ? 'grid-cols-7' :
+                heatmapRange <= 14 ? 'grid-cols-7' : 'grid-cols-10'
+            }`}>
+                {heatmapData.map((day) => (
+                    <div key={day.date} className="text-center group relative">
+                        <p className="text-xs text-[#8a6a5c] mb-1">{day.dayName}</p>
+                        <div
+                            className={`h-8 rounded-lg ${getIntensityClass(day.total)} transition-all hover:ring-2 hover:ring-[#C8A288]/40 cursor-default`}
+                        />
+                        {/* Tooltip on hover */}
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10">
+                            <div className="bg-[#4A3B32] text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg">
+                                <p className="font-medium">{day.date}</p>
+                                {day.total > 0 ? (
+                                    <div className="mt-1 space-y-0.5 text-[#E6D5CC]">
+                                        {day.quiz > 0 && <p>{day.quiz} quiz{day.quiz !== 1 ? 'zes' : ''}</p>}
+                                        {day.review > 0 && <p>{day.review} review{day.review !== 1 ? 's' : ''}</p>}
+                                        {day.notes > 0 && <p>{day.notes} note{day.notes !== 1 ? 's' : ''}</p>}
+                                        {day.qa > 0 && <p>{day.qa} Q&A</p>}
+                                        {day.pomodoro > 0 && <p>{day.pomodoro} pomodoro{day.pomodoro !== 1 ? 's' : ''}</p>}
+                                        {day.chat > 0 && <p>{day.chat} chat{day.chat !== 1 ? 's' : ''}</p>}
+                                    </div>
+                                ) : (
+                                    <p className="mt-1 text-[#E6D5CC]">No activity</p>
+                                )}
                             </div>
-                        );
-                    })}
-                </div>
-
-                <div className="flex items-center justify-end gap-2 mt-3">
-                    <span className="text-xs text-[#8a6a5c]">Less</span>
-                    <div className="flex gap-1">
-                        <div className="h-3 w-3 rounded bg-[#E6D5CC]" />
-                        <div className="h-3 w-3 rounded bg-green-100" />
-                        <div className="h-3 w-3 rounded bg-green-300" />
-                        <div className="h-3 w-3 rounded bg-green-500" />
+                        </div>
                     </div>
-                    <span className="text-xs text-[#8a6a5c]">More</span>
+                ))}
+            </div>
+
+            {/* Legend */}
+            <div className="flex items-center justify-end gap-2 mt-3">
+                <span className="text-xs text-[#8a6a5c]">Less</span>
+                <div className="flex gap-1">
+                    <div className="h-3 w-3 rounded bg-[#E6D5CC]" />
+                    <div className="h-3 w-3 rounded bg-green-100" />
+                    <div className="h-3 w-3 rounded bg-green-300" />
+                    <div className="h-3 w-3 rounded bg-green-500" />
                 </div>
+                <span className="text-xs text-[#8a6a5c]">More</span>
             </div>
         </div>
     );

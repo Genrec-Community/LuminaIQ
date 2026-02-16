@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Settings as SettingsIcon,
@@ -17,45 +17,11 @@ import {
     Brain,
     Smartphone
 } from 'lucide-react';
+import { useSettings } from '../context/SettingsContext';
 
 const Settings = () => {
     const navigate = useNavigate();
-    
-    // Load settings from localStorage
-    const [settings, setSettings] = useState(() => {
-        const saved = localStorage.getItem('lumina_settings');
-        return saved ? JSON.parse(saved) : {
-            bookIsolation: true,          // Book-level isolation (each book separate)
-            darkMode: false,               // Dark mode theme
-            pomodoroWork: 25,              // Pomodoro work duration (minutes)
-            pomodoroBreak: 5,              // Short break duration
-            pomodoroLongBreak: 15,         // Long break duration
-            pomodoroAutoStart: false,      // Auto-start next session
-            studyReminders: true,          // Enable study reminders
-            reminderTime: '09:00',         // Default reminder time
-            soundEnabled: true,            // Sound effects
-            showStreaks: true,             // Show streak counter
-            compactMode: false,            // Compact UI for mobile
-            tutorStyle: 'balanced',        // AI tutor style: simple, balanced, detailed
-            quizDifficulty: 'adaptive',    // Quiz difficulty preference
-        };
-    });
-
-    // Save settings whenever they change
-    useEffect(() => {
-        localStorage.setItem('lumina_settings', JSON.stringify(settings));
-        
-        // Apply dark mode to document
-        if (settings.darkMode) {
-            document.documentElement.classList.add('dark');
-        } else {
-            document.documentElement.classList.remove('dark');
-        }
-    }, [settings]);
-
-    const updateSetting = (key, value) => {
-        setSettings(prev => ({ ...prev, [key]: value }));
-    };
+    const { settings, updateSetting, resetSettings } = useSettings();
 
     const ToggleSwitch = ({ enabled, onChange, label, description, icon: Icon }) => (
         <div className="flex items-center justify-between p-4 bg-white rounded-xl border border-[#E6D5CC] hover:border-[#C8A288] transition-colors">
@@ -360,8 +326,7 @@ const Settings = () => {
                     <button
                         onClick={() => {
                             if (confirm('Reset all settings to defaults?')) {
-                                localStorage.removeItem('lumina_settings');
-                                window.location.reload();
+                                resetSettings();
                             }
                         }}
                         className="w-full p-4 bg-red-50 text-red-600 rounded-xl border border-red-200 hover:bg-red-100 transition-colors font-medium"

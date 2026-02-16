@@ -4,6 +4,7 @@ import {
     FileText, Tag, Clock, Trash2, Edit2, Check,
     FolderOpen, Star, Filter
 } from 'lucide-react';
+import { getBookmarks, addBookmark as addBookmarkApi, updateBookmark as updateBookmarkApi, deleteBookmark as deleteBookmarkApi } from '../api';
 
 const BookmarksPanel = ({
     projectId,
@@ -19,62 +20,75 @@ const BookmarksPanel = ({
     const [showAddForm, setShowAddForm] = useState(false);
     const [newBookmark, setNewBookmark] = useState({ title: '', note: '', documentId: '', type: 'topic' });
 
-    // Load bookmarks
+    // Load bookmarks from API
     useEffect(() => {
-        const saved = localStorage.getItem(`bookmarks_${projectId}`);
-        if (saved) {
-            setBookmarks(JSON.parse(saved));
-        }
+        const load = async () => {
+            try {
+                const data = await getBookmarks(projectId);
+                setBookmarks(data.bookmarks || []);
+            } catch (err) {
+                console.error('Failed to load bookmarks:', err);
+            }
+        };
+        load();
     }, [projectId]);
 
-    // Save bookmarks
-    const saveBookmarks = (updated) => {
-        setBookmarks(updated);
-        localStorage.setItem(`bookmarks_${projectId}`, JSON.stringify(updated));
-    };
-
-    const addBookmark = () => {
+    const addBookmark = async () => {
         if (!newBookmark.title) return;
 
-        const bookmark = {
-            id: Date.now().toString(),
-            title: newBookmark.title,
-            note: newBookmark.note,
-            documentId: newBookmark.documentId || null,
-            documentName: newBookmark.documentId 
-                ? documents.find(d => d.id === newBookmark.documentId)?.filename 
-                : null,
-            type: newBookmark.type,
-            createdAt: new Date().toISOString(),
-            starred: false,
-        };
-
-        saveBookmarks([bookmark, ...bookmarks]);
-        setNewBookmark({ title: '', note: '', documentId: '', type: 'topic' });
-        setShowAddForm(false);
+        try {
+            const result = await addBookmarkApi(
+                projectId,
+                newBookmark.title,
+                newBookmark.note,
+                newBookmark.documentId || null,
+                newBookmark.type
+            );
+            // Add document name for display
+            const docName = newBookmark.documentId
+                ? documents.find(d => d.id === newBookmark.documentId)?.filename
+                : null;
+            const bookmark = { ...result, documentName: docName, starred: false };
+            setBookmarks([bookmark, ...bookmarks]);
+            setNewBookmark({ title: '', note: '', documentId: '', type: 'topic' });
+            setShowAddForm(false);
+        } catch (err) {
+            console.error('Failed to add bookmark:', err);
+        }
     };
 
-    const deleteBookmark = (id) => {
-        saveBookmarks(bookmarks.filter(b => b.id !== id));
+    const deleteBookmark = async (id) => {
+        try {
+            await deleteBookmarkApi(id);
+            setBookmarks(bookmarks.filter(b => b.id !== id));
+        } catch (err) {
+            console.error('Failed to delete bookmark:', err);
+        }
     };
 
     const toggleStar = (id) => {
-        saveBookmarks(bookmarks.map(b => 
+        // Star is a UI-only feature (not stored in DB), keep local
+        setBookmarks(bookmarks.map(b =>
             b.id === id ? { ...b, starred: !b.starred } : b
         ));
     };
 
-    const updateNote = (id) => {
-        saveBookmarks(bookmarks.map(b =>
-            b.id === id ? { ...b, note: editNote } : b
-        ));
-        setEditingId(null);
-        setEditNote('');
+    const updateNote = async (id) => {
+        try {
+            await updateBookmarkApi(id, { note: editNote });
+            setBookmarks(bookmarks.map(b =>
+                b.id === id ? { ...b, note: editNote } : b
+            ));
+            setEditingId(null);
+            setEditNote('');
+        } catch (err) {
+            console.error('Failed to update bookmark:', err);
+        }
     };
 
     // Filter and search
     const filteredBookmarks = bookmarks
-        .filter(b => filterDoc === 'all' || b.documentId === filterDoc)
+        .filter(b => filterDoc === 'all' || b.document_id === filterDoc || b.documentId === filterDoc)
         .filter(b => 
             b.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
             b.note?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -83,7 +97,7 @@ const BookmarksPanel = ({
             // Starred first, then by date
             if (a.starred && !b.starred) return -1;
             if (!a.starred && b.starred) return 1;
-            return new Date(b.createdAt) - new Date(a.createdAt);
+            return new Date(b.createdAt || b.created_at) - new Date(a.createdAt || a.created_at);
         });
 
     const getDocName = (docId) => {
@@ -275,7 +289,7 @@ const BookmarksPanel = ({
                                         )}
                                         <span className="flex items-center gap-1">
                                             <Clock className="h-3 w-3" />
-                                            {new Date(bookmark.createdAt).toLocaleDateString()}
+                                            {new Date(bookmark.createdAt || bookmark.created_at).toLocaleDateString()}
                                         </span>
                                     </div>
                                 </div>

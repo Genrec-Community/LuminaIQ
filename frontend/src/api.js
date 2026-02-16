@@ -496,3 +496,143 @@ export const endLearningSession = async (sessionId, topicsVisited, totalTimeMs) 
     return response.data;
 };
 
+// ============== User Data API (replaces localStorage) ==============
+
+// --- Settings ---
+export const getUserSettings = async () => {
+    const response = await api.get('/user-data/settings');
+    return response.data;
+};
+
+export const saveUserSettings = async (settings) => {
+    const response = await api.put('/user-data/settings', { settings });
+    return response.data;
+};
+
+// --- Bookmarks ---
+export const getBookmarks = async (projectId) => {
+    const response = await api.get(`/user-data/bookmarks/${projectId}`);
+    return response.data;
+};
+
+export const addBookmark = async (projectId, title, note = '', documentId = null, type = 'general') => {
+    const response = await api.post('/user-data/bookmarks', {
+        project_id: projectId,
+        title,
+        note,
+        document_id: documentId,
+        type,
+    });
+    return response.data;
+};
+
+export const updateBookmark = async (bookmarkId, updates) => {
+    const response = await api.patch(`/user-data/bookmarks/${bookmarkId}`, updates);
+    return response.data;
+};
+
+export const deleteBookmark = async (bookmarkId) => {
+    const response = await api.delete(`/user-data/bookmarks/${bookmarkId}`);
+    return response.data;
+};
+
+// --- Study Activity ---
+export const getStudyActivity = async (projectId, days = 90) => {
+    const response = await api.get(`/user-data/activity/${projectId}`, { params: { days } });
+    return response.data;
+};
+
+export const recordStudyActivity = async (projectId, activityType, meta = null) => {
+    const response = await api.post('/user-data/activity', {
+        project_id: projectId,
+        activity_type: activityType,
+        meta,
+    });
+    return response.data;
+};
+
+// --- Exams ---
+export const getExams = async (projectId) => {
+    const response = await api.get(`/user-data/exams/${projectId}`);
+    return response.data;
+};
+
+export const saveExam = async (projectId, name, examDate, topics = [], difficulty = 'medium') => {
+    const response = await api.post('/user-data/exams', {
+        project_id: projectId,
+        name,
+        exam_date: examDate,
+        topics,
+        difficulty,
+    });
+    return response.data;
+};
+
+export const deleteExam = async (examId) => {
+    const response = await api.delete(`/user-data/exams/${examId}`);
+    return response.data;
+};
+
+// --- Learning Progress ---
+export const getLearningProgress = async (projectId) => {
+    const response = await api.get(`/user-data/progress/${projectId}`);
+    return response.data;
+};
+
+export const saveLearningProgress = async (projectId, completedTopics) => {
+    const response = await api.put('/user-data/progress', {
+        project_id: projectId,
+        completed_topics: completedTopics,
+    });
+    return response.data;
+};
+
+// --- Pomodoro ---
+export const getPomodoro = async (projectId = null, documentId = null) => {
+    const params = {};
+    if (projectId) params.project_id = projectId;
+    if (documentId) params.document_id = documentId;
+    const response = await api.get('/user-data/pomodoro', { params });
+    return response.data;
+};
+
+export const savePomodoro = async (sessions, focusTimeMinutes, projectId = null, documentId = null) => {
+    const response = await api.put('/user-data/pomodoro', {
+        project_id: projectId,
+        document_id: documentId,
+        sessions,
+        focus_time_minutes: focusTimeMinutes,
+    });
+    return response.data;
+};
+
+// --- Recent Searches ---
+export const getRecentSearches = async (projectId) => {
+    const response = await api.get(`/user-data/searches/${projectId}`);
+    return response.data;
+};
+
+export const saveRecentSearch = async (projectId, query) => {
+    const response = await api.post('/user-data/searches', {
+        project_id: projectId,
+        query,
+    });
+    return response.data;
+};
+
+export const clearRecentSearches = async (projectId) => {
+    const response = await api.delete(`/user-data/searches/${projectId}`);
+    return response.data;
+};
+
+// --- Streaks ---
+export const getStreak = async (projectId) => {
+    const response = await api.get(`/user-data/streaks/${projectId}`);
+    return response.data;
+};
+
+export const updateStreak = async (projectId) => {
+    const response = await api.post(`/user-data/streaks/${projectId}`);
+    return response.data;
+};
+

@@ -4,68 +4,59 @@ import {
     Volume2, VolumeX, Settings, X, Check,
     Timer, Brain, Target, TrendingUp
 } from 'lucide-react';
+import { recordActivity } from '../utils/studyActivity';
+import { useSettings } from '../context/SettingsContext';
+import { getPomodoro, savePomodoro } from '../api';
 
 const PomodoroTimer = ({ 
+    projectId = null,
     documentId = null,
     documentName = 'Study Session',
     onSessionComplete,
     compact = false 
 }) => {
-    // Load settings
-    const getSettings = () => {
-        const saved = localStorage.getItem('lumina_settings');
-        return saved ? JSON.parse(saved) : {
-            pomodoroWork: 25,
-            pomodoroBreak: 5,
-            pomodoroLongBreak: 15,
-            pomodoroAutoStart: false,
-            soundEnabled: true,
-        };
-    };
-
-    const settings = getSettings();
+    const { settings } = useSettings();
     
     // Timer states
     const [mode, setMode] = useState('work'); // 'work', 'break', 'longBreak'
-    const [timeLeft, setTimeLeft] = useState(settings.pomodoroWork * 60);
+    const [timeLeft, setTimeLeft] = useState((settings.pomodoroWork || 25) * 60);
     const [isRunning, setIsRunning] = useState(false);
     const [sessionsCompleted, setSessionsCompleted] = useState(0);
     const [totalFocusTime, setTotalFocusTime] = useState(0);
     const [showSettings, setShowSettings] = useState(false);
-    const [soundEnabled, setSoundEnabled] = useState(settings.soundEnabled);
+    const [soundEnabled, setSoundEnabled] = useState(settings.soundEnabled !== false);
     
     // Custom durations
-    const [workDuration, setWorkDuration] = useState(settings.pomodoroWork);
-    const [breakDuration, setBreakDuration] = useState(settings.pomodoroBreak);
-    const [longBreakDuration, setLongBreakDuration] = useState(settings.pomodoroLongBreak);
+    const [workDuration, setWorkDuration] = useState(settings.pomodoroWork || 25);
+    const [breakDuration, setBreakDuration] = useState(settings.pomodoroBreak || 5);
+    const [longBreakDuration, setLongBreakDuration] = useState(settings.pomodoroLongBreak || 15);
     
     const audioRef = useRef(null);
     const intervalRef = useRef(null);
 
-    // Load session history for this document
+    // Load session history from API
     useEffect(() => {
-        const key = documentId ? `pomodoro_${documentId}` : 'pomodoro_global';
-        const saved = localStorage.getItem(key);
-        if (saved) {
-            const data = JSON.parse(saved);
-            const today = new Date().toDateString();
-            if (data.date === today) {
+        const load = async () => {
+            try {
+                const data = await getPomodoro(projectId, documentId);
                 setSessionsCompleted(data.sessions || 0);
-                setTotalFocusTime(data.focusTime || 0);
+                setTotalFocusTime((data.focusTime || 0) * 60); // API stores minutes, timer uses seconds
+            } catch (err) {
+                console.warn('Failed to load pomodoro data:', err);
             }
-        }
-    }, [documentId]);
+        };
+        load();
+    }, [documentId, projectId]);
 
-    // Save session history
+    // Save session history to API
     const saveSession = useCallback(() => {
-        const key = documentId ? `pomodoro_${documentId}` : 'pomodoro_global';
-        const today = new Date().toDateString();
-        localStorage.setItem(key, JSON.stringify({
-            date: today,
-            sessions: sessionsCompleted,
-            focusTime: totalFocusTime,
-        }));
-    }, [documentId, sessionsCompleted, totalFocusTime]);
+        savePomodoro(
+            sessionsCompleted,
+            Math.round(totalFocusTime / 60), // convert seconds to minutes
+            projectId,
+            documentId
+        ).catch(err => console.warn('Failed to save pomodoro:', err));
+    }, [documentId, projectId, sessionsCompleted, totalFocusTime]);
 
     // Timer logic
     useEffect(() => {
@@ -106,6 +97,11 @@ const PomodoroTimer = ({
             const newSessions = sessionsCompleted + 1;
             setSessionsCompleted(newSessions);
             
+            // Track pomodoro activity for heatmap
+            if (projectId) {
+                recordActivity(projectId, 'pomodoro');
+            }
+            
             // Notify parent
             if (onSessionComplete) {
                 onSessionComplete({
@@ -128,8 +124,7 @@ const PomodoroTimer = ({
             setTimeLeft(workDuration * 60);
             
             // Auto-start if enabled
-            const currentSettings = getSettings();
-            if (currentSettings.pomodoroAutoStart) {
+            if (settings.pomodoroAutoStart) {
                 setTimeout(() => setIsRunning(true), 1000);
             }
         }

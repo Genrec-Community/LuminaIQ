@@ -4,6 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { generateMCQ, generateSubjectiveTest, submitEvaluation, submitSubjectiveTest, generateNotes, recordPerformance, createCardsFromQuiz, getSuggestedTopic } from '../../api';
 import { useToast } from '../../context/ToastContext';
+import { recordActivity } from '../../utils/studyActivity';
 
 const QuizView = ({ 
     projectId, 
@@ -191,6 +192,9 @@ const QuizView = ({
             await recordPerformance(projectId, topic, score, wrong);
             setPerformanceSaved(true);
             
+            // Track quiz activity with score for heatmap & trend
+            recordActivity(projectId, 'quiz', { score: Math.round(percentage) });
+            
             // Notify parent about quiz completion
             if (onQuizComplete) {
                 const passed = percentage >= 80;
@@ -335,6 +339,9 @@ const QuizView = ({
                     const wrongEquiv = evalTest.questions.length - correctEquiv;
                     await recordPerformance(projectId, topic, correctEquiv, wrongEquiv);
                     
+                    // Track quiz activity for heatmap
+                    recordActivity(projectId, 'quiz', { score: Math.round(subjectivePercent) });
+                    
                     if (onQuizComplete) {
                         onQuizComplete(topic, subjectivePercent, passed);
                     }
@@ -376,6 +383,9 @@ const QuizView = ({
         const totalWrong = (mcqScoreData.total - mcqScoreData.score) + Math.round(((subjectiveResult.max_score - subjectiveResult.total_score) / subjectiveResult.max_score) * 2);
         
         recordPerformance(projectId, topic, totalCorrect, totalWrong).catch(console.error);
+        
+        // Track combined quiz activity for heatmap
+        recordActivity(projectId, 'quiz', { score: Math.round(combined) });
         
         if (onQuizComplete) {
             onQuizComplete(topic, combined, passed);

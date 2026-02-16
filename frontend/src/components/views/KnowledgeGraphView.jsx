@@ -20,6 +20,8 @@ import {
 } from 'lucide-react';
 import { 
     getKnowledgeGraphVisualization, 
+    getKnowledgeGraph,
+    getTopics,
     getTopicSummary, 
     recordGraphInteraction,
     getLearningSuggestions,
@@ -57,9 +59,33 @@ const KnowledgeGraphView = ({ projectId }) => {
     // Pan mode
     const [isPanMode, setIsPanMode] = useState(false);
 
+    // Refs to avoid stale closures in Cytoscape event handlers & cleanup
+    const selectedTopicRef = useRef(null);
+    const topicStartTimeRef = useRef(null);
+    const sessionIdRef = useRef(null);
+    const sessionStartTimeRef = useRef(null);
+    const topicsVisitedRef = useRef(new Set());
+    const isPanModeRef = useRef(false);
+
+    // Sync refs with state
+    useEffect(() => { selectedTopicRef.current = selectedTopic; }, [selectedTopic]);
+    useEffect(() => { topicStartTimeRef.current = topicStartTime; }, [topicStartTime]);
+    useEffect(() => { sessionIdRef.current = sessionId; }, [sessionId]);
+    useEffect(() => { sessionStartTimeRef.current = sessionStartTime; }, [sessionStartTime]);
+    useEffect(() => { topicsVisitedRef.current = topicsVisited; }, [topicsVisited]);
+    useEffect(() => { isPanModeRef.current = isPanMode; }, [isPanMode]);
+
     // Initialize Cytoscape
     const initCytoscape = useCallback((data) => {
         if (!containerRef.current || !data) return;
+        
+        // Safety check: container must have dimensions
+        const rect = containerRef.current.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) {
+            console.warn('KnowledgeGraph: container has zero dimensions, retrying...');
+            setTimeout(() => initCytoscape(data), 100);
+            return;
+        }
         
         // Destroy existing instance
         if (cyRef.current) {
@@ -69,6 +95,14 @@ const KnowledgeGraphView = ({ projectId }) => {
         // Prepare elements
         const elements = [];
         
+        // Count connections per node for size scaling
+        const degreeMap = {};
+        data.nodes.forEach(node => { degreeMap[node.id] = 0; });
+        data.edges.forEach(edge => {
+            degreeMap[edge.source] = (degreeMap[edge.source] || 0) + 1;
+            degreeMap[edge.target] = (degreeMap[edge.target] || 0) + 1;
+        });
+        
         // Add nodes
         data.nodes.forEach(node => {
             elements.push({
@@ -76,16 +110,17 @@ const KnowledgeGraphView = ({ projectId }) => {
                     id: node.id,
                     label: node.label,
                     type: node.type,
-                    document: node.document || null
+                    document: node.document || null,
+                    degree: degreeMap[node.id] || 0
                 }
             });
         });
         
-        // Add edges
-        data.edges.forEach(edge => {
+        // Add edges (use index for unique IDs to avoid collisions with hyphenated names)
+        data.edges.forEach((edge, idx) => {
             elements.push({
                 data: {
-                    id: `${edge.source}-${edge.target}`,
+                    id: `edge_${idx}`,
                     source: edge.source,
                     target: edge.target,
                     type: edge.type,
@@ -99,33 +134,38 @@ const KnowledgeGraphView = ({ projectId }) => {
             container: containerRef.current,
             elements,
             style: [
-                // Book nodes (documents)
+                // Book nodes (documents) — large, prominent anchor nodes
                 {
                     selector: 'node[type="book"]',
                     style: {
-                        'background-color': '#C8A288',
-                        'border-color': '#A08072',
+                        'background-color': '#A08072',
+                        'background-opacity': 0.95,
+                        'border-color': '#7B5B4E',
                         'border-width': 3,
                         'label': 'data(label)',
                         'text-valign': 'bottom',
                         'text-halign': 'center',
-                        'text-margin-y': 8,
-                        'font-size': '12px',
+                        'text-margin-y': 10,
+                        'font-size': '11px',
                         'font-weight': 'bold',
                         'color': '#4A3B32',
-                        'width': 50,
-                        'height': 50,
+                        'text-outline-color': '#FDF6F0',
+                        'text-outline-width': 2,
+                        'width': 55,
+                        'height': 55,
                         'shape': 'round-rectangle',
                         'text-wrap': 'wrap',
-                        'text-max-width': '80px'
+                        'text-max-width': '120px',
+                        'z-index': 10
                     }
                 },
-                // Topic nodes
+                // Topic nodes — sized by degree (connectivity)
                 {
                     selector: 'node[type="topic"]',
                     style: {
                         'background-color': '#FDF6F0',
-                        'border-color': '#E6D5CC',
+                        'background-opacity': 0.95,
+                        'border-color': '#D4BFB4',
                         'border-width': 2,
                         'label': 'data(label)',
                         'text-valign': 'center',
@@ -134,10 +174,24 @@ const KnowledgeGraphView = ({ projectId }) => {
                         'color': '#4A3B32',
                         'width': 'label',
                         'height': 'label',
-                        'padding': '12px',
+                        'padding': '14px',
                         'shape': 'round-rectangle',
                         'text-wrap': 'wrap',
-                        'text-max-width': '100px'
+                        'text-max-width': '130px',
+                        'z-index': 5
+                    }
+                },
+                // High-connectivity topic nodes (4+ connections)
+                {
+                    selector: 'node[type="topic"][degree >= 4]',
+                    style: {
+                        'background-color': '#F0E4DA',
+                        'border-color': '#C8A288',
+                        'border-width': 2.5,
+                        'font-size': '11px',
+                        'font-weight': 'bold',
+                        'padding': '16px',
+                        'text-max-width': '150px'
                     }
                 },
                 // Selected node
@@ -145,8 +199,12 @@ const KnowledgeGraphView = ({ projectId }) => {
                     selector: 'node:selected',
                     style: {
                         'background-color': '#C8A288',
-                        'border-color': '#8B6914',
-                        'border-width': 3
+                        'border-color': '#7B5B4E',
+                        'border-width': 3,
+                        'color': '#FFFFFF',
+                        'text-outline-color': '#7B5B4E',
+                        'text-outline-width': 1,
+                        'z-index': 20
                     }
                 },
                 // Hovered node
@@ -155,59 +213,99 @@ const KnowledgeGraphView = ({ projectId }) => {
                     style: {
                         'background-color': '#E6D5CC',
                         'border-color': '#C8A288',
-                        'border-width': 2
+                        'border-width': 2.5,
+                        'z-index': 15
                     }
                 },
-                // Edges - contains (book to topic)
+                // Neighbor highlight when a node is selected
+                {
+                    selector: 'node.neighbor',
+                    style: {
+                        'background-color': '#F0E4DA',
+                        'border-color': '#C8A288',
+                        'border-width': 2.5,
+                        'z-index': 12
+                    }
+                },
+                // Dimmed nodes (when a selection is active)
+                {
+                    selector: 'node.dimmed',
+                    style: {
+                        'opacity': 0.3
+                    }
+                },
+                // Edges - contains (book to topic) — subtle connectors
                 {
                     selector: 'edge[type="contains"]',
                     style: {
-                        'line-color': '#C8A288',
-                        'width': 2,
+                        'line-color': '#D4BFB4',
+                        'width': 1.5,
                         'curve-style': 'bezier',
-                        'opacity': 0.6
+                        'opacity': 0.4,
+                        'line-style': 'dotted'
                     }
                 },
-                // Edges - prerequisite
+                // Edges - prerequisite — prominent with arrows
                 {
                     selector: 'edge[type="prerequisite"]',
                     style: {
                         'line-color': '#A08072',
-                        'width': 2,
+                        'width': 2.5,
                         'target-arrow-shape': 'triangle',
                         'target-arrow-color': '#A08072',
+                        'arrow-scale': 1.2,
                         'curve-style': 'bezier',
-                        'opacity': 0.7
+                        'opacity': 0.75
                     }
                 },
-                // Edges - related
+                // Edges - related — dashed connectors
                 {
                     selector: 'edge[type="related"]',
                     style: {
                         'line-color': '#E6D5CC',
-                        'width': 1,
+                        'width': 1.5,
                         'line-style': 'dashed',
                         'curve-style': 'bezier',
-                        'opacity': 0.5
+                        'opacity': 0.45
+                    }
+                },
+                // Highlighted edges (connected to selected node)
+                {
+                    selector: 'edge.highlighted',
+                    style: {
+                        'opacity': 1,
+                        'width': 3,
+                        'z-index': 15
+                    }
+                },
+                // Dimmed edges
+                {
+                    selector: 'edge.dimmed',
+                    style: {
+                        'opacity': 0.1
                     }
                 }
             ],
             layout: {
                 name: 'cose',
                 animate: true,
-                animationDuration: 500,
-                nodeRepulsion: 8000,
-                idealEdgeLength: 100,
-                edgeElasticity: 100,
+                animationDuration: 800,
+                nodeRepulsion: function() { return 12000; },
+                idealEdgeLength: function() { return 150; },
+                edgeElasticity: function() { return 80; },
                 nestingFactor: 1.2,
-                gravity: 0.25,
-                numIter: 1000,
+                gravity: 0.15,
+                numIter: 1500,
                 coolingFactor: 0.95,
-                minTemp: 1.0
+                minTemp: 1.0,
+                nodeDimensionsIncludeLabels: true,
+                padding: 60
             },
-            minZoom: 0.3,
-            maxZoom: 3,
-            wheelSensitivity: 0.2
+            minZoom: 0.2,
+            maxZoom: 4,
+            wheelSensitivity: 0.15,
+            boxSelectionEnabled: false,
+            selectionType: 'single'
         });
         
         // Event handlers
@@ -216,10 +314,19 @@ const KnowledgeGraphView = ({ projectId }) => {
             const topicLabel = node.data('label');
             
             // Record click interaction (non-blocking)
-            if (topicStartTime && selectedTopic) {
-                const duration = Date.now() - topicStartTime;
-                recordGraphInteraction(projectId, selectedTopic, 'click', duration).catch(() => {});
+            if (topicStartTimeRef.current && selectedTopicRef.current) {
+                const duration = Date.now() - topicStartTimeRef.current;
+                recordGraphInteraction(projectId, selectedTopicRef.current, 'click', duration).catch(() => {});
             }
+            
+            // Highlight neighborhood: dim everything, then highlight selected + neighbors
+            cyRef.current.elements().removeClass('neighbor highlighted dimmed');
+            cyRef.current.elements().addClass('dimmed');
+            
+            const neighborhood = node.neighborhood().add(node);
+            neighborhood.nodes().removeClass('dimmed').addClass('neighbor');
+            neighborhood.edges().removeClass('dimmed').addClass('highlighted');
+            node.removeClass('neighbor dimmed'); // selected state handles this node
             
             setSelectedTopic(topicLabel);
             setTopicStartTime(Date.now());
@@ -232,6 +339,25 @@ const KnowledgeGraphView = ({ projectId }) => {
             fetchSuggestions(topicLabel);
         });
         
+        // Click on book nodes to highlight their topics
+        cyRef.current.on('tap', 'node[type="book"]', (evt) => {
+            const node = evt.target;
+            cyRef.current.elements().removeClass('neighbor highlighted dimmed');
+            cyRef.current.elements().addClass('dimmed');
+            
+            const neighborhood = node.neighborhood().add(node);
+            neighborhood.nodes().removeClass('dimmed').addClass('neighbor');
+            neighborhood.edges().removeClass('dimmed').addClass('highlighted');
+            node.removeClass('neighbor dimmed');
+        });
+        
+        // Click on background to clear highlight
+        cyRef.current.on('tap', (evt) => {
+            if (evt.target === cyRef.current) {
+                cyRef.current.elements().removeClass('neighbor highlighted dimmed');
+            }
+        });
+        
         cyRef.current.on('mouseover', 'node', (evt) => {
             evt.target.addClass('hover');
             containerRef.current.style.cursor = 'pointer';
@@ -239,13 +365,17 @@ const KnowledgeGraphView = ({ projectId }) => {
         
         cyRef.current.on('mouseout', 'node', (evt) => {
             evt.target.removeClass('hover');
-            containerRef.current.style.cursor = isPanMode ? 'grab' : 'default';
+            containerRef.current.style.cursor = isPanModeRef.current ? 'grab' : 'default';
         });
         
-        // Fit graph to container
-        cyRef.current.fit(undefined, 50);
+        // Fit graph to container AFTER layout completes (not immediately,
+        // since the cose layout animates over 500ms and the container may
+        // not have dimensions yet if it just appeared in the DOM)
+        cyRef.current.on('layoutstop', () => {
+            cyRef.current.fit(undefined, 50);
+        });
         
-    }, [projectId, isPanMode, selectedTopic, topicStartTime]);
+    }, [projectId]);
 
     // Fetch graph data
     const fetchGraphData = async () => {
@@ -260,7 +390,6 @@ const KnowledgeGraphView = ({ projectId }) => {
                 console.warn('Knowledge graph visualization endpoint failed, falling back:', vizErr);
                 // Fallback: use the learning API endpoint
                 try {
-                    const { getKnowledgeGraph, getTopics } = await import('../../api');
                     const kgData = await getKnowledgeGraph(projectId);
                     const topicsData = await getTopics(projectId);
                     
@@ -307,21 +436,23 @@ const KnowledgeGraphView = ({ projectId }) => {
             }
             
             setGraphData(data);
+            setLoading(false); // MUST be in same sync block as setGraphData — see useEffect below
             
-            // Initialize session (non-blocking - don't let it break the graph)
-            try {
-                const session = await startLearningSession(projectId);
+            // Initialize session (fire-and-forget — do NOT await, it would
+            // separate setGraphData and setLoading into different React batches,
+            // causing the Cytoscape useEffect to fire while the container is
+            // still hidden behind the loading spinner)
+            startLearningSession(projectId).then(session => {
                 setSessionId(session.session_id);
                 setSessionStartTime(Date.now());
-            } catch (sessionErr) {
+            }).catch(sessionErr => {
                 console.warn('Session tracking unavailable:', sessionErr.message);
                 setSessionStartTime(Date.now());
-            }
+            });
             
         } catch (err) {
             console.error('Error fetching graph:', err);
             setError(err.message || 'Failed to load knowledge graph');
-        } finally {
             setLoading(false);
         }
     };
@@ -364,6 +495,11 @@ const KnowledgeGraphView = ({ projectId }) => {
                 await recordGraphInteraction(projectId, selectedTopic, 'summary_view', duration);
             } catch (e) { /* analytics optional */ }
         }
+        // Clear graph highlighting
+        if (cyRef.current) {
+            cyRef.current.elements().removeClass('neighbor highlighted dimmed');
+            cyRef.current.elements().unselect();
+        }
         setSelectedTopic(null);
         setTopicSummary(null);
         setTopicStartTime(null);
@@ -387,11 +523,23 @@ const KnowledgeGraphView = ({ projectId }) => {
     useEffect(() => {
         fetchGraphData();
         
+        // Resize observer to tell Cytoscape when container changes size
+        const resizeObserver = new ResizeObserver(() => {
+            if (cyRef.current) {
+                cyRef.current.resize();
+                cyRef.current.fit(undefined, 50);
+            }
+        });
+        if (containerRef.current) {
+            resizeObserver.observe(containerRef.current);
+        }
+        
         // Cleanup on unmount
         return () => {
-            if (sessionId && sessionStartTime) {
-                const totalTime = Date.now() - sessionStartTime;
-                endLearningSession(sessionId, Array.from(topicsVisited), totalTime);
+            resizeObserver.disconnect();
+            if (sessionIdRef.current && sessionStartTimeRef.current) {
+                const totalTime = Date.now() - sessionStartTimeRef.current;
+                endLearningSession(sessionIdRef.current, Array.from(topicsVisitedRef.current), totalTime);
             }
             if (cyRef.current) {
                 cyRef.current.destroy();
@@ -400,11 +548,26 @@ const KnowledgeGraphView = ({ projectId }) => {
     }, [projectId]);
 
     // Initialize Cytoscape when data changes
+    // Use double-rAF to ensure the container div has been painted with
+    // proper dimensions before Cytoscape tries to render into it.
+    // When loading changes from true→false and graphData is set in the
+    // same render batch, the container appears in the DOM but may have
+    // 0x0 dimensions until the browser paints.
     useEffect(() => {
         if (graphData) {
-            initCytoscape(graphData);
+            let innerRaf = null;
+            const outerRaf = requestAnimationFrame(() => {
+                innerRaf = requestAnimationFrame(() => {
+                    initCytoscape(graphData);
+                });
+            });
+            return () => {
+                cancelAnimationFrame(outerRaf);
+                if (innerRaf !== null) cancelAnimationFrame(innerRaf);
+            };
         }
-    }, [graphData, initCytoscape]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [graphData]);
 
     // Navigate to suggested topic
     const navigateToTopic = async (topic) => {
@@ -416,6 +579,14 @@ const KnowledgeGraphView = ({ projectId }) => {
         if (cyRef.current) {
             const node = cyRef.current.getElementById(topic);
             if (node.length) {
+                // Highlight neighborhood
+                cyRef.current.elements().removeClass('neighbor highlighted dimmed');
+                cyRef.current.elements().addClass('dimmed');
+                const neighborhood = node.neighborhood().add(node);
+                neighborhood.nodes().removeClass('dimmed').addClass('neighbor');
+                neighborhood.edges().removeClass('dimmed').addClass('highlighted');
+                node.removeClass('neighbor dimmed');
+                
                 cyRef.current.animate({
                     center: { eles: node },
                     zoom: 1.5
@@ -485,7 +656,13 @@ const KnowledgeGraphView = ({ projectId }) => {
                                 {graphData?.project_name || 'Knowledge Graph'}
                             </h2>
                             <span className="text-xs text-[#8a6a5c] bg-white/80 px-2 py-1 rounded-full">
-                                {graphData?.nodes?.length || 0} topics
+                                {graphData?.nodes?.filter(n => n.type === 'topic').length || 0} topics
+                            </span>
+                            <span className="text-xs text-[#8a6a5c] bg-white/80 px-2 py-1 rounded-full">
+                                {graphData?.nodes?.filter(n => n.type === 'book').length || 0} docs
+                            </span>
+                            <span className="text-xs text-[#8a6a5c] bg-white/80 px-2 py-1 rounded-full">
+                                {graphData?.edges?.length || 0} links
                             </span>
                         </div>
                         
@@ -538,27 +715,35 @@ const KnowledgeGraphView = ({ projectId }) => {
                 <div 
                     ref={containerRef} 
                     className="w-full h-full"
-                    style={{ cursor: isPanMode ? 'grab' : 'default' }}
+                    style={{ cursor: isPanMode ? 'grab' : 'default', minHeight: '400px' }}
                 />
                 
                 {/* Legend */}
                 <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg p-3 shadow-sm">
                     <p className="text-xs font-medium text-[#4A3B32] mb-2">Legend</p>
-                    <div className="flex flex-col gap-1 text-xs text-[#8a6a5c]">
+                    <div className="flex flex-col gap-1.5 text-xs text-[#8a6a5c]">
                         <div className="flex items-center gap-2">
-                            <div className="w-4 h-4 bg-[#C8A288] rounded" />
-                            <span>Book/Document</span>
+                            <div className="w-4 h-4 bg-[#A08072] rounded border border-[#7B5B4E]" />
+                            <span>Document</span>
                         </div>
                         <div className="flex items-center gap-2">
-                            <div className="w-4 h-4 bg-[#FDF6F0] border border-[#E6D5CC] rounded" />
+                            <div className="w-4 h-4 bg-[#FDF6F0] border-2 border-[#D4BFB4] rounded" />
                             <span>Topic</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="w-4 h-4 bg-[#F0E4DA] border-2 border-[#C8A288] rounded" />
+                            <span>Key Topic (4+ links)</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="w-8 h-0 border-t-2 border-dotted border-[#D4BFB4]" />
+                            <span>Contains</span>
                         </div>
                         <div className="flex items-center gap-2">
                             <div className="w-8 h-0.5 bg-[#A08072]" />
                             <span>Prerequisite</span>
                         </div>
                         <div className="flex items-center gap-2">
-                            <div className="w-8 h-0.5 border-t border-dashed border-[#E6D5CC]" />
+                            <div className="w-8 h-0 border-t border-dashed border-[#E6D5CC]" />
                             <span>Related</span>
                         </div>
                     </div>
