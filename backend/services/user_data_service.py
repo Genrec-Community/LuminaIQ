@@ -191,7 +191,7 @@ class UserDataService:
             if existing.data:
                 row = existing.data[0]
                 # Increment the counter
-                if activity_type in ("quiz", "review", "notes", "qa", "pomodoro", "chat"):
+                if activity_type in ("quiz", "review", "notes", "qa", "pomodoro", "chat", "exam", "path", "knowledge_graph"):
                     row[activity_type] = (row.get(activity_type) or 0) + 1
 
                 # Append quiz score
@@ -199,7 +199,7 @@ class UserDataService:
                 if activity_type == "quiz" and "score" in meta:
                     quiz_scores.append(meta["score"])
 
-                total = sum(row.get(k, 0) for k in ("quiz", "review", "notes", "qa", "pomodoro", "chat"))
+                total = sum(row.get(k, 0) for k in ("quiz", "review", "notes", "qa", "pomodoro", "chat", "exam", "path", "knowledge_graph"))
 
                 update = {
                     activity_type: row[activity_type],
@@ -223,6 +223,7 @@ class UserDataService:
                     "activity_date": today,
                     "quiz": 0, "review": 0, "notes": 0,
                     "qa": 0, "pomodoro": 0, "chat": 0,
+                    "exam": 0, "path": 0, "knowledge_graph": 0,
                     "quiz_scores": [],
                     "total": 0,
                 }

@@ -6,6 +6,7 @@ import {
     FileText, TrendingUp, X, Plus, Trash2, Settings
 } from 'lucide-react';
 import { generateMCQ, generateSubjectiveTest, getExams, saveExam as saveExamApi, deleteExam as deleteExamApi } from '../../api';
+import { recordActivity } from '../../utils/studyActivity';
 
 const ExamPrepMode = ({
     projectId,
@@ -82,6 +83,7 @@ const ExamPrepMode = ({
             setExamName('');
             setExamDate('');
             setSelectedTopics([]);
+            recordActivity(projectId, 'exam', { action: 'save_exam', examName });
         } catch (err) {
             console.error('Failed to save exam:', err);
         }
@@ -131,6 +133,7 @@ const ExamPrepMode = ({
                 timeLimit: (mcqs.length * 1.5 + subjective.length * 5) * 60, // Time in seconds
                 generated: new Date().toISOString(),
             });
+            recordActivity(projectId, 'exam', { action: 'generate_mock', mcqCount: mcqs.length, subjectiveCount: subjective.length });
         } catch (error) {
             console.error('Failed to generate mock exam:', error);
         } finally {

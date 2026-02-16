@@ -462,6 +462,9 @@ const StudyActivityHeatmap = ({ projectId }) => {
                                         {day.qa > 0 && <p>{day.qa} Q&A</p>}
                                         {day.pomodoro > 0 && <p>{day.pomodoro} pomodoro{day.pomodoro !== 1 ? 's' : ''}</p>}
                                         {day.chat > 0 && <p>{day.chat} chat{day.chat !== 1 ? 's' : ''}</p>}
+                                        {day.exam > 0 && <p>{day.exam} exam prep{day.exam !== 1 ? 's' : ''}</p>}
+                                        {day.path > 0 && <p>{day.path} learning path{day.path !== 1 ? 's' : ''}</p>}
+                                        {day.knowledge_graph > 0 && <p>{day.knowledge_graph} graph exploration{day.knowledge_graph !== 1 ? 's' : ''}</p>}
                                     </div>
                                 ) : (
                                     <p className="mt-1 text-[#E6D5CC]">No activity</p>

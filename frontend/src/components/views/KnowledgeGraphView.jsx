@@ -30,6 +30,7 @@ import {
 } from '../../api';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { recordActivity } from '../../utils/studyActivity';
 
 const KnowledgeGraphView = ({ projectId }) => {
     // Graph State
@@ -332,6 +333,9 @@ const KnowledgeGraphView = ({ projectId }) => {
             setTopicStartTime(Date.now());
             setTopicsVisited(prev => new Set([...prev, topicLabel]));
             
+            // Record activity for unified tracking
+            recordActivity(projectId, 'knowledge_graph', { action: 'explore_topic', topic: topicLabel });
+            
             // Fetch summary
             await fetchTopicSummary(topicLabel);
             
@@ -445,6 +449,7 @@ const KnowledgeGraphView = ({ projectId }) => {
             startLearningSession(projectId).then(session => {
                 setSessionId(session.session_id);
                 setSessionStartTime(Date.now());
+                recordActivity(projectId, 'knowledge_graph', { action: 'start_session' });
             }).catch(sessionErr => {
                 console.warn('Session tracking unavailable:', sessionErr.message);
                 setSessionStartTime(Date.now());

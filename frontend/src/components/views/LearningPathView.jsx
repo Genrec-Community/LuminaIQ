@@ -12,6 +12,7 @@ import {
     getPerformance 
 } from '../../api';
 import { useToast } from '../../context/ToastContext';
+import { recordActivity } from '../../utils/studyActivity';
 
 const LearningPathView = ({ 
     projectId, 
@@ -90,6 +91,7 @@ const LearningPathView = ({
         try {
             await buildKnowledgeGraph(projectId, topicsToUse, true);
             await loadData();
+            recordActivity(projectId, 'path', { action: 'build_graph', topicCount: topicsToUse.length });
         } catch (error) {
             console.error('Failed to build graph:', error);
             toast.error('Failed to build learning path. Please try again.');
@@ -160,6 +162,7 @@ const LearningPathView = ({
         // Call parent's onStartQuiz callback
         if (onStartQuiz) {
             onStartQuiz(topic, mode, docsWithTopic);
+            recordActivity(projectId, 'path', { action: 'start_topic_quiz', topic });
         }
     };
     

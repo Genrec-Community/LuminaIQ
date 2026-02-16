@@ -16,6 +16,8 @@ import {
     X,
     ChevronDown,
     ChevronUp,
+    ChevronLeft,
+    ChevronRight,
     RefreshCw,
     Trash2,
     Menu,
@@ -87,6 +89,12 @@ const ProjectView = () => {
     const [isProcessingDocs, setIsProcessingDocs] = useState(true);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isDocsMenuOpen, setIsDocsMenuOpen] = useState(false);
+    const [isLeftCollapsed, setIsLeftCollapsed] = useState(false);
+    const [isRightCollapsed, setIsRightCollapsed] = useState(false);
+
+    // Derived: force expanded when mobile drawers open
+    const leftCollapsed = isLeftCollapsed && !isMobileMenuOpen;
+    const rightCollapsed = isRightCollapsed && !isDocsMenuOpen;
 
     // New Feature States
     const [showSearch, setShowSearch] = useState(false);
@@ -453,13 +461,14 @@ const ProjectView = () => {
                 setActiveTab(id);
                 setIsMobileMenuOpen(false);
             }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === id
+            className={`w-full flex items-center ${leftCollapsed ? 'justify-center px-2' : 'gap-3 px-4'} py-3 rounded-lg transition-colors ${activeTab === id
                 ? 'bg-[#C8A288] text-white font-medium'
                 : 'text-[#4A3B32] hover:bg-[#E6D5CC]'
                 }`}
+            title={leftCollapsed ? label : undefined}
         >
-            <Icon className="h-5 w-5" />
-            <span>{label}</span>
+            <Icon className="h-5 w-5 shrink-0" />
+            {!leftCollapsed && <span>{label}</span>}
         </button>
     );
 
@@ -490,27 +499,39 @@ const ProjectView = () => {
             {/* Sidebar - Desktop & Mobile - Hidden when quiz/qa is active */}
             {!isSidebarHidden && (
             <div className={`
-                fixed inset-y-0 left-0 z-50 w-72 bg-[#FDF6F0]/95 backdrop-blur-xl border-r border-white/20 flex-col transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:flex md:shrink-0 shadow-2xl md:shadow-none
+                fixed inset-y-0 left-0 z-50 ${leftCollapsed ? 'w-16' : 'w-72'} bg-[#FDF6F0]/95 backdrop-blur-xl border-r border-white/20 flex-col transition-all duration-300 ease-in-out md:translate-x-0 md:static md:flex md:shrink-0 shadow-2xl md:shadow-none
                 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
             `}>
-                <div className="p-6">
-                    <div className="flex items-center justify-between mb-8">
-                        <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 bg-gradient-to-br from-[#C8A288] to-[#A08072] rounded-xl flex items-center justify-center text-white shadow-lg shadow-[#C8A288]/20">
-                                <BookOpen className="h-6 w-6" />
+                <div className={leftCollapsed ? 'p-2' : 'p-6'}>
+                    <div className={`flex items-center ${leftCollapsed ? 'justify-center' : 'justify-between'} mb-8`}>
+                        {!leftCollapsed && (
+                            <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 bg-gradient-to-br from-[#C8A288] to-[#A08072] rounded-xl flex items-center justify-center text-white shadow-lg shadow-[#C8A288]/20">
+                                    <BookOpen className="h-6 w-6" />
+                                </div>
+                                <h1 className="text-2xl font-bold text-[#4A3B32] tracking-tight">Lumina IQ</h1>
                             </div>
-                            <h1 className="text-2xl font-bold text-[#4A3B32] tracking-tight">Lumina IQ</h1>
+                        )}
+                        <div className="flex items-center gap-1">
+                            {/* Desktop collapse toggle */}
+                            <button
+                                onClick={() => setIsLeftCollapsed(!isLeftCollapsed)}
+                                className="hidden md:block p-2 hover:bg-[#E6D5CC]/30 rounded-full text-[#8a6a5c] transition-colors"
+                                title={isLeftCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                            >
+                                {leftCollapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
+                            </button>
+                            {/* Close button for mobile */}
+                            <button
+                                onClick={() => setIsMobileMenuOpen(false)}
+                                className="md:hidden p-2 hover:bg-[#E6D5CC]/30 rounded-full text-[#8a6a5c] transition-colors"
+                            >
+                                <X className="h-6 w-6" />
+                            </button>
                         </div>
-                        {/* Close button for mobile */}
-                        <button
-                            onClick={() => setIsMobileMenuOpen(false)}
-                            className="md:hidden p-2 hover:bg-[#E6D5CC]/30 rounded-full text-[#8a6a5c] transition-colors"
-                        >
-                            <X className="h-6 w-6" />
-                        </button>
                     </div>
 
-                    <nav className="space-y-3">
+                    <nav className={leftCollapsed ? 'space-y-1' : 'space-y-3'}>
                         <NavItem id="chat" icon={MessageSquare} label="Chat" />
                         <NavItem id="qa" icon={HelpCircle} label="Q&A Generation" />
                         <NavItem id="quiz" icon={CheckSquare} label="Answer Quiz" />
@@ -523,37 +544,61 @@ const ProjectView = () => {
                     </nav>
                 </div>
 
-                <div className="mt-auto p-6 border-t border-[#E6D5CC]/50">
-                    <button
-                        onClick={() => {
-                            setShowUploadModal(true);
-                            setIsMobileMenuOpen(false);
-                        }}
-                        disabled={uploading}
-                        className="w-full flex items-center gap-3 px-4 py-4 text-[#4A3B32] bg-white border border-[#E6D5CC] hover:bg-[#FDF6F0] hover:border-[#C8A288] rounded-xl transition-all mb-4 shadow-sm group"
-                    >
-                        <div className="h-8 w-8 bg-[#FDF6F0] rounded-lg flex items-center justify-center text-[#C8A288] group-hover:scale-110 transition-transform">
-                            <Plus className="h-5 w-5" />
-                        </div>
-                        <span className="font-semibold">New PDF</span>
-                    </button>
+                <div className={`mt-auto ${leftCollapsed ? 'p-2' : 'p-6'} border-t border-[#E6D5CC]/50`}>
+                    {!leftCollapsed ? (
+                        <>
+                            <button
+                                onClick={() => {
+                                    setShowUploadModal(true);
+                                    setIsMobileMenuOpen(false);
+                                }}
+                                disabled={uploading}
+                                className="w-full flex items-center gap-3 px-4 py-4 text-[#4A3B32] bg-white border border-[#E6D5CC] hover:bg-[#FDF6F0] hover:border-[#C8A288] rounded-xl transition-all mb-4 shadow-sm group"
+                            >
+                                <div className="h-8 w-8 bg-[#FDF6F0] rounded-lg flex items-center justify-center text-[#C8A288] group-hover:scale-110 transition-transform">
+                                    <Plus className="h-5 w-5" />
+                                </div>
+                                <span className="font-semibold">New PDF</span>
+                            </button>
 
-
-                    <div className="flex items-center gap-3 px-4 py-3 bg-white/50 rounded-xl border border-[#E6D5CC]/30">
-                        <div className="h-10 w-10 bg-gradient-to-br from-[#E6D5CC] to-[#d2bab0] rounded-full flex items-center justify-center shadow-inner">
-                            <User className="h-5 w-5 text-[#4A3B32]" />
+                            <div className="flex items-center gap-3 px-4 py-3 bg-white/50 rounded-xl border border-[#E6D5CC]/30">
+                                <div className="h-10 w-10 bg-gradient-to-br from-[#E6D5CC] to-[#d2bab0] rounded-full flex items-center justify-center shadow-inner">
+                                    <User className="h-5 w-5 text-[#4A3B32]" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-bold text-[#4A3B32] truncate">User</p>
+                                    <p className="text-xs text-[#8a6a5c] font-medium">Free Plan</p>
+                                </div>
+                                <button 
+                                    onClick={() => navigate('/settings')}
+                                    className="p-2 hover:bg-black/5 rounded-full transition-colors"
+                                >
+                                    <Settings className="h-4 w-4 text-[#8a6a5c]" />
+                                </button>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="space-y-2">
+                            <button
+                                onClick={() => {
+                                    setShowUploadModal(true);
+                                    setIsMobileMenuOpen(false);
+                                }}
+                                disabled={uploading}
+                                className="w-full flex items-center justify-center p-3 text-[#C8A288] hover:bg-[#E6D5CC]/30 rounded-xl transition-colors"
+                                title="New PDF"
+                            >
+                                <Plus className="h-5 w-5" />
+                            </button>
+                            <button
+                                onClick={() => navigate('/settings')}
+                                className="w-full flex items-center justify-center p-3 text-[#8a6a5c] hover:bg-[#E6D5CC]/30 rounded-xl transition-colors"
+                                title="Settings"
+                            >
+                                <Settings className="h-4 w-4" />
+                            </button>
                         </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-bold text-[#4A3B32] truncate">User</p>
-                            <p className="text-xs text-[#8a6a5c] font-medium">Free Plan</p>
-                        </div>
-                        <button 
-                            onClick={() => navigate('/settings')}
-                            className="p-2 hover:bg-black/5 rounded-full transition-colors"
-                        >
-                            <Settings className="h-4 w-4 text-[#8a6a5c]" />
-                        </button>
-                    </div>
+                    )}
                 </div>
             </div>
             )}
@@ -920,9 +965,36 @@ const ProjectView = () => {
 
             {!isSidebarHidden && (
             <div className={`
-                fixed inset-y-0 right-0 z-50 w-80 bg-[#FDF6F0]/95 backdrop-blur-xl border-l border-white/20 p-6 shadow-2xl shrink-0 flex flex-col overflow-hidden transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:flex lg:shadow-none
+                fixed inset-y-0 right-0 z-50 ${rightCollapsed ? 'w-16' : 'w-80'} bg-[#FDF6F0]/95 backdrop-blur-xl border-l border-white/20 ${rightCollapsed ? 'p-2' : 'p-6'} shadow-2xl shrink-0 flex flex-col overflow-hidden transition-all duration-300 ease-in-out lg:translate-x-0 lg:static lg:flex lg:shadow-none
                 ${isDocsMenuOpen ? 'translate-x-0' : 'translate-x-full'}
             `}>
+                {rightCollapsed ? (
+                    /* Collapsed right sidebar */
+                    <div className="flex flex-col items-center h-full py-2">
+                        <button
+                            onClick={() => setIsRightCollapsed(false)}
+                            className="p-2 hover:bg-[#E6D5CC]/30 rounded-full text-[#8a6a5c] transition-colors mb-4"
+                            title="Expand documents panel"
+                        >
+                            <ChevronLeft className="h-5 w-5" />
+                        </button>
+                        <div className="flex-1 flex flex-col items-center justify-center gap-3">
+                            <div className="relative">
+                                <FileText className="h-6 w-6 text-[#C8A288]" />
+                                {documents.length > 0 && (
+                                    <span className="absolute -top-2 -right-2 h-5 w-5 bg-[#C8A288] text-white text-xs rounded-full flex items-center justify-center font-bold">
+                                        {documents.length}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                        <div className="mt-auto">
+                            <Calendar className="h-4 w-4 text-[#C8A288]" />
+                        </div>
+                    </div>
+                ) : (
+                    /* Expanded right sidebar */
+                    <>
                 <div className="flex justify-between items-center mb-6 lg:hidden shrink-0">
                     <h3 className="font-bold text-xl text-[#4A3B32]">Documents</h3>
                     <button
@@ -930,6 +1002,17 @@ const ProjectView = () => {
                         className="p-2 hover:bg-[#E6D5CC]/30 rounded-full text-[#8a6a5c]"
                     >
                         <X className="h-6 w-6" />
+                    </button>
+                </div>
+
+                {/* Desktop collapse toggle for right sidebar */}
+                <div className="hidden lg:flex justify-end mb-3 shrink-0">
+                    <button
+                        onClick={() => setIsRightCollapsed(true)}
+                        className="p-2 hover:bg-[#E6D5CC]/30 rounded-full text-[#8a6a5c] transition-colors"
+                        title="Collapse documents panel"
+                    >
+                        <ChevronRight className="h-5 w-5" />
                     </button>
                 </div>
 
@@ -1055,7 +1138,9 @@ const ProjectView = () => {
                         </div>
                     </div>
                 </div>
-            </div >
+                    </>
+                )}
+            </div>
             )}
 
             {/* Upload Modal */}

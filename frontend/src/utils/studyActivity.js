@@ -86,7 +86,7 @@ export const getActivityHeatmap = (data, days = 7) => {
 
     for (let i = days - 1; i >= 0; i--) {
         const dateStr = getDaysAgo(i);
-        const dayData = data[dateStr] || { quiz: 0, review: 0, notes: 0, qa: 0, pomodoro: 0, chat: 0, total: 0 };
+        const dayData = data[dateStr] || { quiz: 0, review: 0, notes: 0, qa: 0, pomodoro: 0, chat: 0, exam: 0, path: 0, knowledge_graph: 0, total: 0 };
 
         result.push({
             date: dateStr,
