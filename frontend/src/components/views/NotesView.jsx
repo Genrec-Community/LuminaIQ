@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { BookOpen, Copy, Download, Loader2, ChevronDown } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { BookOpen, Copy, Download, Loader2, ChevronDown, FileDown } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { generateNotes } from '../../api';
@@ -14,13 +14,15 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments }) => {
     const [notesTopicSelection, setNotesTopicSelection] = useState('');
     const [notesContent, setNotesContent] = useState('');
     const [notesLoading, setNotesLoading] = useState(false);
+    const [pdfLoading, setPdfLoading] = useState(false);
+
+    // Ref for the rendered notes content
+    const notesRef = useRef(null);
 
     const handleGenerateNotes = async () => {
         setNotesLoading(true);
         setNotesContent('');
 
-        // If specific topic selected/entered, use it. Otherwise general.
-        // Actually backend expects `topic` for targeted notes.
         const effectiveTopic = notesTopicSelection === '__custom__' ? notesTopic : notesTopicSelection;
 
         try {
@@ -30,14 +32,6 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments }) => {
                 effectiveTopic,
                 selectedDocuments
             );
-            // Assuming data is an object with { notes: "..." } or just the text
-            // Based on other endpoints, it likely returns an object. 
-            // If it returns raw text, data would be the string.
-            // Let's assume it returns { notes: "..." } for now, but if it just returns the string from api.js (response.data), check structure.
-            // Actually, let's look at api.js again. It returns response.data.
-            // If the backend returns { notes: "content" }, then we use data.notes.
-            // If the backend returns "content", we use data.
-            // API returns { content: "..." } based on user report
             setNotesContent(typeof data === 'string' ? data : (data.notes || data.content || JSON.stringify(data)));
             
             // Track notes generation activity for heatmap
@@ -53,6 +47,157 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments }) => {
     const copyToClipboard = () => {
         navigator.clipboard.writeText(notesContent);
         toast.success('Notes copied to clipboard!');
+    };
+
+    const handleDownloadPDF = async () => {
+        if (!notesRef.current || !notesContent) return;
+
+        setPdfLoading(true);
+        try {
+            const html2pdf = (await import('html2pdf.js')).default;
+
+            // Build a clean filename
+            const topicLabel = notesTopic || notesTopicSelection || 'General';
+            const safeFilename = `${notesType} - ${topicLabel}`
+                .replace(/[^a-zA-Z0-9 _-]/g, '')
+                .replace(/\s+/g, '_')
+                .substring(0, 80);
+
+            // Create a temporary container with PDF-optimized styles
+            const container = document.createElement('div');
+            container.innerHTML = `
+                <style>
+                    .pdf-wrapper {
+                        font-family: 'Georgia', 'Times New Roman', serif;
+                        color: #1a1a1a;
+                        line-height: 1.7;
+                        padding: 0;
+                    }
+                    .pdf-header {
+                        text-align: center;
+                        margin-bottom: 24px;
+                        padding-bottom: 16px;
+                        border-bottom: 2px solid #C8A288;
+                    }
+                    .pdf-header h1 {
+                        font-size: 22px;
+                        font-weight: 700;
+                        color: #4A3B32;
+                        margin: 0 0 4px 0;
+                    }
+                    .pdf-header p {
+                        font-size: 13px;
+                        color: #8a6a5c;
+                        margin: 0;
+                    }
+                    .pdf-body h1 { font-size: 20px; font-weight: 700; color: #4A3B32; margin: 24px 0 10px 0; border-bottom: 1px solid #E6D5CC; padding-bottom: 6px; }
+                    .pdf-body h2 { font-size: 17px; font-weight: 700; color: #4A3B32; margin: 20px 0 8px 0; }
+                    .pdf-body h3 { font-size: 15px; font-weight: 600; color: #5a4a42; margin: 16px 0 6px 0; }
+                    .pdf-body p { font-size: 12px; margin: 6px 0; }
+                    .pdf-body ul, .pdf-body ol { font-size: 12px; padding-left: 22px; margin: 6px 0; }
+                    .pdf-body li { margin-bottom: 4px; }
+                    .pdf-body strong { color: #4A3B32; }
+                    .pdf-body blockquote {
+                        border-left: 3px solid #C8A288;
+                        padding: 8px 14px;
+                        margin: 10px 0;
+                        background: #FDF6F0;
+                        font-size: 12px;
+                    }
+                    .pdf-body code {
+                        background: #f0ebe6;
+                        padding: 1px 5px;
+                        border-radius: 3px;
+                        font-size: 11px;
+                        font-family: 'Courier New', monospace;
+                    }
+                    .pdf-body pre {
+                        background: #f8f4f0;
+                        padding: 12px;
+                        border-radius: 6px;
+                        overflow-x: auto;
+                        font-size: 11px;
+                        border: 1px solid #E6D5CC;
+                    }
+                    .pdf-body pre code {
+                        background: none;
+                        padding: 0;
+                    }
+                    .pdf-body table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin: 12px 0;
+                        font-size: 11px;
+                    }
+                    .pdf-body th {
+                        background: #C8A288;
+                        color: white;
+                        font-weight: 600;
+                        padding: 8px 10px;
+                        text-align: left;
+                        border: 1px solid #b0917a;
+                    }
+                    .pdf-body td {
+                        padding: 7px 10px;
+                        border: 1px solid #E6D5CC;
+                    }
+                    .pdf-body tr:nth-child(even) td {
+                        background: #FDF6F0;
+                    }
+                    .pdf-body hr {
+                        border: none;
+                        border-top: 1px solid #E6D5CC;
+                        margin: 16px 0;
+                    }
+                    .pdf-footer {
+                        margin-top: 24px;
+                        padding-top: 12px;
+                        border-top: 1px solid #E6D5CC;
+                        text-align: center;
+                        font-size: 10px;
+                        color: #8a6a5c;
+                    }
+                </style>
+                <div class="pdf-wrapper">
+                    <div class="pdf-header">
+                        <h1>${notesType}</h1>
+                        <p>${topicLabel !== 'General' ? topicLabel + ' | ' : ''}Generated by Lumina IQ | ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                    </div>
+                    <div class="pdf-body">
+                        ${notesRef.current.innerHTML}
+                    </div>
+                    <div class="pdf-footer">
+                        Generated with Lumina IQ &mdash; AI-Powered Study Notes
+                    </div>
+                </div>
+            `;
+
+            const opt = {
+                margin: [12, 14, 12, 14],
+                filename: `${safeFilename}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    letterRendering: true,
+                },
+                jsPDF: {
+                    unit: 'mm',
+                    format: 'a4',
+                    orientation: 'portrait',
+                },
+                pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
+            };
+
+            await html2pdf().set(opt).from(container).save();
+            toast.success('PDF downloaded successfully!');
+        } catch (error) {
+            console.error('PDF generation error:', error);
+            toast.error('Failed to generate PDF. Please try again.');
+        } finally {
+            setPdfLoading(false);
+        }
     };
 
     return (
@@ -172,6 +317,19 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments }) => {
                                 <Copy className="h-5 w-5" />
                             </button>
                             <button
+                                onClick={handleDownloadPDF}
+                                disabled={pdfLoading || notesLoading}
+                                className="flex items-center gap-2 px-4 py-2 border border-[#C8A288] text-[#C8A288] rounded-lg hover:bg-[#C8A288] hover:text-white font-medium transition-colors disabled:opacity-50"
+                                title="Download as PDF"
+                            >
+                                {pdfLoading ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <FileDown className="h-4 w-4" />
+                                )}
+                                <span className="hidden sm:inline">{pdfLoading ? 'Generating...' : 'PDF'}</span>
+                            </button>
+                            <button
                                 onClick={() => { setNotesContent(''); setNotesTopic(''); setNotesTopicSelection(''); }}
                                 className="px-4 py-2 bg-[#C8A288] text-white rounded-lg hover:bg-[#B08B72] font-medium transition-colors"
                             >
@@ -180,7 +338,10 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments }) => {
                         </div>
                     </div>
 
-                    <div className="bg-white p-8 rounded-3xl border border-[#E6D5CC] shadow-sm flex-1 overflow-y-auto prose prose-lg max-w-none text-[#4A3B32]">
+                    <div
+                        ref={notesRef}
+                        className="bg-white p-8 rounded-3xl border border-[#E6D5CC] shadow-sm flex-1 overflow-y-auto prose prose-lg max-w-none text-[#4A3B32]"
+                    >
                         {notesLoading && !notesContent ? (
                             <div className="flex items-center justify-center h-40 gap-3 text-[#8a6a5c]">
                                 <Loader2 className="h-6 w-6 animate-spin" />

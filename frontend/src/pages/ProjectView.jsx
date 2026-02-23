@@ -76,8 +76,25 @@ const ProjectView = () => {
     const navigate = useNavigate();
     const toast = useToast();
     const { settings } = useSettings();
-    const [activeTab, setActiveTab] = useState('chat');
+    const [activeTab, setActiveTab] = useState(() => {
+        return sessionStorage.getItem(`lumina_tab_${projectId}`) || 'chat';
+    });
     const [messages, setMessages] = useState([]);
+
+    // Session cache keys
+    const chatCacheKey = `lumina_chat_${projectId}`;
+
+    // Persist activeTab to sessionStorage
+    useEffect(() => {
+        sessionStorage.setItem(`lumina_tab_${projectId}`, activeTab);
+    }, [activeTab, projectId]);
+
+    // Persist chat messages to sessionStorage
+    useEffect(() => {
+        if (messages.length > 0) {
+            sessionStorage.setItem(chatCacheKey, JSON.stringify(messages));
+        }
+    }, [messages, chatCacheKey]);
     const [inputMessage, setInputMessage] = useState('');
     const [documents, setDocuments] = useState([]);
     const [selectedDocuments, setSelectedDocuments] = useState([]);
@@ -165,8 +182,22 @@ const ProjectView = () => {
                 fetchDocuments()
             ]);
 
-            // Don't auto-load history, user wants fresh session on refresh
-            setMessages([{ role: 'system', content: 'Ready to chat! Ask me anything about your documents.' }]);
+            // Restore chat messages from session cache, or start fresh
+            const cachedMessages = sessionStorage.getItem(`lumina_chat_${projectId}`);
+            if (cachedMessages) {
+                try {
+                    const parsed = JSON.parse(cachedMessages);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        setMessages(parsed);
+                    } else {
+                        setMessages([{ role: 'system', content: 'Ready to chat! Ask me anything about your documents.' }]);
+                    }
+                } catch {
+                    setMessages([{ role: 'system', content: 'Ready to chat! Ask me anything about your documents.' }]);
+                }
+            } else {
+                setMessages([{ role: 'system', content: 'Ready to chat! Ask me anything about your documents.' }]);
+            }
 
             if (docData && docData.documents) {
                 const processing = isAnyDocProcessing(docData.documents);
@@ -331,6 +362,7 @@ const ProjectView = () => {
     const handleNewSession = () => {
         setMessages([{ role: 'system', content: 'Ready to chat! Ask me anything about your documents.' }]);
         setInputMessage('');
+        sessionStorage.removeItem(chatCacheKey);
     };
 
     const handleSendMessage = async (e) => {
@@ -541,6 +573,21 @@ const ProjectView = () => {
                         <NavItem id="analytics" icon={BarChart3} label="Analytics" />
                         <NavItem id="exam" icon={GraduationCap} label="Exam Prep" />
                         <NavItem id="knowledge" icon={Network} label="Knowledge Graph" />
+                        
+                        {/* Settings - prominent in nav */}
+                        <div className={leftCollapsed ? 'pt-2 border-t border-[#E6D5CC]/50' : 'pt-3 mt-3 border-t border-[#E6D5CC]/50'}>
+                            <button
+                                onClick={() => {
+                                    navigate('/settings');
+                                    setIsMobileMenuOpen(false);
+                                }}
+                                className={`w-full flex items-center ${leftCollapsed ? 'justify-center px-2' : 'gap-3 px-4'} py-3 rounded-lg transition-colors text-[#4A3B32] hover:bg-[#E6D5CC]`}
+                                title={leftCollapsed ? 'Settings' : undefined}
+                            >
+                                <Settings className="h-5 w-5 shrink-0" />
+                                {!leftCollapsed && <span>Settings</span>}
+                            </button>
+                        </div>
                     </nav>
                 </div>
 
@@ -569,12 +616,6 @@ const ProjectView = () => {
                                     <p className="text-sm font-bold text-[#4A3B32] truncate">User</p>
                                     <p className="text-xs text-[#8a6a5c] font-medium">Free Plan</p>
                                 </div>
-                                <button 
-                                    onClick={() => navigate('/settings')}
-                                    className="p-2 hover:bg-black/5 rounded-full transition-colors"
-                                >
-                                    <Settings className="h-4 w-4 text-[#8a6a5c]" />
-                                </button>
                             </div>
                         </>
                     ) : (
@@ -589,13 +630,6 @@ const ProjectView = () => {
                                 title="New PDF"
                             >
                                 <Plus className="h-5 w-5" />
-                            </button>
-                            <button
-                                onClick={() => navigate('/settings')}
-                                className="w-full flex items-center justify-center p-3 text-[#8a6a5c] hover:bg-[#E6D5CC]/30 rounded-xl transition-colors"
-                                title="Settings"
-                            >
-                                <Settings className="h-4 w-4" />
                             </button>
                         </div>
                     )}
@@ -857,6 +891,7 @@ const ProjectView = () => {
                                 setPreSelectedQuizMode(null);
                             }}
                             onQuizActiveChange={setIsQuizActive}
+                            onBack={() => setActiveTab('chat')}
                         />
                     )}
 
@@ -867,6 +902,7 @@ const ProjectView = () => {
                             availableTopics={availableTopics}
                             selectedDocuments={selectedDocuments}
                             onQAActiveChange={setIsQAActive}
+                            onBack={() => setActiveTab('chat')}
                         />
                     )}
 
@@ -1203,19 +1239,17 @@ const ProjectView = () => {
                 </div>
             )}
 
-            {/* AI Tutor Chat Panel */}
+            {/* AI Tutor Chat Panel - self-positioned, draggable */}
             {showAITutor && (
-                <div className="fixed bottom-4 right-4 z-50 animate-in slide-in-from-right-4 md:right-[340px]">
-                    <AITutorChat
-                        projectId={projectId}
-                        selectedDocuments={selectedDocuments}
-                        initialTopic={tutorTopic}
-                        onClose={() => {
-                            setShowAITutor(false);
-                            setTutorTopic(null);
-                        }}
-                    />
-                </div>
+                <AITutorChat
+                    projectId={projectId}
+                    selectedDocuments={selectedDocuments}
+                    initialTopic={tutorTopic}
+                    onClose={() => {
+                        setShowAITutor(false);
+                        setTutorTopic(null);
+                    }}
+                />
             )}
 
             {/* Bookmarks Panel */}

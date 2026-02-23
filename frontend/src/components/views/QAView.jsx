@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { HelpCircle, ChevronRight, ChevronDown, Loader2, FileText, AlignLeft, AlignCenter, AlignJustify } from 'lucide-react';
+import { HelpCircle, ChevronRight, ChevronDown, Loader2, FileText, AlignLeft, AlignCenter, AlignJustify, ArrowLeft } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { generateSubjectiveTest } from '../../api';
 import { useToast } from '../../context/ToastContext';
 import { recordActivity } from '../../utils/studyActivity';
 
-const QAView = ({ projectId, availableTopics, selectedDocuments, onQAActiveChange = null }) => {
+const QAView = ({ projectId, availableTopics, selectedDocuments, onQAActiveChange = null, onBack = null }) => {
     const toast = useToast();
     // Q&A State
     const [qaTopic, setQaTopic] = useState('');
@@ -95,6 +95,17 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, onQAActiveChang
 
     return (
         <div className="h-full overflow-y-auto p-4 md:p-8 max-w-3xl mx-auto custom-scrollbar relative">
+            {/* Back Button */}
+            {onBack && !qaLoading && (
+                <button
+                    onClick={onBack}
+                    className="flex items-center gap-2 px-4 py-2 mb-4 text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30 rounded-lg font-medium transition-colors"
+                >
+                    <ArrowLeft className="h-4 w-4" />
+                    Back to Chat
+                </button>
+            )}
+
             {/* Full-screen Loading State */}
             {qaLoading && (
                 <div className="h-full flex flex-col items-center justify-center animate-in fade-in duration-300">

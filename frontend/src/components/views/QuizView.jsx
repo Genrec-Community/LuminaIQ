@@ -16,7 +16,8 @@ const QuizView = ({
     cameFromPath = false,
     onReturnToPath = null,
     onQuizComplete = null,
-    onQuizActiveChange = null // NEW: Callback to notify parent when quiz is active
+    onQuizActiveChange = null, // NEW: Callback to notify parent when quiz is active
+    onBack = null // NEW: Back button to return to chat
 }) => {
     const toast = useToast();
     const [quizMode, setQuizMode] = useState('mcq'); // 'mcq' | 'subjective' | 'both'
@@ -449,6 +450,19 @@ const QuizView = ({
 
     return (
         <div className="h-full flex flex-col relative w-full">
+            {/* Back Button - shown when no quiz is active and not loading */}
+            {onBack && !mcqLoading && !evalLoading && !mcqTest && !evalTest && !cameFromPath && (
+                <div className="px-4 pt-4 md:px-8 md:pt-6">
+                    <button
+                        onClick={onBack}
+                        className="flex items-center gap-2 px-4 py-2 text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30 rounded-lg font-medium transition-colors"
+                    >
+                        <ArrowLeft className="h-4 w-4" />
+                        Back to Chat
+                    </button>
+                </div>
+            )}
+
             {/* Full-screen Loading State for MCQ */}
             {mcqLoading && (
                 <div className="h-full flex flex-col items-center justify-center animate-in fade-in duration-300">

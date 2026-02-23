@@ -1,8 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
     Brain, Send, Loader2, Lightbulb, HelpCircle,
     BookOpen, Sparkles, RefreshCw, ThumbsUp, ThumbsDown,
-    MessageSquare, GraduationCap, Baby, Microscope, X
+    MessageSquare, GraduationCap, Baby, Microscope, X, GripHorizontal
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -26,6 +26,107 @@ const AITutorChat = ({
     const [showStylePicker, setShowStylePicker] = useState(false);
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
+
+    // Drag state
+    const [position, setPosition] = useState({ x: 0, y: 0 });
+    const [isDragging, setIsDragging] = useState(false);
+    const dragStartRef = useRef({ x: 0, y: 0 });
+    const positionRef = useRef({ x: 0, y: 0 });
+    const containerRef = useRef(null);
+
+    // Initialize position to bottom-right on mount
+    useEffect(() => {
+        const initX = window.innerWidth - 420;
+        const initY = window.innerHeight - 530;
+        const clamped = {
+            x: Math.max(0, initX),
+            y: Math.max(0, initY)
+        };
+        setPosition(clamped);
+        positionRef.current = clamped;
+    }, []);
+
+    // Drag handlers
+    const handleMouseDown = useCallback((e) => {
+        // Only left mouse button
+        if (e.button !== 0) return;
+        e.preventDefault();
+        setIsDragging(true);
+        dragStartRef.current = {
+            x: e.clientX - positionRef.current.x,
+            y: e.clientY - positionRef.current.y
+        };
+    }, []);
+
+    const handleMouseMove = useCallback((e) => {
+        if (!isDragging) return;
+        const newX = e.clientX - dragStartRef.current.x;
+        const newY = e.clientY - dragStartRef.current.y;
+
+        // Clamp to viewport
+        const maxX = window.innerWidth - 400;
+        const maxY = window.innerHeight - 520;
+        const clamped = {
+            x: Math.max(0, Math.min(newX, maxX)),
+            y: Math.max(0, Math.min(newY, maxY))
+        };
+
+        positionRef.current = clamped;
+        setPosition(clamped);
+    }, [isDragging]);
+
+    const handleMouseUp = useCallback(() => {
+        setIsDragging(false);
+    }, []);
+
+    // Touch drag handlers for mobile
+    const handleTouchStart = useCallback((e) => {
+        const touch = e.touches[0];
+        setIsDragging(true);
+        dragStartRef.current = {
+            x: touch.clientX - positionRef.current.x,
+            y: touch.clientY - positionRef.current.y
+        };
+    }, []);
+
+    const handleTouchMove = useCallback((e) => {
+        if (!isDragging) return;
+        const touch = e.touches[0];
+        const newX = touch.clientX - dragStartRef.current.x;
+        const newY = touch.clientY - dragStartRef.current.y;
+
+        const maxX = window.innerWidth - 400;
+        const maxY = window.innerHeight - 520;
+        const clamped = {
+            x: Math.max(0, Math.min(newX, maxX)),
+            y: Math.max(0, Math.min(newY, maxY))
+        };
+
+        positionRef.current = clamped;
+        setPosition(clamped);
+    }, [isDragging]);
+
+    const handleTouchEnd = useCallback(() => {
+        setIsDragging(false);
+    }, []);
+
+    // Attach global mouse/touch listeners when dragging
+    useEffect(() => {
+        if (isDragging) {
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
+            window.addEventListener('touchmove', handleTouchMove, { passive: false });
+            window.addEventListener('touchend', handleTouchEnd);
+            document.body.style.userSelect = 'none';
+        }
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+            window.removeEventListener('touchmove', handleTouchMove);
+            window.removeEventListener('touchend', handleTouchEnd);
+            document.body.style.userSelect = '';
+        };
+    }, [isDragging, handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd]);
 
     const tutorStyles = {
         simple: {
@@ -181,13 +282,27 @@ Guidelines:
     const CurrentStyleIcon = tutorStyles[tutorStyle].icon;
 
     return (
-        <div className="h-full flex flex-col bg-white rounded-2xl border border-[#E6D5CC] overflow-hidden">
-            {/* Header */}
-            <div className="p-4 border-b border-[#E6D5CC] bg-gradient-to-r from-[#C8A288] to-[#A08072] text-white">
+        <div
+            ref={containerRef}
+            className="fixed z-50 w-[390px] h-[510px] flex flex-col bg-white rounded-2xl border border-[#E6D5CC] overflow-hidden shadow-2xl"
+            style={{
+                left: `${position.x}px`,
+                top: `${position.y}px`,
+            }}
+        >
+            {/* Draggable Header */}
+            <div
+                className={`p-4 border-b border-[#E6D5CC] bg-gradient-to-r from-[#C8A288] to-[#A08072] text-white shrink-0 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                onMouseDown={handleMouseDown}
+                onTouchStart={handleTouchStart}
+            >
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-                            <Brain className="h-6 w-6" />
+                        <div className="flex items-center gap-1">
+                            <GripHorizontal className="h-4 w-4 opacity-50" />
+                            <div className="h-10 w-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                                <Brain className="h-6 w-6" />
+                            </div>
                         </div>
                         <div>
                             <h3 className="font-bold flex items-center gap-2">
@@ -196,14 +311,14 @@ Guidelines:
                                     {tutorStyles[tutorStyle].name}
                                 </span>
                             </h3>
-                            <p className="text-sm opacity-90 truncate max-w-[200px]">
+                            <p className="text-sm opacity-90 truncate max-w-[180px]">
                                 {topic || documentName}
                             </p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
                         <button
-                            onClick={() => setShowStylePicker(!showStylePicker)}
+                            onClick={(e) => { e.stopPropagation(); setShowStylePicker(!showStylePicker); }}
                             className="p-2 hover:bg-white/20 rounded-lg transition-colors"
                             title="Change teaching style"
                         >
@@ -211,7 +326,7 @@ Guidelines:
                         </button>
                         {onClose && (
                             <button
-                                onClick={onClose}
+                                onClick={(e) => { e.stopPropagation(); onClose(); }}
                                 className="p-2 hover:bg-white/20 rounded-lg transition-colors"
                             >
                                 <X className="h-5 w-5" />
@@ -222,7 +337,7 @@ Guidelines:
 
                 {/* Style Picker */}
                 {showStylePicker && (
-                    <div className="mt-3 grid grid-cols-2 gap-2">
+                    <div className="mt-3 grid grid-cols-2 gap-2" onMouseDown={(e) => e.stopPropagation()}>
                         {Object.entries(tutorStyles).map(([key, style]) => {
                             const Icon = style.icon;
                             return (
@@ -247,8 +362,8 @@ Guidelines:
                 )}
             </div>
 
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {/* Messages - fixed scrollable area */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
                 {messages.map((msg, idx) => (
                     <div
                         key={idx}
@@ -280,7 +395,7 @@ Guidelines:
 
             {/* Quick Prompts */}
             {messages.length <= 2 && (
-                <div className="px-4 pb-2">
+                <div className="px-4 pb-2 shrink-0">
                     <p className="text-xs text-[#8a6a5c] mb-2">Quick questions:</p>
                     <div className="flex flex-wrap gap-2">
                         {quickPrompts.map((prompt, idx) => {
@@ -301,25 +416,25 @@ Guidelines:
                 </div>
             )}
 
-            {/* Input */}
-            <div className="p-4 border-t border-[#E6D5CC] bg-white">
-                <div className="flex gap-3">
+            {/* Input - fixed at bottom */}
+            <div className="p-3 border-t border-[#E6D5CC] bg-white shrink-0">
+                <div className="flex gap-2">
                     <div className="flex-1 relative">
                         <textarea
                             ref={inputRef}
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={handleKeyDown}
-                            placeholder="Ask me anything about the material..."
+                            placeholder="Ask me anything..."
                             rows={1}
-                            className="w-full px-4 py-3 bg-[#FDF6F0] border-none rounded-xl focus:ring-2 focus:ring-[#C8A288] outline-none text-[#4A3B32] placeholder-[#8a6a5c] resize-none"
+                            className="w-full px-4 py-2.5 bg-[#FDF6F0] border-none rounded-xl focus:ring-2 focus:ring-[#C8A288] outline-none text-[#4A3B32] placeholder-[#8a6a5c] resize-none text-sm"
                             disabled={loading}
                         />
                     </div>
                     <button
                         onClick={() => handleSend()}
                         disabled={loading || !input.trim()}
-                        className="px-4 py-3 bg-[#C8A288] text-white rounded-xl hover:bg-[#B08B72] transition-colors disabled:opacity-50 flex items-center gap-2"
+                        className="px-3 py-2.5 bg-[#C8A288] text-white rounded-xl hover:bg-[#B08B72] transition-colors disabled:opacity-50 flex items-center gap-2"
                     >
                         {loading ? (
                             <Loader2 className="h-5 w-5 animate-spin" />
@@ -328,9 +443,6 @@ Guidelines:
                         )}
                     </button>
                 </div>
-                <p className="text-xs text-[#8a6a5c] mt-2 text-center">
-                    Tip: Press Enter to send, Shift+Enter for new line
-                </p>
             </div>
         </div>
     );
