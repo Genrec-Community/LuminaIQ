@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 from api.deps import get_current_user
 from services.user_data_service import user_data
+from services.gamification_service import gamification
 from utils.logger import logger
 
 router = APIRouter()
@@ -28,12 +29,16 @@ class AddBookmarkRequest(BaseModel):
     note: str = ""
     document_id: Optional[str] = None
     type: str = "general"
+    highlight_text: Optional[str] = None
+    color: Optional[str] = None
 
 
 class UpdateBookmarkRequest(BaseModel):
     title: Optional[str] = None
     note: Optional[str] = None
     type: Optional[str] = None
+    highlight_text: Optional[str] = None
+    color: Optional[str] = None
 
 
 class RecordActivityRequest(BaseModel):
@@ -69,6 +74,40 @@ class SaveSearchRequest(BaseModel):
 
 class ClearSearchesRequest(BaseModel):
     project_id: str
+
+
+class AwardXPRequest(BaseModel):
+    activity_type: str
+    meta: Optional[Dict[str, Any]] = None
+
+
+# ============== Gamification ==============
+
+@router.get("/gamification")
+async def get_gamification_data(current_user: dict = Depends(get_current_user)):
+    try:
+        data = await gamification.get_gamification(current_user["id"])
+        return data
+    except Exception as e:
+        logger.error(f"Error getting gamification: {e}")
+        raise HTTPException(500, str(e))
+
+
+@router.post("/gamification/award-xp")
+async def award_xp(
+    request: AwardXPRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    try:
+        result = await gamification.award_xp(
+            user_id=current_user["id"],
+            activity_type=request.activity_type,
+            meta=request.meta,
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Error awarding XP: {e}")
+        raise HTTPException(500, str(e))
 
 
 # ============== Settings ==============
@@ -123,6 +162,8 @@ async def add_bookmark(
             note=request.note,
             document_id=request.document_id,
             bookmark_type=request.type,
+            highlight_text=request.highlight_text,
+            color=request.color,
         )
         return bookmark
     except Exception as e:

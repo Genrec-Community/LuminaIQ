@@ -15,13 +15,20 @@ import {
     Layers,
     Timer,
     Brain,
-    Smartphone
+    Smartphone,
+    User,
+    GraduationCap,
+    Sparkles,
+    BookMarked,
+    Pencil
 } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
+import { useGamification } from '../context/GamificationContext';
 
 const Settings = () => {
     const navigate = useNavigate();
     const { settings, updateSetting, resetSettings } = useSettings();
+    const { data: gamificationData } = useGamification();
 
     const ToggleSwitch = ({ enabled, onChange, label, description, icon: Icon }) => (
         <div className="flex items-center justify-between p-4 bg-white rounded-xl border border-[#E6D5CC] hover:border-[#C8A288] transition-colors">
@@ -129,6 +136,168 @@ const Settings = () => {
 
             {/* Content */}
             <div className="max-w-4xl mx-auto px-4 py-6 space-y-8">
+
+                {/* Student Profile Section */}
+                <section>
+                    <h2 className="text-lg font-bold text-[#4A3B32] mb-4 flex items-center gap-2">
+                        <User className="h-5 w-5 text-[#C8A288]" />
+                        Student Profile
+                    </h2>
+
+                    {/* Profile Card with Level */}
+                    <div className="bg-gradient-to-br from-[#C8A288] via-[#B08B72] to-[#8a6a5c] rounded-2xl p-5 mb-4 text-white relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+                        <div className="relative z-10 flex items-center gap-4">
+                            <div className="h-16 w-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/30 shadow-lg shrink-0">
+                                {settings.studentName ? (
+                                    <span className="text-2xl font-black">{settings.studentName.charAt(0).toUpperCase()}</span>
+                                ) : (
+                                    <User className="h-7 w-7" />
+                                )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-lg font-bold truncate">
+                                    {settings.studentName || 'Set your name'}
+                                </p>
+                                <p className="text-white/70 text-sm font-medium">
+                                    {gamificationData ? `Level ${gamificationData.level} — ${gamificationData.level_title}` : 'Getting started...'}
+                                </p>
+                                {settings.learningGoal && (
+                                    <p className="text-white/60 text-xs mt-1 truncate">
+                                        Goal: {settings.learningGoal}
+                                    </p>
+                                )}
+                            </div>
+                            {gamificationData && (
+                                <div className="text-right shrink-0 hidden sm:block">
+                                    <p className="text-2xl font-black">{gamificationData.total_xp}</p>
+                                    <p className="text-white/70 text-xs font-semibold">Total XP</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="space-y-3">
+                        {/* Name */}
+                        <div className="p-4 bg-white rounded-xl border border-[#E6D5CC]">
+                            <div className="flex items-center gap-4 mb-3">
+                                <div className="h-10 w-10 bg-[#FDF6F0] rounded-lg flex items-center justify-center">
+                                    <Pencil className="h-5 w-5 text-[#C8A288]" />
+                                </div>
+                                <div>
+                                    <p className="font-bold text-[#4A3B32]">Your Name</p>
+                                    <p className="text-sm text-[#8a6a5c]">How should we address you?</p>
+                                </div>
+                            </div>
+                            <input
+                                type="text"
+                                value={settings.studentName || ''}
+                                onChange={(e) => updateSetting('studentName', e.target.value)}
+                                placeholder="Enter your name..."
+                                className="w-full px-4 py-2.5 bg-[#FDF6F0] border border-[#E6D5CC] rounded-lg focus:ring-2 focus:ring-[#C8A288] outline-none text-[#4A3B32] font-medium placeholder-[#8a6a5c]/50"
+                            />
+                        </div>
+
+                        {/* Learning Goal */}
+                        <div className="p-4 bg-white rounded-xl border border-[#E6D5CC]">
+                            <div className="flex items-center gap-4 mb-3">
+                                <div className="h-10 w-10 bg-[#FDF6F0] rounded-lg flex items-center justify-center">
+                                    <Target className="h-5 w-5 text-[#C8A288]" />
+                                </div>
+                                <div>
+                                    <p className="font-bold text-[#4A3B32]">Learning Goal</p>
+                                    <p className="text-sm text-[#8a6a5c]">What are you studying for?</p>
+                                </div>
+                            </div>
+                            <input
+                                type="text"
+                                value={settings.learningGoal || ''}
+                                onChange={(e) => updateSetting('learningGoal', e.target.value)}
+                                placeholder="e.g., Pass my biology exam, Master JavaScript..."
+                                className="w-full px-4 py-2.5 bg-[#FDF6F0] border border-[#E6D5CC] rounded-lg focus:ring-2 focus:ring-[#C8A288] outline-none text-[#4A3B32] font-medium placeholder-[#8a6a5c]/50"
+                            />
+                        </div>
+
+                        {/* Self-Assessed Level */}
+                        <SelectOption
+                            value={settings.selfLevel || 'intermediate'}
+                            onChange={(v) => updateSetting('selfLevel', v)}
+                            label="Your Level"
+                            description="How would you rate your current knowledge?"
+                            icon={GraduationCap}
+                            options={[
+                                { value: 'beginner', label: 'Beginner — Just starting out' },
+                                { value: 'intermediate', label: 'Intermediate — Know the basics' },
+                                { value: 'advanced', label: 'Advanced — Looking to master' },
+                            ]}
+                        />
+
+                        {/* Learning Style */}
+                        <SelectOption
+                            value={settings.learningStyle || 'balanced'}
+                            onChange={(v) => updateSetting('learningStyle', v)}
+                            label="Preferred Learning Style"
+                            description="How do you learn best?"
+                            icon={Sparkles}
+                            options={[
+                                { value: 'visual', label: 'Visual — Diagrams & summaries' },
+                                { value: 'reading', label: 'Reading — Deep text-based study' },
+                                { value: 'practice', label: 'Practice — Quizzes & exercises' },
+                                { value: 'balanced', label: 'Balanced — Mix of everything' },
+                            ]}
+                        />
+
+                        {/* Daily Study Goal */}
+                        <NumberInput
+                            value={settings.dailyStudyGoal || 30}
+                            onChange={(v) => updateSetting('dailyStudyGoal', v)}
+                            label="Daily Study Goal"
+                            description="How many minutes per day do you want to study?"
+                            icon={Clock}
+                            min={10}
+                            max={180}
+                            suffix="min"
+                        />
+
+                        {/* Subjects of Interest */}
+                        <div className="p-4 bg-white rounded-xl border border-[#E6D5CC]">
+                            <div className="flex items-center gap-4 mb-3">
+                                <div className="h-10 w-10 bg-[#FDF6F0] rounded-lg flex items-center justify-center">
+                                    <BookMarked className="h-5 w-5 text-[#C8A288]" />
+                                </div>
+                                <div>
+                                    <p className="font-bold text-[#4A3B32]">Subjects of Interest</p>
+                                    <p className="text-sm text-[#8a6a5c]">Select topics you're interested in</p>
+                                </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {['Science', 'Mathematics', 'History', 'Literature', 'Programming', 'Languages', 'Business', 'Arts', 'Psychology', 'Philosophy', 'Engineering', 'Medicine'].map(subject => {
+                                    const selected = (settings.subjectsOfInterest || []).includes(subject);
+                                    return (
+                                        <button
+                                            key={subject}
+                                            onClick={() => {
+                                                const current = settings.subjectsOfInterest || [];
+                                                const next = selected
+                                                    ? current.filter(s => s !== subject)
+                                                    : [...current, subject];
+                                                updateSetting('subjectsOfInterest', next);
+                                            }}
+                                            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                                                selected
+                                                    ? 'bg-[#C8A288] text-white shadow-sm'
+                                                    : 'bg-[#FDF6F0] text-[#8a6a5c] border border-[#E6D5CC] hover:border-[#C8A288] hover:text-[#4A3B32]'
+                                            }`}
+                                        >
+                                            {selected && <Check className="h-3 w-3 inline mr-1 -mt-0.5" />}
+                                            {subject}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                </section>
                 
                 {/* Learning Mode Section */}
                 <section>

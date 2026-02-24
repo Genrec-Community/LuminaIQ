@@ -3,6 +3,7 @@
  * 
  * Tracks real user study activity per day via the backend API.
  * Used by AdvancedAnalytics heatmap and trend calculations.
+ * Also triggers gamification XP awards via a callback bridge.
  * 
  * The data shape remains the same:
  *   {
@@ -12,6 +13,22 @@
  */
 
 import { recordStudyActivity, getStudyActivity } from '../api';
+
+// ============================
+// Gamification XP Bridge
+// ============================
+// Module-level callback so the GamificationContext can register
+// itself without requiring every component to pass earnXP manually.
+let _xpCallback = null;
+
+/**
+ * Register a callback that will be invoked whenever activity is recorded.
+ * Called by GamificationContext on mount.
+ * @param {function|null} cb - (activityType, meta) => void
+ */
+export const setXPCallback = (cb) => {
+    _xpCallback = cb;
+};
 
 /**
  * Get today's date as YYYY-MM-DD string
@@ -44,8 +61,9 @@ const getDayName = (dateStr) => {
 
 /**
  * Record a study activity event (fire-and-forget to backend).
+ * Also triggers gamification XP award via the registered callback.
  * @param {string} projectId
- * @param {'quiz'|'review'|'notes'|'qa'|'pomodoro'|'chat'} activityType
+ * @param {'quiz'|'review'|'notes'|'qa'|'pomodoro'|'chat'|'exam'|'path'|'knowledge_graph'} activityType
  * @param {object} [meta] - Optional metadata, e.g. { score: 80 } for quiz
  */
 export const recordActivity = (projectId, activityType, meta = {}) => {
@@ -55,6 +73,15 @@ export const recordActivity = (projectId, activityType, meta = {}) => {
     recordStudyActivity(projectId, activityType, meta).catch(err =>
         console.warn('Failed to record study activity:', err)
     );
+
+    // Award XP via gamification bridge (also fire-and-forget)
+    if (_xpCallback) {
+        try {
+            _xpCallback(activityType, meta);
+        } catch (err) {
+            console.warn('Failed to award XP:', err);
+        }
+    }
 };
 
 /**

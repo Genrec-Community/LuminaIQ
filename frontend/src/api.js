@@ -515,14 +515,17 @@ export const getBookmarks = async (projectId) => {
     return response.data;
 };
 
-export const addBookmark = async (projectId, title, note = '', documentId = null, type = 'general') => {
-    const response = await api.post('/user-data/bookmarks', {
+export const addBookmark = async (projectId, title, note = '', documentId = null, type = 'general', highlightText = null, color = null) => {
+    const body = {
         project_id: projectId,
         title,
         note,
         document_id: documentId,
         type,
-    });
+    };
+    if (highlightText) body.highlight_text = highlightText;
+    if (color) body.color = color;
+    const response = await api.post('/user-data/bookmarks', body);
     return response.data;
 };
 
@@ -633,6 +636,20 @@ export const getStreak = async (projectId) => {
 
 export const updateStreak = async (projectId) => {
     const response = await api.post(`/user-data/streaks/${projectId}`);
+    return response.data;
+};
+
+// --- Gamification ---
+export const getGamification = async () => {
+    const response = await api.get('/user-data/gamification');
+    return response.data;
+};
+
+export const awardXP = async (activityType, meta = null) => {
+    const response = await api.post('/user-data/gamification/award-xp', {
+        activity_type: activityType,
+        meta,
+    });
     return response.data;
 };
 

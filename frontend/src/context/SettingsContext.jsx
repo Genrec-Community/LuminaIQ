@@ -12,6 +12,15 @@ export const useSettings = () => {
 };
 
 const defaultSettings = {
+    // Student Profile
+    studentName: '',
+    learningGoal: '',
+    selfLevel: 'intermediate',
+    learningStyle: 'balanced',
+    subjectsOfInterest: [],
+    dailyStudyGoal: 30, // minutes
+
+    // Learning Mode
     bookIsolation: true,
     darkMode: false,
     pomodoroWork: 25,

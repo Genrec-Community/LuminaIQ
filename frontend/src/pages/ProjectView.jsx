@@ -29,7 +29,11 @@ import {
     GraduationCap,
     Bookmark,
     Network,
-    BarChart3
+    BarChart3,
+    Trophy,
+    Zap,
+    Maximize2,
+    Minimize2
 } from 'lucide-react';
 import {
     uploadDocument,
@@ -70,12 +74,15 @@ import PomodoroTimer from '../components/PomodoroTimer';
 import AITutorChat from '../components/AITutorChat';
 import BookmarksPanel from '../components/BookmarksPanel';
 import GlobalSearch from '../components/GlobalSearch';
+import GamificationPanel from '../components/GamificationPanel';
+import { useGamification } from '../context/GamificationContext';
 
 const ProjectView = () => {
     const { projectId } = useParams();
     const navigate = useNavigate();
     const toast = useToast();
     const { settings } = useSettings();
+    const { data: gamificationData, earnXP } = useGamification();
     const [activeTab, setActiveTab] = useState(() => {
         return sessionStorage.getItem(`lumina_tab_${projectId}`) || 'chat';
     });
@@ -118,6 +125,8 @@ const ProjectView = () => {
     const [showPomodoro, setShowPomodoro] = useState(false);
     const [showAITutor, setShowAITutor] = useState(false);
     const [showBookmarks, setShowBookmarks] = useState(false);
+    const [showGamification, setShowGamification] = useState(false);
+    const [zenMode, setZenMode] = useState(false);
     const [tutorTopic, setTutorTopic] = useState(null);
 
     // Topics State
@@ -153,7 +162,7 @@ const ProjectView = () => {
     const [isQAActive, setIsQAActive] = useState(false);
     
     // Combined sidebar hidden state
-    const isSidebarHidden = isQuizActive || isQAActive;
+    const isSidebarHidden = isQuizActive || isQAActive || zenMode;
 
     // File Upload Ref
     const fileInputRef = useRef(null);
@@ -316,18 +325,25 @@ const ProjectView = () => {
                 e.preventDefault();
                 setShowSearch(true);
             }
-            // Escape to close modals
+            // Ctrl+Shift+Z or Cmd+Shift+Z for zen mode toggle
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
+                e.preventDefault();
+                setZenMode(prev => !prev);
+            }
+            // Escape to close modals or exit zen mode
             if (e.key === 'Escape') {
+                if (zenMode) { setZenMode(false); return; }
                 if (showSearch) setShowSearch(false);
                 if (showPomodoro) setShowPomodoro(false);
                 if (showAITutor) setShowAITutor(false);
                 if (showBookmarks) setShowBookmarks(false);
+                if (showGamification) setShowGamification(false);
             }
         };
 
         document.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [showSearch, showPomodoro, showAITutor, showBookmarks]);
+    }, [showSearch, showPomodoro, showAITutor, showBookmarks, showGamification, zenMode]);
 
     const [showSummary, setShowSummary] = useState(false);
     const [summaryContent, setSummaryContent] = useState('');
@@ -638,9 +654,14 @@ const ProjectView = () => {
             )}
 
             {/* Main Content Area */}
-            <div className="flex-1 flex flex-col min-w-0 bg-white/50 md:bg-white md:m-4 md:rounded-3xl shadow-sm border-x md:border-y border-[#E6D5CC]/50 md:border-[#E6D5CC] overflow-hidden backdrop-blur-sm">
+            <div className={`flex-1 flex flex-col min-w-0 overflow-hidden backdrop-blur-sm ${
+                zenMode
+                    ? 'bg-white m-0 rounded-none border-0 shadow-none'
+                    : 'bg-white/50 md:bg-white md:m-4 md:rounded-3xl shadow-sm border-x md:border-y border-[#E6D5CC]/50 md:border-[#E6D5CC]'
+            }`}>
 
-                {/* Header (Context) */}
+                {/* Header (Context) - Hidden in Zen Mode */}
+                {!zenMode && (
                 <div className="px-4 md:px-6 py-4 border-b border-[#E6D5CC]/50 flex justify-between items-center bg-white/50 backdrop-blur-md sticky top-0 z-30">
                     <div className="flex items-center gap-3 flex-1 overflow-hidden">
                         {/* Mobile Menu Button */}
@@ -754,6 +775,32 @@ const ProjectView = () => {
                             <Bookmark className="h-5 w-5" />
                         </button>
 
+                        {/* Gamification / XP Button */}
+                        <button
+                            onClick={() => setShowGamification(!showGamification)}
+                            className={`relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl transition-all text-sm font-bold ${showGamification
+                                ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-md shadow-amber-500/20'
+                                : 'bg-gradient-to-r from-amber-50 to-orange-50 text-amber-700 border border-amber-200/60 hover:shadow-md hover:shadow-amber-500/10 hover:border-amber-300'
+                            }`}
+                            title="XP & Achievements"
+                        >
+                            <Trophy className="h-4 w-4" />
+                            {gamificationData && (
+                                <span className="hidden sm:inline">
+                                    Lv.{gamificationData.level}
+                                </span>
+                            )}
+                            {gamificationData && (
+                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${showGamification
+                                    ? 'bg-white/20 text-white'
+                                    : 'bg-amber-200/50 text-amber-800'
+                                }`}>
+                                    <Zap className="h-2.5 w-2.5 inline -mt-0.5" />
+                                    {gamificationData.total_xp}
+                                </span>
+                            )}
+                        </button>
+
                         {/* AI Tutor Button */}
                         <button
                             onClick={() => setShowAITutor(!showAITutor)}
@@ -761,6 +808,15 @@ const ProjectView = () => {
                             title="AI Tutor"
                         >
                             <Brain className="h-5 w-5" />
+                        </button>
+
+                        {/* Focus / Zen Mode Button */}
+                        <button
+                            onClick={() => setZenMode(!zenMode)}
+                            className={`p-2 rounded-xl transition-colors hidden sm:block ${zenMode ? 'bg-[#C8A288] text-white' : 'text-[#4A3B32] hover:bg-[#E6D5CC]/30'}`}
+                            title="Focus Mode (Ctrl+Shift+Z)"
+                        >
+                            <Maximize2 className="h-5 w-5" />
                         </button>
 
                         {/* Docs Toggle - Mobile/Tablet */}
@@ -778,6 +834,24 @@ const ProjectView = () => {
                         </button>
                     </div>
                 </div>
+                )}
+
+                {/* Zen Mode Floating Controls */}
+                {zenMode && (
+                    <div className="absolute top-3 right-3 z-50 flex items-center gap-2 animate-in fade-in duration-300">
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-[#4A3B32]/80 backdrop-blur-md text-white/90 rounded-full text-xs font-medium shadow-lg">
+                            <div className="h-2 w-2 bg-green-400 rounded-full animate-pulse" />
+                            Focus Mode
+                        </div>
+                        <button
+                            onClick={() => setZenMode(false)}
+                            className="p-2 bg-[#4A3B32]/80 backdrop-blur-md text-white/90 rounded-full hover:bg-[#4A3B32] transition-colors shadow-lg"
+                            title="Exit Focus Mode (Esc)"
+                        >
+                            <Minimize2 className="h-4 w-4" />
+                        </button>
+                    </div>
+                )}
 
                 {/* Content Body */}
                 <div className="flex-1 overflow-hidden relative">
@@ -1268,6 +1342,15 @@ const ProjectView = () => {
                                 setShowAITutor(true);
                             }
                         }}
+                    />
+                </div>
+            )}
+
+            {/* Gamification Panel */}
+            {showGamification && (
+                <div className="fixed top-16 right-4 z-50 md:right-[340px]">
+                    <GamificationPanel
+                        onClose={() => setShowGamification(false)}
                     />
                 </div>
             )}

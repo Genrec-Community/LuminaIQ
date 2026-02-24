@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { HelpCircle, FileText, LogOut, CheckSquare, X, ChevronDown, Loader2, BookMarked, Brain, Zap, Sparkles, ArrowLeft, Target, Trophy, AlertTriangle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { generateMCQ, generateSubjectiveTest, submitEvaluation, submitSubjectiveTest, generateNotes, recordPerformance, createCardsFromQuiz, getSuggestedTopic } from '../../api';
+import { generateMCQ, generateSubjectiveTest, submitEvaluation, submitSubjectiveTest, generateNotes, recordPerformance, createCardsFromQuiz, getSuggestedTopic, getPerformance } from '../../api';
 import { useToast } from '../../context/ToastContext';
 import { recordActivity } from '../../utils/studyActivity';
+import { useSettings } from '../../context/SettingsContext';
 
 const QuizView = ({ 
     projectId, 
@@ -20,6 +21,7 @@ const QuizView = ({
     onBack = null // NEW: Back button to return to chat
 }) => {
     const toast = useToast();
+    const { settings } = useSettings();
     const [quizMode, setQuizMode] = useState('mcq'); // 'mcq' | 'subjective' | 'both'
 
     // MCQ State
@@ -27,6 +29,11 @@ const QuizView = ({
     const [mcqTopicSelection, setMcqTopicSelection] = useState('');
     const [mcqNumQuestions, setMcqNumQuestions] = useState(5);
     const [mcqDifficulty, setMcqDifficulty] = useState('medium'); // 'easy' | 'medium' | 'hard'
+    
+    // Adaptive Difficulty State
+    const [isAdaptiveMode, setIsAdaptiveMode] = useState(false);
+    const [adaptiveComputed, setAdaptiveComputed] = useState(null); // { difficulty, avgScore, quizCount }
+    const [adaptiveLoading, setAdaptiveLoading] = useState(false);
     const [mcqTest, setMcqTest] = useState(null);
     const [mcqLoading, setMcqLoading] = useState(false);
     const [mcqUserAnswers, setMcqUserAnswers] = useState({});
@@ -58,6 +65,76 @@ const QuizView = ({
     const [bothMcqScore, setBothMcqScore] = useState(null);
     const [bothSubjectiveScore, setBothSubjectiveScore] = useState(null);
     const [bothCombinedScore, setBothCombinedScore] = useState(null);
+    
+    // ==================== ADAPTIVE DIFFICULTY ENGINE ====================
+    
+    // Initialize adaptive mode from settings on mount
+    useEffect(() => {
+        if (settings.quizDifficulty === 'adaptive') {
+            setIsAdaptiveMode(true);
+            computeAdaptiveDifficulty();
+        } else {
+            setIsAdaptiveMode(false);
+            setAdaptiveComputed(null);
+            setMcqDifficulty(settings.quizDifficulty || 'medium');
+        }
+    }, [settings.quizDifficulty, projectId]);
+    
+    // Compute adaptive difficulty from recent performance
+    const computeAdaptiveDifficulty = async () => {
+        setAdaptiveLoading(true);
+        try {
+            const perfData = await getPerformance(projectId);
+            
+            // perfData is an array of { topic, correct, wrong, ... }
+            // Calculate average score across all recent quizzes
+            let totalCorrect = 0;
+            let totalWrong = 0;
+            let quizCount = 0;
+            
+            if (perfData && Array.isArray(perfData)) {
+                // Use up to last 10 entries for adaptive calculation
+                const recent = perfData.slice(-10);
+                recent.forEach(entry => {
+                    totalCorrect += (entry.correct || 0);
+                    totalWrong += (entry.wrong || 0);
+                    quizCount++;
+                });
+            }
+            
+            const totalAttempted = totalCorrect + totalWrong;
+            let avgScore = totalAttempted > 0 ? (totalCorrect / totalAttempted) * 100 : 50;
+            
+            // Determine difficulty:
+            // < 50% average => easy (student is struggling)
+            // 50-80% average => medium (student is learning)
+            // > 80% average => hard (student is excelling)
+            let computedDifficulty = 'medium';
+            if (quizCount === 0) {
+                // No history — use self-assessed level from profile
+                const levelMap = { beginner: 'easy', intermediate: 'medium', advanced: 'hard' };
+                computedDifficulty = levelMap[settings.selfLevel] || 'medium';
+            } else if (avgScore < 50) {
+                computedDifficulty = 'easy';
+            } else if (avgScore > 80) {
+                computedDifficulty = 'hard';
+            } else {
+                computedDifficulty = 'medium';
+            }
+            
+            setAdaptiveComputed({ difficulty: computedDifficulty, avgScore: Math.round(avgScore), quizCount });
+            setMcqDifficulty(computedDifficulty);
+        } catch (error) {
+            console.log('Adaptive difficulty: no performance data, using medium', error);
+            // Fallback to self-assessed level
+            const levelMap = { beginner: 'easy', intermediate: 'medium', advanced: 'hard' };
+            const fallback = levelMap[settings.selfLevel] || 'medium';
+            setAdaptiveComputed({ difficulty: fallback, avgScore: 0, quizCount: 0 });
+            setMcqDifficulty(fallback);
+        } finally {
+            setAdaptiveLoading(false);
+        }
+    };
     
     // Notify parent when quiz is active (loading or test exists)
     useEffect(() => {
@@ -194,7 +271,7 @@ const QuizView = ({
             setPerformanceSaved(true);
             
             // Track quiz activity with score for heatmap & trend
-            recordActivity(projectId, 'quiz', { score: Math.round(percentage) });
+            recordActivity(projectId, 'quiz', { score: Math.round(percentage), num_questions: total });
             
             // Notify parent about quiz completion
             if (onQuizComplete) {
@@ -247,7 +324,6 @@ const QuizView = ({
             setMcqTopicSelection('');
         }
         setMcqNumQuestions(5);
-        setMcqDifficulty('medium');
         setMcqUserAnswers({});
         setMcqSubmitted(false);
         setMcqScore(null);
@@ -263,6 +339,13 @@ const QuizView = ({
         setEvalTest(null);
         setEvalResult(null);
         setEvalUserAnswers({});
+        
+        // Re-compute adaptive difficulty if in adaptive mode (picks up new quiz results)
+        if (isAdaptiveMode) {
+            computeAdaptiveDifficulty();
+        } else {
+            setMcqDifficulty(settings.quizDifficulty || 'medium');
+        }
     };
 
     // ==================== SUBJECTIVE HANDLERS ====================
@@ -341,7 +424,7 @@ const QuizView = ({
                     await recordPerformance(projectId, topic, correctEquiv, wrongEquiv);
                     
                     // Track quiz activity for heatmap
-                    recordActivity(projectId, 'quiz', { score: Math.round(subjectivePercent) });
+                    recordActivity(projectId, 'quiz', { score: Math.round(subjectivePercent), num_questions: evalTest.questions.length });
                     
                     if (onQuizComplete) {
                         onQuizComplete(topic, subjectivePercent, passed);
@@ -386,7 +469,7 @@ const QuizView = ({
         recordPerformance(projectId, topic, totalCorrect, totalWrong).catch(console.error);
         
         // Track combined quiz activity for heatmap
-        recordActivity(projectId, 'quiz', { score: Math.round(combined) });
+        recordActivity(projectId, 'quiz', { score: Math.round(combined), num_questions: (mcqScoreData?.total || 5) + (subjectiveResult?.questions?.length || 2) });
         
         if (onQuizComplete) {
             onQuizComplete(topic, combined, passed);
@@ -576,6 +659,30 @@ const QuizView = ({
                                     
                                     <div>
                                         <label className="block text-sm font-bold mb-2 text-[#4A3B32] uppercase tracking-wide opacity-80">Difficulty</label>
+                                        
+                                        {/* Adaptive Mode Banner */}
+                                        {isAdaptiveMode && adaptiveComputed && (
+                                            <div className="mb-3 p-3 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl animate-in fade-in">
+                                                <div className="flex items-center gap-2 text-purple-700">
+                                                    <Sparkles className="h-4 w-4" />
+                                                    <span className="text-xs font-bold uppercase tracking-wide">Adaptive Mode</span>
+                                                </div>
+                                                <p className="text-xs text-purple-600 mt-1">
+                                                    {adaptiveComputed.quizCount === 0 
+                                                        ? `Set to "${adaptiveComputed.difficulty}" based on your profile level`
+                                                        : `Avg score: ${adaptiveComputed.avgScore}% across ${adaptiveComputed.quizCount} quiz${adaptiveComputed.quizCount > 1 ? 'zes' : ''} — auto-set to "${adaptiveComputed.difficulty}"`
+                                                    }
+                                                </p>
+                                                <p className="text-xs text-purple-500 mt-0.5 italic">You can override by selecting below</p>
+                                            </div>
+                                        )}
+                                        {isAdaptiveMode && adaptiveLoading && (
+                                            <div className="mb-3 p-3 bg-purple-50 border border-purple-200 rounded-xl flex items-center gap-2 text-purple-600">
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                <span className="text-xs font-medium">Analyzing your performance...</span>
+                                            </div>
+                                        )}
+                                        
                                         <div className="flex gap-2">
                                             {[
                                                 { value: 'easy', label: 'Easy', icon: Zap, color: 'text-green-600 bg-green-50 border-green-200' },
@@ -905,6 +1012,30 @@ const QuizView = ({
                                     
                                     <div>
                                         <label className="block text-sm font-bold mb-2 text-[#4A3B32] uppercase tracking-wide opacity-80">Difficulty</label>
+                                        
+                                        {/* Adaptive Mode Banner */}
+                                        {isAdaptiveMode && adaptiveComputed && (
+                                            <div className="mb-3 p-3 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl animate-in fade-in">
+                                                <div className="flex items-center gap-2 text-purple-700">
+                                                    <Sparkles className="h-4 w-4" />
+                                                    <span className="text-xs font-bold uppercase tracking-wide">Adaptive Mode</span>
+                                                </div>
+                                                <p className="text-xs text-purple-600 mt-1">
+                                                    {adaptiveComputed.quizCount === 0 
+                                                        ? `Set to "${adaptiveComputed.difficulty}" based on your profile level`
+                                                        : `Avg score: ${adaptiveComputed.avgScore}% across ${adaptiveComputed.quizCount} quiz${adaptiveComputed.quizCount > 1 ? 'zes' : ''} — auto-set to "${adaptiveComputed.difficulty}"`
+                                                    }
+                                                </p>
+                                                <p className="text-xs text-purple-500 mt-0.5 italic">You can override by selecting below</p>
+                                            </div>
+                                        )}
+                                        {isAdaptiveMode && adaptiveLoading && (
+                                            <div className="mb-3 p-3 bg-purple-50 border border-purple-200 rounded-xl flex items-center gap-2 text-purple-600">
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                <span className="text-xs font-medium">Analyzing your performance...</span>
+                                            </div>
+                                        )}
+                                        
                                         <div className="flex gap-2">
                                             {[
                                                 { value: 'easy', label: 'Easy', icon: Zap, color: 'text-green-600 bg-green-50 border-green-200' },
