@@ -20,6 +20,12 @@ api.interceptors.response.use(
         if (!config || config._retryCount >= 3) {
             return Promise.reject(error);
         }
+
+        // Don't retry auth endpoints — surface errors immediately to the user
+        const url = config.url || '';
+        if (url.includes('/auth/')) {
+            return Promise.reject(error);
+        }
         
         // Check if error is retryable (503, 429, network errors)
         const status = error.response?.status;

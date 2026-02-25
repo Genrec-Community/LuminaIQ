@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { getGamification, awardXP } from '../api';
 import { setXPCallback } from '../utils/studyActivity';
+import { useAuth } from './AuthContext';
 
 const GamificationContext = createContext(null);
 
@@ -13,12 +14,17 @@ export const useGamification = () => {
 };
 
 export const GamificationProvider = ({ children }) => {
+    const { user } = useAuth();
     const [data, setData] = useState(null);
     const [loaded, setLoaded] = useState(false);
     const [xpEvents, setXpEvents] = useState([]); // For XP toast animations
 
-    // Load gamification data on mount
+    // Load gamification data only when user is authenticated
     useEffect(() => {
+        if (!user) {
+            setLoaded(true);
+            return;
+        }
         const load = async () => {
             try {
                 const result = await getGamification();
@@ -30,7 +36,7 @@ export const GamificationProvider = ({ children }) => {
             }
         };
         load();
-    }, []);
+    }, [user]);
 
     // Award XP and trigger animations
     const earnXP = useCallback(async (activityType, meta = {}) => {

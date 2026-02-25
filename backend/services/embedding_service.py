@@ -4,7 +4,6 @@ from typing import List
 from utils.logger import logger
 import os
 import asyncio
-import requests
 from concurrent.futures import ThreadPoolExecutor
 
 
@@ -24,9 +23,6 @@ class EmbeddingService:
     def __init__(self):
         os.environ["TOGETHER_API_KEY"] = settings.TOGETHER_API_KEY
         
-        # Validate API key before initializing
-        self._validate_api_key()
-        
         self.embeddings = TogetherEmbeddings(
             model=settings.EMBEDDING_MODEL, together_api_key=settings.TOGETHER_API_KEY
         )
@@ -36,36 +32,6 @@ class EmbeddingService:
         )
         logger.info(f"[EmbeddingService] Initialized with {self.MAX_WORKERS} workers")
     
-    def _validate_api_key(self):
-        """Validate Together AI API key"""
-        try:
-            logger.info("[EmbeddingService] Validating Together AI API key...")
-            response = requests.get(
-                "https://api.together.ai/v1/models",
-                headers={
-                    "Authorization": f"Bearer {settings.TOGETHER_API_KEY}",
-                    "Content-Type": "application/json"
-                },
-                timeout=10
-            )
-            if response.status_code == 200:
-                models = response.json().get('data', [])
-                model_ids = [m.get('id', '') for m in models]
-                logger.info(f"[EmbeddingService] API key valid. {len(models)} models available")
-                
-                # Check if embedding model is available
-                if settings.EMBEDDING_MODEL in model_ids:
-                    logger.info(f"[EmbeddingService] Embedding model '{settings.EMBEDDING_MODEL}' is AVAILABLE")
-                else:
-                    logger.warning(f"[EmbeddingService] Embedding model '{settings.EMBEDDING_MODEL}' NOT found!")
-                    logger.info(f"[EmbeddingService] Available embedding models: {[m for m in model_ids if 'embed' in m.lower() or 'bge' in m.lower()][:10]}")
-            elif response.status_code == 401:
-                logger.error("[EmbeddingService] API key INVALID (401 Unauthorized)")
-            else:
-                logger.warning(f"[EmbeddingService] API validation returned {response.status_code}")
-        except Exception as e:
-            logger.warning(f"[EmbeddingService] Could not validate API key: {e}")
-
     async def generate_embeddings(self, texts: List[str]) -> List[List[float]]:
         """
         Generate embeddings for a batch of texts.

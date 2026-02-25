@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { getUserSettings, saveUserSettings } from '../api';
+import { useAuth } from './AuthContext';
 
 const SettingsContext = createContext();
 
@@ -37,11 +38,16 @@ const defaultSettings = {
 };
 
 export const SettingsProvider = ({ children }) => {
+    const { user } = useAuth();
     const [settings, setSettings] = useState(defaultSettings);
     const [loaded, setLoaded] = useState(false);
 
-    // Load settings from API on mount
+    // Load settings from API only when user is authenticated
     useEffect(() => {
+        if (!user) {
+            setLoaded(true);
+            return;
+        }
         const load = async () => {
             try {
                 const data = await getUserSettings();
@@ -55,7 +61,7 @@ export const SettingsProvider = ({ children }) => {
             }
         };
         load();
-    }, []);
+    }, [user]);
 
     // Apply dark mode whenever settings change
     useEffect(() => {

@@ -33,6 +33,13 @@ async def login(user_in: UserLogin):
     try:
         return await auth_service.login(user_in.email, user_in.password)
     except Exception as e:
+        error_msg = str(e).lower()
+        # Distinguish timeout/network errors from invalid credentials
+        if "timed out" in error_msg or "timeout" in error_msg or "connect" in error_msg:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Authentication service temporarily unavailable. Please try again.",
+            )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(e),

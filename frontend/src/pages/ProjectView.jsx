@@ -662,56 +662,152 @@ const ProjectView = () => {
 
                 {/* Header (Context) - Hidden in Zen Mode */}
                 {!zenMode && (
-                <div className="px-4 md:px-6 py-4 border-b border-[#E6D5CC]/50 flex justify-between items-center bg-white/50 backdrop-blur-md sticky top-0 z-30">
-                    <div className="flex items-center gap-3 flex-1 overflow-hidden">
+                <div className="px-3 md:px-5 py-2.5 border-b border-[#E6D5CC]/50 bg-white/50 backdrop-blur-md sticky top-0 z-30">
+                    {/* Single-row header with proper spacing */}
+                    <div className="flex items-center gap-2 h-11">
                         {/* Mobile Menu Button */}
                         <button
                             onClick={() => setIsMobileMenuOpen(true)}
-                            className="md:hidden p-2 -ml-2 hover:bg-[#E6D5CC]/30 rounded-xl text-[#4A3B32] transition-colors"
+                            className="md:hidden p-2 -ml-1 hover:bg-[#E6D5CC]/30 rounded-lg text-[#4A3B32] transition-colors shrink-0"
                         >
-                            <Menu className="h-6 w-6" />
+                            <Menu className="h-5 w-5" />
                         </button>
 
-                        <div className="min-w-0 flex items-center gap-3">
-                            <div>
-                                <h2 className="text-lg font-bold truncate text-[#4A3B32]">
-                                    {activeTab === 'chat' && 'Chat'}
-                                    {activeTab === 'qa' && 'Q&A'}
-                                    {activeTab === 'quiz' && 'Quiz'}
-                                    {activeTab === 'notes' && 'Notes'}
-                                    {activeTab === 'path' && 'Learning Path'}
-                                    {activeTab === 'study' && 'Study'}
-                                    {activeTab === 'analytics' && 'Analytics'}
-                                    {activeTab === 'exam' && 'Exam Prep'}
-                                    {activeTab === 'knowledge' && 'Knowledge Graph'}
-                                </h2>
-                                <p className="text-xs text-[#8a6a5c] truncate hidden sm:block">
-                                    {documents.length > 0 ? `Active: ${documents[0].filename}` : 'No document active'}
-                                </p>
-                            </div>
+                        {/* Left: Tab name + Summary */}
+                        <div className="flex items-center gap-2 min-w-0 shrink-0">
+                            <h2 className="text-base font-bold text-[#4A3B32] whitespace-nowrap">
+                                {activeTab === 'chat' && 'Chat'}
+                                {activeTab === 'qa' && 'Q&A'}
+                                {activeTab === 'quiz' && 'Quiz'}
+                                {activeTab === 'notes' && 'Notes'}
+                                {activeTab === 'path' && 'Learning Path'}
+                                {activeTab === 'study' && 'Study'}
+                                {activeTab === 'analytics' && 'Analytics'}
+                                {activeTab === 'exam' && 'Exam Prep'}
+                                {activeTab === 'knowledge' && 'Knowledge Graph'}
+                            </h2>
 
-                            {/* Summary Dropdown */}
+                            {/* Summary Dropdown - compact pill */}
                             {documents.length > 0 && (
-                                <div className="relative">
-                                    <button
-                                        onClick={toggleSummary}
-                                        className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 bg-[#FDF6F0] text-[#C8A288] border border-[#C8A288]/30 rounded-full hover:bg-[#E6D5CC]/30 transition-all"
-                                    >
-                                        <FileText className="h-3 w-3" />
-                                        Summary
-                                        {showSummary ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                                    </button>
-                                </div>
+                                <button
+                                    onClick={toggleSummary}
+                                    className={`hidden sm:flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full transition-all shrink-0 ${
+                                        showSummary
+                                            ? 'bg-[#C8A288] text-white'
+                                            : 'bg-[#FDF6F0] text-[#C8A288] border border-[#E6D5CC] hover:border-[#C8A288]/40'
+                                    }`}
+                                >
+                                    <FileText className="h-3 w-3" />
+                                    Su
+                                    {showSummary ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                                </button>
                             )}
                         </div>
 
-                        {/* Summary Content Area */}
-                        {showSummary && (
-                            <div className="absolute top-16 left-4 right-4 md:left-auto md:w-96 p-5 bg-white/95 backdrop-blur-xl rounded-2xl border border-[#E6D5CC] shadow-2xl animate-in slide-in-from-top-4 z-50">
-                                <div className="flex justify-between items-center mb-3">
-                                    <h4 className="font-bold text-sm text-[#4A3B32] uppercase tracking-wide">
-                                        {selectedDocuments.length > 0 ? (selectedDocuments.length === 1 ? 'Document Summary' : 'Selection Summary') : 'Project Summary'}
-                                    </h4>
+                        {/* Center: Active document name - fills remaining space */}
+                        <div className="flex-1 min-w-0 hidden md:block">
+                            <p className="text-xs text-[#8a6a5c]/70 truncate text-center px-2">
+                                {documents.length > 0 ? documents[0].filename : ''}
+                            </p>
+                        </div>
+
+                        {/* Spacer for mobile */}
+                        <div className="flex-1 md:hidden" />
+
+                        {/* Right: Toolbar - grouped with subtle dividers */}
+                        <div className="flex items-center shrink-0">
+                            {/* Core tools group */}
+                            <div className="flex items-center">
+                                <button
+                                    onClick={() => setShowSearch(true)}
+                                    className="p-2 rounded-lg text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30 transition-colors"
+                                    title="Search (Ctrl+K)"
+                                >
+                                    <Search className="h-[18px] w-[18px]" />
+                                </button>
+                                <button
+                                    onClick={() => setShowPomodoro(!showPomodoro)}
+                                    className={`p-2 rounded-lg transition-colors ${showPomodoro ? 'bg-[#C8A288] text-white' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30'}`}
+                                    title="Pomodoro Timer"
+                                >
+                                    <Timer className="h-[18px] w-[18px]" />
+                                </button>
+                                <button
+                                    onClick={() => setShowBookmarks(!showBookmarks)}
+                                    className={`p-2 rounded-lg transition-colors ${showBookmarks ? 'bg-[#C8A288] text-white' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30'}`}
+                                    title="Bookmarks & Highlights"
+                                >
+                                    <Bookmark className="h-[18px] w-[18px]" />
+                                </button>
+                            </div>
+
+                            {/* Divider */}
+                            <div className="w-px h-5 bg-[#E6D5CC]/60 mx-1 hidden sm:block" />
+
+                            {/* Gamification - compact chip */}
+                            <button
+                                onClick={() => setShowGamification(!showGamification)}
+                                className={`flex items-center gap-1 px-2 py-1.5 rounded-lg transition-all text-xs font-bold shrink-0 ${showGamification
+                                    ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-sm'
+                                    : 'text-amber-700 hover:bg-amber-50'
+                                }`}
+                                title="XP & Achievements"
+                            >
+                                <Trophy className="h-3.5 w-3.5" />
+                                {gamificationData && (
+                                    <span className="tabular-nums">{gamificationData.total_xp}<Zap className="h-2.5 w-2.5 inline ml-0.5 -mt-0.5" /></span>
+                                )}
+                            </button>
+
+                            {/* Divider */}
+                            <div className="w-px h-5 bg-[#E6D5CC]/60 mx-1 hidden sm:block" />
+
+                            {/* Secondary tools */}
+                            <div className="hidden sm:flex items-center">
+                                <button
+                                    onClick={() => setShowAITutor(!showAITutor)}
+                                    className={`p-2 rounded-lg transition-colors ${showAITutor ? 'bg-[#C8A288] text-white' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30'}`}
+                                    title="AI Tutor"
+                                >
+                                    <Brain className="h-[18px] w-[18px]" />
+                                </button>
+                                <button
+                                    onClick={() => setZenMode(true)}
+                                    className="p-2 rounded-lg text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30 transition-colors"
+                                    title="Focus Mode (Ctrl+Shift+Z)"
+                                >
+                                    <Maximize2 className="h-[18px] w-[18px]" />
+                                </button>
+                            </div>
+
+                            {/* Docs Toggle - Mobile/Tablet */}
+                            <button
+                                onClick={() => setIsDocsMenuOpen(!isDocsMenuOpen)}
+                                className={`p-2 rounded-lg transition-colors lg:hidden ${isDocsMenuOpen ? 'bg-[#C8A288] text-white' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30'}`}
+                                title="Documents"
+                            >
+                                <FileText className="h-[18px] w-[18px]" />
+                            </button>
+
+                            {/* Exit */}
+                            <button
+                                onClick={() => navigate('/dashboard')}
+                                className="p-2 rounded-lg text-[#8a6a5c]/50 hover:bg-red-50 hover:text-red-500 transition-colors ml-0.5"
+                                title="Back to Dashboard"
+                            >
+                                <LogOut className="h-[18px] w-[18px]" />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Summary Content Area - positioned below header */}
+                    {showSummary && (
+                        <div className="absolute top-full left-4 right-4 md:left-auto md:right-4 md:w-96 mt-1 p-5 bg-white/95 backdrop-blur-xl rounded-2xl border border-[#E6D5CC] shadow-2xl animate-in slide-in-from-top-2 z-50">
+                            <div className="flex justify-between items-center mb-3">
+                                <h4 className="font-bold text-sm text-[#4A3B32] uppercase tracking-wide">
+                                    {selectedDocuments.length > 0 ? (selectedDocuments.length === 1 ? 'Document Summary' : 'Selection Summary') : 'Project Summary'}
+                                </h4>
+                                <div className="flex items-center gap-1">
                                     <button
                                         onClick={fetchSummary}
                                         disabled={summaryLoading}
@@ -720,119 +816,38 @@ const ProjectView = () => {
                                     >
                                         <RefreshCw className={`h-3.5 w-3.5 ${summaryLoading ? 'animate-spin' : ''}`} />
                                     </button>
+                                    <button
+                                        onClick={() => setShowSummary(false)}
+                                        className="p-1.5 hover:bg-[#FDF6F0] rounded-full transition-colors"
+                                    >
+                                        <X className="h-3.5 w-3.5" />
+                                    </button>
                                 </div>
-                                {summaryLoading ? (
-                                    <div className="flex flex-col items-center justify-center py-12 gap-4">
-                                        <div className="relative">
-                                            <div className="h-16 w-16 border-4 border-[#E6D5CC] rounded-full"></div>
-                                            <div className="absolute inset-0 h-16 w-16 border-4 border-[#C8A288] rounded-full border-t-transparent animate-spin"></div>
-                                            <FileText className="absolute inset-0 m-auto h-6 w-6 text-[#C8A288]" />
-                                        </div>
-                                        <div className="text-center">
-                                            <p className="text-sm font-bold text-[#4A3B32]">Generating Summary</p>
-                                            <p className="text-xs text-[#8a6a5c] mt-1">Analyzing your documents...</p>
-                                        </div>
-                                        <div className="flex gap-1">
-                                            <div className="h-2 w-2 bg-[#C8A288] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                                            <div className="h-2 w-2 bg-[#C8A288] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                                            <div className="h-2 w-2 bg-[#C8A288] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="prose prose-sm max-w-none text-sm text-[#4A3B32] max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
-                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{summaryContent}</ReactMarkdown>
-                                    </div>
-                                )}
                             </div>
-                        )}
-                    </div>
-
-                    <div className="flex items-center gap-1 sm:gap-2">
-                        {/* Search Button */}
-                        <button
-                            onClick={() => setShowSearch(true)}
-                            className="p-2 rounded-xl text-[#4A3B32] hover:bg-[#E6D5CC]/30 transition-colors"
-                            title="Search (Ctrl+K)"
-                        >
-                            <Search className="h-5 w-5" />
-                        </button>
-
-                        {/* Pomodoro Timer Button */}
-                        <button
-                            onClick={() => setShowPomodoro(!showPomodoro)}
-                            className={`p-2 rounded-xl transition-colors ${showPomodoro ? 'bg-[#C8A288] text-white' : 'text-[#4A3B32] hover:bg-[#E6D5CC]/30'}`}
-                            title="Pomodoro Timer"
-                        >
-                            <Timer className="h-5 w-5" />
-                        </button>
-
-                        {/* Bookmarks Button */}
-                        <button
-                            onClick={() => setShowBookmarks(!showBookmarks)}
-                            className={`p-2 rounded-xl transition-colors ${showBookmarks ? 'bg-[#C8A288] text-white' : 'text-[#4A3B32] hover:bg-[#E6D5CC]/30'}`}
-                            title="Bookmarks"
-                        >
-                            <Bookmark className="h-5 w-5" />
-                        </button>
-
-                        {/* Gamification / XP Button */}
-                        <button
-                            onClick={() => setShowGamification(!showGamification)}
-                            className={`relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl transition-all text-sm font-bold ${showGamification
-                                ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-md shadow-amber-500/20'
-                                : 'bg-gradient-to-r from-amber-50 to-orange-50 text-amber-700 border border-amber-200/60 hover:shadow-md hover:shadow-amber-500/10 hover:border-amber-300'
-                            }`}
-                            title="XP & Achievements"
-                        >
-                            <Trophy className="h-4 w-4" />
-                            {gamificationData && (
-                                <span className="hidden sm:inline">
-                                    Lv.{gamificationData.level}
-                                </span>
+                            {summaryLoading ? (
+                                <div className="flex flex-col items-center justify-center py-12 gap-4">
+                                    <div className="relative">
+                                        <div className="h-16 w-16 border-4 border-[#E6D5CC] rounded-full"></div>
+                                        <div className="absolute inset-0 h-16 w-16 border-4 border-[#C8A288] rounded-full border-t-transparent animate-spin"></div>
+                                        <FileText className="absolute inset-0 m-auto h-6 w-6 text-[#C8A288]" />
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-sm font-bold text-[#4A3B32]">Generating Summary</p>
+                                        <p className="text-xs text-[#8a6a5c] mt-1">Analyzing your documents...</p>
+                                    </div>
+                                    <div className="flex gap-1">
+                                        <div className="h-2 w-2 bg-[#C8A288] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                                        <div className="h-2 w-2 bg-[#C8A288] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                                        <div className="h-2 w-2 bg-[#C8A288] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="prose prose-sm max-w-none text-sm text-[#4A3B32] max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{summaryContent}</ReactMarkdown>
+                                </div>
                             )}
-                            {gamificationData && (
-                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${showGamification
-                                    ? 'bg-white/20 text-white'
-                                    : 'bg-amber-200/50 text-amber-800'
-                                }`}>
-                                    <Zap className="h-2.5 w-2.5 inline -mt-0.5" />
-                                    {gamificationData.total_xp}
-                                </span>
-                            )}
-                        </button>
-
-                        {/* AI Tutor Button */}
-                        <button
-                            onClick={() => setShowAITutor(!showAITutor)}
-                            className={`p-2 rounded-xl transition-colors hidden sm:block ${showAITutor ? 'bg-[#C8A288] text-white' : 'text-[#4A3B32] hover:bg-[#E6D5CC]/30'}`}
-                            title="AI Tutor"
-                        >
-                            <Brain className="h-5 w-5" />
-                        </button>
-
-                        {/* Focus / Zen Mode Button */}
-                        <button
-                            onClick={() => setZenMode(!zenMode)}
-                            className={`p-2 rounded-xl transition-colors hidden sm:block ${zenMode ? 'bg-[#C8A288] text-white' : 'text-[#4A3B32] hover:bg-[#E6D5CC]/30'}`}
-                            title="Focus Mode (Ctrl+Shift+Z)"
-                        >
-                            <Maximize2 className="h-5 w-5" />
-                        </button>
-
-                        {/* Docs Toggle - Mobile/Tablet */}
-                        <button
-                            onClick={() => setIsDocsMenuOpen(!isDocsMenuOpen)}
-                            className={`p-2 rounded-xl transition-colors lg:hidden ${isDocsMenuOpen ? 'bg-[#C8A288] text-white' : 'text-[#4A3B32] hover:bg-[#E6D5CC]/30'}`}
-                        >
-                            <FileText className="h-5 w-5" />
-                        </button>
-
-                        {/* New Session Button */}
-
-                        <button onClick={() => navigate('/dashboard')} className="p-2 hover:bg-red-50 hover:text-red-500 rounded-xl text-[#8a6a5c] transition-colors">
-                            <LogOut className="h-5 w-5" />
-                        </button>
-                    </div>
+                        </div>
+                    )}
                 </div>
                 )}
 
