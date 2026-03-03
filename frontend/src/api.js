@@ -659,3 +659,24 @@ export const awardXP = async (activityType, meta = null) => {
     return response.data;
 };
 
+// ============== Mindmap & Flashcard API ==============
+
+export const generateMindmap = async (projectId, topic, selectedDocuments = []) => {
+    const response = await api.post('/learning/mindmap/generate', {
+        project_id: projectId,
+        topic,
+        selected_documents: selectedDocuments,
+    });
+    return response.data;
+};
+
+export const generateFlashcards = async (projectId, topic, numCards = 8, selectedDocuments = []) => {
+    const response = await api.post('/learning/flashcards/generate', {
+        project_id: projectId,
+        topic,
+        num_cards: numCards,
+        selected_documents: selectedDocuments,
+    });
+    return response.data;
+};
+

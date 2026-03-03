@@ -38,7 +38,7 @@ class QdrantService:
             timeout=120,  # Increased from 60 for large batches
         )
 
-    async def create_collection(self, collection_name: str, vector_size: int = 768):
+    async def create_collection(self, collection_name: str, vector_size: int = settings.EMBEDDING_DIMENSION):
         """Create a new collection and ensure indexes exist"""
         try:
             collections = self.client.get_collections().collections

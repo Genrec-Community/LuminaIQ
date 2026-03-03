@@ -4,7 +4,7 @@ import {
     Trophy, Star, Zap, Target, Award, Crown,
     Shield, TrendingUp, BookOpen, Brain, Timer,
     MessageSquare, FileText, Map, CheckCircle,
-    Rocket, X, ChevronRight, Lock, Sparkles
+    Rocket, Lock, Sparkles, X
 } from 'lucide-react';
 import { useGamification } from '../context/GamificationContext';
 
@@ -29,26 +29,28 @@ const BADGE_ICONS = {
     'zap': Zap,
 };
 
-// Badge category colors
+// Badge category colors — earthy palette compatible
 const CATEGORY_COLORS = {
-    milestone: { bg: 'from-blue-400 to-blue-600', ring: 'ring-blue-300', text: 'text-blue-600', light: 'bg-blue-50' },
-    achievement: { bg: 'from-amber-400 to-amber-600', ring: 'ring-amber-300', text: 'text-amber-600', light: 'bg-amber-50' },
-    habit: { bg: 'from-emerald-400 to-emerald-600', ring: 'ring-emerald-300', text: 'text-emerald-600', light: 'bg-emerald-50' },
-    level: { bg: 'from-purple-400 to-purple-600', ring: 'ring-purple-300', text: 'text-purple-600', light: 'bg-purple-50' },
-    xp: { bg: 'from-rose-400 to-rose-600', ring: 'ring-rose-300', text: 'text-rose-600', light: 'bg-rose-50' },
+    milestone: { bg: 'from-blue-400 to-blue-600', text: 'text-blue-600', light: 'bg-blue-50', border: 'border-blue-200/50' },
+    achievement: { bg: 'from-amber-400 to-amber-600', text: 'text-amber-600', light: 'bg-amber-50', border: 'border-amber-200/50' },
+    habit: { bg: 'from-emerald-400 to-emerald-600', text: 'text-emerald-600', light: 'bg-emerald-50', border: 'border-emerald-200/50' },
+    level: { bg: 'from-purple-400 to-purple-600', text: 'text-purple-600', light: 'bg-purple-50', border: 'border-purple-200/50' },
+    xp: { bg: 'from-rose-400 to-rose-600', text: 'text-rose-600', light: 'bg-rose-50', border: 'border-rose-200/50' },
 };
 
+/**
+ * GamificationPanel — Floating popup triggered from the header toolbar.
+ * 420px wide, close button, tabs for Overview / Badges / Levels.
+ */
 const GamificationPanel = ({ onClose }) => {
     const { data } = useGamification();
-    const [activeView, setActiveView] = useState('overview'); // overview, badges, levels
+    const [activeTab, setActiveTab] = useState('overview');
 
     if (!data) {
         return (
-            <div className="w-[420px] max-h-[85vh] bg-white rounded-2xl shadow-2xl border border-[#E6D5CC] p-6 flex items-center justify-center">
-                <div className="flex flex-col items-center gap-3">
-                    <div className="h-10 w-10 border-3 border-[#C8A288] border-t-transparent rounded-full animate-spin" />
-                    <p className="text-sm text-[#8a6a5c]">Loading achievements...</p>
-                </div>
+            <div className="w-[420px] bg-white rounded-2xl shadow-2xl border border-[#E6D5CC] p-8 flex flex-col items-center gap-3">
+                <div className="h-10 w-10 border-3 border-[#C8A288] border-t-transparent rounded-full animate-spin" />
+                <p className="text-sm text-[#8a6a5c]">Loading progress...</p>
             </div>
         );
     }
@@ -57,58 +59,64 @@ const GamificationPanel = ({ onClose }) => {
     const allBadges = data.all_badges || [];
     const allLevels = data.all_levels || [];
     const stats = data.stats || {};
+    const earnedCount = data.badges?.length || 0;
+
+    const tabs = [
+        { id: 'overview', label: 'Overview', icon: TrendingUp },
+        { id: 'badges', label: `Badges (${earnedCount})`, icon: Award },
+        { id: 'levels', label: 'Levels', icon: Crown },
+    ];
 
     return (
-        <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.97 }}
-            transition={{ duration: 0.25, ease: 'easeOut' }}
-            className="w-[420px] max-h-[85vh] bg-white rounded-2xl shadow-2xl border border-[#E6D5CC] overflow-hidden flex flex-col"
-        >
-            {/* Header — Level Card */}
-            <div className="relative overflow-hidden">
-                {/* Gradient background */}
-                <div className="bg-gradient-to-br from-[#C8A288] via-[#B08B72] to-[#8a6a5c] px-6 pt-5 pb-6">
+        <div className="w-[420px] max-h-[85vh] bg-white rounded-2xl shadow-2xl border border-[#E6D5CC] flex flex-col overflow-hidden">
+            {/* Header with gradient */}
+            <div className="relative overflow-hidden shrink-0">
+                <div className="bg-gradient-to-br from-[#C8A288] via-[#B08B72] to-[#8a6a5c] px-5 pt-4 pb-4">
                     {/* Decorative circles */}
                     <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
-                    <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
-                    
+                    <div className="absolute bottom-0 left-0 w-20 h-20 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
+
                     <div className="relative z-10">
-                        <div className="flex justify-between items-start mb-4">
-                            <div className="flex items-center gap-3">
-                                {/* Level badge */}
-                                <div className="relative">
-                                    <div className="h-14 w-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/30 shadow-lg">
-                                        <span className="text-2xl font-black text-white">{data.level}</span>
-                                    </div>
-                                    <div className="absolute -bottom-1 -right-1 h-5 w-5 bg-yellow-400 rounded-full flex items-center justify-center shadow-md">
-                                        <Star className="h-3 w-3 text-yellow-800 fill-yellow-800" />
-                                    </div>
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-bold text-white">{data.level_title}</h3>
-                                    <p className="text-white/70 text-xs font-medium">Level {data.level}</p>
-                                </div>
+                        {/* Title + Close */}
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                                <Trophy className="h-5 w-5 text-yellow-300" />
+                                <h3 className="text-white font-bold text-base">Your Progress</h3>
                             </div>
                             <button
                                 onClick={onClose}
-                                className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white/70 hover:text-white"
+                                className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
                             >
-                                <X className="h-5 w-5" />
+                                <X className="h-4 w-4 text-white/80" />
                             </button>
                         </div>
 
-                        {/* XP Progress Bar */}
-                        <div className="space-y-2">
-                            <div className="flex justify-between items-center text-xs">
-                                <span className="text-white/80 font-semibold flex items-center gap-1.5">
+                        {/* Level + XP */}
+                        <div className="flex items-center gap-3 mb-3">
+                            <div className="relative">
+                                <div className="h-14 w-14 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/30 shadow-lg">
+                                    <span className="text-2xl font-black text-white">{data.level}</span>
+                                </div>
+                                <div className="absolute -bottom-1 -right-1 h-5 w-5 bg-yellow-400 rounded-full flex items-center justify-center shadow-md">
+                                    <Star className="h-3 w-3 text-yellow-800 fill-yellow-800" />
+                                </div>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <h4 className="text-base font-bold text-white truncate">{data.level_title}</h4>
+                                <p className="text-white/70 text-sm font-medium flex items-center gap-1">
                                     <Zap className="h-3.5 w-3.5 text-yellow-300" />
-                                    {data.total_xp.toLocaleString()} XP Total
-                                </span>
+                                    {data.total_xp?.toLocaleString()} XP
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* XP Progress Bar */}
+                        <div className="space-y-1.5">
+                            <div className="flex justify-between items-center text-xs">
+                                <span className="text-white/70 font-medium">Progress</span>
                                 {data.next_level && (
                                     <span className="text-white/60">
-                                        {data.xp_in_level}/{data.xp_needed} to Level {data.next_level.level}
+                                        {data.xp_in_level}/{data.xp_needed} to Lv.{data.next_level.level}
                                     </span>
                                 )}
                             </div>
@@ -120,10 +128,9 @@ const GamificationPanel = ({ onClose }) => {
                                     className="h-full bg-gradient-to-r from-yellow-300 via-yellow-400 to-amber-400 rounded-full relative"
                                 >
                                     <div className="absolute inset-0 bg-gradient-to-b from-white/30 to-transparent rounded-full" />
-                                    {/* Shimmer effect */}
                                     <motion.div
                                         animate={{ x: ['-100%', '200%'] }}
-                                        transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
+                                        transition={{ duration: 2, repeat: Infinity, repeatDelay: 4 }}
                                         className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent rounded-full"
                                     />
                                 </motion.div>
@@ -133,195 +140,181 @@ const GamificationPanel = ({ onClose }) => {
                 </div>
             </div>
 
-            {/* Tab Navigation */}
-            <div className="flex border-b border-[#E6D5CC]/50 px-2 pt-2 bg-[#FDF6F0]/50">
-                {[
-                    { id: 'overview', label: 'Overview', icon: TrendingUp },
-                    { id: 'badges', label: `Badges (${data.badges?.length || 0}/${allBadges.length})`, icon: Award },
-                    { id: 'levels', label: 'Levels', icon: Crown },
-                ].map(tab => (
-                    <button
-                        key={tab.id}
-                        onClick={() => setActiveView(tab.id)}
-                        className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold rounded-t-lg transition-all flex-1 justify-center ${
-                            activeView === tab.id
-                                ? 'bg-white text-[#4A3B32] border border-[#E6D5CC]/50 border-b-white -mb-px shadow-sm'
-                                : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-white/50'
-                        }`}
-                    >
-                        <tab.icon className="h-3.5 w-3.5" />
-                        {tab.label}
-                    </button>
-                ))}
+            {/* Tab Bar */}
+            <div className="flex border-b border-[#E6D5CC] bg-[#FDF6F0]/50 shrink-0">
+                {tabs.map(tab => {
+                    const Icon = tab.icon;
+                    const isActive = activeTab === tab.id;
+                    return (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-bold transition-all border-b-2 ${
+                                isActive
+                                    ? 'border-[#C8A288] text-[#C8A288] bg-white'
+                                    : 'border-transparent text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-white/50'
+                            }`}
+                        >
+                            <Icon className="h-3.5 w-3.5" />
+                            {tab.label}
+                        </button>
+                    );
+                })}
             </div>
 
-            {/* Content Area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-                <AnimatePresence mode="wait">
-                    {activeView === 'overview' && (
-                        <motion.div
-                            key="overview"
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: 10 }}
-                            className="space-y-4"
-                        >
-                            {/* Quick Stats Grid */}
-                            <div className="grid grid-cols-3 gap-2">
-                                <StatCard icon={CheckCircle} label="Quizzes" value={stats.quizzes_completed || 0} color="blue" />
-                                <StatCard icon={Star} label="Perfect" value={stats.perfect_scores || 0} color="amber" />
-                                <StatCard icon={Target} label="Questions" value={stats.questions_answered || 0} color="emerald" />
-                                <StatCard icon={Timer} label="Pomodoros" value={stats.pomodoros_completed || 0} color="purple" />
-                                <StatCard icon={FileText} label="Notes" value={stats.notes_generated || 0} color="rose" />
-                                <StatCard icon={Brain} label="Reviews" value={stats.reviews_completed || 0} color="cyan" />
-                            </div>
-
-                            {/* Recent Badges */}
-                            <div>
-                                <h4 className="text-sm font-bold text-[#4A3B32] mb-2 flex items-center gap-1.5">
-                                    <Award className="h-4 w-4 text-[#C8A288]" />
-                                    Recent Badges
-                                </h4>
-                                {data.badges && data.badges.length > 0 ? (
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {data.badges.slice(-4).reverse().map((badge, i) => (
-                                            <BadgeMini key={badge.id || i} badge={badge} earned />
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="bg-[#FDF6F0] rounded-xl p-4 text-center">
-                                        <Award className="h-8 w-8 text-[#E6D5CC] mx-auto mb-2" />
-                                        <p className="text-xs text-[#8a6a5c]">Complete activities to earn badges!</p>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Next Milestones */}
-                            <div>
-                                <h4 className="text-sm font-bold text-[#4A3B32] mb-2 flex items-center gap-1.5">
-                                    <Rocket className="h-4 w-4 text-[#C8A288]" />
-                                    Next Milestones
-                                </h4>
-                                <div className="space-y-1.5">
-                                    {getNextMilestones(stats, data.total_xp, data.level, earnedBadgeIds, allBadges).map((m, i) => (
-                                        <MilestoneRow key={i} milestone={m} />
-                                    ))}
-                                </div>
-                            </div>
-                        </motion.div>
-                    )}
-
-                    {activeView === 'badges' && (
-                        <motion.div
-                            key="badges"
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: 10 }}
-                            className="space-y-4"
-                        >
-                            {Object.entries(groupByCategory(allBadges)).map(([category, badges]) => (
-                                <div key={category}>
-                                    <h4 className="text-xs font-bold text-[#8a6a5c] uppercase tracking-wider mb-2">
-                                        {category}
-                                    </h4>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {badges.map((badge) => (
-                                            <BadgeCard
-                                                key={badge.id}
-                                                badge={badge}
-                                                earned={earnedBadgeIds.has(badge.id)}
-                                            />
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
-                        </motion.div>
-                    )}
-
-                    {activeView === 'levels' && (
-                        <motion.div
-                            key="levels"
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: 10 }}
-                            className="space-y-2"
-                        >
-                            {allLevels.map((lvl, i) => {
-                                const isCurrentLevel = lvl.level === data.level;
-                                const isUnlocked = data.level >= lvl.level;
-                                const nextLvl = allLevels[i + 1];
-
-                                return (
-                                    <motion.div
-                                        key={lvl.level}
-                                        initial={{ opacity: 0, y: 10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: i * 0.04 }}
-                                        className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
-                                            isCurrentLevel
-                                                ? 'bg-gradient-to-r from-[#FDF6F0] to-amber-50/50 border-[#C8A288] shadow-md shadow-[#C8A288]/10'
-                                                : isUnlocked
-                                                    ? 'bg-white border-[#E6D5CC]/50'
-                                                    : 'bg-gray-50/50 border-gray-100 opacity-60'
-                                        }`}
-                                    >
-                                        {/* Level Number */}
-                                        <div className={`h-10 w-10 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 ${
-                                            isCurrentLevel
-                                                ? 'bg-gradient-to-br from-[#C8A288] to-[#8a6a5c] text-white shadow-md shadow-[#C8A288]/30'
-                                                : isUnlocked
-                                                    ? 'bg-[#E6D5CC] text-[#4A3B32]'
-                                                    : 'bg-gray-200 text-gray-400'
-                                        }`}>
-                                            {isUnlocked ? lvl.level : <Lock className="h-4 w-4" />}
-                                        </div>
-
-                                        {/* Level Info */}
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                <p className={`text-sm font-bold truncate ${isUnlocked ? 'text-[#4A3B32]' : 'text-gray-400'}`}>
-                                                    {lvl.title}
-                                                </p>
-                                                {isCurrentLevel && (
-                                                    <span className="text-[9px] font-bold uppercase bg-[#C8A288] text-white px-1.5 py-0.5 rounded-full tracking-wider">
-                                                        Current
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <p className="text-[11px] text-[#8a6a5c]">
-                                                {lvl.xp_required.toLocaleString()} XP required
-                                            </p>
-
-                                            {/* Progress bar for current level */}
-                                            {isCurrentLevel && nextLvl && (
-                                                <div className="mt-1.5 h-1.5 bg-[#E6D5CC] rounded-full overflow-hidden">
-                                                    <motion.div
-                                                        initial={{ width: 0 }}
-                                                        animate={{ width: `${data.level_progress || 0}%` }}
-                                                        transition={{ duration: 1, delay: 0.5 }}
-                                                        className="h-full bg-gradient-to-r from-[#C8A288] to-amber-400 rounded-full"
-                                                    />
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Checkmark / lock icon */}
-                                        {isUnlocked && !isCurrentLevel && (
-                                            <CheckCircle className="h-5 w-5 text-emerald-400 shrink-0" />
-                                        )}
-                                        {isCurrentLevel && (
-                                            <Sparkles className="h-5 w-5 text-amber-400 shrink-0" />
-                                        )}
-                                    </motion.div>
-                                );
-                            })}
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                {activeTab === 'overview' && renderOverview(stats, data, earnedBadgeIds, allBadges)}
+                {activeTab === 'badges' && renderBadges(data.badges || [], allBadges, earnedBadgeIds)}
+                {activeTab === 'levels' && renderLevels(data, allLevels)}
             </div>
-        </motion.div>
+        </div>
     );
 };
+
+// ===================== Tab Renderers =====================
+
+function renderOverview(stats, data, earnedBadgeIds, allBadges) {
+    return (
+        <div className="space-y-4">
+            {/* Quick Stats Grid */}
+            <div>
+                <h4 className="text-[10px] font-bold text-[#8a6a5c] uppercase tracking-wider mb-2">Activity Stats</h4>
+                <div className="grid grid-cols-3 gap-2">
+                    <StatCard icon={CheckCircle} label="Quizzes" value={stats.quizzes_completed || 0} color="blue" />
+                    <StatCard icon={Star} label="Perfect" value={stats.perfect_scores || 0} color="amber" />
+                    <StatCard icon={Target} label="Questions" value={stats.questions_answered || 0} color="emerald" />
+                    <StatCard icon={Timer} label="Pomodoros" value={stats.pomodoros_completed || 0} color="purple" />
+                    <StatCard icon={FileText} label="Notes" value={stats.notes_generated || 0} color="rose" />
+                    <StatCard icon={Brain} label="Reviews" value={stats.reviews_completed || 0} color="cyan" />
+                </div>
+            </div>
+
+            {/* Next Milestones */}
+            <div>
+                <h4 className="text-[10px] font-bold text-[#8a6a5c] uppercase tracking-wider mb-2">Next Milestones</h4>
+                <div className="space-y-2">
+                    {getNextMilestones(stats, data.total_xp, data.level, earnedBadgeIds, allBadges).map((m, i) => (
+                        <MilestoneRow key={i} milestone={m} />
+                    ))}
+                    {getNextMilestones(stats, data.total_xp, data.level, earnedBadgeIds, allBadges).length === 0 && (
+                        <div className="text-center py-4">
+                            <Trophy className="h-8 w-8 text-amber-400 mx-auto mb-2" />
+                            <p className="text-sm font-bold text-[#4A3B32]">All milestones achieved!</p>
+                            <p className="text-xs text-[#8a6a5c]">You're a true scholar</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function renderBadges(earnedBadges, allBadges, earnedBadgeIds) {
+    return (
+        <div className="space-y-4">
+            {/* Earned Badges */}
+            {earnedBadges.length > 0 && (
+                <div>
+                    <h4 className="text-[10px] font-bold text-[#8a6a5c] uppercase tracking-wider mb-2">
+                        Recently Earned
+                    </h4>
+                    <div className="grid grid-cols-2 gap-2">
+                        {earnedBadges.slice(-4).reverse().map((badge, i) => (
+                            <BadgeMini key={badge.id || i} badge={badge} earned />
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* All Badges by Category */}
+            {Object.entries(groupByCategory(allBadges)).map(([category, badges]) => (
+                <div key={category}>
+                    <h4 className="text-[10px] font-bold text-[#8a6a5c] uppercase tracking-wider mb-2 capitalize">
+                        {category}
+                    </h4>
+                    <div className="grid grid-cols-3 gap-2">
+                        {badges.map((badge) => (
+                            <BadgeCard
+                                key={badge.id}
+                                badge={badge}
+                                earned={earnedBadgeIds.has(badge.id)}
+                            />
+                        ))}
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+function renderLevels(data, allLevels) {
+    return (
+        <div className="space-y-2">
+            {allLevels.map((lvl, i) => {
+                const isCurrentLevel = lvl.level === data.level;
+                const isUnlocked = data.level >= lvl.level;
+                const nextLvl = allLevels[i + 1];
+
+                return (
+                    <div
+                        key={lvl.level}
+                        className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
+                            isCurrentLevel
+                                ? 'bg-gradient-to-r from-[#FDF6F0] to-amber-50/50 border-[#C8A288] shadow-sm'
+                                : isUnlocked
+                                    ? 'bg-white border-[#E6D5CC]/50'
+                                    : 'bg-gray-50/50 border-gray-100 opacity-50'
+                        }`}
+                    >
+                        {/* Level Number */}
+                        <div className={`h-10 w-10 rounded-lg flex items-center justify-center font-bold text-sm shrink-0 ${
+                            isCurrentLevel
+                                ? 'bg-gradient-to-br from-[#C8A288] to-[#8a6a5c] text-white shadow-sm'
+                                : isUnlocked
+                                    ? 'bg-[#E6D5CC] text-[#4A3B32]'
+                                    : 'bg-gray-200 text-gray-400'
+                        }`}>
+                            {isUnlocked ? lvl.level : <Lock className="h-3.5 w-3.5" />}
+                        </div>
+
+                        {/* Level Info */}
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5">
+                                <p className={`text-sm font-bold truncate ${isUnlocked ? 'text-[#4A3B32]' : 'text-gray-400'}`}>
+                                    {lvl.title}
+                                </p>
+                                {isCurrentLevel && (
+                                    <Sparkles className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                                )}
+                            </div>
+                            <p className="text-[11px] text-[#8a6a5c]">
+                                {lvl.xp_required.toLocaleString()} XP
+                            </p>
+
+                            {/* Progress bar for current level */}
+                            {isCurrentLevel && nextLvl && (
+                                <div className="mt-1.5 h-1.5 bg-[#E6D5CC] rounded-full overflow-hidden">
+                                    <motion.div
+                                        initial={{ width: 0 }}
+                                        animate={{ width: `${data.level_progress || 0}%` }}
+                                        transition={{ duration: 1, delay: 0.5 }}
+                                        className="h-full bg-gradient-to-r from-[#C8A288] to-amber-400 rounded-full"
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Status icon */}
+                        {isUnlocked && !isCurrentLevel && (
+                            <CheckCircle className="h-5 w-5 text-emerald-400 shrink-0" />
+                        )}
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
 
 // ===================== Sub-Components =====================
 
@@ -341,7 +334,7 @@ const StatCard = ({ icon: Icon, label, value, color }) => {
             <div className={`h-8 w-8 rounded-lg ${c} flex items-center justify-center mx-auto mb-1.5`}>
                 <Icon className="h-4 w-4" />
             </div>
-            <p className="text-lg font-black text-[#4A3B32]">{value}</p>
+            <p className="text-base font-black text-[#4A3B32]">{value}</p>
             <p className="text-[10px] text-[#8a6a5c] font-medium">{label}</p>
         </div>
     );
@@ -354,9 +347,9 @@ const BadgeMini = ({ badge, earned }) => {
 
     return (
         <div className={`flex items-center gap-2.5 p-2.5 rounded-xl border ${
-            earned ? `${colors.light} border-${category === 'achievement' ? 'amber' : category === 'habit' ? 'emerald' : 'blue'}-200/50` : 'bg-gray-50 border-gray-100'
+            earned ? `${colors.light} ${colors.border}` : 'bg-gray-50 border-gray-100'
         }`}>
-            <div className={`h-9 w-9 rounded-lg bg-gradient-to-br ${colors.bg} flex items-center justify-center shrink-0 shadow-sm`}>
+            <div className={`h-8 w-8 rounded-lg bg-gradient-to-br ${colors.bg} flex items-center justify-center shrink-0 shadow-sm`}>
                 <Icon className="h-4 w-4 text-white" />
             </div>
             <div className="min-w-0">
@@ -373,35 +366,32 @@ const BadgeCard = ({ badge, earned }) => {
     const Icon = BADGE_ICONS[badge.icon] || Award;
 
     return (
-        <motion.div
-            whileHover={earned ? { scale: 1.03 } : {}}
-            className={`relative p-3 rounded-xl border text-center transition-all ${
+        <div
+            className={`relative p-2.5 rounded-xl border text-center transition-all ${
                 earned
                     ? `${colors.light} border-transparent shadow-sm`
                     : 'bg-gray-50/50 border-gray-100'
             }`}
         >
-            {/* Badge icon */}
-            <div className={`h-11 w-11 rounded-xl mx-auto mb-2 flex items-center justify-center ${
+            <div className={`h-10 w-10 rounded-lg mx-auto mb-1.5 flex items-center justify-center ${
                 earned
-                    ? `bg-gradient-to-br ${colors.bg} shadow-md`
+                    ? `bg-gradient-to-br ${colors.bg} shadow-sm`
                     : 'bg-gray-200'
             }`}>
                 {earned ? (
                     <Icon className="h-5 w-5 text-white" />
                 ) : (
-                    <Lock className="h-4 w-4 text-gray-400" />
+                    <Lock className="h-3.5 w-3.5 text-gray-400" />
                 )}
             </div>
 
-            <p className={`text-xs font-bold truncate ${earned ? 'text-[#4A3B32]' : 'text-gray-400'}`}>
+            <p className={`text-[11px] font-bold truncate ${earned ? 'text-[#4A3B32]' : 'text-gray-400'}`}>
                 {badge.title}
             </p>
-            <p className={`text-[10px] leading-tight mt-0.5 ${earned ? 'text-[#8a6a5c]' : 'text-gray-300'}`}>
+            <p className={`text-[9px] leading-tight mt-0.5 ${earned ? 'text-[#8a6a5c]' : 'text-gray-300'}`}>
                 {badge.description}
             </p>
 
-            {/* Earned sparkle */}
             {earned && (
                 <div className="absolute -top-1 -right-1">
                     <div className={`h-5 w-5 rounded-full bg-gradient-to-br ${colors.bg} flex items-center justify-center shadow-sm`}>
@@ -409,7 +399,7 @@ const BadgeCard = ({ badge, earned }) => {
                     </div>
                 </div>
             )}
-        </motion.div>
+        </div>
     );
 };
 
@@ -417,7 +407,7 @@ const MilestoneRow = ({ milestone }) => {
     const progress = Math.min(Math.round((milestone.current / milestone.target) * 100), 100);
 
     return (
-        <div className="flex items-center gap-3 p-2.5 bg-[#FDF6F0] rounded-xl border border-[#E6D5CC]/30">
+        <div className="flex items-center gap-3 p-3 bg-[#FDF6F0] rounded-xl border border-[#E6D5CC]/30">
             <div className="h-8 w-8 rounded-lg bg-[#E6D5CC]/50 flex items-center justify-center shrink-0">
                 <milestone.icon className="h-4 w-4 text-[#C8A288]" />
             </div>
@@ -454,7 +444,6 @@ function groupByCategory(badges) {
 function getNextMilestones(stats, totalXP, level, earnedIds, allBadges) {
     const milestones = [];
 
-    // Find unearned badges and calculate progress toward them
     const milestoneMap = [
         { id: 'first_quiz', stat: 'quizzes_completed', target: 1, icon: Rocket, title: 'Complete first quiz' },
         { id: 'quizzes_10', stat: 'quizzes_completed', target: 10, icon: CheckCircle, title: 'Complete 10 quizzes' },

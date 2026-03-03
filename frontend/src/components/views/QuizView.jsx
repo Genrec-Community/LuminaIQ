@@ -742,7 +742,7 @@ const QuizView = ({
 
                                 <div className="flex-1 flex flex-col animate-in fade-in slide-in-from-right-4 duration-300 px-2" key={currentQuestionIndex}>
                                     <div className="bg-white p-6 md:p-8 rounded-3xl border border-[#E6D5CC] shadow-sm mb-6">
-                                        <div className="prose prose-lg max-w-none text-[#4A3B32] font-medium mb-6">
+                                        <div className="prose prose-lg max-w-none text-[#4A3B32] font-medium mb-6 overflow-x-auto">
                                             <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                                 {mcqTest.questions[currentQuestionIndex].question}
                                             </ReactMarkdown>
@@ -1231,7 +1231,7 @@ const QuizView = ({
                                                             {q.explanation && (
                                                                 <div className="mt-3 p-3 bg-white/60 rounded-lg border border-[#E6D5CC]/50">
                                                                     <span className="font-semibold text-[#4A3B32] block mb-1">Explanation:</span>
-                                                                    <div className="text-[#5a4a42] prose prose-sm max-w-none">
+                                                                    <div className="text-[#5a4a42] prose prose-sm max-w-none overflow-x-auto">
                                                                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{q.explanation}</ReactMarkdown>
                                                                     </div>
                                                                 </div>

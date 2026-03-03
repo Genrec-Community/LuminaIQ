@@ -39,8 +39,10 @@ from services.learning_service import (
     spaced_repetition,
 )
 from services.knowledge_graph_service import knowledge_graph
+from services.llm_service import llm_service
 from api.deps import get_current_user
 from utils.logger import logger
+import json
 
 router = APIRouter()
 
@@ -719,3 +721,321 @@ async def get_suggested_topic(
             "reason": f"Error generating suggestion: {str(e)}",
             "type": "error",
         }
+
+
+# ============== Mindmap Generation ==============
+
+
+class GenerateMindmapRequest(BaseModel):
+    project_id: str
+    topic: str
+    selected_documents: List[str] = []
+
+
+@router.post("/mindmap/generate")
+async def generate_mindmap(
+    request: GenerateMindmapRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Generate a hierarchical mindmap for a specific topic using RAG context.
+
+    Returns a tree structure with the topic as root, main branches as subtopics,
+    and leaf nodes as key details/concepts.
+    """
+    try:
+        # 1. Retrieve relevant document chunks for this topic using RAG
+        collection_name = f"project_{request.project_id}"
+        from services.qdrant_service import qdrant_service
+        from services.embedding_service import embedding_service
+
+        # Get embeddings for the topic query
+        query_text = f"{request.topic}: key concepts, subtopics, and important details"
+        query_vector = await embedding_service.generate_embedding(query_text)
+
+        # Search for relevant chunks
+        filter_conditions = None
+        if request.selected_documents:
+            filter_conditions = {"document_ids": request.selected_documents}
+
+        results = await qdrant_service.search(
+            collection_name=collection_name,
+            query_vector=query_vector,
+            limit=8,
+            filter_conditions=filter_conditions,
+        )
+
+        # Build context from chunks
+        context_parts = []
+        for result in results:
+            text = result.get("text", "")
+            if text:
+                context_parts.append(text)
+
+        context = "\n\n".join(context_parts) if context_parts else ""
+
+        # 2. Generate mindmap using LLM
+        prompt = f"""You are an expert educator. Create a detailed hierarchical mindmap for the topic below.
+Use the provided context from study documents to make the mindmap accurate and comprehensive.
+
+TOPIC: {request.topic}
+
+DOCUMENT CONTEXT:
+{context[:6000]}
+
+TASK: Create a mindmap as a JSON tree structure with the topic as the root node.
+
+RULES:
+1. The root node is the main topic
+2. Create 3-6 main branches (major subtopics/themes)
+3. Each branch should have 2-4 leaf nodes (specific concepts, facts, or details)
+4. Keep node labels concise (2-8 words each)
+5. Make it educational and useful for study/review
+6. Use information from the context when available
+
+OUTPUT FORMAT - Return ONLY valid JSON, no markdown:
+{{
+  "label": "{request.topic}",
+  "children": [
+    {{
+      "label": "Main Branch 1",
+      "children": [
+        {{"label": "Detail 1"}},
+        {{"label": "Detail 2"}}
+      ]
+    }},
+    {{
+      "label": "Main Branch 2",
+      "children": [
+        {{"label": "Detail A"}},
+        {{"label": "Detail B"}}
+      ]
+    }}
+  ]
+}}"""
+
+        messages = [{"role": "user", "content": prompt}]
+        response = await llm_service.chat_completion(
+            messages, temperature=0.3, max_tokens=2000
+        )
+
+        # Parse the mindmap JSON
+        mindmap_data = _parse_mindmap_json(response)
+
+        if not mindmap_data:
+            raise HTTPException(500, "Failed to generate mindmap structure")
+
+        return {
+            "success": True,
+            "topic": request.topic,
+            "mindmap": mindmap_data,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating mindmap: {e}")
+        import traceback
+
+        logger.error(traceback.format_exc())
+        raise HTTPException(500, f"Failed to generate mindmap: {str(e)}")
+
+
+def _parse_mindmap_json(response: str) -> Optional[Dict]:
+    """Parse mindmap JSON from LLM response with repair logic."""
+    if not response:
+        return None
+
+    clean = response.strip()
+
+    # Remove markdown code blocks
+    if clean.startswith("```"):
+        lines = clean.split("\n")
+        if lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        clean = "\n".join(lines)
+
+    # Find JSON object
+    start = clean.find("{")
+    if start == -1:
+        return None
+
+    end = clean.rfind("}")
+    if end > start:
+        json_str = clean[start : end + 1]
+        try:
+            data = json.loads(json_str)
+            if "label" in data:
+                return data
+        except json.JSONDecodeError:
+            pass
+
+    # Try repair: find last complete }
+    json_str = clean[start:]
+    last_brace = json_str.rfind("}")
+    if last_brace > 0:
+        truncated = json_str[: last_brace + 1]
+        try:
+            data = json.loads(truncated)
+            if "label" in data:
+                return data
+        except json.JSONDecodeError:
+            pass
+
+    return None
+
+
+# ============== Flashcard Generation ==============
+
+
+class GenerateFlashcardsRequest(BaseModel):
+    project_id: str
+    topic: str
+    num_cards: int = Field(default=8, ge=3, le=20)
+    selected_documents: List[str] = []
+
+
+@router.post("/flashcards/generate")
+async def generate_flashcards(
+    request: GenerateFlashcardsRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Generate study flashcards for a specific topic using RAG context.
+
+    Returns a list of question/answer flashcard pairs focused on the topic.
+    """
+    try:
+        # 1. Retrieve relevant document chunks for this topic
+        collection_name = f"project_{request.project_id}"
+        from services.qdrant_service import qdrant_service
+        from services.embedding_service import embedding_service
+
+        query_text = f"{request.topic}: important facts, definitions, and key concepts"
+        query_vector = await embedding_service.generate_embedding(query_text)
+
+        filter_conditions = None
+        if request.selected_documents:
+            filter_conditions = {"document_ids": request.selected_documents}
+
+        results = await qdrant_service.search(
+            collection_name=collection_name,
+            query_vector=query_vector,
+            limit=8,
+            filter_conditions=filter_conditions,
+        )
+
+        context_parts = []
+        for result in results:
+            text = result.get("text", "")
+            if text:
+                context_parts.append(text)
+
+        context = "\n\n".join(context_parts) if context_parts else ""
+
+        # 2. Generate flashcards using LLM
+        prompt = f"""You are an expert educator creating study flashcards.
+
+TOPIC: {request.topic}
+
+DOCUMENT CONTEXT:
+{context[:6000]}
+
+TASK: Create exactly {request.num_cards} flashcards for studying this topic.
+
+RULES:
+1. Each card has a "front" (question/prompt) and "back" (answer/explanation)
+2. Cover different aspects of the topic (definitions, concepts, relationships, applications)
+3. Questions should be clear and specific
+4. Answers should be concise but complete (1-3 sentences)
+5. Mix question types: "What is...", "How does...", "Why is...", "Compare...", "Define..."
+6. Use information from the provided context
+7. Make cards progressively harder
+
+OUTPUT FORMAT - Return ONLY valid JSON array, no markdown:
+[
+  {{"front": "What is X?", "back": "X is..."}},
+  {{"front": "How does Y work?", "back": "Y works by..."}}
+]"""
+
+        messages = [{"role": "user", "content": prompt}]
+        response = await llm_service.chat_completion(
+            messages, temperature=0.4, max_tokens=3000
+        )
+
+        # Parse the flashcards JSON
+        flashcards = _parse_flashcards_json(response)
+
+        if not flashcards:
+            raise HTTPException(500, "Failed to generate flashcards")
+
+        return {
+            "success": True,
+            "topic": request.topic,
+            "flashcards": flashcards,
+            "count": len(flashcards),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating flashcards: {e}")
+        import traceback
+
+        logger.error(traceback.format_exc())
+        raise HTTPException(500, f"Failed to generate flashcards: {str(e)}")
+
+
+def _parse_flashcards_json(response: str) -> Optional[List[Dict]]:
+    """Parse flashcards JSON array from LLM response."""
+    if not response:
+        return None
+
+    clean = response.strip()
+
+    # Remove markdown code blocks
+    if clean.startswith("```"):
+        lines = clean.split("\n")
+        if lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        clean = "\n".join(lines)
+
+    # Find JSON array
+    start = clean.find("[")
+    if start == -1:
+        return None
+
+    end = clean.rfind("]")
+    if end > start:
+        json_str = clean[start : end + 1]
+        try:
+            data = json.loads(json_str)
+            if isinstance(data, list) and len(data) > 0:
+                # Validate structure
+                valid = [
+                    c for c in data if isinstance(c, dict) and "front" in c and "back" in c
+                ]
+                return valid if valid else None
+        except json.JSONDecodeError:
+            pass
+
+    # Repair: find last complete object
+    json_str = clean[start:]
+    last_brace = json_str.rfind("}")
+    if last_brace > 0:
+        truncated = json_str[: last_brace + 1].rstrip().rstrip(",") + "]"
+        try:
+            data = json.loads(truncated)
+            if isinstance(data, list):
+                valid = [
+                    c for c in data if isinstance(c, dict) and "front" in c and "back" in c
+                ]
+                return valid if valid else None
+        except json.JSONDecodeError:
+            pass
+
+    return None

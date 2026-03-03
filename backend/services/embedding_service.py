@@ -32,11 +32,20 @@ class EmbeddingService:
         )
         logger.info(f"[EmbeddingService] Initialized with {self.MAX_WORKERS} workers")
     
+    def _add_passage_prefix(self, texts: List[str]) -> List[str]:
+        """Add 'passage: ' prefix for E5 instruct models (document/passage embedding)."""
+        return [f"passage: {t}" for t in texts]
+
+    def _add_query_prefix(self, text: str) -> str:
+        """Add 'query: ' prefix for E5 instruct models (search query embedding)."""
+        return f"query: {text}"
+
     async def generate_embeddings(self, texts: List[str]) -> List[List[float]]:
         """
-        Generate embeddings for a batch of texts.
+        Generate embeddings for a batch of texts (documents/passages).
 
         Uses dedicated thread pool for faster concurrent API calls.
+        E5 instruct models require 'passage: ' prefix for document chunks.
         """
         try:
             if not texts:
@@ -44,12 +53,12 @@ class EmbeddingService:
 
             loop = asyncio.get_running_loop()
 
-            # Run embedding in dedicated thread pool (Together API is sync)
-            texts_copy = list(texts)
+            # Add E5 instruction prefix for passages
+            prefixed_texts = self._add_passage_prefix(texts)
             embeddings = await loop.run_in_executor(
                 self._executor,  # Use dedicated pool, not None (default)
                 self.embeddings.embed_documents,
-                texts_copy,
+                prefixed_texts,
             )
             return embeddings
 
@@ -58,13 +67,17 @@ class EmbeddingService:
             raise
 
     async def generate_embedding(self, text: str) -> List[float]:
-        """Generate embedding for a single text"""
+        """Generate embedding for a single text (search query).
+        
+        E5 instruct models require 'query: ' prefix for search queries.
+        """
         try:
             loop = asyncio.get_running_loop()
+            prefixed_text = self._add_query_prefix(text)
             return await loop.run_in_executor(
                 self._executor,  # Use dedicated pool
                 self.embeddings.embed_query,
-                text,
+                prefixed_text,
             )
         except Exception as e:
             logger.error(f"Error generating embedding: {str(e)}")

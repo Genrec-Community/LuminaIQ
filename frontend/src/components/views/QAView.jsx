@@ -6,11 +6,19 @@ import { generateSubjectiveTest } from '../../api';
 import { useToast } from '../../context/ToastContext';
 import { recordActivity } from '../../utils/studyActivity';
 
-const QAView = ({ projectId, availableTopics, selectedDocuments, onQAActiveChange = null, onBack = null }) => {
+const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopic = null, onQAActiveChange = null, onBack = null }) => {
     const toast = useToast();
     // Q&A State
     const [qaTopic, setQaTopic] = useState('');
     const [qaTopicSelection, setQaTopicSelection] = useState('');
+
+    // Pre-select topic when navigating from Learning Path
+    useEffect(() => {
+        if (preSelectedTopic && availableTopics?.includes(preSelectedTopic)) {
+            setQaTopicSelection(preSelectedTopic);
+            setQaTopic(preSelectedTopic);
+        }
+    }, [preSelectedTopic]);
     const [qaNumQuestions, setQaNumQuestions] = useState(5);
     const [answerSize, setAnswerSize] = useState('medium'); // 'small' | 'medium' | 'large'
     const [qaTest, setQaTest] = useState(null);
@@ -299,7 +307,7 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, onQAActiveChang
                             {qaRevealed[idx] && (
                                 <div className="px-6 pb-6 pt-0 animate-in fade-in slide-in-from-top-2">
                                     <div className="pl-12">
-                                        <div className="p-4 bg-[#FDF6F0] rounded-xl text-[#4A3B32] leading-relaxed border border-[#E6D5CC]">
+                                        <div className="p-4 bg-[#FDF6F0] rounded-xl text-[#4A3B32] leading-relaxed border border-[#E6D5CC] prose prose-sm max-w-none overflow-x-auto">
                                             <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                                 {pair.answer}
                                             </ReactMarkdown>

@@ -201,7 +201,7 @@ const StudyDashboard = ({ projectId, availableTopics }) => {
                 <div className="bg-white rounded-2xl border border-[#E6D5CC] shadow-sm p-6 mb-6">
                     <div className="text-xs font-bold text-[#8a6a5c] uppercase mb-2">{currentCard.topic}</div>
                     
-                    <div className="prose prose-lg max-w-none text-[#4A3B32] mb-6">
+                    <div className="prose prose-lg max-w-none text-[#4A3B32] mb-6 overflow-x-auto">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
                             {currentCard.question}
                         </ReactMarkdown>
@@ -216,7 +216,7 @@ const StudyDashboard = ({ projectId, availableTopics }) => {
                         </button>
                     ) : (
                         <div className="space-y-4">
-                            <div className="bg-[#FDF6F0] rounded-xl p-4 prose prose-sm max-w-none">
+                            <div className="bg-[#FDF6F0] rounded-xl p-4 prose prose-sm max-w-none overflow-x-auto">
                                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                     {currentCard.answer}
                                 </ReactMarkdown>

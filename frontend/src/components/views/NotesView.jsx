@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { BookOpen, Copy, Download, Loader2, ChevronDown, FileDown } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -6,7 +6,7 @@ import { generateNotes } from '../../api';
 import { useToast } from '../../context/ToastContext';
 import { recordActivity } from '../../utils/studyActivity';
 
-const NotesView = ({ projectId, availableTopics, selectedDocuments }) => {
+const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopic = null }) => {
     const toast = useToast();
     // Notes State
     const [notesType, setNotesType] = useState('Comprehensive Summary');
@@ -15,6 +15,14 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments }) => {
     const [notesContent, setNotesContent] = useState('');
     const [notesLoading, setNotesLoading] = useState(false);
     const [pdfLoading, setPdfLoading] = useState(false);
+
+    // Pre-select topic when navigating from Learning Path
+    useEffect(() => {
+        if (preSelectedTopic && availableTopics?.includes(preSelectedTopic)) {
+            setNotesTopicSelection(preSelectedTopic);
+            setNotesTopic(preSelectedTopic);
+        }
+    }, [preSelectedTopic]);
 
     // Ref for the rendered notes content
     const notesRef = useRef(null);
@@ -340,7 +348,7 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments }) => {
 
                     <div
                         ref={notesRef}
-                        className="bg-white p-8 rounded-3xl border border-[#E6D5CC] shadow-sm flex-1 overflow-y-auto prose prose-lg max-w-none text-[#4A3B32]"
+                        className="bg-white p-8 rounded-3xl border border-[#E6D5CC] shadow-sm flex-1 overflow-y-auto overflow-x-auto prose prose-lg max-w-none text-[#4A3B32]"
                     >
                         {notesLoading && !notesContent ? (
                             <div className="flex items-center justify-center h-40 gap-3 text-[#8a6a5c]">

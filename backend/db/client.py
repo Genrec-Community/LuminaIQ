@@ -9,9 +9,9 @@ class SupabaseClient:
     def get_instance(cls) -> Client:
         if cls._instance is None:
             options = SyncClientOptions(
-                postgrest_client_timeout=15,
-                storage_client_timeout=15,
-                function_client_timeout=10,
+                postgrest_client_timeout=30,
+                storage_client_timeout=30,
+                function_client_timeout=15,
             )
             cls._instance = create_client(
                 settings.SUPABASE_URL,

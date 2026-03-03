@@ -13,22 +13,34 @@ export const useGamification = () => {
     return context;
 };
 
+// Per-activity cooldowns (ms) to prevent XP spam
+const ACTIVITY_COOLDOWNS = {
+    chat: 15000,           // 15s between chat XP awards
+    review: 3000,          // 3s between review awards
+    knowledge_graph: 10000, // 10s between graph explore awards
+    path: 8000,            // 8s between path awards
+};
+
 export const GamificationProvider = ({ children }) => {
     const { user } = useAuth();
     const [data, setData] = useState(null);
     const [loaded, setLoaded] = useState(false);
     const [xpEvents, setXpEvents] = useState([]); // For XP toast animations
 
+    // Cooldown tracker: { activityType: lastAwardTimestamp }
+    const cooldownsRef = useRef({});
+
     // Load gamification data only when user is authenticated
     useEffect(() => {
         if (!user) {
+            setData(null);
             setLoaded(true);
             return;
         }
         const load = async () => {
             try {
                 const result = await getGamification();
-                setData(result);
+                if (result) setData(result);
             } catch (err) {
                 console.warn('Failed to load gamification data:', err);
             } finally {
@@ -40,38 +52,49 @@ export const GamificationProvider = ({ children }) => {
 
     // Award XP and trigger animations
     const earnXP = useCallback(async (activityType, meta = {}) => {
+        // Cooldown check — skip if we awarded this activity type too recently
+        const cooldownMs = ACTIVITY_COOLDOWNS[activityType];
+        if (cooldownMs) {
+            const lastAward = cooldownsRef.current[activityType] || 0;
+            if (Date.now() - lastAward < cooldownMs) {
+                return null; // Silently skip — too soon
+            }
+        }
+
         try {
             const result = await awardXP(activityType, meta);
 
             if (result && !result.error) {
-                // Update local state
-                setData(prev => prev ? {
-                    ...prev,
-                    total_xp: result.total_xp,
-                    level: result.level,
-                    level_title: result.level_title,
-                    level_progress: result.level_progress,
-                    xp_in_level: result.xp_in_level,
-                    xp_needed: result.xp_needed,
-                    next_level: result.next_level,
-                    stats: result.stats,
-                } : prev);
+                // Record this award time for cooldown
+                cooldownsRef.current[activityType] = Date.now();
 
-                // Add new badges to local state
-                if (result.new_badges && result.new_badges.length > 0) {
-                    setData(prev => {
-                        if (!prev) return prev;
-                        const existingIds = new Set((prev.badges || []).map(b => b.id));
-                        const toAdd = result.new_badges.filter(b => !existingIds.has(b.id));
-                        return {
-                            ...prev,
-                            badges: [...(prev.badges || []), ...toAdd.map(b => ({
-                                ...b,
-                                earned_at: new Date().toISOString(),
-                            }))],
-                        };
-                    });
-                }
+                // Update local state with the new values from server
+                setData(prev => {
+                    if (!prev) return prev;
+
+                    // Merge new badges
+                    let updatedBadges = prev.badges || [];
+                    if (result.new_badges && result.new_badges.length > 0) {
+                        const existingIds = new Set(updatedBadges.map(b => b.id));
+                        const toAdd = result.new_badges
+                            .filter(b => !existingIds.has(b.id))
+                            .map(b => ({ ...b, earned_at: new Date().toISOString() }));
+                        updatedBadges = [...updatedBadges, ...toAdd];
+                    }
+
+                    return {
+                        ...prev,
+                        total_xp: result.total_xp,
+                        level: result.level,
+                        level_title: result.level_title,
+                        level_progress: result.level_progress,
+                        xp_in_level: result.xp_in_level,
+                        xp_needed: result.xp_needed,
+                        next_level: result.next_level,
+                        stats: result.stats,
+                        badges: updatedBadges,
+                    };
+                });
 
                 // Create XP event for toast animation
                 const event = {
@@ -93,6 +116,8 @@ export const GamificationProvider = ({ children }) => {
                 }, 4000);
 
                 return result;
+            } else if (result && result.error) {
+                console.warn('XP award failed on server:', result.error);
             }
         } catch (err) {
             console.warn('Failed to award XP:', err);
@@ -116,7 +141,7 @@ export const GamificationProvider = ({ children }) => {
     const refresh = useCallback(async () => {
         try {
             const result = await getGamification();
-            setData(result);
+            if (result) setData(result);
         } catch (err) {
             console.warn('Failed to refresh gamification:', err);
         }

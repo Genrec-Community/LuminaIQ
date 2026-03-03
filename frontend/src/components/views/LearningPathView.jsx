@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
     Target, BookOpen, ChevronRight, Loader2, RefreshCw, 
-    CheckCircle, Circle, Lock, Unlock, Brain, Sparkles,
+    CheckCircle, Circle, Brain, Sparkles,
     ArrowRight, Play, AlertTriangle, Trophy, XCircle,
-    Plus, FileText, CheckSquare, HelpCircle
+    Plus, FileText, CheckSquare, HelpCircle, MessageSquare,
+    Network, Zap, GitBranch, Layers
 } from 'lucide-react';
 import { 
     getLearningPath, 
@@ -20,10 +21,16 @@ const LearningPathView = ({
     selectedDocuments, 
     setSelectedDocuments, 
     documentTopics,
-    documents = [], // Add documents prop for names
+    documents = [],
     completedTopics = new Set(),
     onStartQuiz,
-    onTopicComplete
+    onTopicComplete,
+    onGenerateNotes,
+    onStartQA,
+    onOpenTutor,
+    onOpenKnowledgeGraph,
+    onOpenMindmap,
+    onOpenFlashcards
 }) => {
     // Helper to get document name by ID
     const getDocName = (docId) => {
@@ -44,17 +51,29 @@ const LearningPathView = ({
     }, [projectId]);
     
     const loadData = async () => {
-        setLoading(true);
+        // Try to load from sessionStorage cache for instant display
+        const cacheKey = `lumina_path_${projectId}`;
+        const cached = sessionStorage.getItem(cacheKey);
+        if (cached) {
+            try {
+                const { learningPath: cachedPath, graphStats: cachedStats, performance: cachedPerf } = JSON.parse(cached);
+                if (cachedPath) setLearningPath(cachedPath);
+                if (cachedStats) setGraphStats(cachedStats);
+                if (cachedPerf) setPerformance(cachedPerf);
+                setLoading(false); // Show cached data immediately
+            } catch (e) {
+                // ignore parse errors, will fetch fresh
+            }
+        }
+        
         try {
-            // Load learning path
+            // Fetch fresh data (background refresh if cached data was shown)
             const pathData = await getLearningPath(projectId);
             setLearningPath(pathData);
             
-            // Load graph stats
             const graphData = await getKnowledgeGraph(projectId);
             setGraphStats(graphData.stats);
             
-            // Load user performance
             const perfData = await getPerformance(projectId);
             const perfMap = {};
             (perfData.performance || []).forEach(p => {
@@ -67,6 +86,13 @@ const LearningPathView = ({
                 };
             });
             setPerformance(perfMap);
+            
+            // Cache the fresh data for next visit
+            sessionStorage.setItem(cacheKey, JSON.stringify({
+                learningPath: pathData,
+                graphStats: graphData.stats,
+                performance: perfMap
+            }));
         } catch (error) {
             console.error('Failed to load learning path:', error);
         } finally {
@@ -90,6 +116,8 @@ const LearningPathView = ({
         setBuilding(true);
         try {
             await buildKnowledgeGraph(projectId, topicsToUse, true);
+            // Clear cache so fresh data is loaded
+            sessionStorage.removeItem(`lumina_path_${projectId}`);
             await loadData();
             recordActivity(projectId, 'path', { action: 'build_graph', topicCount: topicsToUse.length });
         } catch (error) {
@@ -98,23 +126,6 @@ const LearningPathView = ({
         } finally {
             setBuilding(false);
         }
-    };
-    
-    // Check if a topic is unlocked (previous topic completed OR first topic)
-    const isTopicUnlocked = (topicIndex) => {
-        if (topicIndex === 0) return true; // First topic always unlocked
-        
-        const pathItems = learningPath?.learning_path || [];
-        
-        // Check if previous topic is completed
-        if (topicIndex > 0) {
-            const prevTopic = pathItems[topicIndex - 1]?.topic;
-            if (!completedTopics.has(prevTopic)) {
-                return false;
-            }
-        }
-        
-        return true;
     };
     
     // Find which documents contain a topic
@@ -150,12 +161,6 @@ const LearningPathView = ({
         
         if (!topic) return;
         
-        // Check if unlocked
-        if (!isTopicUnlocked(topicIndex)) {
-            toast.info('Complete the previous topic first to unlock this one!');
-            return;
-        }
-        
         // Get documents containing this topic
         const docsWithTopic = findDocumentsForTopic(topic);
         
@@ -165,16 +170,60 @@ const LearningPathView = ({
             recordActivity(projectId, 'path', { action: 'start_topic_quiz', topic });
         }
     };
+
+    // Handle generating notes for a topic
+    const handleGenerateNotes = (topicIndex) => {
+        const pathItems = learningPath?.learning_path || [];
+        const topic = pathItems[topicIndex]?.topic;
+        if (!topic || !onGenerateNotes) return;
+        const docsWithTopic = findDocumentsForTopic(topic);
+        onGenerateNotes(topic, docsWithTopic);
+        recordActivity(projectId, 'path', { action: 'generate_notes', topic });
+    };
+
+    // Handle starting Q&A for a topic
+    const handleStartQA = (topicIndex) => {
+        const pathItems = learningPath?.learning_path || [];
+        const topic = pathItems[topicIndex]?.topic;
+        if (!topic || !onStartQA) return;
+        const docsWithTopic = findDocumentsForTopic(topic);
+        onStartQA(topic, docsWithTopic);
+        recordActivity(projectId, 'path', { action: 'start_qa', topic });
+    };
+
+    // Handle opening AI Tutor for a topic
+    const handleOpenTutor = (topicIndex) => {
+        const pathItems = learningPath?.learning_path || [];
+        const topic = pathItems[topicIndex]?.topic;
+        if (!topic || !onOpenTutor) return;
+        onOpenTutor(topic);
+        recordActivity(projectId, 'path', { action: 'open_tutor', topic });
+    };
+
+    // Handle opening Mindmap for a topic
+    const handleOpenMindmap = (topicIndex) => {
+        const pathItems = learningPath?.learning_path || [];
+        const topic = pathItems[topicIndex]?.topic;
+        if (!topic || !onOpenMindmap) return;
+        const docsWithTopic = findDocumentsForTopic(topic);
+        onOpenMindmap(topic, docsWithTopic);
+        recordActivity(projectId, 'path', { action: 'open_mindmap', topic });
+    };
+
+    // Handle opening Flashcards for a topic
+    const handleOpenFlashcards = (topicIndex) => {
+        const pathItems = learningPath?.learning_path || [];
+        const topic = pathItems[topicIndex]?.topic;
+        if (!topic || !onOpenFlashcards) return;
+        const docsWithTopic = findDocumentsForTopic(topic);
+        onOpenFlashcards(topic, docsWithTopic);
+        recordActivity(projectId, 'path', { action: 'open_flashcards', topic });
+    };
     
-    const getTopicStatus = (topic, topicIndex) => {
+    const getTopicStatus = (topic) => {
         // Check if completed
         if (completedTopics.has(topic)) {
             return { status: 'completed', label: 'Completed', color: 'green' };
-        }
-        
-        // Check if locked
-        if (!isTopicUnlocked(topicIndex)) {
-            return { status: 'locked', label: 'Locked', color: 'gray' };
         }
         
         // Check if in progress (has attempts but not completed)
@@ -183,7 +232,7 @@ const LearningPathView = ({
             return { status: 'in_progress', label: 'In Progress', color: 'yellow' };
         }
         
-        return { status: 'unlocked', label: 'Ready', color: 'blue' };
+        return { status: 'ready', label: 'Ready', color: 'blue' };
     };
     
     // Calculate overall progress
@@ -222,7 +271,7 @@ const LearningPathView = ({
                     </div>
                     <h2 className="text-2xl font-bold text-[#4A3B32] mb-2">Learning Path</h2>
                     <p className="text-[#8a6a5c]">
-                        Complete each topic with 80%+ to unlock the next
+                        Your personalized study sequence
                     </p>
                 </div>
 
@@ -313,10 +362,6 @@ const LearningPathView = ({
                         {/* Legend */}
                         <div className="flex flex-wrap gap-4 text-xs font-medium mb-4">
                             <div className="flex items-center gap-1.5">
-                                <Lock className="h-3 w-3 text-gray-400" />
-                                <span className="text-gray-600">Locked</span>
-                            </div>
-                            <div className="flex items-center gap-1.5">
                                 <Play className="h-3 w-3 text-blue-500" />
                                 <span className="text-blue-700">Ready</span>
                             </div>
@@ -332,11 +377,10 @@ const LearningPathView = ({
 
                         {/* Path Items */}
                         {learningPath.learning_path.map((item, idx) => {
-                            const status = getTopicStatus(item.topic, idx);
+                            const status = getTopicStatus(item.topic);
                             const perf = performance[item.topic];
                             const isLast = idx === learningPath.learning_path.length - 1;
                             const isExpanded = expandedTopic === idx;
-                            const isLocked = status.status === 'locked';
                             const docsWithTopic = findDocumentsForTopic(item.topic);
                             const docsInContext = getDocsInContext(item.topic);
                             
@@ -355,27 +399,23 @@ const LearningPathView = ({
                                             isExpanded ? 'border-[#C8A288] shadow-lg ring-2 ring-[#C8A288]/20' :
                                             status.status === 'completed' ? 'border-green-200 bg-green-50/50' :
                                             status.status === 'in_progress' ? 'border-yellow-200 bg-yellow-50/50' :
-                                            status.status === 'locked' ? 'border-gray-200 bg-gray-50/50 opacity-60' :
                                             'border-[#E6D5CC] hover:border-[#C8A288]'
                                         }`}
                                     >
                                         {/* Main Card Content */}
                                         <div 
-                                            className={`p-4 ${!isLocked ? 'cursor-pointer' : ''}`}
-                                            onClick={() => !isLocked && setExpandedTopic(isExpanded ? null : idx)}
+                                            className="p-4 cursor-pointer"
+                                            onClick={() => setExpandedTopic(isExpanded ? null : idx)}
                                         >
                                             <div className="flex items-start gap-4">
                                                 {/* Order Badge */}
                                                 <div className={`h-12 w-12 rounded-full flex items-center justify-center font-bold text-lg flex-shrink-0 ${
                                                     status.status === 'completed' ? 'bg-green-500 text-white' :
                                                     status.status === 'in_progress' ? 'bg-yellow-400 text-white' :
-                                                    status.status === 'locked' ? 'bg-gray-300 text-gray-500' :
                                                     'bg-blue-500 text-white'
                                                 }`}>
                                                     {status.status === 'completed' ? (
                                                         <CheckCircle className="h-6 w-6" />
-                                                    ) : status.status === 'locked' ? (
-                                                        <Lock className="h-5 w-5" />
                                                     ) : (
                                                         item.order
                                                     )}
@@ -384,9 +424,7 @@ const LearningPathView = ({
                                                 {/* Content */}
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-start justify-between gap-2">
-                                                        <h4 className={`font-bold text-lg ${
-                                                            isLocked ? 'text-gray-400' : 'text-[#4A3B32]'
-                                                        }`}>{item.topic}</h4>
+                                                        <h4 className="font-bold text-lg text-[#4A3B32]">{item.topic}</h4>
                                                         <div className="flex items-center gap-2">
                                                             {/* Context indicator */}
                                                             {docsWithTopic.length > 0 && (
@@ -401,21 +439,12 @@ const LearningPathView = ({
                                                             <span className={`text-xs font-bold px-2 py-1 rounded-full whitespace-nowrap ${
                                                                 status.status === 'completed' ? 'bg-green-100 text-green-700' :
                                                                 status.status === 'in_progress' ? 'bg-yellow-100 text-yellow-700' :
-                                                                status.status === 'locked' ? 'bg-gray-100 text-gray-500' :
                                                                 'bg-blue-100 text-blue-700'
                                                             }`}>
                                                                 {status.label}
                                                             </span>
                                                         </div>
                                                     </div>
-                                                    
-                                                    {/* Prerequisites */}
-                                                    {item.prerequisites?.length > 0 && (
-                                                        <div className="flex items-center gap-2 mt-2 text-sm text-[#8a6a5c]">
-                                                            <Lock className="h-3.5 w-3.5" />
-                                                            <span>Requires: {item.prerequisites.join(', ')}</span>
-                                                        </div>
-                                                    )}
                                                     
                                                     {/* Performance Stats */}
                                                     {perf && perf.attempts > 0 && (
@@ -429,7 +458,7 @@ const LearningPathView = ({
                                                     )}
                                                     
                                                     {/* Click to expand hint */}
-                                                    {!isLocked && !isExpanded && status.status !== 'completed' && (
+                                                    {!isExpanded && status.status !== 'completed' && (
                                                         <div className="flex items-center gap-2 mt-3 text-sm text-[#C8A288] font-medium">
                                                             <Play className="h-4 w-4" />
                                                             <span>Click to see options</span>
@@ -446,13 +475,13 @@ const LearningPathView = ({
                                             </div>
                                         </div>
                                         
-                                        {/* Expanded Actions Section */}
-                                        {isExpanded && !isLocked && (
+                                        {/* Expanded Actions Section -- Study Hub */}
+                                        {isExpanded && (
                                             <div className="px-4 pb-4 pt-2 border-t border-[#E6D5CC] mt-2">
                                                 <div className="bg-[#FDF6F0] rounded-xl p-4">
-                                                    <h5 className="font-bold text-[#4A3B32] mb-3 flex items-center gap-2">
+                                                    <h5 className="font-bold text-[#4A3B32] mb-4 flex items-center gap-2">
                                                         <Play className="h-4 w-4 text-[#C8A288]" />
-                                                        Start Learning: {item.topic}
+                                                        Study Hub: {item.topic}
                                                     </h5>
                                                     
                                                     {/* Context Selection */}
@@ -475,60 +504,182 @@ const LearningPathView = ({
                                                             </div>
                                                         </div>
                                                     )}
-                                                    
-                                                    {/* Quiz Options */}
-                                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleStartQuiz(idx, 'mcq');
-                                                            }}
-                                                            className="p-4 bg-white border-2 border-[#E6D5CC] rounded-xl hover:border-[#C8A288] transition-all group"
-                                                        >
-                                                            <div className="flex flex-col items-center text-center">
-                                                                <div className="h-10 w-10 bg-purple-100 rounded-lg flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                                                                    <CheckSquare className="h-5 w-5 text-purple-600" />
+
+                                                    {/* Study Actions -- Learn Section */}
+                                                    <div className="mb-4">
+                                                        <p className="text-[10px] font-bold text-[#8a6a5c] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                                            <BookOpen className="h-3 w-3" />
+                                                            Learn & Review
+                                                        </p>
+                                                        <div className="grid grid-cols-3 gap-2">
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleGenerateNotes(idx);
+                                                                }}
+                                                                className="p-3 bg-white border-2 border-[#E6D5CC] rounded-xl hover:border-emerald-400 hover:bg-emerald-50/50 transition-all group"
+                                                            >
+                                                                <div className="flex flex-col items-center text-center">
+                                                                    <div className="h-9 w-9 bg-emerald-100 rounded-lg flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
+                                                                        <FileText className="h-4 w-4 text-emerald-600" />
+                                                                    </div>
+                                                                    <span className="font-bold text-xs text-[#4A3B32]">Notes</span>
+                                                                    <span className="text-[10px] text-[#8a6a5c]">Generate</span>
                                                                 </div>
-                                                                <span className="font-bold text-[#4A3B32]">MCQ Only</span>
-                                                                <span className="text-xs text-[#8a6a5c]">10 questions</span>
-                                                            </div>
-                                                        </button>
-                                                        
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleStartQuiz(idx, 'subjective');
-                                                            }}
-                                                            className="p-4 bg-white border-2 border-[#E6D5CC] rounded-xl hover:border-[#C8A288] transition-all group"
-                                                        >
-                                                            <div className="flex flex-col items-center text-center">
-                                                                <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                                                                    <FileText className="h-5 w-5 text-blue-600" />
+                                                            </button>
+
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleStartQA(idx);
+                                                                }}
+                                                                className="p-3 bg-white border-2 border-[#E6D5CC] rounded-xl hover:border-amber-400 hover:bg-amber-50/50 transition-all group"
+                                                            >
+                                                                <div className="flex flex-col items-center text-center">
+                                                                    <div className="h-9 w-9 bg-amber-100 rounded-lg flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
+                                                                        <HelpCircle className="h-4 w-4 text-amber-600" />
+                                                                    </div>
+                                                                    <span className="font-bold text-xs text-[#4A3B32]">Q&A</span>
+                                                                    <span className="text-[10px] text-[#8a6a5c]">Study</span>
                                                                 </div>
-                                                                <span className="font-bold text-[#4A3B32]">Subjective</span>
-                                                                <span className="text-xs text-[#8a6a5c]">2 questions</span>
-                                                            </div>
-                                                        </button>
-                                                        
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleStartQuiz(idx, 'both');
-                                                            }}
-                                                            className="p-4 bg-gradient-to-br from-[#C8A288] to-[#A08072] text-white border-2 border-transparent rounded-xl hover:shadow-lg transition-all group"
-                                                        >
-                                                            <div className="flex flex-col items-center text-center">
-                                                                <div className="h-10 w-10 bg-white/20 rounded-lg flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                                                                    <Brain className="h-5 w-5" />
+                                                            </button>
+
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleOpenTutor(idx);
+                                                                }}
+                                                                className="p-3 bg-white border-2 border-[#E6D5CC] rounded-xl hover:border-blue-400 hover:bg-blue-50/50 transition-all group"
+                                                            >
+                                                                <div className="flex flex-col items-center text-center">
+                                                                    <div className="h-9 w-9 bg-blue-100 rounded-lg flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
+                                                                        <MessageSquare className="h-4 w-4 text-blue-600" />
+                                                                    </div>
+                                                                    <span className="font-bold text-xs text-[#4A3B32]">AI Tutor</span>
+                                                                    <span className="text-[10px] text-[#8a6a5c]">Chat</span>
                                                                 </div>
-                                                                <span className="font-bold">Complete Quiz</span>
-                                                                <span className="text-xs opacity-80">5 MCQ + 2 Subjective</span>
-                                                            </div>
-                                                        </button>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Explore & Visualize Section */}
+                                                    <div className="mb-4">
+                                                        <p className="text-[10px] font-bold text-[#8a6a5c] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                                            <GitBranch className="h-3 w-3" />
+                                                            Explore & Visualize
+                                                        </p>
+                                                        <div className="grid grid-cols-2 gap-2">
+                                                            {onOpenMindmap && (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleOpenMindmap(idx);
+                                                                    }}
+                                                                    className="p-3 bg-white border-2 border-[#E6D5CC] rounded-xl hover:border-indigo-400 hover:bg-indigo-50/50 transition-all group"
+                                                                >
+                                                                    <div className="flex flex-col items-center text-center">
+                                                                        <div className="h-9 w-9 bg-indigo-100 rounded-lg flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
+                                                                            <GitBranch className="h-4 w-4 text-indigo-600" />
+                                                                        </div>
+                                                                        <span className="font-bold text-xs text-[#4A3B32]">Mindmap</span>
+                                                                        <span className="text-[10px] text-[#8a6a5c]">Visualize</span>
+                                                                    </div>
+                                                                </button>
+                                                            )}
+
+                                                            {onOpenFlashcards && (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleOpenFlashcards(idx);
+                                                                    }}
+                                                                    className="p-3 bg-white border-2 border-[#E6D5CC] rounded-xl hover:border-orange-400 hover:bg-orange-50/50 transition-all group"
+                                                                >
+                                                                    <div className="flex flex-col items-center text-center">
+                                                                        <div className="h-9 w-9 bg-orange-100 rounded-lg flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
+                                                                            <Layers className="h-4 w-4 text-orange-600" />
+                                                                        </div>
+                                                                        <span className="font-bold text-xs text-[#4A3B32]">Flashcards</span>
+                                                                        <span className="text-[10px] text-[#8a6a5c]">Study</span>
+                                                                    </div>
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                     
-                                                    <p className="text-xs text-[#8a6a5c] mt-3 text-center">
-                                                        Score 80% or higher to complete this topic and unlock the next
+                                                    {/* Test Yourself -- Quiz Section */}
+                                                    <div className="mb-3">
+                                                        <p className="text-[10px] font-bold text-[#8a6a5c] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                                            <Zap className="h-3 w-3" />
+                                                            Test Your Knowledge
+                                                        </p>
+                                                        <div className="grid grid-cols-3 gap-2">
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleStartQuiz(idx, 'mcq');
+                                                                }}
+                                                                className="p-3 bg-white border-2 border-[#E6D5CC] rounded-xl hover:border-purple-400 hover:bg-purple-50/50 transition-all group"
+                                                            >
+                                                                <div className="flex flex-col items-center text-center">
+                                                                    <div className="h-9 w-9 bg-purple-100 rounded-lg flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
+                                                                        <CheckSquare className="h-4 w-4 text-purple-600" />
+                                                                    </div>
+                                                                    <span className="font-bold text-xs text-[#4A3B32]">MCQ</span>
+                                                                    <span className="text-[10px] text-[#8a6a5c]">10 questions</span>
+                                                                </div>
+                                                            </button>
+                                                            
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleStartQuiz(idx, 'subjective');
+                                                                }}
+                                                                className="p-3 bg-white border-2 border-[#E6D5CC] rounded-xl hover:border-blue-400 hover:bg-blue-50/50 transition-all group"
+                                                            >
+                                                                <div className="flex flex-col items-center text-center">
+                                                                    <div className="h-9 w-9 bg-blue-100 rounded-lg flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
+                                                                        <FileText className="h-4 w-4 text-blue-600" />
+                                                                    </div>
+                                                                    <span className="font-bold text-xs text-[#4A3B32]">Subjective</span>
+                                                                    <span className="text-[10px] text-[#8a6a5c]">2 questions</span>
+                                                                </div>
+                                                            </button>
+                                                            
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleStartQuiz(idx, 'both');
+                                                                }}
+                                                                className="p-3 bg-gradient-to-br from-[#C8A288] to-[#A08072] text-white border-2 border-transparent rounded-xl hover:shadow-lg transition-all group"
+                                                            >
+                                                                <div className="flex flex-col items-center text-center">
+                                                                    <div className="h-9 w-9 bg-white/20 rounded-lg flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
+                                                                        <Brain className="h-4 w-4" />
+                                                                    </div>
+                                                                    <span className="font-bold text-xs">Full Quiz</span>
+                                                                    <span className="text-[10px] opacity-80">5 + 2</span>
+                                                                </div>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Explore */}
+                                                    {onOpenKnowledgeGraph && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                onOpenKnowledgeGraph();
+                                                            }}
+                                                            className="w-full p-2.5 bg-white border border-[#E6D5CC] rounded-xl hover:border-[#C8A288] transition-all flex items-center justify-center gap-2 text-sm font-medium text-[#8a6a5c] hover:text-[#4A3B32]"
+                                                        >
+                                                            <Network className="h-4 w-4 text-[#C8A288]" />
+                                                            View Knowledge Graph
+                                                        </button>
+                                                    )}
+                                                    
+                                                    <p className="text-[10px] text-[#8a6a5c] mt-3 text-center">
+                                                        Take quizzes to track your progress on each topic
                                                     </p>
                                                 </div>
                                             </div>
@@ -565,11 +716,11 @@ const LearningPathView = ({
                         <div>
                             <p className="font-bold text-[#4A3B32] mb-1">How It Works</p>
                             <ul className="space-y-1">
-                                <li>1. Click on an unlocked topic to expand quiz options</li>
-                                <li>2. Choose MCQ, Subjective, or Complete Quiz (recommended)</li>
-                                <li>3. Score 80% or higher to mark the topic as complete</li>
-                                <li>4. Completing a topic unlocks the next one in the path</li>
-                                <li>5. Use "Add to Context" to select relevant documents in the sidebar</li>
+                                <li>1. Click on any topic to open the Study Hub</li>
+                                <li>2. Use <strong>Learn & Review</strong> tools: Notes, Q&A, AI Tutor</li>
+                                <li>3. When ready, <strong>Test Your Knowledge</strong> with MCQ, Subjective, or Full Quiz</li>
+                                <li>4. Track your progress as you complete each topic</li>
+                                <li>5. Use "Add to Context" to select relevant documents</li>
                             </ul>
                         </div>
                     </div>

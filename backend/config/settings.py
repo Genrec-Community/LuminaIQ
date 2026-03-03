@@ -30,7 +30,8 @@ class Settings(BaseSettings):
 
     # LLM Configuration
     LLM_MODEL: str = "OpenAI/gpt-oss-20B"
-    EMBEDDING_MODEL: str = "BAAI/bge-base-en-v1.5-vllm"
+    EMBEDDING_MODEL: str = "intfloat/multilingual-e5-large-instruct"
+    EMBEDDING_DIMENSION: int = 1024
     CHUNK_SIZE: int = 800  # Larger chunks = fewer API calls
     CHUNK_OVERLAP: int = 100  # Better context continuity
 

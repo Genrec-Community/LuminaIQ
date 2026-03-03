@@ -72,6 +72,15 @@ export const SettingsProvider = ({ children }) => {
         }
     }, [settings.darkMode]);
 
+    // Apply compact mode whenever settings change
+    useEffect(() => {
+        if (settings.compactMode) {
+            document.documentElement.classList.add('compact');
+        } else {
+            document.documentElement.classList.remove('compact');
+        }
+    }, [settings.compactMode]);
+
     const updateSetting = useCallback((key, value) => {
         setSettings(prev => {
             const next = { ...prev, [key]: value };

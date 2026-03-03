@@ -31,7 +31,6 @@ import {
     Network,
     BarChart3,
     Trophy,
-    Zap,
     Maximize2,
     Minimize2
 } from 'lucide-react';
@@ -54,6 +53,7 @@ import {
 } from '../api';
 import { useToast } from '../context/ToastContext';
 import { useSettings } from '../context/SettingsContext';
+import { useGamification } from '../context/GamificationContext';
 import { recordActivity } from '../utils/studyActivity';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -68,6 +68,8 @@ import LearningPathView from '../components/views/LearningPathView';
 import AdvancedAnalytics from '../components/views/AdvancedAnalytics';
 import ExamPrepMode from '../components/views/ExamPrepMode';
 import KnowledgeGraphView from '../components/views/KnowledgeGraphView';
+import TopicMindmap from '../components/views/TopicMindmap';
+import TopicFlashcards from '../components/views/TopicFlashcards';
 
 // Utility Components
 import PomodoroTimer from '../components/PomodoroTimer';
@@ -75,14 +77,14 @@ import AITutorChat from '../components/AITutorChat';
 import BookmarksPanel from '../components/BookmarksPanel';
 import GlobalSearch from '../components/GlobalSearch';
 import GamificationPanel from '../components/GamificationPanel';
-import { useGamification } from '../context/GamificationContext';
 
 const ProjectView = () => {
     const { projectId } = useParams();
     const navigate = useNavigate();
     const toast = useToast();
     const { settings } = useSettings();
-    const { data: gamificationData, earnXP } = useGamification();
+    const { data: gamificationData } = useGamification();
+    const [showGamification, setShowGamification] = useState(false);
     const [activeTab, setActiveTab] = useState(() => {
         return sessionStorage.getItem(`lumina_tab_${projectId}`) || 'chat';
     });
@@ -94,6 +96,11 @@ const ProjectView = () => {
     // Persist activeTab to sessionStorage
     useEffect(() => {
         sessionStorage.setItem(`lumina_tab_${projectId}`, activeTab);
+        // Dismiss mindmap/flashcard overlays when switching tabs
+        setMindmapTopic(null);
+        setMindmapDocs([]);
+        setFlashcardTopic(null);
+        setFlashcardDocs([]);
     }, [activeTab, projectId]);
 
     // Persist chat messages to sessionStorage
@@ -125,7 +132,6 @@ const ProjectView = () => {
     const [showPomodoro, setShowPomodoro] = useState(false);
     const [showAITutor, setShowAITutor] = useState(false);
     const [showBookmarks, setShowBookmarks] = useState(false);
-    const [showGamification, setShowGamification] = useState(false);
     const [zenMode, setZenMode] = useState(false);
     const [tutorTopic, setTutorTopic] = useState(null);
 
@@ -138,6 +144,12 @@ const ProjectView = () => {
     const [preSelectedTopic, setPreSelectedTopic] = useState(null);
     const [preSelectedQuizMode, setPreSelectedQuizMode] = useState(null);
     const [cameFromPath, setCameFromPath] = useState(false);
+    
+    // Mindmap & Flashcards State (shown inline, only from learning path)
+    const [mindmapTopic, setMindmapTopic] = useState(null);
+    const [mindmapDocs, setMindmapDocs] = useState([]);
+    const [flashcardTopic, setFlashcardTopic] = useState(null);
+    const [flashcardDocs, setFlashcardDocs] = useState([]);
     
     // Learning Progress (persisted in Supabase)
     const [learningProgress, setLearningProgress] = useState(new Set());
@@ -343,7 +355,7 @@ const ProjectView = () => {
 
         document.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [showSearch, showPomodoro, showAITutor, showBookmarks, showGamification, zenMode]);
+    }, [showSearch, showPomodoro, showAITutor, showBookmarks, zenMode]);
 
     const [showSummary, setShowSummary] = useState(false);
     const [summaryContent, setSummaryContent] = useState('');
@@ -744,24 +756,6 @@ const ProjectView = () => {
                             {/* Divider */}
                             <div className="w-px h-5 bg-[#E6D5CC]/60 mx-1 hidden sm:block" />
 
-                            {/* Gamification - compact chip */}
-                            <button
-                                onClick={() => setShowGamification(!showGamification)}
-                                className={`flex items-center gap-1 px-2 py-1.5 rounded-lg transition-all text-xs font-bold shrink-0 ${showGamification
-                                    ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-sm'
-                                    : 'text-amber-700 hover:bg-amber-50'
-                                }`}
-                                title="XP & Achievements"
-                            >
-                                <Trophy className="h-3.5 w-3.5" />
-                                {gamificationData && (
-                                    <span className="tabular-nums">{gamificationData.total_xp}<Zap className="h-2.5 w-2.5 inline ml-0.5 -mt-0.5" /></span>
-                                )}
-                            </button>
-
-                            {/* Divider */}
-                            <div className="w-px h-5 bg-[#E6D5CC]/60 mx-1 hidden sm:block" />
-
                             {/* Secondary tools */}
                             <div className="hidden sm:flex items-center">
                                 <button
@@ -779,6 +773,27 @@ const ProjectView = () => {
                                     <Maximize2 className="h-[18px] w-[18px]" />
                                 </button>
                             </div>
+
+                            {/* Divider */}
+                            <div className="w-px h-5 bg-[#E6D5CC]/60 mx-0.5 hidden sm:block" />
+
+                            {/* Gamification Button */}
+                            <button
+                                onClick={() => setShowGamification(!showGamification)}
+                                className={`hidden sm:flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-all ${
+                                    showGamification
+                                        ? 'bg-[#C8A288] text-white'
+                                        : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30'
+                                }`}
+                                title="Progress & XP"
+                            >
+                                <Trophy className="h-[18px] w-[18px]" />
+                                {gamificationData && (
+                                    <span className="text-[11px] font-bold tabular-nums">
+                                        {gamificationData.total_xp?.toLocaleString()} XP
+                                    </span>
+                                )}
+                            </button>
 
                             {/* Docs Toggle - Mobile/Tablet */}
                             <button
@@ -842,7 +857,7 @@ const ProjectView = () => {
                                     </div>
                                 </div>
                             ) : (
-                                <div className="prose prose-sm max-w-none text-sm text-[#4A3B32] max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                                <div className="prose prose-sm max-w-none text-sm text-[#4A3B32] max-h-[60vh] overflow-y-auto overflow-x-auto pr-2 custom-scrollbar">
                                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{summaryContent}</ReactMarkdown>
                                 </div>
                             )}
@@ -882,7 +897,7 @@ const ProjectView = () => {
                                             : 'bg-[#FDF6F0] text-[#4A3B32] rounded-bl-none'
                                             }`}>
                                             {msg.content ? (
-                                                <div className={`text-sm leading-relaxed ${msg.role === 'assistant' ? 'prose prose-sm max-w-none prose-p:my-2 prose-headings:text-[#4A3B32] prose-a:text-[#C8A288]' : ''}`}>
+                                                <div className={`text-sm leading-relaxed ${msg.role === 'assistant' ? 'prose prose-sm max-w-none overflow-x-auto prose-p:my-2 prose-headings:text-[#4A3B32] prose-a:text-[#C8A288]' : ''}`}>
                                                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                                         {msg.content}
                                                     </ReactMarkdown>
@@ -990,6 +1005,7 @@ const ProjectView = () => {
                             projectId={projectId}
                             availableTopics={availableTopics}
                             selectedDocuments={selectedDocuments}
+                            preSelectedTopic={preSelectedTopic}
                             onQAActiveChange={setIsQAActive}
                             onBack={() => setActiveTab('chat')}
                         />
@@ -1001,6 +1017,7 @@ const ProjectView = () => {
                             projectId={projectId}
                             availableTopics={availableTopics}
                             selectedDocuments={selectedDocuments}
+                            preSelectedTopic={preSelectedTopic}
                         />
                     )}
                     
@@ -1042,6 +1059,41 @@ const ProjectView = () => {
                                     console.warn('Failed to save progress:', err)
                                 );
                             }}
+                            onGenerateNotes={(topic, docsToSelect) => {
+                                if (docsToSelect && docsToSelect.length > 0) {
+                                    setSelectedDocuments(docsToSelect);
+                                }
+                                setPreSelectedTopic(topic);
+                                setActiveTab('notes');
+                            }}
+                            onStartQA={(topic, docsToSelect) => {
+                                if (docsToSelect && docsToSelect.length > 0) {
+                                    setSelectedDocuments(docsToSelect);
+                                }
+                                setPreSelectedTopic(topic);
+                                setActiveTab('qa');
+                            }}
+                            onOpenTutor={(topic) => {
+                                setTutorTopic(topic);
+                                setShowAITutor(true);
+                            }}
+                            onOpenKnowledgeGraph={() => {
+                                setActiveTab('knowledge');
+                            }}
+                            onOpenMindmap={(topic, docsToSelect) => {
+                                if (docsToSelect && docsToSelect.length > 0) {
+                                    setSelectedDocuments(docsToSelect);
+                                }
+                                setMindmapTopic(topic);
+                                setMindmapDocs(docsToSelect || []);
+                            }}
+                            onOpenFlashcards={(topic, docsToSelect) => {
+                                if (docsToSelect && docsToSelect.length > 0) {
+                                    setSelectedDocuments(docsToSelect);
+                                }
+                                setFlashcardTopic(topic);
+                                setFlashcardDocs(docsToSelect || []);
+                            }}
                         />
                     )}
 
@@ -1076,6 +1128,36 @@ const ProjectView = () => {
                             <KnowledgeGraphView projectId={projectId} />
                         </div>
                     )}
+
+                    {/* Mindmap Overlay (only from Learning Path) */}
+                    {mindmapTopic && (
+                        <div className="absolute inset-0 z-20 bg-white">
+                            <TopicMindmap
+                                projectId={projectId}
+                                topic={mindmapTopic}
+                                selectedDocuments={mindmapDocs}
+                                onClose={() => {
+                                    setMindmapTopic(null);
+                                    setMindmapDocs([]);
+                                }}
+                            />
+                        </div>
+                    )}
+
+                    {/* Flashcards Overlay (only from Learning Path) */}
+                    {flashcardTopic && (
+                        <div className="absolute inset-0 z-20 bg-white">
+                            <TopicFlashcards
+                                projectId={projectId}
+                                topic={flashcardTopic}
+                                selectedDocuments={flashcardDocs}
+                                onClose={() => {
+                                    setFlashcardTopic(null);
+                                    setFlashcardDocs([]);
+                                }}
+                            />
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -1099,11 +1181,11 @@ const ProjectView = () => {
                         <button
                             onClick={() => setIsRightCollapsed(false)}
                             className="p-2 hover:bg-[#E6D5CC]/30 rounded-full text-[#8a6a5c] transition-colors mb-4"
-                            title="Expand documents panel"
+                            title="Expand panel"
                         >
                             <ChevronLeft className="h-5 w-5" />
                         </button>
-                        <div className="flex-1 flex flex-col items-center justify-center gap-3">
+                        <div className="flex-1 flex flex-col items-center justify-center gap-4">
                             <div className="relative">
                                 <FileText className="h-6 w-6 text-[#C8A288]" />
                                 {documents.length > 0 && (
@@ -1112,6 +1194,7 @@ const ProjectView = () => {
                                     </span>
                                 )}
                             </div>
+                            <div className="w-6 h-px bg-[#E6D5CC]/50" />
                         </div>
                         <div className="mt-auto">
                             <Calendar className="h-4 w-4 text-[#C8A288]" />
@@ -1156,7 +1239,7 @@ const ProjectView = () => {
 
                 {
                     documents.length > 0 ? (
-                        <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1 custom-scrollbar">
+                        <div className="min-h-0 space-y-3 pr-1 custom-scrollbar" style={{ maxHeight: '40vh', overflowY: 'auto' }}>
                             {documents.map((doc) => (
                                 <div
                                     key={doc.id}
@@ -1244,9 +1327,9 @@ const ProjectView = () => {
                             ))}
                         </div>
                     ) : (
-                        <div className="flex-1 flex flex-col items-center justify-center text-center py-8 text-[#8a6a5c]/60">
-                            <div className="h-16 w-16 bg-[#E6D5CC]/30 rounded-full flex items-center justify-center mb-4">
-                                <FileText className="h-8 w-8 opacity-50" />
+                        <div className="flex flex-col items-center justify-center text-center py-6 text-[#8a6a5c]/60">
+                            <div className="h-12 w-12 bg-[#E6D5CC]/30 rounded-full flex items-center justify-center mb-3">
+                                <FileText className="h-6 w-6 opacity-50" />
                             </div>
                             <p className="text-sm font-medium">No documents yet</p>
                             <p className="text-xs mt-1">Upload a PDF to get started</p>
@@ -1254,8 +1337,10 @@ const ProjectView = () => {
                     )
                 }
 
-                <div className="mt-auto pt-4">
-                    <div className="bg-white/60 p-4 rounded-2xl border border-[#E6D5CC]/50 backdrop-blur-sm">
+                <div className="flex-1" />
+
+                <div className="mt-auto pt-3 shrink-0">
+                    <div className="bg-white/60 p-3 rounded-xl border border-[#E6D5CC]/50 backdrop-blur-sm">
                         <p className="text-[10px] text-[#8a6a5c] uppercase font-bold mb-1 tracking-wider">Date Selected</p>
                         <div className="flex items-center gap-2 text-[#4A3B32]">
                             <Calendar className="h-4 w-4 text-[#C8A288]" />
@@ -1333,7 +1418,7 @@ const ProjectView = () => {
                 <AITutorChat
                     projectId={projectId}
                     selectedDocuments={selectedDocuments}
-                    initialTopic={tutorTopic}
+                    topic={tutorTopic}
                     onClose={() => {
                         setShowAITutor(false);
                         setTutorTopic(null);
@@ -1361,12 +1446,10 @@ const ProjectView = () => {
                 </div>
             )}
 
-            {/* Gamification Panel */}
+            {/* Gamification Panel — Floating Popup */}
             {showGamification && (
-                <div className="fixed top-16 right-4 z-50 md:right-[340px]">
-                    <GamificationPanel
-                        onClose={() => setShowGamification(false)}
-                    />
+                <div className="fixed top-14 right-4 z-50 animate-in slide-in-from-top-2 duration-200">
+                    <GamificationPanel onClose={() => setShowGamification(false)} />
                 </div>
             )}
 

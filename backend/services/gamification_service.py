@@ -22,44 +22,54 @@ from datetime import datetime
 from db.client import supabase_client
 from utils.logger import logger
 from uuid import uuid4
+import time
 
 
 # ======================== Level Definitions ========================
+# Progression curve: early levels come fast to hook students,
+# later levels require sustained effort.
 
 LEVELS = [
     {"level": 1, "title": "Curious Reader", "xp_required": 0},
     {"level": 2, "title": "Page Turner", "xp_required": 100},
-    {"level": 3, "title": "Knowledge Seeker", "xp_required": 300},
-    {"level": 4, "title": "Study Warrior", "xp_required": 600},
-    {"level": 5, "title": "Quick Learner", "xp_required": 1000},
-    {"level": 6, "title": "Bookworm", "xp_required": 1500},
-    {"level": 7, "title": "Topic Explorer", "xp_required": 2200},
-    {"level": 8, "title": "Brain Builder", "xp_required": 3000},
-    {"level": 9, "title": "Quiz Champion", "xp_required": 4000},
-    {"level": 10, "title": "Knowledge Knight", "xp_required": 5500},
-    {"level": 11, "title": "Study Sage", "xp_required": 7500},
-    {"level": 12, "title": "Wisdom Keeper", "xp_required": 10000},
-    {"level": 13, "title": "Mind Master", "xp_required": 13000},
-    {"level": 14, "title": "Grand Scholar", "xp_required": 17000},
-    {"level": 15, "title": "Lumina Legend", "xp_required": 22000},
+    {"level": 3, "title": "Knowledge Seeker", "xp_required": 250},
+    {"level": 4, "title": "Study Warrior", "xp_required": 500},
+    {"level": 5, "title": "Quick Learner", "xp_required": 850},
+    {"level": 6, "title": "Bookworm", "xp_required": 1300},
+    {"level": 7, "title": "Topic Explorer", "xp_required": 1900},
+    {"level": 8, "title": "Brain Builder", "xp_required": 2700},
+    {"level": 9, "title": "Quiz Champion", "xp_required": 3700},
+    {"level": 10, "title": "Knowledge Knight", "xp_required": 5000},
+    {"level": 11, "title": "Study Sage", "xp_required": 6800},
+    {"level": 12, "title": "Wisdom Keeper", "xp_required": 9000},
+    {"level": 13, "title": "Mind Master", "xp_required": 12000},
+    {"level": 14, "title": "Grand Scholar", "xp_required": 16000},
+    {"level": 15, "title": "Lumina Legend", "xp_required": 21000},
 ]
 
 # ======================== XP Reward Amounts ========================
+# Balanced so a student doing ~30 min of focused study earns ~100-150 XP.
+# A typical day of active studying (1-2 hours) should yield ~300-500 XP.
+# This means:
+#   Level 2 after first session (~20 min)
+#   Level 5 after ~3-4 days of regular use
+#   Level 10 after ~2-3 weeks of consistent study
+#   Level 15 after ~2 months of dedicated use
 
 XP_REWARDS = {
-    "quiz": 50,
-    "review": 10,
-    "notes": 20,
-    "qa": 25,
-    "chat": 5,
-    "pomodoro": 30,
-    "path": 75,
-    "exam": 40,
-    "knowledge_graph": 15,
+    "chat": 3,              # Very frequent — small reward per message
+    "review": 8,            # Per flashcard review session
+    "knowledge_graph": 10,  # Exploring knowledge graph
+    "notes": 15,            # Generating study notes
+    "qa": 15,               # Q&A study session
+    "path": 20,             # Learning path activity
+    "pomodoro": 25,         # Completing a pomodoro session
+    "quiz": 30,             # Base quiz XP (bonuses added for scores)
+    "exam": 35,             # Exam prep practice
 }
 
-XP_BONUS_PERFECT_QUIZ = 100  # 100% score
-XP_BONUS_HIGH_SCORE = 25     # 90%+ score
+XP_BONUS_PERFECT_QUIZ = 50   # 100% score bonus
+XP_BONUS_HIGH_SCORE = 15     # 90%+ score bonus
 
 # ======================== Badge Definitions ========================
 
@@ -196,61 +206,71 @@ class GamificationService:
 
     async def get_gamification(self, user_id: str) -> Dict[str, Any]:
         """Get the current gamification state for a user."""
-        try:
-            result = (
-                self.client.table("user_gamification")
-                .select("*")
-                .eq("user_id", user_id)
-                .execute()
-            )
+        # Retry up to 2 times on timeout/connection errors
+        last_error = None
+        for attempt in range(3):
+            try:
+                result = (
+                    self.client.table("user_gamification")
+                    .select("*")
+                    .eq("user_id", user_id)
+                    .execute()
+                )
 
-            if result.data:
-                row = result.data[0]
-                total_xp = row.get("total_xp", 0)
-                level_info = self._calculate_level(total_xp)
+                if result.data:
+                    row = result.data[0]
+                    total_xp = row.get("total_xp", 0)
+                    level_info = self._calculate_level(total_xp)
 
-                return {
-                    "total_xp": total_xp,
-                    "level": level_info["level"],
-                    "level_title": level_info["title"],
-                    "xp_in_level": level_info["xp_in_level"],
-                    "xp_needed": level_info["xp_needed"],
-                    "level_progress": level_info["progress"],
-                    "next_level": level_info["next_level"],
-                    "badges": row.get("badges", []),
-                    "stats": row.get("stats", {}),
-                    "all_levels": LEVELS,
-                    "all_badges": BADGE_DEFINITIONS,
-                }
-            else:
-                # Create initial record
-                record = {
-                    "id": str(uuid4()),
-                    "user_id": user_id,
-                    "total_xp": 0,
-                    "level": 1,
-                    "badges": [],
-                    "stats": DEFAULT_STATS.copy(),
-                }
-                self.client.table("user_gamification").insert(record).execute()
+                    return {
+                        "total_xp": total_xp,
+                        "level": level_info["level"],
+                        "level_title": level_info["title"],
+                        "xp_in_level": level_info["xp_in_level"],
+                        "xp_needed": level_info["xp_needed"],
+                        "level_progress": level_info["progress"],
+                        "next_level": level_info["next_level"],
+                        "badges": row.get("badges", []),
+                        "stats": row.get("stats", {}),
+                        "all_levels": LEVELS,
+                        "all_badges": BADGE_DEFINITIONS,
+                    }
+                else:
+                    # Create initial record
+                    record = {
+                        "id": str(uuid4()),
+                        "user_id": user_id,
+                        "total_xp": 0,
+                        "level": 1,
+                        "badges": [],
+                        "stats": DEFAULT_STATS.copy(),
+                    }
+                    self.client.table("user_gamification").insert(record).execute()
 
-                level_info = self._calculate_level(0)
-                return {
-                    "total_xp": 0,
-                    "level": 1,
-                    "level_title": "Curious Reader",
-                    "xp_in_level": 0,
-                    "xp_needed": level_info["xp_needed"],
-                    "level_progress": 0,
-                    "next_level": level_info["next_level"],
-                    "badges": [],
-                    "stats": DEFAULT_STATS.copy(),
-                    "all_levels": LEVELS,
-                    "all_badges": BADGE_DEFINITIONS,
-                }
-        except Exception as e:
-            logger.error(f"Error getting gamification: {e}")
-            return self._default_response()
+                    level_info = self._calculate_level(0)
+                    return {
+                        "total_xp": 0,
+                        "level": 1,
+                        "level_title": "Curious Reader",
+                        "xp_in_level": 0,
+                        "xp_needed": level_info["xp_needed"],
+                        "level_progress": 0,
+                        "next_level": level_info["next_level"],
+                        "badges": [],
+                        "stats": DEFAULT_STATS.copy(),
+                        "all_levels": LEVELS,
+                        "all_badges": BADGE_DEFINITIONS,
+                    }
+            except Exception as e:
+                last_error = e
+                if attempt < 2:
+                    wait = 1.5 * (attempt + 1)
+                    logger.warning(f"Gamification query attempt {attempt+1} failed ({e}), retrying in {wait}s...")
+                    time.sleep(wait)
+                else:
+                    logger.error(f"Error getting gamification after 3 attempts: {e}")
+
+        return self._default_response()
 
     async def award_xp(
         self, user_id: str, activity_type: str, meta: Dict[str, Any] = None
@@ -260,12 +280,22 @@ class GamificationService:
             meta = meta or {}
 
             # Calculate XP amount
-            base_xp = XP_REWARDS.get(activity_type, 5)
+            base_xp = XP_REWARDS.get(activity_type, 3)
             bonus_xp = 0
 
             if activity_type == "quiz":
                 score = meta.get("score", 0)
-                bonus_xp += int(score * 0.5)  # 0-50 bonus
+                num_q = meta.get("num_questions", 0)
+
+                # Scale base XP by number of questions (more questions = more effort)
+                if num_q > 0:
+                    question_bonus = min(num_q, 20) * 2  # 2 XP per question, cap at 20
+                    bonus_xp += question_bonus
+
+                # Score-based bonus (0-100 score -> 0-20 bonus)
+                bonus_xp += int(score * 0.2)
+
+                # Achievement bonuses
                 if score == 100:
                     bonus_xp += XP_BONUS_PERFECT_QUIZ
                 elif score >= 90:
@@ -367,11 +397,10 @@ class GamificationService:
 
         except Exception as e:
             logger.error(f"Error awarding XP: {e}")
+            # Return error flag but do NOT set fake totals — the frontend
+            # checks for .error and ignores the response.
             return {
                 "xp_earned": 0,
-                "total_xp": 0,
-                "level": 1,
-                "level_title": "Curious Reader",
                 "leveled_up": False,
                 "new_badges": [],
                 "error": str(e),

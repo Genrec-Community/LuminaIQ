@@ -48,27 +48,34 @@ const Settings = () => {
 
     // --- Reusable Components ---
 
-    const ToggleSwitch = ({ enabled, onChange, label, description, icon: Icon }) => (
-        <div className="flex items-center justify-between p-4 bg-white rounded-2xl border border-[#E6D5CC]/80 hover:border-[#C8A288]/50 transition-all group">
+    const ToggleSwitch = ({ enabled, onChange, label, description, icon: Icon, comingSoon = false }) => (
+        <div className={`flex items-center justify-between p-4 bg-white rounded-2xl border border-[#E6D5CC]/80 hover:border-[#C8A288]/50 transition-all group ${comingSoon ? 'opacity-70' : ''}`}>
             <div className="flex items-center gap-3.5 min-w-0">
                 <div className="h-10 w-10 bg-[#FDF6F0] rounded-xl flex items-center justify-center shrink-0 group-hover:bg-[#C8A288]/10 transition-colors">
                     <Icon className="h-5 w-5 text-[#C8A288]" />
                 </div>
                 <div className="min-w-0">
-                    <p className="font-semibold text-[#4A3B32] text-sm">{label}</p>
+                    <div className="flex items-center gap-2">
+                        <p className="font-semibold text-[#4A3B32] text-sm">{label}</p>
+                        {comingSoon && (
+                            <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[9px] font-bold rounded-full uppercase tracking-wider">Soon</span>
+                        )}
+                    </div>
                     <p className="text-xs text-[#8a6a5c] mt-0.5 leading-relaxed">{description}</p>
                 </div>
             </div>
             <button
-                onClick={() => onChange(!enabled)}
+                onClick={() => !comingSoon && onChange(!enabled)}
+                disabled={comingSoon}
                 className={`relative w-12 h-7 rounded-full transition-all shrink-0 ml-3 ${
+                    comingSoon ? 'bg-gray-200 cursor-not-allowed' :
                     enabled ? 'bg-[#C8A288] shadow-inner' : 'bg-[#E6D5CC]'
                 }`}
             >
                 <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-transform ${
-                    enabled ? 'translate-x-[22px]' : 'translate-x-0.5'
+                    enabled && !comingSoon ? 'translate-x-[22px]' : 'translate-x-0.5'
                 }`}>
-                    {enabled && <Check className="h-3.5 w-3.5 text-[#C8A288] m-[5px]" />}
+                    {enabled && !comingSoon && <Check className="h-3.5 w-3.5 text-[#C8A288] m-[5px]" />}
                 </div>
             </button>
         </div>
@@ -535,12 +542,13 @@ const Settings = () => {
                     label="Dark Mode"
                     description="Reduce eye strain in low light"
                     icon={Moon}
+                    comingSoon
                 />
                 <ToggleSwitch
                     enabled={settings.compactMode}
                     onChange={(v) => updateSetting('compactMode', v)}
                     label="Compact Mode"
-                    description="Denser layout for smaller screens"
+                    description="Denser layout with reduced spacing"
                     icon={Smartphone}
                 />
             </div>
@@ -555,8 +563,9 @@ const Settings = () => {
                     enabled={settings.studyReminders}
                     onChange={(v) => updateSetting('studyReminders', v)}
                     label="Study Reminders"
-                    description="Get notified when it's time to review"
+                    description="Browser notifications for study sessions"
                     icon={Bell}
+                    comingSoon
                 />
                 <ToggleSwitch
                     enabled={settings.soundEnabled}
@@ -564,6 +573,7 @@ const Settings = () => {
                     label="Sound Effects"
                     description="Play sounds for timers and achievements"
                     icon={Volume2}
+                    comingSoon
                 />
                 <ToggleSwitch
                     enabled={settings.showStreaks}
@@ -571,7 +581,23 @@ const Settings = () => {
                     label="Show Streaks"
                     description="Display your daily study streak"
                     icon={Flame}
+                    comingSoon
                 />
+            </div>
+
+            {/* Coming soon info */}
+            <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200/60">
+                <div className="flex items-start gap-3">
+                    <div className="h-8 w-8 bg-amber-100 rounded-lg flex items-center justify-center shrink-0 mt-0.5">
+                        <Sparkles className="h-4 w-4 text-amber-600" />
+                    </div>
+                    <div>
+                        <p className="font-semibold text-amber-900 text-sm">Features in Development</p>
+                        <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
+                            Study reminders, sound effects, streaks, and dark mode are being built. Settings marked with "Soon" will be enabled in a future update.
+                        </p>
+                    </div>
+                </div>
             </div>
         </div>
     );

@@ -817,7 +817,7 @@ const KnowledgeGraphView = ({ projectId }) => {
                                         </div>
                                     </div>
                                 ) : topicSummary ? (
-                                    <div className="prose prose-sm max-w-none">
+                                    <div className="prose prose-sm max-w-none overflow-x-auto">
                                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                             {topicSummary.summary}
                                         </ReactMarkdown>

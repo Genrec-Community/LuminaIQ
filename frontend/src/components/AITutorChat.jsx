@@ -197,7 +197,9 @@ const AITutorChat = ({
             // Build context-aware prompt
             const systemPrompt = `You are an expert AI tutor. ${style.prompt}
             
-${topic ? `The student is currently studying the topic: "${topic}".` : ''}
+${topic ? `The student is currently studying the topic: "${topic}".
+
+IMPORTANT: You must ONLY answer questions related to the topic "${topic}" and closely related sub-topics. If the student asks about something unrelated to "${topic}", politely decline and redirect them back to the current topic. For example, say: "That's an interesting question, but let's stay focused on ${topic} for now. What would you like to know about it?"` : ''}
 ${documentName ? `They are learning from: "${documentName}".` : ''}
 
 Guidelines:
@@ -377,7 +379,7 @@ Guidelines:
                             }`}
                         >
                             {msg.content ? (
-                                <div className={`text-sm prose prose-sm max-w-none ${
+                                <div className={`text-sm prose prose-sm max-w-none overflow-x-auto ${
                                     msg.role === 'user' ? 'prose-invert' : ''
                                 }`}>
                                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
