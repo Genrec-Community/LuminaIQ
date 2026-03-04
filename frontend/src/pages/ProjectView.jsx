@@ -48,6 +48,8 @@ import {
     submitSubjectiveTest,
     deleteDocument,
     generateNotes,
+    generateMindmap,
+    generateFlashcards,
     getLearningProgress,
     saveLearningProgress
 } from '../api';
@@ -77,6 +79,10 @@ import AITutorChat from '../components/AITutorChat';
 import BookmarksPanel from '../components/BookmarksPanel';
 import GlobalSearch from '../components/GlobalSearch';
 import GamificationPanel from '../components/GamificationPanel';
+
+// Chat Agentic Components
+import { CommandPicker, CommandParamForm } from '../components/chat/ChatCommands';
+import { ToolLoadingCard, ToolResultCard, ToolErrorCard } from '../components/chat/ToolResultCard';
 
 const ProjectView = () => {
     const { projectId } = useParams();
@@ -145,6 +151,11 @@ const ProjectView = () => {
     const [preSelectedQuizMode, setPreSelectedQuizMode] = useState(null);
     const [cameFromPath, setCameFromPath] = useState(false);
     
+    // Pre-generated data from chat @ commands (passed to views via "Open" button)
+    const [preGeneratedNotes, setPreGeneratedNotes] = useState(null);
+    const [preGeneratedQA, setPreGeneratedQA] = useState(null);
+    const [preGeneratedQuiz, setPreGeneratedQuiz] = useState(null);
+    
     // Mindmap & Flashcards State (shown inline, only from learning path)
     const [mindmapTopic, setMindmapTopic] = useState(null);
     const [mindmapDocs, setMindmapDocs] = useState([]);
@@ -178,6 +189,12 @@ const ProjectView = () => {
 
     // File Upload Ref
     const fileInputRef = useRef(null);
+
+    // @ Command System State
+    const [showCommandPicker, setShowCommandPicker] = useState(false);
+    const [commandFilter, setCommandFilter] = useState('');
+    const [activeCommand, setActiveCommand] = useState(null); // command object when param form is shown
+    const [toolLoading, setToolLoading] = useState(false);
 
     // Add loading state for ProjectView
     const [projectViewLoading, setProjectViewLoading] = useState(true);
@@ -267,7 +284,7 @@ const ProjectView = () => {
     };
 
     useEffect(() => {
-        if (activeTab === 'quiz' || activeTab === 'qa' || activeTab === 'notes' || activeTab === 'path' || activeTab === 'exam') {
+        if (activeTab === 'chat' || activeTab === 'quiz' || activeTab === 'qa' || activeTab === 'notes' || activeTab === 'path' || activeTab === 'exam') {
             fetchTopics();
         }
     }, [activeTab, projectId]);
@@ -390,7 +407,156 @@ const ProjectView = () => {
     const handleNewSession = () => {
         setMessages([{ role: 'system', content: 'Ready to chat! Ask me anything about your documents.' }]);
         setInputMessage('');
+        setActiveCommand(null);
+        setShowCommandPicker(false);
         sessionStorage.removeItem(chatCacheKey);
+    };
+
+    // --- @ Command: Input change handler ---
+    const handleInputChange = (e) => {
+        const val = e.target.value;
+        setInputMessage(val);
+
+        // Detect @ at start of input or after space
+        const atMatch = val.match(/(?:^|\s)@(\w*)$/);
+        if (atMatch) {
+            setCommandFilter(atMatch[1]);
+            setShowCommandPicker(true);
+        } else {
+            setShowCommandPicker(false);
+            setCommandFilter('');
+        }
+    };
+
+    // --- @ Command: Select a command from picker ---
+    const handleCommandSelect = (command) => {
+        setShowCommandPicker(false);
+        setCommandFilter('');
+        setInputMessage('');
+        setActiveCommand(command);
+    };
+
+    // --- @ Command: Execute a tool command ---
+    const handleToolExecute = async (toolType, params) => {
+        if (selectedDocuments.length === 0) {
+            toast.warning('Please select at least one document from the sidebar first.');
+            return;
+        }
+
+        setActiveCommand(null);
+        setToolLoading(true);
+
+        // Build a user-facing label for what was requested
+        const labels = {
+            notes: `@Notes — ${params.noteType || 'Summary'}${params.topic ? ` about "${params.topic}"` : ''}`,
+            qa: `@Q&A${params.topic ? ` about "${params.topic}"` : ''} — ${params.numQuestions || 5} questions (${params.answerSize || 'medium'})`,
+            quiz: `@Quiz${params.topic ? ` about "${params.topic}"` : ''} — ${params.numQuestions || 5} MCQs (${params.difficulty || 'medium'})`,
+            mindmap: `@Mindmap — "${params.topic}"`,
+            flashcards: `@Flashcards — "${params.topic}" (${params.numCards || 8} cards)`,
+        };
+
+        // Add user command message
+        setMessages(prev => [...prev,
+            { role: 'user', content: labels[toolType] || `@${toolType}`, type: 'tool_command' },
+            { role: 'assistant', type: 'tool_loading', toolType, toolParams: params }
+        ]);
+
+        try {
+            let result;
+            switch (toolType) {
+                case 'notes':
+                    result = await generateNotes(projectId, params.noteType, params.topic || '', selectedDocuments);
+                    break;
+                case 'qa':
+                    result = await generateSubjectiveTest(projectId, params.topic || '', parseInt(params.numQuestions) || 5, selectedDocuments, params.answerSize || 'medium');
+                    break;
+                case 'quiz':
+                    result = await generateMCQ(projectId, params.topic || '', parseInt(params.numQuestions) || 5, selectedDocuments, params.difficulty || 'medium');
+                    break;
+                case 'mindmap':
+                    result = await generateMindmap(projectId, params.topic, selectedDocuments);
+                    break;
+                case 'flashcards':
+                    result = await generateFlashcards(projectId, params.topic, parseInt(params.numCards) || 8, selectedDocuments);
+                    break;
+                default:
+                    throw new Error(`Unknown tool: ${toolType}`);
+            }
+
+            // Replace loading card with result card
+            setMessages(prev => {
+                const updated = [...prev];
+                const loadingIdx = updated.findLastIndex(m => m.type === 'tool_loading' && m.toolType === toolType);
+                if (loadingIdx !== -1) {
+                    updated[loadingIdx] = {
+                        role: 'assistant',
+                        type: 'tool_result',
+                        toolType,
+                        toolParams: params,
+                        toolData: result,
+                    };
+                }
+                return updated;
+            });
+
+            recordActivity(projectId, toolType === 'notes' ? 'notes' : toolType === 'qa' ? 'qa' : 'chat');
+        } catch (error) {
+            console.error(`Tool ${toolType} error:`, error);
+            // Replace loading card with error card
+            setMessages(prev => {
+                const updated = [...prev];
+                const loadingIdx = updated.findLastIndex(m => m.type === 'tool_loading' && m.toolType === toolType);
+                if (loadingIdx !== -1) {
+                    updated[loadingIdx] = {
+                        role: 'assistant',
+                        type: 'tool_error',
+                        toolType,
+                        toolParams: params,
+                        error: error?.response?.data?.detail || error.message || 'Generation failed',
+                    };
+                }
+                return updated;
+            });
+        } finally {
+            setToolLoading(false);
+        }
+    };
+
+    // --- @ Command: Open result in its dedicated view ---
+    const handleToolOpen = (toolType, toolParams, toolData) => {
+        const topic = toolParams?.topic || '';
+        switch (toolType) {
+            case 'notes':
+                if (topic) setPreSelectedTopic(topic);
+                // Pass pre-generated notes content + noteType so the view displays it directly
+                setPreGeneratedNotes({
+                    content: toolData?.content || '',
+                    noteType: toolParams?.noteType || 'Comprehensive Summary',
+                    topic: topic,
+                });
+                setActiveTab('notes');
+                break;
+            case 'qa':
+                if (topic) setPreSelectedTopic(topic);
+                // Pass pre-generated Q&A data so the view displays it directly
+                setPreGeneratedQA(toolData);
+                setActiveTab('qa');
+                break;
+            case 'quiz':
+                if (topic) setPreSelectedTopic(topic);
+                // Pass pre-generated quiz data so the view displays it directly
+                setPreGeneratedQuiz(toolData);
+                setActiveTab('quiz');
+                break;
+            case 'mindmap':
+                setMindmapTopic(topic);
+                setMindmapDocs(selectedDocuments);
+                break;
+            case 'flashcards':
+                setFlashcardTopic(topic);
+                setFlashcardDocs(selectedDocuments);
+                break;
+        }
     };
 
     const handleSendMessage = async (e) => {
@@ -413,10 +579,12 @@ const ProjectView = () => {
         setMessages(prev => [...prev, { role: 'assistant', content: '', sources: [] }]);
 
         try {
-            const history = newMessages.filter(m => m.role !== 'system').map(m => ({
-                role: m.role,
-                content: m.content
-            }));
+            const history = newMessages
+                .filter(m => m.role !== 'system' && (!m.type || m.type === 'tool_command'))
+                .map(m => ({
+                    role: m.role,
+                    content: m.content || ''
+                }));
 
             await chatMessageStream(
                 projectId,
@@ -892,6 +1060,32 @@ const ProjectView = () => {
                             <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-4 md:p-6 space-y-6">
                                 {messages.map((msg, idx) => (
                                     <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                                        {/* Tool Loading Card */}
+                                        {msg.type === 'tool_loading' && (
+                                            <ToolLoadingCard toolType={msg.toolType} toolParams={msg.toolParams} />
+                                        )}
+
+                                        {/* Tool Result Card */}
+                                        {msg.type === 'tool_result' && (
+                                            <ToolResultCard
+                                                toolType={msg.toolType}
+                                                toolParams={msg.toolParams}
+                                                toolData={msg.toolData}
+                                                onOpen={handleToolOpen}
+                                            />
+                                        )}
+
+                                        {/* Tool Error Card */}
+                                        {msg.type === 'tool_error' && (
+                                            <ToolErrorCard
+                                                toolType={msg.toolType}
+                                                error={msg.error}
+                                                onRetry={() => handleToolExecute(msg.toolType, msg.toolParams)}
+                                            />
+                                        )}
+
+                                        {/* Regular message (no type or tool_command) */}
+                                        {(!msg.type || msg.type === 'tool_command') && (
                                         <div className={`max-w-[95%] md:max-w-[85%] break-words rounded-2xl px-4 py-3 md:px-6 md:py-4 ${msg.role === 'user'
                                             ? 'bg-[#C8A288] text-white rounded-br-none'
                                             : 'bg-[#FDF6F0] text-[#4A3B32] rounded-bl-none'
@@ -922,6 +1116,7 @@ const ProjectView = () => {
                                                 </div>
                                             )}
                                         </div>
+                                        )}
                                     </div>
                                 ))}
                                 {isProcessingDocs && (
@@ -944,25 +1139,46 @@ const ProjectView = () => {
                             </div>
 
                             <div className="p-4 border-t border-[#E6D5CC] bg-white">
-                                <form onSubmit={handleSendMessage} className="flex gap-3 max-w-4xl mx-auto">
-                                    <div className="flex-1 relative">
-                                        <input
-                                            type="text"
-                                            value={inputMessage}
-                                            onChange={(e) => setInputMessage(e.target.value)}
-                                            placeholder="Ask a question about your PDF..."
-                                            className="w-full pl-6 pr-12 py-3 bg-[#FDF6F0] border-none rounded-full focus:ring-2 focus:ring-[#C8A288] outline-none text-[#4A3B32] placeholder-[#8a6a5c]"
-                                            disabled={loading}
+                                <div className="max-w-4xl mx-auto relative">
+                                    {/* Command Picker Dropdown */}
+                                    <CommandPicker
+                                        filter={commandFilter}
+                                        onSelect={handleCommandSelect}
+                                        onClose={() => { setShowCommandPicker(false); setCommandFilter(''); }}
+                                        visible={showCommandPicker && !activeCommand}
+                                    />
+
+                                    {/* Command Parameter Form */}
+                                    {activeCommand && (
+                                        <CommandParamForm
+                                            command={activeCommand}
+                                            availableTopics={availableTopics}
+                                            onExecute={handleToolExecute}
+                                            onCancel={() => setActiveCommand(null)}
+                                            loading={toolLoading}
                                         />
-                                        <button
-                                            type="submit"
-                                            disabled={loading || !inputMessage.trim()}
-                                            className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 bg-[#C8A288] text-white rounded-full hover:bg-[#B08B72] transition-colors disabled:opacity-50"
-                                        >
-                                            <Send className="h-4 w-4" />
-                                        </button>
-                                    </div>
-                                </form>
+                                    )}
+
+                                    <form onSubmit={handleSendMessage} className="flex gap-3">
+                                        <div className="flex-1 relative">
+                                            <input
+                                                type="text"
+                                                value={inputMessage}
+                                                onChange={handleInputChange}
+                                                placeholder="Ask a question or type @ for AI tools..."
+                                                className="w-full pl-6 pr-12 py-3 bg-[#FDF6F0] border-none rounded-full focus:ring-2 focus:ring-[#C8A288] outline-none text-[#4A3B32] placeholder-[#8a6a5c]"
+                                                disabled={loading || toolLoading}
+                                            />
+                                            <button
+                                                type="submit"
+                                                disabled={loading || toolLoading || !inputMessage.trim()}
+                                                className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 bg-[#C8A288] text-white rounded-full hover:bg-[#B08B72] transition-colors disabled:opacity-50"
+                                            >
+                                                <Send className="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -974,6 +1190,8 @@ const ProjectView = () => {
                             selectedDocuments={selectedDocuments}
                             preSelectedTopic={preSelectedTopic}
                             preSelectedMode={preSelectedQuizMode}
+                            preGeneratedData={preGeneratedQuiz}
+                            onConsumePreGenerated={() => setPreGeneratedQuiz(null)}
                             cameFromPath={cameFromPath}
                             onReturnToPath={() => {
                                 setActiveTab('path');
@@ -1006,6 +1224,8 @@ const ProjectView = () => {
                             availableTopics={availableTopics}
                             selectedDocuments={selectedDocuments}
                             preSelectedTopic={preSelectedTopic}
+                            preGeneratedData={preGeneratedQA}
+                            onConsumePreGenerated={() => setPreGeneratedQA(null)}
                             onQAActiveChange={setIsQAActive}
                             onBack={() => setActiveTab('chat')}
                         />
@@ -1018,6 +1238,8 @@ const ProjectView = () => {
                             availableTopics={availableTopics}
                             selectedDocuments={selectedDocuments}
                             preSelectedTopic={preSelectedTopic}
+                            preGeneratedData={preGeneratedNotes}
+                            onConsumePreGenerated={() => setPreGeneratedNotes(null)}
                         />
                     )}
                     

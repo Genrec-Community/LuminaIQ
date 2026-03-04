@@ -6,7 +6,7 @@ import { generateSubjectiveTest } from '../../api';
 import { useToast } from '../../context/ToastContext';
 import { recordActivity } from '../../utils/studyActivity';
 
-const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopic = null, onQAActiveChange = null, onBack = null }) => {
+const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopic = null, preGeneratedData = null, onConsumePreGenerated = null, onQAActiveChange = null, onBack = null }) => {
     const toast = useToast();
     // Q&A State
     const [qaTopic, setQaTopic] = useState('');
@@ -19,6 +19,18 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
             setQaTopic(preSelectedTopic);
         }
     }, [preSelectedTopic]);
+
+    // Load pre-generated Q&A from chat @ command "Open" button
+    useEffect(() => {
+        if (preGeneratedData && preGeneratedData.questions) {
+            setQaTest(preGeneratedData);
+            const topic = preGeneratedData.topic || '';
+            setQaTopic(topic);
+            setQaTopicSelection(topic);
+            setQaRevealed({});
+            if (onConsumePreGenerated) onConsumePreGenerated();
+        }
+    }, [preGeneratedData]);
     const [qaNumQuestions, setQaNumQuestions] = useState(5);
     const [answerSize, setAnswerSize] = useState('medium'); // 'small' | 'medium' | 'large'
     const [qaTest, setQaTest] = useState(null);

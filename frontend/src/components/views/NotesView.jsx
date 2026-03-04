@@ -6,7 +6,7 @@ import { generateNotes } from '../../api';
 import { useToast } from '../../context/ToastContext';
 import { recordActivity } from '../../utils/studyActivity';
 
-const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopic = null }) => {
+const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopic = null, preGeneratedData = null, onConsumePreGenerated = null }) => {
     const toast = useToast();
     // Notes State
     const [notesType, setNotesType] = useState('Comprehensive Summary');
@@ -23,6 +23,19 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
             setNotesTopic(preSelectedTopic);
         }
     }, [preSelectedTopic]);
+
+    // Load pre-generated notes from chat @ command "Open" button
+    useEffect(() => {
+        if (preGeneratedData && preGeneratedData.content) {
+            setNotesContent(preGeneratedData.content);
+            setNotesType(preGeneratedData.noteType || 'Comprehensive Summary');
+            const topic = preGeneratedData.topic || '';
+            setNotesTopic(topic);
+            setNotesTopicSelection(topic);
+            // Signal parent to clear pre-generated data so it doesn't re-apply on re-render
+            if (onConsumePreGenerated) onConsumePreGenerated();
+        }
+    }, [preGeneratedData]);
 
     // Ref for the rendered notes content
     const notesRef = useRef(null);

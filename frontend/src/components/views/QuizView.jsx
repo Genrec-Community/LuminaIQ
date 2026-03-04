@@ -14,6 +14,8 @@ const QuizView = ({
     // Learning Path integration props
     preSelectedTopic = null,
     preSelectedMode = null,
+    preGeneratedData = null,
+    onConsumePreGenerated = null,
     cameFromPath = false,
     onReturnToPath = null,
     onQuizComplete = null,
@@ -166,6 +168,24 @@ const QuizView = ({
             }
         }
     }, [preSelectedTopic, preSelectedMode]);
+
+    // Load pre-generated quiz from chat @ command "Open" button
+    useEffect(() => {
+        if (preGeneratedData && preGeneratedData.questions) {
+            setMcqTest(preGeneratedData);
+            const topic = preGeneratedData.topic || '';
+            setMcqTopic(topic);
+            setMcqTopicSelection(topic);
+            setQuizMode('mcq');
+            setMcqUserAnswers({});
+            setMcqSubmitted(false);
+            setMcqScore(null);
+            setCurrentQuestionIndex(0);
+            setPerformanceSaved(false);
+            setCardsCreated(null);
+            if (onConsumePreGenerated) onConsumePreGenerated();
+        }
+    }, [preGeneratedData]);
     
     // Load suggested topic on mount (only if not coming from path)
     useEffect(() => {
