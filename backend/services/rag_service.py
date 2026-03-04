@@ -9,7 +9,7 @@ from utils.logger import logger
 
 # LangChain Imports
 from langchain_qdrant import QdrantVectorStore
-from langchain_together import ChatTogether
+from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
@@ -58,9 +58,10 @@ class RAGService:
         )
 
         # Initialize LLM
-        self.llm = ChatTogether(
+        self.llm = ChatOpenAI(
             model=settings.LLM_MODEL,
-            together_api_key=settings.TOGETHER_API_KEY,
+            openai_api_key=settings.LLM_API_KEY,
+            openai_api_base=settings.LLM_BASE_URL,
             temperature=0.7,
         )
 

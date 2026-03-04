@@ -1,4 +1,4 @@
-from langchain_together import ChatTogether
+from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from config.settings import settings
 from typing import List, Dict, Any
@@ -7,15 +7,17 @@ import os
 
 class LLMService:
     def __init__(self):
-        os.environ['TOGETHER_API_KEY'] = settings.TOGETHER_API_KEY
+        os.environ['OPENAI_API_KEY'] = settings.LLM_API_KEY
         self.model = settings.LLM_MODEL
-        self.api_key = settings.TOGETHER_API_KEY
+        self.api_key = settings.LLM_API_KEY
+        self.base_url = settings.LLM_BASE_URL
     
     def _get_client(self, temperature: float = 0.7, max_tokens: int = 1000):
         """Create a client with specific settings"""
-        return ChatTogether(
+        return ChatOpenAI(
             model=self.model,
-            together_api_key=self.api_key,
+            openai_api_key=self.api_key,
+            openai_api_base=self.base_url,
             temperature=temperature,
             max_tokens=max_tokens
         )

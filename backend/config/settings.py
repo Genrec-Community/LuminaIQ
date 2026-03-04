@@ -8,8 +8,16 @@ class Settings(BaseSettings):
     SUPABASE_KEY: str
     SUPABASE_SERVICE_KEY: str
 
-    # Together AI Configuration
-    TOGETHER_API_KEY: str
+    # OpenAI-compatible API Configuration (LLM)
+    LLM_API_KEY: str
+    LLM_BASE_URL: str
+    LLM_MODEL: str
+
+    # OpenAI-compatible API Configuration (Embeddings)
+    EMBEDDING_API_KEY: str
+    EMBEDDING_BASE_URL: str
+    EMBEDDING_MODEL: str
+    EMBEDDING_DIMENSION: int = 1024
 
     # Qdrant Configuration
     QDRANT_URL: str = "http://localhost:6333"
@@ -28,14 +36,10 @@ class Settings(BaseSettings):
     MAX_FILE_SIZE: int = 10485760  # 10MB
     ALLOWED_EXTENSIONS: List[str] = ["pdf", "docx", "txt"]
 
-    # LLM Configuration
-    LLM_MODEL: str = "OpenAI/gpt-oss-20B"
-    EMBEDDING_MODEL: str = "intfloat/multilingual-e5-large-instruct"
-    EMBEDDING_DIMENSION: int = 1024
     CHUNK_SIZE: int = 800  # Larger chunks = fewer API calls
     CHUNK_OVERLAP: int = 100  # Better context continuity
 
-    # Rate Limiting for Together AI (600 req/min = 10 req/sec)
+    # Rate Limiting for LLM API (adjust based on your plan limits)
     EMBEDDING_BATCH_SIZE: int = 50  # Chunks per API call
     EMBEDDING_CONCURRENCY: int = 5  # Max parallel requests
     EMBEDDING_DELAY_MS: int = 200  # Delay between batches (ms)

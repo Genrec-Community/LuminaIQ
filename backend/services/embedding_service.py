@@ -1,4 +1,4 @@
-from langchain_together import TogetherEmbeddings
+from langchain_openai import OpenAIEmbeddings
 from config.settings import settings
 from typing import List
 from utils.logger import logger
@@ -21,10 +21,12 @@ class EmbeddingService:
     MAX_WORKERS = 10
 
     def __init__(self):
-        os.environ["TOGETHER_API_KEY"] = settings.TOGETHER_API_KEY
+        os.environ["OPENAI_API_KEY"] = settings.EMBEDDING_API_KEY
         
-        self.embeddings = TogetherEmbeddings(
-            model=settings.EMBEDDING_MODEL, together_api_key=settings.TOGETHER_API_KEY
+        self.embeddings = OpenAIEmbeddings(
+            model=settings.EMBEDDING_MODEL,
+            openai_api_key=settings.EMBEDDING_API_KEY,
+            openai_api_base=settings.EMBEDDING_BASE_URL
         )
         # Dedicated thread pool for embedding calls - much faster than default
         self._executor = ThreadPoolExecutor(
