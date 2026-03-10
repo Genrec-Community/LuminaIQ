@@ -649,9 +649,9 @@ const KnowledgeGraphView = ({ projectId }) => {
     }
 
     return (
-        <div className="flex flex-col lg:flex-row h-full min-h-[500px] md:min-h-[600px] gap-4 p-4">
+        <div className="flex flex-col lg:flex-row h-full min-h-[600px] gap-4 p-0 md:p-4">
             {/* Main Graph Container */}
-            <div className="flex-1 relative bg-[#FDF6F0] rounded-2xl border border-[#E6D5CC] overflow-hidden min-h-[400px]">
+            <div className="flex-1 relative bg-[#FDF6F0] md:rounded-2xl border-y md:border border-[#E6D5CC] overflow-hidden min-h-[500px]">
                 {/* Header */}
                 <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-[#FDF6F0] to-transparent p-3 md:p-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -759,12 +759,27 @@ const KnowledgeGraphView = ({ projectId }) => {
                 )}
             </div>
             
-            {/* Right Panel - Topic Summary Only (Suggestions Removed) */}
-            <div className={`w-full lg:w-96 transition-all duration-300 ${selectedTopic ? 'opacity-100' : 'opacity-50'}`}>
+            {/* Right Panel - Topic Summary (Mobile Bottom Drawer, Desktop Sidebar) */}
+            <div className={`
+                fixed inset-x-0 bottom-0 z-50 lg:static lg:w-96 lg:z-auto
+                transition-all duration-300 ease-in-out
+                ${selectedTopic ? 'translate-y-0 opacity-100' : 'translate-y-full lg:translate-y-0 lg:opacity-50'}
+                h-[55vh] lg:h-full shadow-2xl lg:shadow-none
+            `}>
+                {/* Close backdrop for mobile */}
+                {selectedTopic && (
+                    <div className="absolute -top-10 left-0 right-0 h-10 lg:hidden" onClick={closeTopic} />
+                )}
+
                 {/* Topic Summary Panel */}
-                <div className="h-full bg-white rounded-2xl border border-[#E6D5CC] overflow-hidden flex flex-col">
+                <div className="h-full bg-white rounded-t-3xl lg:rounded-2xl border border-[#E6D5CC] lg:border overflow-hidden flex flex-col">
                     {selectedTopic ? (
                         <>
+                            {/* Drag handle for mobile */}
+                            <div className="w-full flex justify-center py-2 lg:hidden bg-gradient-to-r from-[#C8A288]/5 to-[#C8A288]/10" onClick={closeTopic}>
+                                <div className="w-12 h-1.5 bg-[#E6D5CC] rounded-full" />
+                            </div>
+
                             {/* Topic Header */}
                             <div className="p-4 border-b border-[#E6D5CC] bg-gradient-to-r from-[#C8A288]/10 to-transparent">
                                 <div className="flex items-start justify-between">
@@ -836,7 +851,7 @@ const KnowledgeGraphView = ({ projectId }) => {
                         </>
                     ) : (
                         <div className="flex-1 flex items-center justify-center p-8">
-                            <div className="text-center">
+                            <div className="text-center px-4">
                                 <Target className="w-12 h-12 text-[#E6D5CC] mx-auto mb-4" />
                                 <p className="text-[#8a6a5c] text-sm md:text-base">Click on a topic node to see its summary</p>
                                 <p className="text-xs text-[#8a6a5c]/60 mt-2">

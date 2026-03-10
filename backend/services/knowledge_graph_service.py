@@ -20,7 +20,7 @@ DSA Used:
 import heapq
 from collections import defaultdict, deque
 from typing import List, Dict, Any, Optional, Set, Tuple
-from db.client import get_supabase_client
+from db.client import get_supabase_client, async_db
 from services.llm_service import llm_service
 from utils.logger import logger
 from uuid import uuid4
@@ -68,7 +68,7 @@ class KnowledgeGraph:
 
             # Check if graph already exists
             if not force_rebuild:
-                existing = (
+                existing = await async_db(lambda: 
                     self.client.table("topic_relations")
                     .select("id")
                     .eq("project_id", project_id)
@@ -83,9 +83,9 @@ class KnowledgeGraph:
                     }
             else:
                 # Delete existing relations
-                self.client.table("topic_relations").delete().eq(
+                await async_db(lambda: self.client.table("topic_relations").delete().eq(
                     "project_id", project_id
-                ).execute()
+                ).execute())
 
             # Process topics in batches to avoid token limits
             all_edges = []
@@ -130,7 +130,7 @@ class KnowledgeGraph:
                 # Insert in chunks to avoid large payloads
                 for i in range(0, len(unique_edges), 100):
                     chunk = unique_edges[i : i + 100]
-                    self.client.table("topic_relations").insert(chunk).execute()
+                    await async_db(lambda: self.client.table("topic_relations").insert(chunk).execute())
 
                 logger.info(
                     f"Created {len(unique_edges)} topic relationships for project {project_id}"
@@ -393,7 +393,7 @@ OUTPUT FORMAT - Return ONLY valid JSON, no markdown:
                 "weight": min(1.0, max(0.1, weight)),
             }
 
-            result = self.client.table("topic_relations").insert(edge).execute()
+            result = await async_db(lambda: self.client.table("topic_relations").insert(edge).execute())
             return result.data[0] if result.data else {}
 
         except Exception as e:
@@ -407,7 +407,7 @@ OUTPUT FORMAT - Return ONLY valid JSON, no markdown:
     ) -> Dict[str, List[Dict[str, Any]]]:
         """Get graph as adjacency list."""
         try:
-            result = (
+            result = await async_db(lambda: 
                 self.client.table("topic_relations")
                 .select("*")
                 .eq("project_id", project_id)
@@ -479,7 +479,7 @@ OUTPUT FORMAT - Return ONLY valid JSON, no markdown:
     async def get_prerequisites(self, project_id: str, topic: str) -> List[str]:
         """Get all prerequisite topics for a given topic."""
         try:
-            result = (
+            result = await async_db(lambda: 
                 self.client.table("topic_relations")
                 .select("from_topic")
                 .eq("project_id", project_id)
@@ -497,7 +497,7 @@ OUTPUT FORMAT - Return ONLY valid JSON, no markdown:
     async def get_dependents(self, project_id: str, topic: str) -> List[str]:
         """Get topics that depend on the given topic."""
         try:
-            result = (
+            result = await async_db(lambda: 
                 self.client.table("topic_relations")
                 .select("to_topic")
                 .eq("project_id", project_id)
@@ -526,7 +526,7 @@ OUTPUT FORMAT - Return ONLY valid JSON, no markdown:
             topic_doc_map = await self._get_topic_document_mapping(project_id)
 
             # Get all edges
-            result = (
+            result = await async_db(lambda: 
                 self.client.table("topic_relations")
                 .select("*")
                 .eq("project_id", project_id)
@@ -668,7 +668,7 @@ OUTPUT FORMAT - Return ONLY valid JSON, no markdown:
     async def _get_topic_document_mapping(self, project_id: str) -> Dict[str, str]:
         """Get mapping of topic -> document name"""
         try:
-            result = (
+            result = await async_db(lambda: 
                 self.client.table("documents")
                 .select("id, filename, topics")
                 .eq("project_id", project_id)
@@ -693,7 +693,7 @@ OUTPUT FORMAT - Return ONLY valid JSON, no markdown:
     async def detect_cycle(self, project_id: str) -> bool:
         """Detect if there's a cycle in the prerequisite graph."""
         try:
-            result = (
+            result = await async_db(lambda: 
                 self.client.table("topic_relations")
                 .select("*")
                 .eq("project_id", project_id)
@@ -744,7 +744,7 @@ OUTPUT FORMAT - Return ONLY valid JSON, no markdown:
     async def get_graph_stats(self, project_id: str) -> Dict[str, Any]:
         """Get statistics about the knowledge graph."""
         try:
-            result = (
+            result = await async_db(lambda: 
                 self.client.table("topic_relations")
                 .select("*")
                 .eq("project_id", project_id)
@@ -793,7 +793,7 @@ OUTPUT FORMAT - Return ONLY valid JSON, no markdown:
         Always includes ALL topics from documents, even if no relations exist yet.
         """
         try:
-            result = (
+            result = await async_db(lambda: 
                 self.client.table("topic_relations")
                 .select("*")
                 .eq("project_id", project_id)

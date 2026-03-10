@@ -1,7 +1,7 @@
 import os
 import asyncio
 from typing import Optional, List
-from db.client import get_supabase_client
+from db.client import get_supabase_client, async_db
 from config.settings import settings
 from utils.file_parser import FileParser
 from utils.text_chunker import TextChunker
@@ -100,8 +100,8 @@ class DocumentService:
                 from services.knowledge_graph_service import knowledge_graph
                 from db.client import get_supabase_client
 
-                docs = (
-                    get_supabase_client().table("documents")
+                docs = await async_db(
+                    lambda: get_supabase_client().table("documents")
                     .select("topics")
                     .eq("project_id", project_id)
                     .eq("upload_status", "completed")
@@ -112,8 +112,8 @@ class DocumentService:
                     all_topics.extend(d.get("topics") or [])
                 
                 # Also include topics from the current doc (not yet marked completed)
-                current_doc = (
-                    get_supabase_client().table("documents")
+                current_doc = await async_db(
+                    lambda: get_supabase_client().table("documents")
                     .select("topics")
                     .eq("id", document_id)
                     .execute()
@@ -253,7 +253,7 @@ class DocumentService:
     async def _update_document_status(
         self, document_id: str, status: str, message: Optional[str] = None
     ):
-        """Update document processing status in database"""
+        """Update document processing status in database (non-blocking)"""
         try:
             update_data = {"upload_status": status}
             if status == "completed":
@@ -261,19 +261,23 @@ class DocumentService:
             elif message:
                 update_data["error_message"] = message
 
-            self.client.table("documents").update(update_data).eq(
-                "id", document_id
-            ).execute()
+            await async_db(
+                lambda: self.client.table("documents").update(update_data).eq(
+                    "id", document_id
+                ).execute()
+            )
 
         except Exception as e:
             logger.error(f"Error updating document status: {str(e)}")
 
     async def delete_document(self, project_id: str, document_id: str):
-        """Delete document from DB and Vector Store"""
+        """Delete document from DB and Vector Store (non-blocking)"""
         try:
             collection_name = f"project_{project_id}"
             await qdrant_service.delete_vectors(collection_name, document_id)
-            self.client.table("documents").delete().eq("id", document_id).execute()
+            await async_db(
+                lambda: self.client.table("documents").delete().eq("id", document_id).execute()
+            )
             logger.info(f"Deleted document {document_id} from project {project_id}")
         except Exception as e:
             logger.error(f"Error deleting document: {str(e)}")
@@ -341,8 +345,8 @@ class DocumentService:
                     from services.knowledge_graph_service import knowledge_graph
                     from db.client import get_supabase_client
 
-                    docs = (
-                        get_supabase_client().table("documents")
+                    docs = await async_db(
+                        lambda: get_supabase_client().table("documents")
                         .select("topics")
                         .eq("project_id", project_id)
                         .eq("upload_status", "completed")
@@ -352,8 +356,8 @@ class DocumentService:
                     for d in (docs.data or []):
                         all_topics.extend(d.get("topics") or [])
 
-                    current_doc = (
-                        get_supabase_client().table("documents")
+                    current_doc = await async_db(
+                        lambda: get_supabase_client().table("documents")
                         .select("topics")
                         .eq("id", document_id)
                         .execute()

@@ -18,7 +18,8 @@ class EmbeddingService:
     """
 
     # Optimal workers for I/O-bound embedding API calls
-    MAX_WORKERS = 10
+    MAX_WORKERS_BATCH = 8
+    MAX_WORKERS_SEARCH = 4
 
     def __init__(self):
         os.environ["OPENAI_API_KEY"] = settings.EMBEDDING_API_KEY
@@ -28,11 +29,15 @@ class EmbeddingService:
             openai_api_key=settings.EMBEDDING_API_KEY,
             openai_api_base=settings.EMBEDDING_BASE_URL
         )
-        # Dedicated thread pool for embedding calls - much faster than default
-        self._executor = ThreadPoolExecutor(
-            max_workers=self.MAX_WORKERS, thread_name_prefix="embedding_worker"
+        # Dedicated thread pool for batch embedding calls (document processing)
+        self._batch_executor = ThreadPoolExecutor(
+            max_workers=self.MAX_WORKERS_BATCH, thread_name_prefix="embed_batch"
         )
-        logger.info(f"[EmbeddingService] Initialized with {self.MAX_WORKERS} workers")
+        # Dedicated thread pool for search queries (user-facing, prevents starvation)
+        self._search_executor = ThreadPoolExecutor(
+            max_workers=self.MAX_WORKERS_SEARCH, thread_name_prefix="embed_search"
+        )
+        logger.info(f"[EmbeddingService] Initialized with {self.MAX_WORKERS_BATCH} batch workers and {self.MAX_WORKERS_SEARCH} search workers")
     
     def _add_passage_prefix(self, texts: List[str]) -> List[str]:
         """Add 'passage: ' prefix for E5 instruct models (document/passage embedding)."""
@@ -58,7 +63,7 @@ class EmbeddingService:
             # Add E5 instruction prefix for passages
             prefixed_texts = self._add_passage_prefix(texts)
             embeddings = await loop.run_in_executor(
-                self._executor,  # Use dedicated pool, not None (default)
+                self._batch_executor,  # Use dedicated batch pool
                 self.embeddings.embed_documents,
                 prefixed_texts,
             )
@@ -77,7 +82,7 @@ class EmbeddingService:
             loop = asyncio.get_running_loop()
             prefixed_text = self._add_query_prefix(text)
             return await loop.run_in_executor(
-                self._executor,  # Use dedicated pool
+                self._search_executor,  # Use dedicated search pool
                 self.embeddings.embed_query,
                 prefixed_text,
             )
@@ -86,10 +91,12 @@ class EmbeddingService:
             raise
 
     def shutdown(self):
-        """Cleanup thread pool on shutdown"""
-        if self._executor:
-            self._executor.shutdown(wait=False)
-            logger.info("[EmbeddingService] Thread pool shut down")
+        """Cleanup thread pools on shutdown"""
+        if hasattr(self, '_batch_executor') and self._batch_executor:
+            self._batch_executor.shutdown(wait=False)
+        if hasattr(self, '_search_executor') and self._search_executor:
+            self._search_executor.shutdown(wait=False)
+        logger.info("[EmbeddingService] Thread pools shut down")
 
 
 embedding_service = EmbeddingService()

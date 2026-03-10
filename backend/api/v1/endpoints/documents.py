@@ -24,6 +24,7 @@ from api.deps import get_current_user
 from utils.embedding_queue import get_embedding_queue
 import httpx
 from utils.logger import logger
+from db.client import async_db
 
 router = APIRouter()
 
@@ -141,12 +142,8 @@ async def list_documents(
     List all documents for a project
     """
     try:
-        # Verify project access first ideally, but RLS should handle filtering if configured.
-        # Adding manual check for extra safety.
-
-        # Basic query
-        response = (
-            document_service.client.table("documents")
+        response = await async_db(
+            lambda: document_service.client.table("documents")
             .select("*")
             .eq("project_id", project_id)
             .execute()
@@ -253,8 +250,8 @@ async def search_documents(
             )
             if doc_ids:
                 try:
-                    docs_response = (
-                        document_service.client.table("documents")
+                    docs_response = await async_db(
+                        lambda: document_service.client.table("documents")
                         .select("id, filename")
                         .in_("id", doc_ids)
                         .execute()

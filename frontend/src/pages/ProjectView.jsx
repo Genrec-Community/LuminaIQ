@@ -105,6 +105,20 @@ const ProjectView = () => {
         return sessionStorage.getItem(`lumina_tab_${projectId}`) || 'chat';
     });
     const [messages, setMessages] = useState([]);
+    const messagesEndRef = useRef(null);
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    };
+
+    useEffect(() => {
+        if (activeTab === 'chat') {
+            // Use a slight delay to ensure DOM has updated before scrolling
+            setTimeout(() => {
+                scrollToBottom();
+            }, 50);
+        }
+    }, [messages, activeTab]);
 
     // Session cache keys
     const chatCacheKey = `lumina_chat_${projectId}`;
@@ -765,7 +779,7 @@ const ProjectView = () => {
                 fixed inset-y-0 left-0 z-50 ${leftCollapsed ? 'w-20' : 'w-80'} bg-[#FDF6F0]/95 backdrop-blur-xl border-r border-white/20 flex flex-col transition-all duration-300 ease-in-out md:translate-x-0 md:static md:shrink-0 shadow-2xl md:shadow-none
                 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
             `}>
-                    <div className={`flex-1 flex flex-col ${leftCollapsed ? 'p-3' : 'p-6'}`}>
+                    <div className={`flex-1 flex flex-col min-h-0 ${leftCollapsed ? 'p-3' : 'p-6'}`}>
                         <div className={`flex items-center ${leftCollapsed ? 'justify-center' : 'justify-between'} mb-8`}>
                             {!leftCollapsed && (
                                 <div className="flex items-center gap-3">
@@ -1196,6 +1210,7 @@ const ProjectView = () => {
                                         )}
                                     </div>
                                 ))}
+                                <div ref={messagesEndRef} />
                                 {isProcessingDocs && (
                                     <div className="flex justify-center my-4">
                                         <div className="bg-gradient-to-r from-amber-50 to-orange-50 text-amber-700 px-5 py-4 rounded-xl text-sm flex items-center gap-3 border border-amber-200 shadow-md max-w-lg">

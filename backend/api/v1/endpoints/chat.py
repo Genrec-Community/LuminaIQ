@@ -4,7 +4,7 @@ from services.rag_service import rag_service
 from models.schemas import ChatRequest, ChatResponse, ChatMessage, SummaryRequest
 from typing import Any, List
 from api.deps import get_current_user
-from db.client import get_supabase_client
+from db.client import get_supabase_client, async_db
 
 router = APIRouter()
 
@@ -14,13 +14,12 @@ async def get_chat_history(
     project_id: str, current_user: dict = Depends(get_current_user)
 ):
     """
-    Get chat history for a project
+    Get chat history for a project (non-blocking DB)
     """
     try:
-        # Verify access (simple check or RLS)
         client = get_supabase_client()
-        response = (
-            client.table("chat_messages")
+        response = await async_db(
+            lambda: client.table("chat_messages")
             .select("*")
             .eq("project_id", project_id)
             .order("created_at", desc=False)
@@ -44,18 +43,20 @@ async def chat_message(
     """
     try:
         client = get_supabase_client()
-        # Save User Message
-        client.table("chat_messages").insert(
-            {
-                "project_id": request.project_id,
-                "role": "user",
-                "content": request.message,
-            }
-        ).execute()
+        # Save User Message (non-blocking)
+        await async_db(
+            lambda: client.table("chat_messages").insert(
+                {
+                    "project_id": request.project_id,
+                    "role": "user",
+                    "content": request.message,
+                }
+            ).execute()
+        )
 
-        # Fetch full history for context
-        history_res = (
-            client.table("chat_messages")
+        # Fetch full history for context (non-blocking)
+        history_res = await async_db(
+            lambda: client.table("chat_messages")
             .select("*")
             .eq("project_id", request.project_id)
             .order("created_at", desc=False)
@@ -75,15 +76,17 @@ async def chat_message(
             ],  # Exclude current msg to avoid duplication if RAG appends it
         )
 
-        # Save Assistant Message
-        client.table("chat_messages").insert(
-            {
-                "project_id": request.project_id,
-                "role": "assistant",
-                "content": result["answer"],
-                "sources": result["sources"],
-            }
-        ).execute()
+        # Save Assistant Message (non-blocking)
+        await async_db(
+            lambda: client.table("chat_messages").insert(
+                {
+                    "project_id": request.project_id,
+                    "role": "assistant",
+                    "content": result["answer"],
+                    "sources": result["sources"],
+                }
+            ).execute()
+        )
 
         return result
 
@@ -100,18 +103,20 @@ async def chat_stream(
     """
     try:
         client = get_supabase_client()
-        # Save User Message
-        client.table("chat_messages").insert(
-            {
-                "project_id": request.project_id,
-                "role": "user",
-                "content": request.message,
-            }
-        ).execute()
+        # Save User Message (non-blocking)
+        await async_db(
+            lambda: client.table("chat_messages").insert(
+                {
+                    "project_id": request.project_id,
+                    "role": "user",
+                    "content": request.message,
+                }
+            ).execute()
+        )
 
-        # Fetch full history
-        history_res = (
-            client.table("chat_messages")
+        # Fetch full history (non-blocking)
+        history_res = await async_db(
+            lambda: client.table("chat_messages")
             .select("*")
             .eq("project_id", request.project_id)
             .order("created_at", desc=False)
@@ -152,16 +157,18 @@ async def chat_stream(
                     full_answer += chunk
                     yield chunk
 
-            # Save Assistant Message after stream ends
+            # Save Assistant Message after stream ends (non-blocking)
             try:
-                get_supabase_client().table("chat_messages").insert(
-                    {
-                        "project_id": request.project_id,
-                        "role": "assistant",
-                        "content": full_answer,
-                        "sources": sources,
-                    }
-                ).execute()
+                await async_db(
+                    lambda: get_supabase_client().table("chat_messages").insert(
+                        {
+                            "project_id": request.project_id,
+                            "role": "assistant",
+                            "content": full_answer,
+                            "sources": sources,
+                        }
+                    ).execute()
+                )
             except Exception as save_err:
                 print(f"Failed to save assistant message: {save_err}")
 

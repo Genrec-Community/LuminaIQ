@@ -3,6 +3,15 @@ from supabase.lib.client_options import SyncClientOptions
 from config.settings import settings
 from utils.logger import logger
 import time
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+
+
+# Dedicated thread pool for Supabase calls — prevents blocking the event loop
+_db_executor = ThreadPoolExecutor(
+    max_workers=8,
+    thread_name_prefix="supabase_db"
+)
 
 
 class SupabaseClient:
@@ -57,7 +66,6 @@ def get_supabase_client() -> Client:
 
 
 # Lazy initialization — don't connect at import time.
-# This prevents DNS failures from crashing the entire app on startup.
 supabase_client = None
 
 
@@ -66,3 +74,41 @@ def _get_lazy_client() -> Client:
     if supabase_client is None:
         supabase_client = get_supabase_client()
     return supabase_client
+
+
+# ============================================================================
+# Async DB Wrapper — runs sync Supabase calls in a dedicated thread pool
+# so they DON'T block the event loop
+# ============================================================================
+
+async def async_db_execute(func, *args, **kwargs):
+    """
+    Run a synchronous Supabase operation in a dedicated thread pool.
+
+    This prevents sync DB calls from blocking the asyncio event loop,
+    which is critical for multi-tenant performance.
+
+    Usage:
+        # Instead of (BLOCKS event loop):
+        result = client.table("docs").select("*").execute()
+
+        # Use (NON-BLOCKING):
+        result = await async_db_execute(
+            lambda: client.table("docs").select("*").execute()
+        )
+    """
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(_db_executor, func, *args)
+
+
+async def async_db(callable_fn):
+    """
+    Shorthand wrapper for async DB execution.
+
+    Usage:
+        result = await async_db(
+            lambda: client.table("docs").select("*").eq("id", doc_id).execute()
+        )
+    """
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(_db_executor, callable_fn)

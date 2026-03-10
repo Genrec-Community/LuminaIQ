@@ -4,7 +4,7 @@ from typing import List, Dict, Any, Union
 from services.embedding_service import embedding_service
 from services.qdrant_service import qdrant_service
 from services.llm_service import llm_service
-from db.client import get_supabase_client
+from db.client import get_supabase_client, async_db
 from config.settings import settings
 from utils.logger import logger
 from uuid import uuid4
@@ -82,9 +82,9 @@ Return ONLY a JSON array of topic strings:
 
             # Save to document
             if topics:
-                self.client.table("documents").update({"topics": topics}).eq(
+                await async_db(lambda: self.client.table("documents").update({"topics": topics}).eq(
                     "id", document_id
-                ).execute()
+                ).execute())
                 logger.info(f"Generated {len(topics)} topics for doc {document_id}")
             else:
                 logger.warning(f"No topics generated for doc {document_id}")
@@ -101,8 +101,8 @@ Return ONLY a JSON array of topic strings:
         """Get aggregated topics AND per-document topics. Also triggers knowledge graph building."""
         try:
             # Get all docs with their topics
-            response = (
-                self.client.table("documents")
+            response = await async_db(
+                lambda: self.client.table("documents")
                 .select("id, topics")
                 .eq("project_id", project_id)
                 .eq("upload_status", "completed")
@@ -270,14 +270,14 @@ Respond ONLY with the valid JSON array. Do not add any markdown formatting (like
 
             # 4. Store in database
             test_id = str(uuid4())
-            self.client.table("mcq_tests").insert(
+            await async_db(lambda: self.client.table("mcq_tests").insert(
                 {
                     "id": test_id,
                     "project_id": project_id,
                     "chapter_name": topic if topic else "General Quiz",
                     "questions": json.dumps(questions),
                 }
-            ).execute()
+            ).execute())
 
             logger.info(f"Created MCQ test with ID: {test_id}")
 
@@ -396,7 +396,7 @@ Return only the 3 queries separated by newlines."""
         """Evaluate submitted test answers"""
         try:
             # 1. Get test from database
-            response = (
+            response = await async_db(lambda: 
                 self.client.table("mcq_tests").select("*").eq("id", test_id).execute()
             )
 
@@ -447,7 +447,7 @@ Return only the 3 queries separated by newlines."""
     async def get_saved_tests(self, project_id: str) -> List[Dict[str, Any]]:
         """Get all saved MCQ tests for a project"""
         try:
-            response = (
+            response = await async_db(lambda: 
                 self.client.table("mcq_tests")
                 .select("id, project_id, chapter_name, created_at")
                 .eq("project_id", project_id)
@@ -458,7 +458,7 @@ Return only the 3 queries separated by newlines."""
             # Add question count from stored JSON
             for test in tests:
                 # Fetch question count separately to keep listing lightweight
-                q_response = (
+                q_response = await async_db(lambda: 
                     self.client.table("mcq_tests")
                     .select("questions")
                     .eq("id", test["id"])
@@ -480,7 +480,7 @@ Return only the 3 queries separated by newlines."""
     async def get_saved_test(self, test_id: str) -> Dict[str, Any]:
         """Get a specific saved MCQ test with full questions"""
         try:
-            response = (
+            response = await async_db(lambda: 
                 self.client.table("mcq_tests")
                 .select("*")
                 .eq("id", test_id)
@@ -500,7 +500,7 @@ Return only the 3 queries separated by newlines."""
     async def delete_saved_test(self, test_id: str):
         """Delete a saved MCQ test"""
         try:
-            response = (
+            response = await async_db(lambda: 
                 self.client.table("mcq_tests")
                 .delete()
                 .eq("id", test_id)
