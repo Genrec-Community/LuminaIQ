@@ -1,7 +1,7 @@
 import os
 import asyncio
 from typing import Optional, List
-from db.client import supabase_client
+from db.client import get_supabase_client
 from config.settings import settings
 from utils.file_parser import FileParser
 from utils.text_chunker import TextChunker
@@ -26,7 +26,7 @@ class DocumentService:
     """
 
     def __init__(self):
-        self.client = supabase_client
+        self.client = get_supabase_client()
         self.file_parser = FileParser()
         self.text_chunker = TextChunker(
             chunk_size=settings.CHUNK_SIZE, overlap=settings.CHUNK_OVERLAP
@@ -98,10 +98,10 @@ class DocumentService:
             # 5b. Auto-build knowledge graph from all project topics
             try:
                 from services.knowledge_graph_service import knowledge_graph
-                from db.client import supabase_client
+                from db.client import get_supabase_client
 
                 docs = (
-                    supabase_client.table("documents")
+                    get_supabase_client().table("documents")
                     .select("topics")
                     .eq("project_id", project_id)
                     .eq("upload_status", "completed")
@@ -113,7 +113,7 @@ class DocumentService:
                 
                 # Also include topics from the current doc (not yet marked completed)
                 current_doc = (
-                    supabase_client.table("documents")
+                    get_supabase_client().table("documents")
                     .select("topics")
                     .eq("id", document_id)
                     .execute()
@@ -339,10 +339,10 @@ class DocumentService:
                 # Auto-build knowledge graph from all project topics
                 try:
                     from services.knowledge_graph_service import knowledge_graph
-                    from db.client import supabase_client
+                    from db.client import get_supabase_client
 
                     docs = (
-                        supabase_client.table("documents")
+                        get_supabase_client().table("documents")
                         .select("topics")
                         .eq("project_id", project_id)
                         .eq("upload_status", "completed")
@@ -353,7 +353,7 @@ class DocumentService:
                         all_topics.extend(d.get("topics") or [])
 
                     current_doc = (
-                        supabase_client.table("documents")
+                        get_supabase_client().table("documents")
                         .select("topics")
                         .eq("id", document_id)
                         .execute()

@@ -72,9 +72,10 @@ async def get_knowledge_graph(
         graph_data = await knowledge_graph.get_full_graph(project_id)
         
         # Get project info for center node
-        from db.client import supabase_client
+        from db.client import get_supabase_client
+        client = get_supabase_client()
         project = (
-            supabase_client.table("projects")
+            client.table("projects")
             .select("name")
             .eq("id", project_id)
             .execute()
@@ -83,7 +84,7 @@ async def get_knowledge_graph(
         
         # Get document names for book nodes
         documents = (
-            supabase_client.table("documents")
+            client.table("documents")
             .select("id, filename, topics")
             .eq("project_id", project_id)
             .eq("upload_status", "completed")

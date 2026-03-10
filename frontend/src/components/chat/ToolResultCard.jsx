@@ -119,11 +119,11 @@ export const ToolResultCard = ({ toolType, toolParams, toolData, onOpen }) => {
                 return { primary: `${count} MCQs`, secondary: toolParams?.difficulty || 'medium' };
             }
             case 'mindmap': {
-                const branches = toolData?.mindmap?.children?.length || 0;
-                return { primary: `${branches} branches`, secondary: 'Interactive tree' };
+                const nodes = toolData?.data?.nodes?.length || toolData?.node_count || 0;
+                return { primary: `${nodes} nodes`, secondary: 'Interactive mindmap' };
             }
             case 'flashcards': {
-                const count = toolData?.flashcards?.length || toolData?.count || 0;
+                const count = toolData?.cards?.length || toolData?.card_count || 0;
                 return { primary: `${count} cards`, secondary: 'Flip to study' };
             }
             default:
@@ -141,9 +141,9 @@ export const ToolResultCard = ({ toolType, toolParams, toolData, onOpen }) => {
             case 'quiz':
                 return toolData?.questions?.[0]?.question || '';
             case 'mindmap':
-                return toolData?.mindmap?.children?.map(c => c.label).join(' / ') || '';
+                return toolData?.data?.nodes?.filter(n => n.level === 1)?.map(n => n.label).join(' / ') || toolData?.topic || '';
             case 'flashcards':
-                return toolData?.flashcards?.[0]?.front || '';
+                return toolData?.cards?.[0]?.front || '';
             default:
                 return '';
         }

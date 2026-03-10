@@ -4,7 +4,7 @@ from services.rag_service import rag_service
 from models.schemas import ChatRequest, ChatResponse, ChatMessage, SummaryRequest
 from typing import Any, List
 from api.deps import get_current_user
-from db.client import supabase_client
+from db.client import get_supabase_client
 
 router = APIRouter()
 
@@ -18,8 +18,9 @@ async def get_chat_history(
     """
     try:
         # Verify access (simple check or RLS)
+        client = get_supabase_client()
         response = (
-            supabase_client.table("chat_messages")
+            client.table("chat_messages")
             .select("*")
             .eq("project_id", project_id)
             .order("created_at", desc=False)
@@ -42,8 +43,9 @@ async def chat_message(
     Send a message to the RAG chat (Blocking/Non-streaming)
     """
     try:
+        client = get_supabase_client()
         # Save User Message
-        supabase_client.table("chat_messages").insert(
+        client.table("chat_messages").insert(
             {
                 "project_id": request.project_id,
                 "role": "user",
@@ -53,7 +55,7 @@ async def chat_message(
 
         # Fetch full history for context
         history_res = (
-            supabase_client.table("chat_messages")
+            client.table("chat_messages")
             .select("*")
             .eq("project_id", request.project_id)
             .order("created_at", desc=False)
@@ -74,7 +76,7 @@ async def chat_message(
         )
 
         # Save Assistant Message
-        supabase_client.table("chat_messages").insert(
+        client.table("chat_messages").insert(
             {
                 "project_id": request.project_id,
                 "role": "assistant",
@@ -97,8 +99,9 @@ async def chat_stream(
     Send a message to the RAG chat (Streaming)
     """
     try:
+        client = get_supabase_client()
         # Save User Message
-        supabase_client.table("chat_messages").insert(
+        client.table("chat_messages").insert(
             {
                 "project_id": request.project_id,
                 "role": "user",
@@ -108,7 +111,7 @@ async def chat_stream(
 
         # Fetch full history
         history_res = (
-            supabase_client.table("chat_messages")
+            client.table("chat_messages")
             .select("*")
             .eq("project_id", request.project_id)
             .order("created_at", desc=False)
@@ -151,7 +154,7 @@ async def chat_stream(
 
             # Save Assistant Message after stream ends
             try:
-                supabase_client.table("chat_messages").insert(
+                get_supabase_client().table("chat_messages").insert(
                     {
                         "project_id": request.project_id,
                         "role": "assistant",

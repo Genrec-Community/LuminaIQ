@@ -11,6 +11,8 @@ from api.v1.endpoints import (
     learning,
     knowledge_graph,
     user_data,
+    flashcards,
+    mindmaps,
 )
 
 api_router = APIRouter()
@@ -26,3 +28,5 @@ api_router.include_router(webhook.router, prefix="/webhook", tags=["webhook"])
 api_router.include_router(learning.router, prefix="/learning", tags=["learning"])
 api_router.include_router(knowledge_graph.router, prefix="/knowledge-graph", tags=["knowledge-graph"])
 api_router.include_router(user_data.router, prefix="/user-data", tags=["user-data"])
+api_router.include_router(flashcards.router, prefix="/flashcards", tags=["flashcards"])
+api_router.include_router(mindmaps.router, prefix="/mindmaps", tags=["mindmaps"])

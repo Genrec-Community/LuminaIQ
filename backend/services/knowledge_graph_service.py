@@ -20,7 +20,7 @@ DSA Used:
 import heapq
 from collections import defaultdict, deque
 from typing import List, Dict, Any, Optional, Set, Tuple
-from db.client import supabase_client
+from db.client import get_supabase_client
 from services.llm_service import llm_service
 from utils.logger import logger
 from uuid import uuid4
@@ -50,7 +50,7 @@ class KnowledgeGraph:
     MAX_TOKENS = 4000  # Higher limit for JSON output
 
     def __init__(self):
-        self.client = supabase_client
+        self.client = get_supabase_client()
 
     # ============== Graph Building ==============
 

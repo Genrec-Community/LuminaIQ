@@ -1,6 +1,5 @@
 from typing import Dict, Any, List
-from supabase import create_client, Client
-from config.settings import settings
+from db.client import get_supabase_client
 from utils.logger import logger
 from uuid import uuid4
 from datetime import datetime
@@ -10,10 +9,11 @@ from services.qdrant_service import qdrant_service
 
 class NotesService:
     def __init__(self):
-        self.client: Client = create_client(
-            settings.SUPABASE_URL,
-            settings.SUPABASE_SERVICE_KEY
-        )
+        pass
+
+    @property
+    def client(self):
+        return get_supabase_client()
     
     async def get_notes(self, project_id: str, user_id: str) -> Dict[str, Any]:
         """Get notes for a project"""
@@ -310,12 +310,89 @@ Respond ONLY with the Markdown content."""
             "temperature": temperature,
         }
 
+    async def get_saved_notes(self, project_id: str, user_id: str) -> List[Dict[str, Any]]:
+        """Get all saved notes for a project"""
+        try:
+            response = self.client.table("notes").select(
+                "id, project_id, user_id, title, note_type, topic, created_at, updated_at"
+            ).eq(
+                "project_id", project_id
+            ).eq("user_id", user_id).order("created_at", desc=True).execute()
+
+            return response.data or []
+        except Exception as e:
+            logger.error(f"Error getting saved notes: {str(e)}")
+            raise
+
+    async def get_saved_note(self, note_id: str, user_id: str) -> Dict[str, Any]:
+        """Get a specific saved note with full content"""
+        try:
+            response = self.client.table("notes").select("*").eq(
+                "id", note_id
+            ).eq("user_id", user_id).execute()
+
+            if not response.data:
+                raise Exception("Note not found")
+            return response.data[0]
+        except Exception as e:
+            logger.error(f"Error getting saved note: {str(e)}")
+            raise
+
+    async def delete_saved_note(self, note_id: str, user_id: str):
+        """Delete a saved note"""
+        try:
+            response = self.client.table("notes").delete().eq(
+                "id", note_id
+            ).eq("user_id", user_id).execute()
+            if not response.data:
+                raise Exception("Note not found or unauthorized")
+            logger.info(f"Deleted note {note_id}")
+        except Exception as e:
+            logger.error(f"Error deleting note: {str(e)}")
+            raise
+
+    async def save_generated_notes(
+        self,
+        project_id: str,
+        user_id: str,
+        content: str,
+        note_type: str,
+        topic: str = None
+    ) -> Dict[str, Any]:
+        """Save generated notes to the database"""
+        try:
+            note_id = str(uuid4())
+            title = f"{note_type}"
+            if topic:
+                title += f" - {topic}"
+
+            data = {
+                "id": note_id,
+                "project_id": project_id,
+                "user_id": user_id,
+                "content": content,
+                "title": title,
+                "note_type": note_type,
+                "topic": topic,
+            }
+            response = self.client.table("notes").insert(data).execute()
+
+            if not response.data:
+                raise Exception("Failed to save notes")
+
+            logger.info(f"Saved generated notes {note_id} for project {project_id}")
+            return response.data[0]
+        except Exception as e:
+            logger.error(f"Error saving generated notes: {str(e)}")
+            raise
+
     async def generate_notes(
         self,
         project_id: str,
         note_type: str,
         topic: str = None,
-        selected_documents: List[str] = None
+        selected_documents: List[str] = None,
+        user_id: str = None
     ) -> str:
         """Generate notes using AI with type-specific prompts and retrieval strategies."""
         try:
@@ -363,7 +440,23 @@ Respond ONLY with the Markdown content."""
                 max_tokens=config["max_tokens"]
             )
 
-            return response
+            # Auto-save generated notes if user_id is provided
+            saved_note = None
+            if user_id and response:
+                try:
+                    saved_note = await self.save_generated_notes(
+                        project_id=project_id,
+                        user_id=user_id,
+                        content=response,
+                        note_type=note_type,
+                        topic=topic
+                    )
+                except Exception as save_err:
+                    logger.error(f"Failed to auto-save notes: {save_err}")
+
+            if saved_note:
+                return {"content": response, "note_id": saved_note.get("id"), "title": saved_note.get("title")}
+            return {"content": response}
 
         except Exception as e:
             logger.error(f"Error generating notes: {str(e)}")

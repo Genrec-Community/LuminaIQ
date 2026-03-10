@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-    BookOpen, HelpCircle, CheckSquare, GitBranch, Layers,
-    ChevronDown, Sparkles, X, ArrowRight
+    BookOpen, HelpCircle, CheckSquare,
+    ChevronDown, Sparkles, X, ArrowRight,
+    Brain, CreditCard
 } from 'lucide-react';
 
 // Command definitions with their parameters
@@ -106,11 +107,11 @@ const COMMANDS = [
     {
         id: 'mindmap',
         label: 'Mindmap',
-        description: 'Generate a visual topic mindmap',
-        icon: GitBranch,
-        color: 'text-indigo-600',
-        bgColor: 'bg-indigo-50',
-        borderColor: 'border-indigo-200',
+        description: 'Generate a visual mindmap for a topic',
+        icon: Brain,
+        color: 'text-pink-600',
+        bgColor: 'bg-pink-50',
+        borderColor: 'border-pink-200',
         params: [
             {
                 key: 'topic',
@@ -118,15 +119,23 @@ const COMMANDS = [
                 type: 'topic',
                 default: '',
                 required: true,
-                placeholder: 'Enter a topic (required)',
+                placeholder: 'Enter a topic for the mindmap',
+            },
+            {
+                key: 'title',
+                label: 'Title',
+                type: 'text',
+                default: '',
+                required: false,
+                placeholder: 'Optional custom title',
             },
         ],
     },
     {
         id: 'flashcards',
         label: 'Flashcards',
-        description: 'Generate study flashcards',
-        icon: Layers,
+        description: 'Generate flashcards for studying',
+        icon: CreditCard,
         color: 'text-orange-600',
         bgColor: 'bg-orange-50',
         borderColor: 'border-orange-200',
@@ -137,14 +146,14 @@ const COMMANDS = [
                 type: 'topic',
                 default: '',
                 required: true,
-                placeholder: 'Enter a topic (required)',
+                placeholder: 'Enter a topic for flashcards',
             },
             {
                 key: 'numCards',
-                label: 'Cards',
+                label: 'Number of Cards',
                 type: 'select',
-                options: ['5', '8', '10', '15', '20'],
-                default: '8',
+                options: ['5', '10', '15', '20'],
+                default: '10',
                 required: true,
             },
         ],
@@ -383,6 +392,24 @@ export const CommandParamForm = ({ command, availableTopics, onExecute, onCancel
                                             </button>
                                         ))}
                                     </div>
+                                </div>
+                            );
+                        }
+
+                        // Text param
+                        if (param.type === 'text') {
+                            return (
+                                <div key={param.key}>
+                                    <label className="block text-xs font-bold text-[#4A3B32] uppercase tracking-wide mb-1.5 opacity-80">
+                                        {param.label} {param.required && <span className="text-red-400">*</span>}
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={params[param.key] || ''}
+                                        onChange={(e) => setParams(p => ({ ...p, [param.key]: e.target.value }))}
+                                        placeholder={param.placeholder || ''}
+                                        className="w-full px-3.5 py-2.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#C8A288] text-sm text-[#4A3B32]"
+                                    />
                                 </div>
                             );
                         }

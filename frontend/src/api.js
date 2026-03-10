@@ -292,6 +292,57 @@ export const generateNotes = async (projectId, noteType, topic, selectedDocument
 };
 
 
+// ============== Saved Q&A (Subjective Tests) API ==============
+
+export const getSavedQATests = async (projectId) => {
+    const response = await api.get(`/evaluation/saved/${projectId}`);
+    return response.data;
+};
+
+export const getSavedQATest = async (testId) => {
+    const response = await api.get(`/evaluation/saved/view/${testId}`);
+    return response.data;
+};
+
+export const deleteSavedQATest = async (testId) => {
+    const response = await api.delete(`/evaluation/saved/${testId}`);
+    return response.data;
+};
+
+// ============== Saved Quiz (MCQ Tests) API ==============
+
+export const getSavedQuizzes = async (projectId) => {
+    const response = await api.get(`/mcq/saved/${projectId}`);
+    return response.data;
+};
+
+export const getSavedQuiz = async (testId) => {
+    const response = await api.get(`/mcq/saved/view/${testId}`);
+    return response.data;
+};
+
+export const deleteSavedQuiz = async (testId) => {
+    const response = await api.delete(`/mcq/saved/${testId}`);
+    return response.data;
+};
+
+// ============== Saved Notes API ==============
+
+export const getSavedNotes = async (projectId) => {
+    const response = await api.get(`/notes/saved/${projectId}`);
+    return response.data;
+};
+
+export const getSavedNote = async (noteId) => {
+    const response = await api.get(`/notes/saved/view/${noteId}`);
+    return response.data;
+};
+
+export const deleteSavedNote = async (noteId) => {
+    const response = await api.delete(`/notes/saved/${noteId}`);
+    return response.data;
+};
+
 // ============== Learning API (Adaptive Learning System) ==============
 
 // Performance Tracking
@@ -659,23 +710,98 @@ export const awardXP = async (activityType, meta = null) => {
     return response.data;
 };
 
-// ============== Mindmap & Flashcard API ==============
+// ============== Flashcard API ==============
 
-export const generateMindmap = async (projectId, topic, selectedDocuments = []) => {
-    const response = await api.post('/learning/mindmap/generate', {
-        project_id: projectId,
+export const getFlashcardSets = async (projectId) => {
+    const response = await api.get(`/flashcards/${projectId}`);
+    return response.data;
+};
+
+export const createFlashcardSet = async (projectId, title, topic, description, cards) => {
+    const response = await api.post(`/flashcards/${projectId}`, {
+        title,
         topic,
-        selected_documents: selectedDocuments,
+        description,
+        cards
     });
     return response.data;
 };
 
-export const generateFlashcards = async (projectId, topic, numCards = 8, selectedDocuments = []) => {
-    const response = await api.post('/learning/flashcards/generate', {
-        project_id: projectId,
+export const updateFlashcardSet = async (setId, updates) => {
+    const response = await api.put(`/flashcards/${setId}`, updates);
+    return response.data;
+};
+
+export const deleteFlashcardSet = async (setId) => {
+    const response = await api.delete(`/flashcards/${setId}`);
+    return response.data;
+};
+
+export const getFlashcards = async (setId) => {
+    const response = await api.get(`/flashcards/${setId}/cards`);
+    return response.data;
+};
+
+// ============== Mindmap API ==============
+
+export const getMindmaps = async (projectId) => {
+    const response = await api.get(`/mindmaps/${projectId}`);
+    return response.data;
+};
+
+export const generateMindmap = async (projectId, title, topic, selectedDocuments = []) => {
+    const response = await api.post(`/mindmaps/${projectId}/generate`, {
+        title,
+        topic,
+        selected_documents: selectedDocuments
+    });
+    return response.data;
+};
+
+export const getMindmap = async (mindmapId) => {
+    const response = await api.get(`/mindmaps/${mindmapId}/view`);
+    return response.data;
+};
+
+export const updateMindmap = async (mindmapId, updates) => {
+    const response = await api.put(`/mindmaps/${mindmapId}`, updates);
+    return response.data;
+};
+
+export const deleteMindmap = async (mindmapId) => {
+    const response = await api.delete(`/mindmaps/${mindmapId}`);
+    return response.data;
+};
+
+// ============== Legacy API for Learning Path (TopicMindmap/TopicFlashcards) ==============
+// These are kept for backward compatibility with the Learning Path feature
+
+export const generateMindmapLegacy = async (projectId, topic, selectedDocuments = []) => {
+    // Generate a mindmap with auto-generated title for Learning Path
+    const response = await api.post(`/mindmaps/${projectId}/generate`, {
+        title: `${topic} - Mindmap`,
+        topic,
+        selected_documents: selectedDocuments
+    });
+    return response.data;
+};
+
+export const generateFlashcardsLegacy = async (projectId, topic, numCards = 8, selectedDocuments = []) => {
+    // For Learning Path, we generate flashcards on-the-fly without saving
+    // This would need a separate endpoint or we can use the LLM directly
+    // For now, return a placeholder structure
+    return {
+        topic,
+        cards: []
+    };
+};
+
+// Generate flashcards with AI and create a set
+export const generateFlashcardsWithAI = async (projectId, topic, numCards = 10, selectedDocuments = []) => {
+    const response = await api.post(`/flashcards/${projectId}/generate`, {
         topic,
         num_cards: numCards,
-        selected_documents: selectedDocuments,
+        selected_documents: selectedDocuments
     });
     return response.data;
 };

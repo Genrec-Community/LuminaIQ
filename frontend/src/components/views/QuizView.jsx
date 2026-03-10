@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { HelpCircle, FileText, LogOut, CheckSquare, X, ChevronDown, Loader2, BookMarked, Brain, Zap, Sparkles, ArrowLeft, Target, Trophy, AlertTriangle } from 'lucide-react';
+import { HelpCircle, FileText, LogOut, CheckSquare, X, ChevronDown, Loader2, BookMarked, Brain, Zap, Sparkles, ArrowLeft, Target, Trophy, AlertTriangle, Clock, Trash2, Eye, Plus } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { generateMCQ, generateSubjectiveTest, submitEvaluation, submitSubjectiveTest, generateNotes, recordPerformance, createCardsFromQuiz, getSuggestedTopic, getPerformance } from '../../api';
+import { generateMCQ, generateSubjectiveTest, submitEvaluation, submitSubjectiveTest, generateNotes, recordPerformance, createCardsFromQuiz, getSuggestedTopic, getPerformance, getSavedQuizzes, getSavedQuiz, deleteSavedQuiz } from '../../api';
 import { useToast } from '../../context/ToastContext';
 import { recordActivity } from '../../utils/studyActivity';
 import { useSettings } from '../../context/SettingsContext';
@@ -25,6 +25,11 @@ const QuizView = ({
     const toast = useToast();
     const { settings } = useSettings();
     const [quizMode, setQuizMode] = useState('mcq'); // 'mcq' | 'subjective' | 'both'
+    
+    // Saved quizzes state
+    const [savedQuizzes, setSavedQuizzes] = useState([]);
+    const [savedLoading, setSavedLoading] = useState(true);
+    const [showSavedList, setShowSavedList] = useState(true); // Show list by default
 
     // MCQ State
     const [mcqTopic, setMcqTopic] = useState('');
@@ -166,6 +171,7 @@ const QuizView = ({
                 setMcqNumQuestions(5);
                 setEvalNumQuestions(2);
             }
+            setShowSavedList(false);
         }
     }, [preSelectedTopic, preSelectedMode]);
 
@@ -183,6 +189,7 @@ const QuizView = ({
             setCurrentQuestionIndex(0);
             setPerformanceSaved(false);
             setCardsCreated(null);
+            setShowSavedList(false);
             if (onConsumePreGenerated) onConsumePreGenerated();
         }
     }, [preGeneratedData]);
@@ -191,6 +198,7 @@ const QuizView = ({
     useEffect(() => {
         if (!cameFromPath) {
             loadSuggestedTopic();
+            fetchSavedQuizzes();
         }
     }, [projectId, cameFromPath]);
     
@@ -204,6 +212,64 @@ const QuizView = ({
         } finally {
             setLoadingSuggestion(false);
         }
+    };
+
+    const fetchSavedQuizzes = async () => {
+        setSavedLoading(true);
+        try {
+            const data = await getSavedQuizzes(projectId);
+            setSavedQuizzes(data || []);
+        } catch (error) {
+            console.error('Failed to fetch saved quizzes:', error);
+        } finally {
+            setSavedLoading(false);
+        }
+    };
+
+    const handleViewSavedQuiz = async (testId) => {
+        try {
+            setMcqLoading(true);
+            setShowSavedList(false);
+            const data = await getSavedQuiz(testId);
+            setMcqTest({
+                test_id: data.id,
+                topic: data.chapter_name,
+                questions: data.questions || [],
+            });
+            setMcqTopic(data.chapter_name || '');
+            setMcqTopicSelection(data.chapter_name || '');
+            setQuizMode('mcq');
+            setMcqUserAnswers({});
+            setMcqSubmitted(false);
+            setMcqScore(null);
+            setCurrentQuestionIndex(0);
+            setPerformanceSaved(false);
+            setCardsCreated(null);
+        } catch (error) {
+            console.error('Failed to load saved quiz:', error);
+            toast.error('Failed to load saved quiz');
+            setShowSavedList(true);
+        } finally {
+            setMcqLoading(false);
+        }
+    };
+
+    const handleDeleteSavedQuiz = async (testId, e) => {
+        if (e) e.stopPropagation();
+        try {
+            await deleteSavedQuiz(testId);
+            toast.success('Quiz deleted');
+            setSavedQuizzes(prev => prev.filter(t => t.id !== testId));
+        } catch (error) {
+            console.error('Failed to delete quiz:', error);
+            toast.error('Failed to delete quiz');
+        }
+    };
+
+    const formatDate = (dateStr) => {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     };
     
     const useSuggestedTopic = () => {
@@ -350,6 +416,7 @@ const QuizView = ({
         setCurrentQuestionIndex(0);
         setPerformanceSaved(false);
         setCardsCreated(null);
+        setShowSavedList(true);
         
         // Reset both mode state
         setBothModePhase('mcq');
@@ -359,6 +426,9 @@ const QuizView = ({
         setEvalTest(null);
         setEvalResult(null);
         setEvalUserAnswers({});
+        
+        // Refresh saved quizzes list
+        fetchSavedQuizzes();
         
         // Re-compute adaptive difficulty if in adaptive mode (picks up new quiz results)
         if (isAdaptiveMode) {
@@ -607,7 +677,7 @@ const QuizView = ({
 
             {/* Main Content - Only show when not loading */}
             {!mcqLoading && !evalLoading && (
-            <div className="flex-1 overflow-y-auto w-full max-w-3xl mx-auto pb-24 custom-scrollbar p-2 md:p-8">
+            <div className="flex-1 overflow-y-auto w-full max-w-4xl mx-auto pb-24 custom-scrollbar p-4 md:p-8">
                 
                 {/* Return to Path Button (if came from path) */}
                 {cameFromPath && !mcqTest && !evalTest && (
@@ -616,12 +686,105 @@ const QuizView = ({
                     </div>
                 )}
 
+                {/* ==================== SAVED QUIZZES LIST ==================== */}
+                {showSavedList && !mcqTest && !evalTest && !cameFromPath && (
+                    <div className="animate-in fade-in slide-in-from-bottom-4">
+                        <div className="flex items-center justify-between mb-8">
+                            <div>
+                                <h2 className="text-2xl font-bold text-[#4A3B32]">Quizzes</h2>
+                                <p className="text-[#8a6a5c]">Test your knowledge with AI-generated quizzes</p>
+                            </div>
+                            <button
+                                onClick={() => setShowSavedList(false)}
+                                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#C8A288] to-[#A08072] text-white rounded-lg hover:opacity-90 transition-opacity shadow-sm"
+                            >
+                                <Plus className="h-4 w-4" />
+                                New Quiz
+                            </button>
+                        </div>
+
+                        {savedLoading ? (
+                            <div className="flex items-center justify-center py-16">
+                                <Loader2 className="h-8 w-8 text-[#C8A288] animate-spin" />
+                            </div>
+                        ) : savedQuizzes.length === 0 ? (
+                            <div className="text-center py-16">
+                                <div className="h-20 w-20 bg-[#FDF6F0] rounded-full flex items-center justify-center mx-auto mb-6">
+                                    <CheckSquare className="h-10 w-10 text-[#C8A288]" />
+                                </div>
+                                <h3 className="text-xl font-bold text-[#4A3B32] mb-2">No Quizzes Yet</h3>
+                                <p className="text-[#8a6a5c] mb-6">Generate your first quiz to test your knowledge</p>
+                                <button
+                                    onClick={() => setShowSavedList(false)}
+                                    className="px-6 py-3 bg-gradient-to-r from-[#C8A288] to-[#A08072] text-white rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2 mx-auto"
+                                >
+                                    <CheckSquare className="h-5 w-5" />
+                                    Create Quiz
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {savedQuizzes.map((quiz) => {
+                                    let questionCount = null;
+                                    try {
+                                        const q = quiz.questions;
+                                        if (Array.isArray(q)) questionCount = q.length;
+                                        else if (typeof q === 'string') questionCount = JSON.parse(q).length;
+                                    } catch {}
+                                    return (
+                                        <div
+                                            key={quiz.id}
+                                            onClick={() => handleViewSavedQuiz(quiz.id)}
+                                            className="bg-white rounded-xl border border-[#E6D5CC] p-5 hover:shadow-lg transition-all cursor-pointer group"
+                                        >
+                                            <div className="flex items-start justify-between mb-3">
+                                                <div className="flex-1 min-w-0">
+                                                    <h3 className="font-bold text-[#4A3B32] mb-1 truncate">{quiz.chapter_name || 'General Quiz'}</h3>
+                                                    <div className="flex items-center gap-1.5 text-xs text-[#8a6a5c]">
+                                                        <Clock className="h-3 w-3" />
+                                                        {formatDate(quiz.created_at)}
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={(e) => handleDeleteSavedQuiz(quiz.id, e)}
+                                                    className="text-red-400 hover:text-red-600 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                            {questionCount && (
+                                                <p className="text-xs text-[#8a6a5c] mb-3">{questionCount} questions</p>
+                                            )}
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); handleViewSavedQuiz(quiz.id); }}
+                                                className="w-full py-2 bg-[#C8A288] text-white rounded-lg hover:bg-[#B08B72] transition-colors text-sm font-medium flex items-center justify-center gap-1.5"
+                                            >
+                                                <Eye className="h-3.5 w-3.5" />
+                                                Take Quiz
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* ==================== BOTH MODE ==================== */}
-                {quizMode === 'both' && (
+                {quizMode === 'both' && (!showSavedList || mcqTest || evalTest) && (
                     <>
                         {/* Setup Phase */}
                         {!mcqTest && bothModePhase === 'mcq' && (
                             <div className="mt-8 text-center animate-in fade-in slide-in-from-bottom-4">
+                                {!cameFromPath && (
+                                    <button
+                                        onClick={() => setShowSavedList(true)}
+                                        className="flex items-center gap-2 px-4 py-2 mb-4 text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30 rounded-lg font-medium transition-colors"
+                                    >
+                                        <ArrowLeft className="h-4 w-4" />
+                                        Back to Saved
+                                    </button>
+                                )}
                                 <div className="inline-flex items-center justify-center p-4 bg-white rounded-2xl shadow-sm border border-[#E6D5CC] mb-6">
                                     <Brain className="h-8 w-8 text-[#C8A288]" />
                                 </div>
@@ -932,10 +1095,19 @@ const QuizView = ({
                 )}
 
                 {/* ==================== MCQ ONLY MODE ==================== */}
-                {quizMode === 'mcq' && (
+                {quizMode === 'mcq' && (!showSavedList || mcqTest) && (
                     <>
                         {!mcqTest ? (
                             <div className="mt-8 text-center animate-in fade-in slide-in-from-bottom-4">
+                                {!cameFromPath && (
+                                    <button
+                                        onClick={() => setShowSavedList(true)}
+                                        className="flex items-center gap-2 px-4 py-2 mb-4 text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30 rounded-lg font-medium transition-colors"
+                                    >
+                                        <ArrowLeft className="h-4 w-4" />
+                                        Back to Saved
+                                    </button>
+                                )}
                                 <div className="inline-flex items-center justify-center p-4 bg-white rounded-2xl shadow-sm border border-[#E6D5CC] mb-6">
                                     <HelpCircle className="h-8 w-8 text-[#C8A288]" />
                                 </div>
@@ -1333,10 +1505,19 @@ const QuizView = ({
                 )}
 
                 {/* ==================== SUBJECTIVE ONLY MODE ==================== */}
-                {quizMode === 'subjective' && (
+                {quizMode === 'subjective' && (!showSavedList || evalTest) && (
                     <>
                         {!evalTest ? (
                             <div className="mt-8 text-center animate-in fade-in slide-in-from-bottom-4">
+                                {!cameFromPath && (
+                                    <button
+                                        onClick={() => setShowSavedList(true)}
+                                        className="flex items-center gap-2 px-4 py-2 mb-4 text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30 rounded-lg font-medium transition-colors"
+                                    >
+                                        <ArrowLeft className="h-4 w-4" />
+                                        Back to Saved
+                                    </button>
+                                )}
                                 <div className="inline-flex items-center justify-center p-4 bg-white rounded-2xl shadow-sm border border-[#E6D5CC] mb-6">
                                     <FileText className="h-8 w-8 text-[#C8A288]" />
                                 </div>
@@ -1532,7 +1713,7 @@ const QuizView = ({
             )}
 
             {/* Quiz Mode Toggle - Sticky Bottom Footer */}
-            {!mcqLoading && !evalLoading && !mcqTest && !evalTest && !cameFromPath && (
+            {!mcqLoading && !evalLoading && !mcqTest && !evalTest && !cameFromPath && !showSavedList && (
                 <div className="flex-none p-4 bottom-0 w-full border-t border-[#E6D5CC] bg-[#FDF6F0]/95 backdrop-blur-md z-10">
                     <div className="flex justify-center">
                         <div className="bg-[#E6D5CC]/40 p-1.5 rounded-xl flex gap-1 shadow-inner">

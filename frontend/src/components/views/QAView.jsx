@@ -1,13 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { HelpCircle, ChevronRight, ChevronDown, Loader2, FileText, AlignLeft, AlignCenter, AlignJustify, ArrowLeft } from 'lucide-react';
+import { HelpCircle, ChevronRight, ChevronDown, Loader2, FileText, AlignLeft, AlignCenter, AlignJustify, ArrowLeft, Trash2, Clock, Eye, Plus } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { generateSubjectiveTest } from '../../api';
+import { generateSubjectiveTest, getSavedQATests, getSavedQATest, deleteSavedQATest } from '../../api';
 import { useToast } from '../../context/ToastContext';
 import { recordActivity } from '../../utils/studyActivity';
 
 const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopic = null, preGeneratedData = null, onConsumePreGenerated = null, onQAActiveChange = null, onBack = null }) => {
     const toast = useToast();
+    // View mode: 'list' | 'form' | 'viewing'
+    const [viewMode, setViewMode] = useState('list');
+
+    // Saved tests
+    const [savedTests, setSavedTests] = useState([]);
+    const [savedLoading, setSavedLoading] = useState(true);
+
     // Q&A State
     const [qaTopic, setQaTopic] = useState('');
     const [qaTopicSelection, setQaTopicSelection] = useState('');
@@ -28,22 +35,78 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
             setQaTopic(topic);
             setQaTopicSelection(topic);
             setQaRevealed({});
+            setViewMode('viewing');
             if (onConsumePreGenerated) onConsumePreGenerated();
         }
     }, [preGeneratedData]);
+
     const [qaNumQuestions, setQaNumQuestions] = useState(5);
-    const [answerSize, setAnswerSize] = useState('medium'); // 'small' | 'medium' | 'large'
+    const [answerSize, setAnswerSize] = useState('medium');
     const [qaTest, setQaTest] = useState(null);
     const [qaLoading, setQaLoading] = useState(false);
     const [qaRevealed, setQaRevealed] = useState({});
 
-    // Notify parent when Q&A is active (loading or has questions)
+    // Fetch saved tests on mount
+    useEffect(() => {
+        fetchSavedTests();
+    }, [projectId]);
+
+    // Notify parent when Q&A is active
     useEffect(() => {
         if (onQAActiveChange) {
             const isActive = qaLoading || qaTest !== null;
             onQAActiveChange(isActive);
         }
     }, [qaLoading, qaTest, onQAActiveChange]);
+
+    const fetchSavedTests = async () => {
+        setSavedLoading(true);
+        try {
+            const data = await getSavedQATests(projectId);
+            setSavedTests(data || []);
+        } catch (error) {
+            console.error('Failed to fetch saved Q&A tests:', error);
+        } finally {
+            setSavedLoading(false);
+        }
+    };
+
+    const handleViewSavedTest = async (testId) => {
+        try {
+            setQaLoading(true);
+            setViewMode('viewing');
+            const data = await getSavedQATest(testId);
+            setQaTest({
+                test_id: data.id,
+                topic: data.topic,
+                questions: data.questions || [],
+            });
+            setQaTopic(data.topic || '');
+            setQaRevealed({});
+        } catch (error) {
+            console.error('Failed to load saved test:', error);
+            toast.error('Failed to load saved Q&A session');
+            setViewMode('list');
+        } finally {
+            setQaLoading(false);
+        }
+    };
+
+    const handleDeleteTest = async (testId, e) => {
+        if (e) e.stopPropagation();
+        try {
+            await deleteSavedQATest(testId);
+            toast.success('Q&A session deleted');
+            setSavedTests(prev => prev.filter(t => t.id !== testId));
+            if (qaTest?.test_id === testId) {
+                setQaTest(null);
+                setViewMode('list');
+            }
+        } catch (error) {
+            console.error('Failed to delete test:', error);
+            toast.error('Failed to delete Q&A session');
+        }
+    };
 
     // Answer size config
     const answerSizeConfig = {
@@ -52,7 +115,6 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
         large: { maxQuestions: 5, label: 'Detailed', description: 'In-depth comprehensive answers', icon: AlignJustify }
     };
 
-    // Get available question counts based on answer size
     const getQuestionOptions = () => {
         const max = answerSizeConfig[answerSize].maxQuestions;
         const options = [];
@@ -61,14 +123,12 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
                 options.push(i);
             }
         }
-        // Ensure max is included
         if (!options.includes(max)) {
             options.push(max);
         }
         return options.sort((a, b) => a - b);
     };
 
-    // Adjust question count if it exceeds new max when answer size changes
     const handleAnswerSizeChange = (size) => {
         setAnswerSize(size);
         const maxQ = answerSizeConfig[size].maxQuestions;
@@ -81,17 +141,18 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
         setQaLoading(true);
         setQaTest(null);
         setQaRevealed({});
+        setViewMode('viewing');
 
         try {
-            // Pass answer size to backend
             const data = await generateSubjectiveTest(projectId, qaTopic, qaNumQuestions, selectedDocuments, answerSize);
             setQaTest(data);
-            
-            // Track Q&A generation activity for heatmap
             recordActivity(projectId, 'qa');
+            // Refresh saved list since new test was created
+            fetchSavedTests();
         } catch (error) {
             console.error("QA gen error", error);
             toast.error('Failed to generate Q&A');
+            setViewMode('form');
         } finally {
             setQaLoading(false);
         }
@@ -113,10 +174,16 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
         setQaRevealed({});
     };
 
+    const formatDate = (dateStr) => {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    };
+
     return (
-        <div className="h-full overflow-y-auto p-4 md:p-8 max-w-3xl mx-auto custom-scrollbar relative">
+        <div className="h-full overflow-y-auto p-4 md:p-8 max-w-4xl mx-auto custom-scrollbar relative">
             {/* Back Button */}
-            {onBack && !qaLoading && (
+            {onBack && !qaLoading && viewMode === 'list' && (
                 <button
                     onClick={onBack}
                     className="flex items-center gap-2 px-4 py-2 mb-4 text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30 rounded-lg font-medium transition-colors"
@@ -134,9 +201,10 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
                         <div className="absolute inset-0 h-20 w-20 border-4 border-[#C8A288] rounded-full border-t-transparent animate-spin"></div>
                         <HelpCircle className="absolute inset-0 m-auto h-8 w-8 text-[#C8A288]" />
                     </div>
-                    <h3 className="text-xl font-bold text-[#4A3B32] mb-2">Generating Q&A</h3>
+                    <h3 className="text-xl font-bold text-[#4A3B32] mb-2">Loading Q&A</h3>
                     <p className="text-[#8a6a5c] text-center max-w-xs">
-                        Creating {qaNumQuestions} {answerSizeConfig[answerSize].label.toLowerCase()} questions about <span className="font-semibold">{qaTopic || 'your documents'}</span>...
+                        {viewMode === 'viewing' && !qaTest ? 'Loading saved session...' : `Creating ${qaNumQuestions} ${answerSizeConfig[answerSize].label.toLowerCase()} questions about `}
+                        {viewMode !== 'viewing' || qaTest ? <span className="font-semibold">{qaTopic || 'your documents'}</span> : null}
                     </p>
                     <div className="flex gap-1.5 mt-6">
                         <div className="h-2 w-2 bg-[#C8A288] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
@@ -146,9 +214,97 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
                 </div>
             )}
 
-            {/* Initial Form - Only show when not loading and no test */}
-            {!qaLoading && !qaTest && (
+            {/* ========== LIST VIEW: Show saved Q&A sessions ========== */}
+            {!qaLoading && viewMode === 'list' && (
+                <div className="animate-in fade-in slide-in-from-bottom-4">
+                    <div className="flex items-center justify-between mb-8">
+                        <div>
+                            <h2 className="text-2xl font-bold text-[#4A3B32]">Q&A Sessions</h2>
+                            <p className="text-[#8a6a5c]">Generate study questions and reveal answers</p>
+                        </div>
+                        <button
+                            onClick={() => setViewMode('form')}
+                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#C8A288] to-[#A08072] text-white rounded-lg hover:opacity-90 transition-opacity shadow-sm"
+                        >
+                            <Plus className="h-4 w-4" />
+                            New Q&A
+                        </button>
+                    </div>
+
+                    {savedLoading ? (
+                        <div className="flex items-center justify-center py-16">
+                            <Loader2 className="h-8 w-8 text-[#C8A288] animate-spin" />
+                        </div>
+                    ) : savedTests.length === 0 ? (
+                        <div className="text-center py-16">
+                            <div className="h-20 w-20 bg-[#FDF6F0] rounded-full flex items-center justify-center mx-auto mb-6">
+                                <HelpCircle className="h-10 w-10 text-[#C8A288]" />
+                            </div>
+                            <h3 className="text-xl font-bold text-[#4A3B32] mb-2">No Q&A Sessions Yet</h3>
+                            <p className="text-[#8a6a5c] mb-6">Generate your first set of study questions</p>
+                            <button
+                                onClick={() => setViewMode('form')}
+                                className="px-6 py-3 bg-gradient-to-r from-[#C8A288] to-[#A08072] text-white rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2 mx-auto"
+                            >
+                                <HelpCircle className="h-5 w-5" />
+                                Generate Q&A
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {savedTests.map((test) => (
+                                <div
+                                    key={test.id}
+                                    onClick={() => handleViewSavedTest(test.id)}
+                                    className="bg-white rounded-xl border border-[#E6D5CC] p-5 hover:shadow-lg transition-all cursor-pointer group"
+                                >
+                                    <div className="flex items-start justify-between mb-3">
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className="font-bold text-[#4A3B32] mb-1 truncate">{test.topic || 'General Q&A'}</h3>
+                                            <div className="flex items-center gap-1.5 text-xs text-[#8a6a5c]">
+                                                <Clock className="h-3 w-3" />
+                                                {formatDate(test.created_at)}
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={(e) => handleDeleteTest(test.id, e)}
+                                            className="text-red-400 hover:text-red-600 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                    {test.has_results && (
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <div className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full font-medium">
+                                                Score: {test.percentage?.toFixed(0)}%
+                                            </div>
+                                        </div>
+                                    )}
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleViewSavedTest(test.id); }}
+                                        className="w-full py-2 bg-[#C8A288] text-white rounded-lg hover:bg-[#B08B72] transition-colors text-sm font-medium flex items-center justify-center gap-1.5"
+                                    >
+                                        <Eye className="h-3.5 w-3.5" />
+                                        View
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ========== FORM VIEW: Generate new Q&A ========== */}
+            {!qaLoading && viewMode === 'form' && (
                 <div className="text-center py-12 animate-in fade-in slide-in-from-bottom-4">
+                    <button
+                        onClick={() => setViewMode('list')}
+                        className="flex items-center gap-2 px-4 py-2 mb-4 text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30 rounded-lg font-medium transition-colors"
+                    >
+                        <ArrowLeft className="h-4 w-4" />
+                        Back to Saved
+                    </button>
+
                     <div className="h-20 w-20 bg-[#FDF6F0] rounded-full flex items-center justify-center mx-auto mb-6">
                         <HelpCircle className="h-10 w-10 text-[#C8A288]" />
                     </div>
@@ -159,7 +315,6 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
                         {/* Topic Selection */}
                         <div>
                             <label className="block text-sm font-bold mb-2 text-[#4A3B32] uppercase tracking-wide opacity-80">Topic</label>
-
                             {availableTopics.length > 0 ? (
                                 <div className="relative">
                                     <select
@@ -265,14 +420,21 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
                 </div>
             )}
 
-            {/* Results - Show when test is loaded */}
-            {!qaLoading && qaTest && (
+            {/* ========== VIEWING MODE: Show Q&A results ========== */}
+            {!qaLoading && viewMode === 'viewing' && qaTest && (
                 <div className="space-y-6 pb-12 animate-in fade-in slide-in-from-bottom-8 duration-500">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                         <div>
+                            <button
+                                onClick={() => { setQaTest(null); setViewMode('list'); }}
+                                className="flex items-center gap-1.5 text-sm text-[#8a6a5c] hover:text-[#4A3B32] mb-2 transition-colors"
+                            >
+                                <ArrowLeft className="h-3.5 w-3.5" />
+                                Back to Saved
+                            </button>
                             <h3 className="text-2xl font-bold text-[#4A3B32]">{qaTest.topic || 'General'} Q&A</h3>
                             <p className="text-sm text-[#8a6a5c]">
-                                {qaTest.questions?.length} {answerSizeConfig[answerSize].label.toLowerCase()} questions
+                                {qaTest.questions?.length} questions
                             </p>
                         </div>
                         <div className="flex gap-2">
@@ -289,7 +451,7 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
                                 Hide All
                             </button>
                             <button
-                                onClick={() => setQaTest(null)}
+                                onClick={() => { setQaTest(null); setViewMode('form'); }}
                                 className="px-4 py-1.5 text-sm bg-[#C8A288] text-white rounded-lg hover:bg-[#B08B72] font-medium transition-colors"
                             >
                                 New Q&A

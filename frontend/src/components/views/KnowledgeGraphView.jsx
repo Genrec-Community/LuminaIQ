@@ -649,30 +649,32 @@ const KnowledgeGraphView = ({ projectId }) => {
     }
 
     return (
-        <div className="flex h-[calc(100vh-200px)] min-h-[600px] gap-4">
+        <div className="flex flex-col lg:flex-row h-full min-h-[500px] md:min-h-[600px] gap-4 p-4">
             {/* Main Graph Container */}
-            <div className="flex-1 relative bg-[#FDF6F0] rounded-2xl border border-[#E6D5CC] overflow-hidden">
+            <div className="flex-1 relative bg-[#FDF6F0] rounded-2xl border border-[#E6D5CC] overflow-hidden min-h-[400px]">
                 {/* Header */}
-                <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-[#FDF6F0] to-transparent p-4">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Network className="w-5 h-5 text-[#C8A288]" />
-                            <h2 className="font-semibold text-[#4A3B32]">
+                <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-[#FDF6F0] to-transparent p-3 md:p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <Network className="w-5 h-5 text-[#C8A288] shrink-0" />
+                            <h2 className="font-semibold text-[#4A3B32] text-sm md:text-base">
                                 {graphData?.project_name || 'Knowledge Graph'}
                             </h2>
-                            <span className="text-xs text-[#8a6a5c] bg-white/80 px-2 py-1 rounded-full">
-                                {graphData?.nodes?.filter(n => n.type === 'topic').length || 0} topics
-                            </span>
-                            <span className="text-xs text-[#8a6a5c] bg-white/80 px-2 py-1 rounded-full">
-                                {graphData?.nodes?.filter(n => n.type === 'book').length || 0} docs
-                            </span>
-                            <span className="text-xs text-[#8a6a5c] bg-white/80 px-2 py-1 rounded-full">
-                                {graphData?.edges?.length || 0} links
-                            </span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-xs text-[#8a6a5c] bg-white/80 px-2 py-1 rounded-full">
+                                    {graphData?.nodes?.filter(n => n.type === 'topic').length || 0} topics
+                                </span>
+                                <span className="text-xs text-[#8a6a5c] bg-white/80 px-2 py-1 rounded-full">
+                                    {graphData?.nodes?.filter(n => n.type === 'book').length || 0} docs
+                                </span>
+                                <span className="text-xs text-[#8a6a5c] bg-white/80 px-2 py-1 rounded-full">
+                                    {graphData?.edges?.length || 0} links
+                                </span>
+                            </div>
                         </div>
                         
                         {/* Controls */}
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 md:gap-2">
                             <button
                                 onClick={togglePanMode}
                                 className={`p-2 rounded-lg transition-colors ${
@@ -724,32 +726,20 @@ const KnowledgeGraphView = ({ projectId }) => {
                 />
                 
                 {/* Legend */}
-                <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg p-3 shadow-sm">
+                <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg p-3 shadow-sm max-w-[200px]">
                     <p className="text-xs font-medium text-[#4A3B32] mb-2">Legend</p>
                     <div className="flex flex-col gap-1.5 text-xs text-[#8a6a5c]">
                         <div className="flex items-center gap-2">
-                            <div className="w-4 h-4 bg-[#A08072] rounded border border-[#7B5B4E]" />
+                            <div className="w-4 h-4 bg-[#A08072] rounded border border-[#7B5B4E] shrink-0" />
                             <span>Document</span>
                         </div>
                         <div className="flex items-center gap-2">
-                            <div className="w-4 h-4 bg-[#FDF6F0] border-2 border-[#D4BFB4] rounded" />
+                            <div className="w-4 h-4 bg-[#FDF6F0] border-2 border-[#D4BFB4] rounded shrink-0" />
                             <span>Topic</span>
                         </div>
                         <div className="flex items-center gap-2">
-                            <div className="w-4 h-4 bg-[#F0E4DA] border-2 border-[#C8A288] rounded" />
-                            <span>Key Topic (4+ links)</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className="w-8 h-0 border-t-2 border-dotted border-[#D4BFB4]" />
-                            <span>Contains</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className="w-8 h-0.5 bg-[#A08072]" />
-                            <span>Prerequisite</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className="w-8 h-0 border-t border-dashed border-[#E6D5CC]" />
-                            <span>Related</span>
+                            <div className="w-4 h-4 bg-[#F0E4DA] border-2 border-[#C8A288] rounded shrink-0" />
+                            <span>Key Topic</span>
                         </div>
                     </div>
                 </div>
@@ -769,17 +759,17 @@ const KnowledgeGraphView = ({ projectId }) => {
                 )}
             </div>
             
-            {/* Right Panel - Topic Summary & Suggestions */}
-            <div className={`w-96 flex flex-col gap-4 transition-all duration-300 ${selectedTopic ? 'opacity-100' : 'opacity-50'}`}>
+            {/* Right Panel - Topic Summary Only (Suggestions Removed) */}
+            <div className={`w-full lg:w-96 transition-all duration-300 ${selectedTopic ? 'opacity-100' : 'opacity-50'}`}>
                 {/* Topic Summary Panel */}
-                <div className="flex-1 bg-white rounded-2xl border border-[#E6D5CC] overflow-hidden flex flex-col">
+                <div className="h-full bg-white rounded-2xl border border-[#E6D5CC] overflow-hidden flex flex-col">
                     {selectedTopic ? (
                         <>
                             {/* Topic Header */}
                             <div className="p-4 border-b border-[#E6D5CC] bg-gradient-to-r from-[#C8A288]/10 to-transparent">
                                 <div className="flex items-start justify-between">
-                                    <div className="flex-1">
-                                        <h3 className="font-semibold text-[#4A3B32] text-lg">
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="font-semibold text-[#4A3B32] text-base md:text-lg truncate">
                                             {selectedTopic}
                                         </h3>
                                         {topicSummary?.cached && (
@@ -788,7 +778,7 @@ const KnowledgeGraphView = ({ projectId }) => {
                                             </span>
                                         )}
                                     </div>
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 ml-2">
                                         <button
                                             onClick={() => fetchTopicSummary(selectedTopic, true)}
                                             className="p-1.5 hover:bg-[#E6D5CC] rounded-lg transition-colors"
@@ -848,46 +838,12 @@ const KnowledgeGraphView = ({ projectId }) => {
                         <div className="flex-1 flex items-center justify-center p-8">
                             <div className="text-center">
                                 <Target className="w-12 h-12 text-[#E6D5CC] mx-auto mb-4" />
-                                <p className="text-[#8a6a5c]">Click on a topic node to see its summary</p>
+                                <p className="text-[#8a6a5c] text-sm md:text-base">Click on a topic node to see its summary</p>
                                 <p className="text-xs text-[#8a6a5c]/60 mt-2">
                                     Summaries are generated from your documents using AI
                                 </p>
                             </div>
                         </div>
-                    )}
-                </div>
-                
-                {/* Suggestions Panel */}
-                <div className="bg-white rounded-2xl border border-[#E6D5CC] p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                        <Sparkles className="w-4 h-4 text-[#C8A288]" />
-                        <h3 className="font-medium text-[#4A3B32]">Suggested Next</h3>
-                    </div>
-                    
-                    {suggestions?.suggestions?.length > 0 ? (
-                        <div className="space-y-2">
-                            {suggestions.suggestions.map((topic, idx) => (
-                                <button
-                                    key={idx}
-                                    onClick={() => navigateToTopic(topic)}
-                                    className="w-full text-left p-3 bg-[#FDF6F0] rounded-xl hover:bg-[#E6D5CC] transition-colors group"
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-sm text-[#4A3B32] font-medium">{topic}</span>
-                                        <ChevronRight className="w-4 h-4 text-[#8a6a5c] group-hover:translate-x-1 transition-transform" />
-                                    </div>
-                                    {suggestions.reasons?.[idx] && (
-                                        <p className="text-xs text-[#8a6a5c] mt-1">
-                                            {suggestions.reasons[idx]}
-                                        </p>
-                                    )}
-                                </button>
-                            ))}
-                        </div>
-                    ) : (
-                        <p className="text-sm text-[#8a6a5c] text-center py-4">
-                            Explore topics to get personalized suggestions
-                        </p>
                     )}
                 </div>
             </div>

@@ -1,20 +1,32 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { BookOpen, Copy, Download, Loader2, ChevronDown, FileDown } from 'lucide-react';
+import { BookOpen, Copy, Loader2, ChevronDown, FileDown, Trash2, Clock, Eye, Plus, ArrowLeft } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { generateNotes } from '../../api';
+import { generateNotes, getSavedNotes, getSavedNote, deleteSavedNote } from '../../api';
 import { useToast } from '../../context/ToastContext';
 import { recordActivity } from '../../utils/studyActivity';
 
 const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopic = null, preGeneratedData = null, onConsumePreGenerated = null }) => {
     const toast = useToast();
+
+    // View mode: 'list' | 'form' | 'viewing'
+    const [viewMode, setViewMode] = useState('list');
+
+    // Saved notes
+    const [savedNotes, setSavedNotes] = useState([]);
+    const [savedLoading, setSavedLoading] = useState(true);
+
     // Notes State
     const [notesType, setNotesType] = useState('Comprehensive Summary');
     const [notesTopic, setNotesTopic] = useState('');
     const [notesTopicSelection, setNotesTopicSelection] = useState('');
     const [notesContent, setNotesContent] = useState('');
+    const [notesTitle, setNotesTitle] = useState('');
     const [notesLoading, setNotesLoading] = useState(false);
     const [pdfLoading, setPdfLoading] = useState(false);
+
+    // Ref for the rendered notes content
+    const notesRef = useRef(null);
 
     // Pre-select topic when navigating from Learning Path
     useEffect(() => {
@@ -32,17 +44,70 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
             const topic = preGeneratedData.topic || '';
             setNotesTopic(topic);
             setNotesTopicSelection(topic);
-            // Signal parent to clear pre-generated data so it doesn't re-apply on re-render
+            setNotesTitle(preGeneratedData.title || preGeneratedData.noteType || 'Notes');
+            setViewMode('viewing');
             if (onConsumePreGenerated) onConsumePreGenerated();
         }
     }, [preGeneratedData]);
 
-    // Ref for the rendered notes content
-    const notesRef = useRef(null);
+    // Fetch saved notes on mount
+    useEffect(() => {
+        fetchSavedNotes();
+    }, [projectId]);
+
+    const fetchSavedNotes = async () => {
+        setSavedLoading(true);
+        try {
+            const data = await getSavedNotes(projectId);
+            setSavedNotes(data || []);
+        } catch (error) {
+            console.error('Failed to fetch saved notes:', error);
+        } finally {
+            setSavedLoading(false);
+        }
+    };
+
+    const handleViewSavedNote = async (noteId) => {
+        try {
+            setNotesLoading(true);
+            setViewMode('viewing');
+            const data = await getSavedNote(noteId);
+            setNotesContent(data.content || '');
+            setNotesType(data.note_type || 'Comprehensive Summary');
+            setNotesTopic(data.topic || '');
+            setNotesTopicSelection(data.topic || '');
+            setNotesTitle(data.title || data.note_type || 'Notes');
+        } catch (error) {
+            console.error('Failed to load saved note:', error);
+            toast.error('Failed to load saved note');
+            setViewMode('list');
+        } finally {
+            setNotesLoading(false);
+        }
+    };
+
+    const handleDeleteNote = async (noteId, e) => {
+        if (e) e.stopPropagation();
+        try {
+            await deleteSavedNote(noteId);
+            toast.success('Note deleted');
+            setSavedNotes(prev => prev.filter(n => n.id !== noteId));
+        } catch (error) {
+            console.error('Failed to delete note:', error);
+            toast.error('Failed to delete note');
+        }
+    };
+
+    const formatDate = (dateStr) => {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    };
 
     const handleGenerateNotes = async () => {
         setNotesLoading(true);
         setNotesContent('');
+        setViewMode('viewing');
 
         const effectiveTopic = notesTopicSelection === '__custom__' ? notesTopic : notesTopicSelection;
 
@@ -54,15 +119,28 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
                 selectedDocuments
             );
             setNotesContent(typeof data === 'string' ? data : (data.notes || data.content || JSON.stringify(data)));
-            
+            setNotesTitle(data.title || notesType);
+
             // Track notes generation activity for heatmap
             recordActivity(projectId, 'notes');
+
+            // Refresh saved list since new note was auto-saved
+            fetchSavedNotes();
         } catch (error) {
             console.error("Notes gen error", error);
             toast.error('Failed to generate notes');
+            setViewMode('form');
         } finally {
             setNotesLoading(false);
         }
+    };
+
+    const handleBackToList = () => {
+        setNotesContent('');
+        setNotesTopic('');
+        setNotesTopicSelection('');
+        setNotesTitle('');
+        setViewMode('list');
     };
 
     const copyToClipboard = () => {
@@ -221,6 +299,17 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
         }
     };
 
+    // Note type badge color
+    const getNoteTypeBadge = (type) => {
+        const map = {
+            'Comprehensive Summary': { bg: 'bg-blue-50', text: 'text-blue-700' },
+            'Bullet Point Key Facts': { bg: 'bg-green-50', text: 'text-green-700' },
+            'Glossary of Terms': { bg: 'bg-purple-50', text: 'text-purple-700' },
+            'Exam Cheat Sheet': { bg: 'bg-orange-50', text: 'text-orange-700' },
+        };
+        return map[type] || { bg: 'bg-gray-50', text: 'text-gray-700' };
+    };
+
     return (
         <div className="h-full overflow-y-auto p-4 md:p-8 max-w-4xl mx-auto custom-scrollbar relative">
             {/* Full-screen Loading Overlay */}
@@ -243,8 +332,101 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
                 </div>
             )}
 
-            {!notesContent && !notesLoading ? (
+            {/* ========== LIST VIEW: Show saved notes ========== */}
+            {!notesLoading && viewMode === 'list' && (
+                <div className="animate-in fade-in slide-in-from-bottom-4">
+                    <div className="flex items-center justify-between mb-8">
+                        <div>
+                            <h2 className="text-2xl font-bold text-[#4A3B32]">Study Notes</h2>
+                            <p className="text-[#8a6a5c]">Generate comprehensive summaries or targeted study guides</p>
+                        </div>
+                        <button
+                            onClick={() => setViewMode('form')}
+                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#C8A288] to-[#A08072] text-white rounded-lg hover:opacity-90 transition-opacity shadow-sm"
+                        >
+                            <Plus className="h-4 w-4" />
+                            New Notes
+                        </button>
+                    </div>
+
+                    {savedLoading ? (
+                        <div className="flex items-center justify-center py-16">
+                            <Loader2 className="h-8 w-8 text-[#C8A288] animate-spin" />
+                        </div>
+                    ) : savedNotes.length === 0 ? (
+                        <div className="text-center py-16">
+                            <div className="h-20 w-20 bg-[#FDF6F0] rounded-full flex items-center justify-center mx-auto mb-6">
+                                <BookOpen className="h-10 w-10 text-[#C8A288]" />
+                            </div>
+                            <h3 className="text-xl font-bold text-[#4A3B32] mb-2">No Notes Yet</h3>
+                            <p className="text-[#8a6a5c] mb-6">Generate your first set of study notes</p>
+                            <button
+                                onClick={() => setViewMode('form')}
+                                className="px-6 py-3 bg-gradient-to-r from-[#C8A288] to-[#A08072] text-white rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2 mx-auto"
+                            >
+                                <BookOpen className="h-5 w-5" />
+                                Generate Notes
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {savedNotes.map((note) => {
+                                const badge = getNoteTypeBadge(note.note_type);
+                                return (
+                                    <div
+                                        key={note.id}
+                                        onClick={() => handleViewSavedNote(note.id)}
+                                        className="bg-white rounded-xl border border-[#E6D5CC] p-5 hover:shadow-lg transition-all cursor-pointer group"
+                                    >
+                                        <div className="flex items-start justify-between mb-3">
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className="font-bold text-[#4A3B32] mb-1 truncate">{note.title || note.note_type || 'Notes'}</h3>
+                                                <div className="flex items-center gap-1.5 text-xs text-[#8a6a5c]">
+                                                    <Clock className="h-3 w-3" />
+                                                    {formatDate(note.created_at)}
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={(e) => handleDeleteNote(note.id, e)}
+                                                className="text-red-400 hover:text-red-600 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                        {note.note_type && (
+                                            <div className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium mb-2 ${badge.bg} ${badge.text}`}>
+                                                {note.note_type}
+                                            </div>
+                                        )}
+                                        {note.topic && (
+                                            <p className="text-xs text-[#8a6a5c] mb-3 truncate">{note.topic}</p>
+                                        )}
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handleViewSavedNote(note.id); }}
+                                            className="w-full py-2 bg-[#C8A288] text-white rounded-lg hover:bg-[#B08B72] transition-colors text-sm font-medium flex items-center justify-center gap-1.5"
+                                        >
+                                            <Eye className="h-3.5 w-3.5" />
+                                            View
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ========== FORM VIEW: Generate new notes ========== */}
+            {!notesLoading && viewMode === 'form' && (
                 <div className="text-center py-12 animate-in fade-in slide-in-from-bottom-4">
+                    <button
+                        onClick={() => setViewMode('list')}
+                        className="flex items-center gap-2 px-4 py-2 mb-4 text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30 rounded-lg font-medium transition-colors"
+                    >
+                        <ArrowLeft className="h-4 w-4" />
+                        Back to Saved
+                    </button>
+
                     <div className="h-20 w-20 bg-[#FDF6F0] rounded-full flex items-center justify-center mx-auto mb-6">
                         <BookOpen className="h-10 w-10 text-[#C8A288]" />
                     </div>
@@ -322,25 +504,39 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
                         </button>
                     </div>
                 </div>
-            ) : (
-                <div className="pb-12 animate-in fade-in slide-in-from-bottom-8 duration-500 h-full flex flex-col">
-                    <div className="flex justify-between items-center mb-6">
+            )}
+
+            {/* ========== VIEWING MODE: Show notes content ========== */}
+            {!notesLoading && viewMode === 'viewing' && notesContent && (
+                <div className="pb-6 animate-in fade-in slide-in-from-bottom-8 duration-500">
+                    {/* Action Bar */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-[#E6D5CC]">
                         <div>
-                            <h3 className="text-2xl font-bold text-[#4A3B32]">{notesType}</h3>
-                            <p className="text-sm text-[#8a6a5c] font-medium">{notesTopic || notesTopicSelection || 'General'}</p>
+                            <button
+                                onClick={handleBackToList}
+                                className="flex items-center gap-1.5 text-sm text-[#8a6a5c] hover:text-[#4A3B32] mb-2 transition-colors"
+                            >
+                                <ArrowLeft className="h-3.5 w-3.5" />
+                                Back to Saved
+                            </button>
+                            <h3 className="text-xl md:text-2xl font-bold text-[#4A3B32]">{notesTitle || notesType}</h3>
+                            {(notesTopic || notesTopicSelection) && (
+                                <p className="text-sm text-[#8a6a5c] font-medium mt-1">{notesTopic || notesTopicSelection}</p>
+                            )}
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                             <button
                                 onClick={copyToClipboard}
-                                className="p-2 border border-[#E6D5CC] rounded-lg hover:bg-[#FDF6F0] text-[#8a6a5c] transition-colors"
+                                className="flex items-center gap-2 px-3 py-2 border border-[#E6D5CC] rounded-lg hover:bg-[#FDF6F0] text-[#8a6a5c] transition-colors text-sm"
                                 title="Copy to Clipboard"
                             >
-                                <Copy className="h-5 w-5" />
+                                <Copy className="h-4 w-4" />
+                                <span className="hidden sm:inline">Copy</span>
                             </button>
                             <button
                                 onClick={handleDownloadPDF}
                                 disabled={pdfLoading || notesLoading}
-                                className="flex items-center gap-2 px-4 py-2 border border-[#C8A288] text-[#C8A288] rounded-lg hover:bg-[#C8A288] hover:text-white font-medium transition-colors disabled:opacity-50"
+                                className="flex items-center gap-2 px-3 py-2 border border-[#C8A288] text-[#C8A288] rounded-lg hover:bg-[#C8A288] hover:text-white font-medium transition-colors disabled:opacity-50 text-sm"
                                 title="Download as PDF"
                             >
                                 {pdfLoading ? (
@@ -351,17 +547,35 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
                                 <span className="hidden sm:inline">{pdfLoading ? 'Generating...' : 'PDF'}</span>
                             </button>
                             <button
-                                onClick={() => { setNotesContent(''); setNotesTopic(''); setNotesTopicSelection(''); }}
-                                className="px-4 py-2 bg-[#C8A288] text-white rounded-lg hover:bg-[#B08B72] font-medium transition-colors"
+                                onClick={() => { setNotesContent(''); setNotesTopic(''); setNotesTopicSelection(''); setNotesTitle(''); setViewMode('form'); }}
+                                className="px-3 py-2 bg-[#C8A288] text-white rounded-lg hover:bg-[#B08B72] font-medium transition-colors text-sm"
                             >
                                 New Notes
                             </button>
                         </div>
                     </div>
 
+                    {/* Notes Content */}
                     <div
                         ref={notesRef}
-                        className="bg-white p-8 rounded-3xl border border-[#E6D5CC] shadow-sm flex-1 overflow-y-auto overflow-x-auto prose prose-lg max-w-none text-[#4A3B32]"
+                        className="bg-white p-6 md:p-10 rounded-2xl border border-[#E6D5CC] shadow-sm prose prose-base md:prose-lg max-w-none text-[#4A3B32] overflow-x-auto
+                        prose-headings:text-[#4A3B32] prose-headings:font-bold
+                        prose-h1:text-2xl prose-h1:mb-4 prose-h1:pb-2 prose-h1:border-b prose-h1:border-[#E6D5CC]
+                        prose-h2:text-xl prose-h2:mb-3 prose-h2:mt-6
+                        prose-h3:text-lg prose-h3:mb-2 prose-h3:mt-4
+                        prose-p:leading-relaxed prose-p:mb-4
+                        prose-ul:my-4 prose-ul:list-disc prose-ul:pl-6
+                        prose-ol:my-4 prose-ol:list-decimal prose-ol:pl-6
+                        prose-li:mb-2
+                        prose-strong:text-[#4A3B32] prose-strong:font-semibold
+                        prose-code:bg-[#FDF6F0] prose-code:px-2 prose-code:py-1 prose-code:rounded prose-code:text-sm prose-code:text-[#C8A288]
+                        prose-pre:bg-[#FDF6F0] prose-pre:border prose-pre:border-[#E6D5CC] prose-pre:rounded-xl prose-pre:p-4
+                        prose-blockquote:border-l-4 prose-blockquote:border-[#C8A288] prose-blockquote:pl-4 prose-blockquote:italic prose-blockquote:text-[#8a6a5c]
+                        prose-a:text-[#C8A288] prose-a:no-underline hover:prose-a:underline
+                        prose-table:border-collapse prose-table:w-full
+                        prose-th:bg-[#C8A288] prose-th:text-white prose-th:p-3 prose-th:text-left prose-th:font-semibold
+                        prose-td:border prose-td:border-[#E6D5CC] prose-td:p-3
+                        prose-tr:even:bg-[#FDF6F0]"
                     >
                         {notesLoading && !notesContent ? (
                             <div className="flex items-center justify-center h-40 gap-3 text-[#8a6a5c]">

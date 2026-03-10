@@ -11,7 +11,7 @@ Features:
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from collections import Counter, defaultdict
-from db.client import supabase_client
+from db.client import get_supabase_client
 from services.llm_service import llm_service
 from services.embedding_service import embedding_service
 from services.qdrant_service import qdrant_service
@@ -27,7 +27,7 @@ class GraphAnalyticsService:
     """
 
     def __init__(self):
-        self.client = supabase_client
+        self.client = get_supabase_client()
 
     # ============== Analytics Recording ==============
 

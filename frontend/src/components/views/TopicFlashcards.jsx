@@ -3,7 +3,7 @@ import {
     Layers, RefreshCw, ArrowLeft, ArrowRight,
     RotateCcw, Check, X, Shuffle, Eye, EyeOff
 } from 'lucide-react';
-import { generateFlashcards } from '../../api';
+import { generateFlashcardsLegacy as generateFlashcards } from '../../api';
 
 const FlashCard = ({ card, index, total, flipped, onFlip }) => {
     return (

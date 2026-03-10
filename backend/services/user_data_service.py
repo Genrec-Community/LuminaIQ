@@ -13,15 +13,15 @@ Tables managed:
 """
 
 from typing import List, Dict, Any, Optional
-from datetime import date, datetime
-from db.client import supabase_client
+from datetime import date, datetime, timedelta
+from db.client import get_supabase_client
 from utils.logger import logger
 from uuid import uuid4
 
 
 class UserDataService:
     def __init__(self):
-        self.client = supabase_client
+        self.client = get_supabase_client()
 
     # ===================== 1. User Settings =====================
 
@@ -520,7 +520,7 @@ class UserDataService:
                     # Already studied today
                     return {"current": current, "longest": longest, "lastStudyDate": today}
 
-                yesterday = date.today().replace(day=date.today().day - 1).isoformat() if date.today().day > 1 else None
+                yesterday = (date.today() - timedelta(days=1)).isoformat()
                 if last_date == yesterday:
                     current += 1
                 else:

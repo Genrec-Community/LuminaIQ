@@ -182,7 +182,7 @@ const ExamPrepMode = ({
     );
 
     return (
-        <div className="h-full overflow-y-auto">
+        <div className="h-full overflow-y-auto custom-scrollbar">
             {/* Header */}
             <div className="sticky top-0 bg-gradient-to-r from-[#C8A288] to-[#A08072] text-white p-4 z-10">
                 <div className="flex items-center justify-between">
@@ -206,7 +206,7 @@ const ExamPrepMode = ({
                 </div>
             </div>
 
-            <div className="p-4 md:p-6 space-y-6">
+            <div className="p-4 md:p-8 space-y-6">
                 {/* Active Exam Countdown */}
                 {activeExam && countdown && (
                     <div className={`rounded-2xl p-6 ${urgency.bg} border-2 border-current ${urgency.color}`}>

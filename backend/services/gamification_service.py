@@ -19,10 +19,10 @@ CREATE INDEX idx_user_gamification_user_id ON user_gamification(user_id);
 
 from typing import Dict, Any, List
 from datetime import datetime
-from db.client import supabase_client
+from db.client import get_supabase_client
 from utils.logger import logger
 from uuid import uuid4
-import time
+import asyncio
 
 
 # ======================== Level Definitions ========================
@@ -126,7 +126,7 @@ DEFAULT_STATS = {
 
 class GamificationService:
     def __init__(self):
-        self.client = supabase_client
+        self.client = get_supabase_client()
 
     # -------------------- Level Calculation --------------------
 
@@ -266,7 +266,7 @@ class GamificationService:
                 if attempt < 2:
                     wait = 1.5 * (attempt + 1)
                     logger.warning(f"Gamification query attempt {attempt+1} failed ({e}), retrying in {wait}s...")
-                    time.sleep(wait)
+                    await asyncio.sleep(wait)
                 else:
                     logger.error(f"Error getting gamification after 3 attempts: {e}")
 

@@ -3,7 +3,7 @@ import {
     GitBranch, X, RefreshCw, ZoomIn, ZoomOut,
     ChevronRight, ChevronDown, Circle, ArrowLeft
 } from 'lucide-react';
-import { generateMindmap } from '../../api';
+import { generateMindmapLegacy as generateMindmap } from '../../api';
 
 const NODE_COLORS = [
     { bg: 'bg-blue-100', border: 'border-blue-300', text: 'text-blue-800', line: '#93c5fd' },

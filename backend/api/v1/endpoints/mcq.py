@@ -24,6 +24,42 @@ async def get_topics(project_id: str, current_user: dict = Depends(get_current_u
         raise HTTPException(500, str(e))
 
 
+@router.get("/saved/{project_id}")
+async def get_saved_tests(
+    project_id: str, current_user: dict = Depends(get_current_user)
+):
+    """Get all saved MCQ tests for a project"""
+    try:
+        tests = await mcq_service.get_saved_tests(project_id)
+        return tests
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@router.get("/saved/view/{test_id}")
+async def get_saved_test(
+    test_id: str, current_user: dict = Depends(get_current_user)
+):
+    """Get a specific saved MCQ test with full questions"""
+    try:
+        test = await mcq_service.get_saved_test(test_id)
+        return test
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@router.delete("/saved/{test_id}")
+async def delete_saved_test(
+    test_id: str, current_user: dict = Depends(get_current_user)
+):
+    """Delete a saved MCQ test"""
+    try:
+        await mcq_service.delete_saved_test(test_id)
+        return {"message": "Test deleted successfully"}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
 @router.post("/generate", response_model=MCQTestResponse)
 async def generate_mcq(
     request: MCQGenerateRequest, current_user: dict = Depends(get_current_user)

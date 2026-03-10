@@ -4,7 +4,7 @@ from typing import List, Dict, Any, Union
 from services.embedding_service import embedding_service
 from services.qdrant_service import qdrant_service
 from services.llm_service import llm_service
-from db.client import supabase_client
+from db.client import get_supabase_client
 from config.settings import settings
 from utils.logger import logger
 from uuid import uuid4
@@ -12,7 +12,7 @@ from uuid import uuid4
 
 class MCQService:
     def __init__(self):
-        self.client = supabase_client
+        self.client = get_supabase_client()
 
     async def generate_document_topics(
         self, project_id: str, document_id: str
@@ -441,6 +441,76 @@ Return only the 3 queries separated by newlines."""
 
         except Exception as e:
             logger.error(f"Error submitting test: {str(e)}")
+            raise
+
+
+    async def get_saved_tests(self, project_id: str) -> List[Dict[str, Any]]:
+        """Get all saved MCQ tests for a project"""
+        try:
+            response = (
+                self.client.table("mcq_tests")
+                .select("id, project_id, chapter_name, created_at")
+                .eq("project_id", project_id)
+                .order("created_at", desc=True)
+                .execute()
+            )
+            tests = response.data or []
+            # Add question count from stored JSON
+            for test in tests:
+                # Fetch question count separately to keep listing lightweight
+                q_response = (
+                    self.client.table("mcq_tests")
+                    .select("questions")
+                    .eq("id", test["id"])
+                    .execute()
+                )
+                if q_response.data and q_response.data[0].get("questions"):
+                    try:
+                        questions = json.loads(q_response.data[0]["questions"])
+                        test["question_count"] = len(questions)
+                    except (json.JSONDecodeError, TypeError):
+                        test["question_count"] = 0
+                else:
+                    test["question_count"] = 0
+            return tests
+        except Exception as e:
+            logger.error(f"Error getting saved MCQ tests: {str(e)}")
+            raise
+
+    async def get_saved_test(self, test_id: str) -> Dict[str, Any]:
+        """Get a specific saved MCQ test with full questions"""
+        try:
+            response = (
+                self.client.table("mcq_tests")
+                .select("*")
+                .eq("id", test_id)
+                .execute()
+            )
+            if not response.data:
+                raise Exception("Test not found")
+
+            test = response.data[0]
+            if test.get("questions") and isinstance(test["questions"], str):
+                test["questions"] = json.loads(test["questions"])
+            return test
+        except Exception as e:
+            logger.error(f"Error getting saved MCQ test: {str(e)}")
+            raise
+
+    async def delete_saved_test(self, test_id: str):
+        """Delete a saved MCQ test"""
+        try:
+            response = (
+                self.client.table("mcq_tests")
+                .delete()
+                .eq("id", test_id)
+                .execute()
+            )
+            if not response.data:
+                raise Exception("Test not found")
+            logger.info(f"Deleted MCQ test {test_id}")
+        except Exception as e:
+            logger.error(f"Error deleting MCQ test: {str(e)}")
             raise
 
 
