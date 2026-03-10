@@ -34,7 +34,12 @@ import {
     Maximize2,
     Minimize2,
     Layers,
-    Zap
+    Zap,
+    PanelRight,
+    Check,
+    CloudUpload,
+    Eye,
+    EyeOff
 } from 'lucide-react';
 import {
     uploadDocument,
@@ -127,16 +132,15 @@ const ProjectView = () => {
     const [deletingDocIds, setDeletingDocIds] = useState(new Set());
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
-    const [showUploadModal, setShowUploadModal] = useState(false);
     const [isProcessingDocs, setIsProcessingDocs] = useState(true);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-    const [isDocsMenuOpen, setIsDocsMenuOpen] = useState(false);
     const [isLeftCollapsed, setIsLeftCollapsed] = useState(false);
+    const [showRightSidebarUpload, setShowRightSidebarUpload] = useState(false);
+    const [isMobileDocsOpen, setIsMobileDocsOpen] = useState(false);
     const [isRightCollapsed, setIsRightCollapsed] = useState(false);
 
     // Derived: force expanded when mobile drawers open
     const leftCollapsed = isLeftCollapsed && !isMobileMenuOpen;
-    const rightCollapsed = isRightCollapsed && !isDocsMenuOpen;
 
     // New Feature States
     const [showSearch, setShowSearch] = useState(false);
@@ -146,33 +150,31 @@ const ProjectView = () => {
     const [zenMode, setZenMode] = useState(false);
     const [tutorTopic, setTutorTopic] = useState(null);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
-    const [showBookSection, setShowBookSection] = useState(false);
-    const [showDocumentsPanel, setShowDocumentsPanel] = useState(false);
 
     // Topics State
     const [availableTopics, setAvailableTopics] = useState([]);
     const [allProjectTopics, setAllProjectTopics] = useState([]);
     const [documentTopics, setDocumentTopics] = useState({});
-    
+
     // Learning Path Integration State
     const [preSelectedTopic, setPreSelectedTopic] = useState(null);
     const [preSelectedQuizMode, setPreSelectedQuizMode] = useState(null);
     const [cameFromPath, setCameFromPath] = useState(false);
-    
+
     // Pre-generated data from chat @ commands (passed to views via "Open" button)
     const [preGeneratedNotes, setPreGeneratedNotes] = useState(null);
     const [preGeneratedQA, setPreGeneratedQA] = useState(null);
     const [preGeneratedQuiz, setPreGeneratedQuiz] = useState(null);
-    
+
     // Mindmap & Flashcards State (shown inline, only from learning path)
     const [mindmapTopic, setMindmapTopic] = useState(null);
     const [mindmapDocs, setMindmapDocs] = useState([]);
     const [flashcardTopic, setFlashcardTopic] = useState(null);
     const [flashcardDocs, setFlashcardDocs] = useState([]);
-    
+
     // Learning Progress (persisted in Supabase)
     const [learningProgress, setLearningProgress] = useState(new Set());
-    
+
     // Load learning progress from API
     useEffect(() => {
         const loadProgress = async () => {
@@ -187,11 +189,11 @@ const ProjectView = () => {
         };
         loadProgress();
     }, [projectId]);
-    
+
     // Quiz/Q&A Active State (hides sidebars during generation/active)
     const [isQuizActive, setIsQuizActive] = useState(false);
     const [isQAActive, setIsQAActive] = useState(false);
-    
+
     // Combined sidebar hidden state
     const isSidebarHidden = isQuizActive || isQAActive || zenMode;
 
@@ -214,9 +216,9 @@ const ProjectView = () => {
         // Helper to check if any document is still processing
         const isAnyDocProcessing = (docs) => {
             if (!docs || docs.length === 0) return false;
-            return docs.some(d => 
-                d.upload_status === 'pending' || 
-                d.upload_status === 'processing' || 
+            return docs.some(d =>
+                d.upload_status === 'pending' ||
+                d.upload_status === 'processing' ||
                 d.upload_status === 'embedding' ||
                 d.upload_status === 'queued'
             );
@@ -262,7 +264,7 @@ const ProjectView = () => {
             if (data && data.documents) {
                 const processing = isAnyDocProcessing(data.documents);
                 setIsProcessingDocs(processing);
-                
+
                 // Don't stop polling - we need to detect new uploads too
                 // Just update the state
             }
@@ -480,8 +482,8 @@ const ProjectView = () => {
 
         // Add user command message
         setMessages(prev => [...prev,
-            { role: 'user', content: labels[toolType] || `@${toolType}`, type: 'tool_command' },
-            { role: 'assistant', type: 'tool_loading', toolType, toolParams: params }
+        { role: 'user', content: labels[toolType] || `@${toolType}`, type: 'tool_command' },
+        { role: 'assistant', type: 'tool_loading', toolType, toolParams: params }
         ]);
 
         try {
@@ -646,7 +648,7 @@ const ProjectView = () => {
                         }
                         return updated;
                     });
-                    
+
                     // Track chat activity for heatmap
                     recordActivity(projectId, 'chat');
                     setLoading(false);
@@ -759,385 +761,354 @@ const ProjectView = () => {
 
             {/* Sidebar - Desktop & Mobile - Hidden when quiz/qa is active */}
             {!isSidebarHidden && (
-            <div className={`
+                <div className={`
                 fixed inset-y-0 left-0 z-50 ${leftCollapsed ? 'w-20' : 'w-80'} bg-[#FDF6F0]/95 backdrop-blur-xl border-r border-white/20 flex flex-col transition-all duration-300 ease-in-out md:translate-x-0 md:static md:shrink-0 shadow-2xl md:shadow-none
                 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
             `}>
-                <div className={`flex-1 flex flex-col ${leftCollapsed ? 'p-3' : 'p-6'}`}>
-                    <div className={`flex items-center ${leftCollapsed ? 'justify-center' : 'justify-between'} mb-8`}>
-                        {!leftCollapsed && (
-                            <div className="flex items-center gap-3">
-                                <div className="h-10 w-10 bg-gradient-to-br from-[#C8A288] to-[#A08072] rounded-xl flex items-center justify-center text-white shadow-lg shadow-[#C8A288]/20">
-                                    <BookOpen className="h-6 w-6" />
-                                </div>
-                                <h1 className="text-2xl font-bold text-[#4A3B32] tracking-tight">Lumina IQ</h1>
-                            </div>
-                        )}
-                        <div className="flex items-center gap-1">
-                            {/* Desktop collapse toggle */}
-                            <button
-                                onClick={() => setIsLeftCollapsed(!isLeftCollapsed)}
-                                className="hidden md:block p-2 hover:bg-[#E6D5CC]/30 rounded-full text-[#8a6a5c] transition-colors"
-                                title={isLeftCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                            >
-                                {leftCollapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
-                            </button>
-                            {/* Close button for mobile */}
-                            <button
-                                onClick={() => setIsMobileMenuOpen(false)}
-                                className="md:hidden p-2 hover:bg-[#E6D5CC]/30 rounded-full text-[#8a6a5c] transition-colors"
-                            >
-                                <X className="h-6 w-6" />
-                            </button>
-                        </div>
-                    </div>
-
-                    <nav className={`flex-1 overflow-y-auto min-h-0 custom-scrollbar ${leftCollapsed ? 'space-y-2' : 'space-y-4'}`}>
-                        {/* Main Navigation Items */}
-                        <NavItem id="chat" icon={MessageSquare} label="Chat" />
-                        <NavItem id="path" icon={Target} label="Learning Path" />
-                        
-                        {/* General Section - Expandable */}
-                        <div className={leftCollapsed ? '' : ''}>
-                            <button
-                                onClick={() => setActiveTab(activeTab === 'general' ? 'chat' : 'general')}
-                                className={`w-full flex items-center ${leftCollapsed ? 'justify-center px-3 py-4' : 'gap-4 px-5 py-4'} rounded-xl transition-colors ${activeTab === 'general' || activeTab === 'qa' || activeTab === 'quiz' || activeTab === 'notes' || activeTab === 'flashcards' || activeTab === 'mindmap'
-                                    ? 'bg-[#C8A288] text-white font-semibold shadow-md shadow-[#C8A288]/20'
-                                    : 'text-[#4A3B32] hover:bg-[#E6D5CC] hover:shadow-sm'
-                                }`}
-                                title={leftCollapsed ? 'General' : undefined}
-                            >
-                                <FileText className="h-6 w-6 shrink-0" />
-                                {!leftCollapsed && (
-                                    <>
-                                        <span className="flex-1 text-left text-base">General</span>
-                                        <ChevronDown className={`h-5 w-5 transition-transform ${activeTab === 'general' || activeTab === 'qa' || activeTab === 'quiz' || activeTab === 'notes' || activeTab === 'flashcards' || activeTab === 'mindmap' ? 'rotate-180' : ''}`} />
-                                    </>
-                                )}
-                            </button>
-                            
-                            {/* General Sub-items */}
-                            {!leftCollapsed && (activeTab === 'general' || activeTab === 'qa' || activeTab === 'quiz' || activeTab === 'notes' || activeTab === 'flashcards' || activeTab === 'mindmap') && (
-                                <div className="ml-6 mt-2 space-y-2 border-l-2 border-[#E6D5CC] pl-4">
-                                    <button
-                                        onClick={() => {
-                                            setActiveTab('qa');
-                                            setIsMobileMenuOpen(false);
-                                        }}
-                                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-base transition-colors ${
-                                            activeTab === 'qa' ? 'text-[#C8A288] font-semibold bg-[#FDF6F0]' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/50'
-                                        }`}
-                                    >
-                                        <HelpCircle className="h-5 w-5" />
-                                        <span>Q&A</span>
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            setActiveTab('quiz');
-                                            setIsMobileMenuOpen(false);
-                                        }}
-                                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-base transition-colors ${
-                                            activeTab === 'quiz' ? 'text-[#C8A288] font-semibold bg-[#FDF6F0]' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/50'
-                                        }`}
-                                    >
-                                        <CheckSquare className="h-5 w-5" />
-                                        <span>Answer Quiz</span>
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            setActiveTab('notes');
-                                            setIsMobileMenuOpen(false);
-                                        }}
-                                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-base transition-colors ${
-                                            activeTab === 'notes' ? 'text-[#C8A288] font-semibold bg-[#FDF6F0]' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/50'
-                                        }`}
-                                    >
-                                        <FileText className="h-5 w-5" />
-                                        <span>Notes</span>
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            setActiveTab('flashcards');
-                                            setIsMobileMenuOpen(false);
-                                        }}
-                                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-base transition-colors ${
-                                            activeTab === 'flashcards' ? 'text-[#C8A288] font-semibold bg-[#FDF6F0]' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/50'
-                                        }`}
-                                    >
-                                        <Layers className="h-5 w-5" />
-                                        <span>Flashcards</span>
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            setActiveTab('mindmap');
-                                            setIsMobileMenuOpen(false);
-                                        }}
-                                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-base transition-colors ${
-                                            activeTab === 'mindmap' ? 'text-[#C8A288] font-semibold bg-[#FDF6F0]' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/50'
-                                        }`}
-                                    >
-                                        <Zap className="h-5 w-5" />
-                                        <span>Mindmap</span>
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-
-                        <NavItem id="exam" icon={GraduationCap} label="Exam Prep" />
-                        <NavItem id="knowledge" icon={Network} label="Knowledge Graph" />
-                        
-                        {/* Documents Section with Divider */}
-                        <div className={leftCollapsed ? 'pt-3 border-t border-[#E6D5CC]/50' : 'pt-4 mt-4 border-t border-[#E6D5CC]/50'}>
-                            <div className={leftCollapsed ? '' : 'px-5 mb-3'}>
-                                {!leftCollapsed && (
-                                    <p className="text-sm font-bold text-[#8a6a5c] uppercase tracking-wider">Documents</p>
-                                )}
-                            </div>
-                            
-                            {/* Upload Button */}
-                            <button
-                                onClick={() => {
-                                    setShowUploadModal(true);
-                                    setIsMobileMenuOpen(false);
-                                }}
-                                disabled={uploading}
-                                className={`w-full flex items-center ${leftCollapsed ? 'justify-center px-3 py-4' : 'gap-4 px-5 py-4'} rounded-xl transition-colors text-[#4A3B32] hover:bg-[#E6D5CC] hover:shadow-sm`}
-                                title={leftCollapsed ? 'Upload Document' : undefined}
-                            >
-                                <Upload className="h-6 w-6 shrink-0 text-[#C8A288]" />
-                                {!leftCollapsed && <span className="text-base">Upload</span>}
-                            </button>
-                            
-                            {/* View Documents Button */}
-                            <button
-                                onClick={() => {
-                                    setShowDocumentsPanel(true);
-                                    setIsMobileMenuOpen(false);
-                                }}
-                                className={`w-full flex items-center ${leftCollapsed ? 'justify-center px-3 py-4' : 'gap-4 px-5 py-4'} rounded-xl transition-colors ${selectedDocuments.length > 0 
-                                    ? 'bg-[#C8A288] text-white font-semibold shadow-md' 
-                                    : 'text-[#4A3B32] hover:bg-[#E6D5CC] hover:shadow-sm'
-                                }`}
-                                title={leftCollapsed ? 'View Documents' : undefined}
-                            >
-                                <FileText className="h-6 w-6 shrink-0" />
-                                {!leftCollapsed && (
-                                    <span className="text-base">View Documents</span>
-                                )}
-                            </button>
-                        </div>
-                    </nav>
-
-                    {/* Profile Section - Bottom of Sidebar */}
-                    <div className={`mt-auto ${leftCollapsed ? 'p-3' : 'p-6'} border-t border-[#E6D5CC]/50`}>
-                        <button
-                            onClick={() => setShowProfileMenu(!showProfileMenu)}
-                            className={`profile-dropdown w-full flex items-center ${leftCollapsed ? 'justify-center px-3 py-4' : 'gap-4 px-5 py-4'} rounded-xl transition-all hover:bg-[#E6D5CC] hover:shadow-sm group`}
-                            title={leftCollapsed ? 'Profile' : undefined}
-                        >
-                            <div className="h-10 w-10 bg-gradient-to-br from-[#C8A288] to-[#A08072] rounded-full flex items-center justify-center text-white shadow-md group-hover:shadow-lg transition-shadow shrink-0">
-                                <User className="h-5 w-5" />
-                            </div>
+                    <div className={`flex-1 flex flex-col ${leftCollapsed ? 'p-3' : 'p-6'}`}>
+                        <div className={`flex items-center ${leftCollapsed ? 'justify-center' : 'justify-between'} mb-8`}>
                             {!leftCollapsed && (
-                                <div className="flex-1 text-left">
-                                    <p className="text-sm font-bold text-[#4A3B32]">Profile</p>
-                                    <p className="text-xs text-[#8a6a5c]">Settings & More</p>
+                                <div className="flex items-center gap-3">
+                                    <div className="h-10 w-10 bg-gradient-to-br from-[#C8A288] to-[#A08072] rounded-xl flex items-center justify-center text-white shadow-lg shadow-[#C8A288]/20">
+                                        <BookOpen className="h-6 w-6" />
+                                    </div>
+                                    <h1 className="text-2xl font-bold text-[#4A3B32] tracking-tight">Lumina IQ</h1>
                                 </div>
                             )}
-                            {!leftCollapsed && (
-                                <Settings className="h-5 w-5 text-[#8a6a5c] group-hover:text-[#C8A288] transition-colors" />
-                            )}
-                        </button>
+                            <div className="flex items-center gap-1">
+                                {/* Desktop collapse toggle */}
+                                <button
+                                    onClick={() => setIsLeftCollapsed(!isLeftCollapsed)}
+                                    className="hidden md:block p-2 hover:bg-[#E6D5CC]/30 rounded-full text-[#8a6a5c] transition-colors"
+                                    title={isLeftCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                                >
+                                    {leftCollapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
+                                </button>
+                                {/* Close button for mobile */}
+                                <button
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                    className="md:hidden p-2 hover:bg-[#E6D5CC]/30 rounded-full text-[#8a6a5c] transition-colors"
+                                >
+                                    <X className="h-6 w-6" />
+                                </button>
+                            </div>
+                        </div>
+
+                        <nav className={`flex-1 overflow-y-auto min-h-0 custom-scrollbar ${leftCollapsed ? 'space-y-2' : 'space-y-4'}`}>
+                            {/* Main Navigation Items */}
+                            <NavItem id="chat" icon={MessageSquare} label="Chat" />
+                            <NavItem id="path" icon={Target} label="Learning Path" />
+
+                            {/* General Section - Expandable */}
+                            <div className={leftCollapsed ? '' : ''}>
+                                <button
+                                    onClick={() => setActiveTab(activeTab === 'general' ? 'chat' : 'general')}
+                                    className={`w-full flex items-center ${leftCollapsed ? 'justify-center px-3 py-4' : 'gap-4 px-5 py-4'} rounded-xl transition-colors ${activeTab === 'general' || activeTab === 'qa' || activeTab === 'quiz' || activeTab === 'notes' || activeTab === 'flashcards' || activeTab === 'mindmap'
+                                        ? 'bg-[#C8A288] text-white font-semibold shadow-md shadow-[#C8A288]/20'
+                                        : 'text-[#4A3B32] hover:bg-[#E6D5CC] hover:shadow-sm'
+                                        }`}
+                                    title={leftCollapsed ? 'General' : undefined}
+                                >
+                                    <FileText className="h-6 w-6 shrink-0" />
+                                    {!leftCollapsed && (
+                                        <>
+                                            <span className="flex-1 text-left text-base">General</span>
+                                            <ChevronDown className={`h-5 w-5 transition-transform ${activeTab === 'general' || activeTab === 'qa' || activeTab === 'quiz' || activeTab === 'notes' || activeTab === 'flashcards' || activeTab === 'mindmap' ? 'rotate-180' : ''}`} />
+                                        </>
+                                    )}
+                                </button>
+
+                                {/* General Sub-items */}
+                                {!leftCollapsed && (activeTab === 'general' || activeTab === 'qa' || activeTab === 'quiz' || activeTab === 'notes' || activeTab === 'flashcards' || activeTab === 'mindmap') && (
+                                    <div className="ml-6 mt-2 space-y-2 border-l-2 border-[#E6D5CC] pl-4">
+                                        <button
+                                            onClick={() => {
+                                                setActiveTab('qa');
+                                                setIsMobileMenuOpen(false);
+                                            }}
+                                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-base transition-colors ${activeTab === 'qa' ? 'text-[#C8A288] font-semibold bg-[#FDF6F0]' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/50'
+                                                }`}
+                                        >
+                                            <HelpCircle className="h-5 w-5" />
+                                            <span>Q&A</span>
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setActiveTab('quiz');
+                                                setIsMobileMenuOpen(false);
+                                            }}
+                                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-base transition-colors ${activeTab === 'quiz' ? 'text-[#C8A288] font-semibold bg-[#FDF6F0]' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/50'
+                                                }`}
+                                        >
+                                            <CheckSquare className="h-5 w-5" />
+                                            <span>Answer Quiz</span>
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setActiveTab('notes');
+                                                setIsMobileMenuOpen(false);
+                                            }}
+                                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-base transition-colors ${activeTab === 'notes' ? 'text-[#C8A288] font-semibold bg-[#FDF6F0]' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/50'
+                                                }`}
+                                        >
+                                            <FileText className="h-5 w-5" />
+                                            <span>Notes</span>
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setActiveTab('flashcards');
+                                                setIsMobileMenuOpen(false);
+                                            }}
+                                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-base transition-colors ${activeTab === 'flashcards' ? 'text-[#C8A288] font-semibold bg-[#FDF6F0]' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/50'
+                                                }`}
+                                        >
+                                            <Layers className="h-5 w-5" />
+                                            <span>Flashcards</span>
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setActiveTab('mindmap');
+                                                setIsMobileMenuOpen(false);
+                                            }}
+                                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-base transition-colors ${activeTab === 'mindmap' ? 'text-[#C8A288] font-semibold bg-[#FDF6F0]' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/50'
+                                                }`}
+                                        >
+                                            <Zap className="h-5 w-5" />
+                                            <span>Mindmap</span>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            <NavItem id="exam" icon={GraduationCap} label="Exam Prep" />
+                            <NavItem id="knowledge" icon={Network} label="Knowledge Graph" />
+
+
+                        </nav>
+
+                        {/* Profile Section - Fixed at Bottom of Sidebar */}
+                        <div className={`shrink-0 ${leftCollapsed ? 'p-3' : 'p-4'} border-t border-[#E6D5CC]/50 bg-[#FDF6F0]/95 backdrop-blur-sm`}>
+                            <button
+                                onClick={() => setShowProfileMenu(!showProfileMenu)}
+                                className={`profile-dropdown w-full flex items-center ${leftCollapsed ? 'justify-center px-3 py-3' : 'gap-3 px-4 py-3'} rounded-xl transition-all hover:bg-[#E6D5CC] hover:shadow-sm group`}
+                                title={leftCollapsed ? 'Profile' : undefined}
+                            >
+                                <div className="h-10 w-10 bg-gradient-to-br from-[#C8A288] to-[#A08072] rounded-full flex items-center justify-center text-white shadow-md group-hover:shadow-lg transition-shadow shrink-0">
+                                    <User className="h-5 w-5" />
+                                </div>
+                                {!leftCollapsed && (
+                                    <div className="flex-1 text-left">
+                                        <p className="text-sm font-bold text-[#4A3B32]">Profile</p>
+                                        <p className="text-xs text-[#8a6a5c]">Settings & More</p>
+                                    </div>
+                                )}
+                                {!leftCollapsed && (
+                                    <Settings className="h-5 w-5 text-[#8a6a5c] group-hover:text-[#C8A288] transition-colors" />
+                                )}
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
             )}
 
             {/* Main Content Area */}
-            <div className={`flex-1 flex flex-col min-w-0 overflow-hidden backdrop-blur-sm ${
-                zenMode
-                    ? 'bg-white m-0 rounded-none border-0 shadow-none'
-                    : 'bg-white/50 md:bg-white md:m-4 md:rounded-3xl shadow-sm border-x md:border-y border-[#E6D5CC]/50 md:border-[#E6D5CC]'
-            }`}>
+            <div className={`flex-1 flex flex-col min-w-0 overflow-hidden backdrop-blur-sm ${zenMode
+                ? 'bg-white m-0 rounded-none border-0 shadow-none'
+                : 'bg-white/50 md:bg-white md:m-4 md:rounded-3xl shadow-sm border-x md:border-y border-[#E6D5CC]/50 md:border-[#E6D5CC]'
+                }`}>
 
                 {/* Header (Context) - Hidden in Zen Mode */}
                 {!zenMode && (
-                <div className="px-3 md:px-5 py-2.5 border-b border-[#E6D5CC]/50 bg-white/50 backdrop-blur-md sticky top-0 z-30">
-                    {/* Single-row header with proper spacing */}
-                    <div className="flex items-center gap-2 h-11">
-                        {/* Mobile Menu Button */}
-                        <button
-                            onClick={() => setIsMobileMenuOpen(true)}
-                            className="md:hidden p-2 -ml-1 hover:bg-[#E6D5CC]/30 rounded-lg text-[#4A3B32] transition-colors shrink-0"
-                        >
-                            <Menu className="h-5 w-5" />
-                        </button>
+                    <div className="px-3 md:px-5 py-2.5 border-b border-[#E6D5CC]/50 bg-white/50 backdrop-blur-md sticky top-0 z-30">
+                        {/* Single-row header with proper spacing */}
+                        <div className="flex items-center gap-2 h-11">
+                            {/* Mobile Menu Button */}
+                            <button
+                                onClick={() => setIsMobileMenuOpen(true)}
+                                className="md:hidden p-2 -ml-1 hover:bg-[#E6D5CC]/30 rounded-lg text-[#4A3B32] transition-colors shrink-0"
+                            >
+                                <Menu className="h-5 w-5" />
+                            </button>
 
-                        {/* Left: Tab name + Summary */}
-                        <div className="flex items-center gap-2 min-w-0 shrink-0">
-                            <h2 className="text-base font-bold text-[#4A3B32] whitespace-nowrap">
-                                {activeTab === 'chat' && 'Chat'}
-                                {activeTab === 'qa' && 'Q&A'}
-                                {activeTab === 'quiz' && 'Quiz'}
-                                {activeTab === 'notes' && 'Notes'}
-                                {activeTab === 'flashcards' && 'Flashcards'}
-                                {activeTab === 'mindmap' && 'Mindmap'}
-                                {activeTab === 'path' && 'Learning Path'}
-                                {activeTab === 'study' && 'Study'}
-                                {activeTab === 'analytics' && 'Analytics'}
-                                {activeTab === 'exam' && 'Exam Prep'}
-                                {activeTab === 'knowledge' && 'Knowledge Graph'}
-                            </h2>
+                            {/* Left: Tab name + Summary */}
+                            <div className="flex items-center gap-2 min-w-0 shrink-0">
+                                <h2 className="text-base font-bold text-[#4A3B32] whitespace-nowrap">
+                                    {activeTab === 'chat' && 'Chat'}
+                                    {activeTab === 'qa' && 'Q&A'}
+                                    {activeTab === 'quiz' && 'Quiz'}
+                                    {activeTab === 'notes' && 'Notes'}
+                                    {activeTab === 'flashcards' && 'Flashcards'}
+                                    {activeTab === 'mindmap' && 'Mindmap'}
+                                    {activeTab === 'path' && 'Learning Path'}
+                                    {activeTab === 'study' && 'Study'}
+                                    {activeTab === 'analytics' && 'Analytics'}
+                                    {activeTab === 'exam' && 'Exam Prep'}
+                                    {activeTab === 'knowledge' && 'Knowledge Graph'}
+                                </h2>
 
-                            {/* Summary Dropdown - compact pill */}
-                            {documents.length > 0 && (
-                                <button
-                                    onClick={toggleSummary}
-                                    className={`hidden sm:flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full transition-all shrink-0 ${
-                                        showSummary
+                                {/* Summary Dropdown - compact pill */}
+                                {documents.length > 0 && (
+                                    <button
+                                        onClick={toggleSummary}
+                                        className={`hidden sm:flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full transition-all shrink-0 ${showSummary
                                             ? 'bg-[#C8A288] text-white'
                                             : 'bg-[#FDF6F0] text-[#C8A288] border border-[#E6D5CC] hover:border-[#C8A288]/40'
-                                    }`}
-                                >
-                                    <FileText className="h-3 w-3" />
-                                    Summary
-                                    {showSummary ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                                </button>
-                            )}
-                        </div>
-
-                        {/* Spacer for mobile */}
-                        <div className="flex-1" />
-
-                        {/* Right: Toolbar - grouped with subtle dividers */}
-                        <div className="flex items-center shrink-0">
-                            {/* Core tools group */}
-                            <div className="flex items-center">
-                                <button
-                                    onClick={() => setShowSearch(true)}
-                                    className="p-2.5 rounded-lg text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30 transition-colors"
-                                    title="Search (Ctrl+K)"
-                                >
-                                    <Search className="h-5 w-5" />
-                                </button>
-                                <button
-                                    onClick={() => setShowAITutor(!showAITutor)}
-                                    className={`p-2.5 rounded-lg transition-colors ${showAITutor ? 'bg-[#C8A288] text-white' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30'}`}
-                                    title="AI Tutor"
-                                >
-                                    <Brain className="h-5 w-5" />
-                                </button>
-                                <button
-                                    onClick={() => setShowPomodoro(!showPomodoro)}
-                                    className={`p-2.5 rounded-lg transition-colors ${showPomodoro ? 'bg-[#C8A288] text-white' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30'}`}
-                                    title="Pomodoro Timer"
-                                >
-                                    <Timer className="h-5 w-5" />
-                                </button>
-                                <button
-                                    onClick={() => setShowBookmarks(!showBookmarks)}
-                                    className={`p-2.5 rounded-lg transition-colors ${showBookmarks ? 'bg-[#C8A288] text-white' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30'}`}
-                                    title="Bookmarks & Highlights"
-                                >
-                                    <Bookmark className="h-5 w-5" />
-                                </button>
+                                            }`}
+                                    >
+                                        <FileText className="h-3 w-3" />
+                                        Summary
+                                        {showSummary ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                                    </button>
+                                )}
                             </div>
 
-                            {/* Divider */}
-                            <div className="w-px h-6 bg-[#E6D5CC]/60 mx-1 hidden sm:block" />
+                            {/* Spacer for mobile */}
+                            <div className="flex-1" />
 
-                            {/* Secondary tools */}
-                            <div className="hidden sm:flex items-center">
+                            {/* Right: Toolbar - grouped with subtle dividers */}
+                            <div className="flex items-center shrink-0">
+                                {/* Core tools group */}
+                                <div className="flex items-center">
+                                    <button
+                                        onClick={() => setShowSearch(true)}
+                                        className="p-2.5 rounded-lg text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30 transition-colors"
+                                        title="Search (Ctrl+K)"
+                                    >
+                                        <Search className="h-5 w-5" />
+                                    </button>
+                                    <button
+                                        onClick={() => setShowAITutor(!showAITutor)}
+                                        className={`p-2.5 rounded-lg transition-colors ${showAITutor ? 'bg-[#C8A288] text-white' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30'}`}
+                                        title="AI Tutor"
+                                    >
+                                        <Brain className="h-5 w-5" />
+                                    </button>
+                                    <button
+                                        onClick={() => setShowPomodoro(!showPomodoro)}
+                                        className={`p-2.5 rounded-lg transition-colors ${showPomodoro ? 'bg-[#C8A288] text-white' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30'}`}
+                                        title="Pomodoro Timer"
+                                    >
+                                        <Timer className="h-5 w-5" />
+                                    </button>
+                                    <button
+                                        onClick={() => setShowBookmarks(!showBookmarks)}
+                                        className={`p-2.5 rounded-lg transition-colors ${showBookmarks ? 'bg-[#C8A288] text-white' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30'}`}
+                                        title="Bookmarks & Highlights"
+                                    >
+                                        <Bookmark className="h-5 w-5" />
+                                    </button>
+                                </div>
+
+                                {/* Divider */}
+                                <div className="w-px h-6 bg-[#E6D5CC]/60 mx-1 hidden sm:block" />
+
+                                {/* Secondary tools */}
+                                <div className="hidden sm:flex items-center">
+                                    <button
+                                        onClick={() => setZenMode(true)}
+                                        className="p-2.5 rounded-lg text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30 transition-colors"
+                                        title="Focus Mode (Ctrl+Shift+Z)"
+                                    >
+                                        <Maximize2 className="h-5 w-5" />
+                                    </button>
+                                    <button
+                                        onClick={() => setIsRightCollapsed(!isRightCollapsed)}
+                                        className={`p-2.5 rounded-lg transition-colors ${!isRightCollapsed ? 'bg-[#C8A288]/10 text-[#C8A288]' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30'}`}
+                                        title={isRightCollapsed ? 'Show Documents Panel' : 'Hide Documents Panel'}
+                                    >
+                                        <PanelRight className="h-5 w-5" />
+                                    </button>
+                                </div>
+
+                                {/* Divider */}
+                                <div className="w-px h-6 bg-[#E6D5CC]/60 mx-0.5 hidden sm:block" />
+
+                                {/* Gamification Button */}
                                 <button
-                                    onClick={() => setZenMode(true)}
-                                    className="p-2.5 rounded-lg text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30 transition-colors"
-                                    title="Focus Mode (Ctrl+Shift+Z)"
-                                >
-                                    <Maximize2 className="h-5 w-5" />
-                                </button>
-                            </div>
-
-                            {/* Divider */}
-                            <div className="w-px h-6 bg-[#E6D5CC]/60 mx-0.5 hidden sm:block" />
-
-                            {/* Gamification Button */}
-                            <button
-                                onClick={() => setShowGamification(!showGamification)}
-                                className={`hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-lg transition-all ${
-                                    showGamification
+                                    onClick={() => setShowGamification(!showGamification)}
+                                    className={`hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-lg transition-all ${showGamification
                                         ? 'bg-[#C8A288] text-white'
                                         : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30'
-                                }`}
-                                title="Progress & XP"
-                            >
-                                <Trophy className="h-5 w-5" />
-                                {gamificationData && (
-                                    <span className="text-xs font-bold tabular-nums">
-                                        {gamificationData.total_xp?.toLocaleString()} XP
-                                    </span>
-                                )}
-                            </button>
+                                        }`}
+                                    title="Progress & XP"
+                                >
+                                    <Trophy className="h-5 w-5" />
+                                    {gamificationData && (
+                                        <span className="text-xs font-bold tabular-nums">
+                                            {gamificationData.total_xp?.toLocaleString()} XP
+                                        </span>
+                                    )}
+                                </button>
 
-                            {/* Exit */}
-                            <button
-                                onClick={() => navigate('/dashboard')}
-                                className="p-2.5 rounded-lg text-[#8a6a5c]/50 hover:bg-red-50 hover:text-red-500 transition-colors ml-0.5"
-                                title="Back to Dashboard"
-                            >
-                                <LogOut className="h-5 w-5" />
-                            </button>
-                        </div>
-                    </div>
+                                {/* Documents Sidebar Toggle (Mobile) */}
+                                <button
+                                    onClick={() => setIsMobileDocsOpen(!isMobileDocsOpen)}
+                                    className={`md:hidden p-2.5 rounded-lg transition-colors ${isMobileDocsOpen ? 'bg-[#C8A288] text-white' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30'}`}
+                                    title="Documents"
+                                >
+                                    <PanelRight className="h-5 w-5" />
+                                </button>
 
-                    {/* Summary Content Area - positioned below header */}
-                    {showSummary && (
-                        <div className="absolute top-full left-4 right-4 md:left-auto md:right-4 md:w-96 mt-1 p-5 bg-white/95 backdrop-blur-xl rounded-2xl border border-[#E6D5CC] shadow-2xl animate-in slide-in-from-top-2 z-50">
-                            <div className="flex justify-between items-center mb-3">
-                                <h4 className="font-bold text-sm text-[#4A3B32] uppercase tracking-wide">
-                                    {selectedDocuments.length > 0 ? (selectedDocuments.length === 1 ? 'Document Summary' : 'Selection Summary') : 'Project Summary'}
-                                </h4>
-                                <div className="flex items-center gap-1">
-                                    <button
-                                        onClick={fetchSummary}
-                                        disabled={summaryLoading}
-                                        title="Regenerate Summary"
-                                        className="p-1.5 hover:bg-[#FDF6F0] rounded-full transition-colors disabled:opacity-50"
-                                    >
-                                        <RefreshCw className={`h-3.5 w-3.5 ${summaryLoading ? 'animate-spin' : ''}`} />
-                                    </button>
-                                    <button
-                                        onClick={() => setShowSummary(false)}
-                                        className="p-1.5 hover:bg-[#FDF6F0] rounded-full transition-colors"
-                                    >
-                                        <X className="h-3.5 w-3.5" />
-                                    </button>
-                                </div>
+                                {/* Exit */}
+                                <button
+                                    onClick={() => navigate('/dashboard')}
+                                    className="p-2.5 rounded-lg text-[#8a6a5c]/50 hover:bg-red-50 hover:text-red-500 transition-colors ml-0.5"
+                                    title="Back to Dashboard"
+                                >
+                                    <LogOut className="h-5 w-5" />
+                                </button>
                             </div>
-                            {summaryLoading ? (
-                                <div className="flex flex-col items-center justify-center py-12 gap-4">
-                                    <div className="relative">
-                                        <div className="h-16 w-16 border-4 border-[#E6D5CC] rounded-full"></div>
-                                        <div className="absolute inset-0 h-16 w-16 border-4 border-[#C8A288] rounded-full border-t-transparent animate-spin"></div>
-                                        <FileText className="absolute inset-0 m-auto h-6 w-6 text-[#C8A288]" />
-                                    </div>
-                                    <div className="text-center">
-                                        <p className="text-sm font-bold text-[#4A3B32]">Generating Summary</p>
-                                        <p className="text-xs text-[#8a6a5c] mt-1">Analyzing your documents...</p>
-                                    </div>
-                                    <div className="flex gap-1">
-                                        <div className="h-2 w-2 bg-[#C8A288] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                                        <div className="h-2 w-2 bg-[#C8A288] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                                        <div className="h-2 w-2 bg-[#C8A288] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="prose prose-sm max-w-none text-sm text-[#4A3B32] max-h-[60vh] overflow-y-auto overflow-x-auto pr-2 custom-scrollbar">
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{summaryContent}</ReactMarkdown>
-                                </div>
-                            )}
                         </div>
-                    )}
-                </div>
+
+                        {/* Summary Content Area - positioned below header */}
+                        {showSummary && (
+                            <div className="absolute top-full left-4 right-4 md:left-auto md:right-4 md:w-96 mt-1 p-5 bg-white/95 backdrop-blur-xl rounded-2xl border border-[#E6D5CC] shadow-2xl animate-in slide-in-from-top-2 z-50">
+                                <div className="flex justify-between items-center mb-3">
+                                    <h4 className="font-bold text-sm text-[#4A3B32] uppercase tracking-wide">
+                                        {selectedDocuments.length > 0 ? (selectedDocuments.length === 1 ? 'Document Summary' : 'Selection Summary') : 'Project Summary'}
+                                    </h4>
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            onClick={fetchSummary}
+                                            disabled={summaryLoading}
+                                            title="Regenerate Summary"
+                                            className="p-1.5 hover:bg-[#FDF6F0] rounded-full transition-colors disabled:opacity-50"
+                                        >
+                                            <RefreshCw className={`h-3.5 w-3.5 ${summaryLoading ? 'animate-spin' : ''}`} />
+                                        </button>
+                                        <button
+                                            onClick={() => setShowSummary(false)}
+                                            className="p-1.5 hover:bg-[#FDF6F0] rounded-full transition-colors"
+                                        >
+                                            <X className="h-3.5 w-3.5" />
+                                        </button>
+                                    </div>
+                                </div>
+                                {summaryLoading ? (
+                                    <div className="flex flex-col items-center justify-center py-12 gap-4">
+                                        <div className="relative">
+                                            <div className="h-16 w-16 border-4 border-[#E6D5CC] rounded-full"></div>
+                                            <div className="absolute inset-0 h-16 w-16 border-4 border-[#C8A288] rounded-full border-t-transparent animate-spin"></div>
+                                            <FileText className="absolute inset-0 m-auto h-6 w-6 text-[#C8A288]" />
+                                        </div>
+                                        <div className="text-center">
+                                            <p className="text-sm font-bold text-[#4A3B32]">Generating Summary</p>
+                                            <p className="text-xs text-[#8a6a5c] mt-1">Analyzing your documents...</p>
+                                        </div>
+                                        <div className="flex gap-1">
+                                            <div className="h-2 w-2 bg-[#C8A288] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                                            <div className="h-2 w-2 bg-[#C8A288] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                                            <div className="h-2 w-2 bg-[#C8A288] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="prose prose-sm max-w-none text-sm text-[#4A3B32] max-h-[60vh] overflow-y-auto overflow-x-auto pr-2 custom-scrollbar">
+                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{summaryContent}</ReactMarkdown>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 )}
 
                 {/* Zen Mode Floating Controls */}
@@ -1192,36 +1163,36 @@ const ProjectView = () => {
 
                                         {/* Regular message (no type or tool_command) */}
                                         {(!msg.type || msg.type === 'tool_command') && (
-                                        <div className={`max-w-[95%] md:max-w-[85%] break-words rounded-2xl px-4 py-3 md:px-6 md:py-4 ${msg.role === 'user'
-                                            ? 'bg-[#C8A288] text-white rounded-br-none'
-                                            : 'bg-[#FDF6F0] text-[#4A3B32] rounded-bl-none'
-                                            }`}>
-                                            {msg.content ? (
-                                                <div className={`text-sm leading-relaxed ${msg.role === 'assistant' ? 'prose prose-sm max-w-none overflow-x-auto prose-p:my-2 prose-headings:text-[#4A3B32] prose-a:text-[#C8A288]' : ''}`}>
-                                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                                        {msg.content}
-                                                    </ReactMarkdown>
-                                                </div>
-                                            ) : (
-                                                <Loader2 className="h-5 w-5 animate-spin text-[#8a6a5c]" />
-                                            )}
-
-                                            {/* Citations Rendering */}
-                                            {msg.sources && msg.sources.length > 0 && (
-                                                <div className="mt-4 pt-3 border-t border-black/10">
-                                                    <p className="text-xs font-bold mb-2 opacity-70 flex items-center gap-1">
-                                                        <BookOpen className="h-3 w-3" /> Sources:
-                                                    </p>
-                                                    <div className="flex flex-wrap gap-2">
-                                                        {msg.sources.map((source, i) => (
-                                                            <div key={i} className="text-xs bg-white/50 px-2 py-1 rounded border border-black/5 max-w-xs truncate cursor-help" title={source.chunk_text}>
-                                                                <span className="font-medium">{source.doc_name}</span>
-                                                            </div>
-                                                        ))}
+                                            <div className={`max-w-[95%] md:max-w-[85%] break-words rounded-2xl px-4 py-3 md:px-6 md:py-4 ${msg.role === 'user'
+                                                ? 'bg-[#C8A288] text-white rounded-br-none'
+                                                : 'bg-[#FDF6F0] text-[#4A3B32] rounded-bl-none'
+                                                }`}>
+                                                {msg.content ? (
+                                                    <div className={`text-sm leading-relaxed ${msg.role === 'assistant' ? 'prose prose-sm max-w-none overflow-x-auto prose-p:my-2 prose-headings:text-[#4A3B32] prose-a:text-[#C8A288]' : ''}`}>
+                                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                                            {msg.content}
+                                                        </ReactMarkdown>
                                                     </div>
-                                                </div>
-                                            )}
-                                        </div>
+                                                ) : (
+                                                    <Loader2 className="h-5 w-5 animate-spin text-[#8a6a5c]" />
+                                                )}
+
+                                                {/* Citations Rendering */}
+                                                {msg.sources && msg.sources.length > 0 && (
+                                                    <div className="mt-4 pt-3 border-t border-black/10">
+                                                        <p className="text-xs font-bold mb-2 opacity-70 flex items-center gap-1">
+                                                            <BookOpen className="h-3 w-3" /> Sources:
+                                                        </p>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {msg.sources.map((source, i) => (
+                                                                <div key={i} className="text-xs bg-white/50 px-2 py-1 rounded border border-black/5 max-w-xs truncate cursor-help" title={source.chunk_text}>
+                                                                    <span className="font-medium">{source.doc_name}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
                                 ))}
@@ -1326,7 +1297,7 @@ const ProjectView = () => {
                         />
                     )}
 
-{/* Q&A Generation View (Study Mode) */}
+                    {/* Q&A Generation View (Study Mode) */}
                     {activeTab === 'qa' && (
                         <QAView
                             projectId={projectId}
@@ -1354,7 +1325,7 @@ const ProjectView = () => {
                             onConsumePreGenerated={() => setPreGeneratedNotes(null)}
                         />
                     )}
-                    
+
                     {/* Flashcards View */}
                     {activeTab === 'flashcards' && (
                         <FlashcardsView
@@ -1363,7 +1334,7 @@ const ProjectView = () => {
                             selectedDocuments={selectedDocuments}
                         />
                     )}
-                    
+
                     {/* Mindmap View */}
                     {activeTab === 'mindmap' && (
                         <MindmapView
@@ -1372,7 +1343,7 @@ const ProjectView = () => {
                             selectedDocuments={selectedDocuments}
                         />
                     )}
-                    
+
                     {/* Study Dashboard View */}
                     {activeTab === 'study' && (
                         <StudyDashboard
@@ -1380,7 +1351,7 @@ const ProjectView = () => {
                             availableTopics={allProjectTopics}
                         />
                     )}
-                    
+
                     {/* Learning Path View */}
                     {activeTab === 'path' && (
                         <LearningPathView
@@ -1511,26 +1482,220 @@ const ProjectView = () => {
                 </div>
             </div>
 
-            {/* Upload Modal */}
-            {
-                showUploadModal && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowUploadModal(false)}>
-                        <div className="bg-white rounded-2xl p-8 max-w-2xl w-full mx-4" onClick={(e) => e.stopPropagation()}>
-                            <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-2xl font-bold text-[#4A3B32]">Upload Documents</h2>
+            {/* ===== RIGHT SIDEBAR — Document Management ===== */}
+            {!isSidebarHidden && (
+                <>
+                    {/* Mobile Overlay */}
+                    {isMobileDocsOpen && (
+                        <div
+                            className="fixed inset-0 bg-black/50 z-40 md:hidden"
+                            onClick={() => setIsMobileDocsOpen(false)}
+                        />
+                    )}
+                    <div className={`
+                    fixed inset-y-0 right-0 z-50 w-80 bg-[#FDF6F0]/98 backdrop-blur-xl border-l border-[#E6D5CC]/60 flex flex-col transition-all duration-300 ease-in-out
+                    md:translate-x-0 md:static md:shrink-0
+                    ${isRightCollapsed ? 'md:w-0 md:border-0 md:overflow-hidden md:p-0' : 'md:w-80'}
+                    ${isMobileDocsOpen ? 'translate-x-0' : 'translate-x-full'}
+                    shadow-2xl md:shadow-none
+                `}>
+                        {/* Right Sidebar Header */}
+                        <div className="shrink-0 px-5 py-4 border-b border-[#E6D5CC]/50 bg-gradient-to-br from-[#FDF6F0] to-white/80">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="h-8 w-8 bg-gradient-to-br from-[#C8A288] to-[#A08072] rounded-lg flex items-center justify-center text-white shadow-sm">
+                                        <FileText className="h-4 w-4" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-sm font-bold text-[#4A3B32] leading-tight">Documents</h3>
+                                        <p className="text-[10px] text-[#8a6a5c]">
+                                            {selectedDocuments.length > 0
+                                                ? `${selectedDocuments.length} of ${documents.length} selected`
+                                                : `${documents.length} document${documents.length !== 1 ? 's' : ''}`
+                                            }
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    {/* Collapse toggle (desktop) */}
+                                    <button
+                                        onClick={() => setIsRightCollapsed(!isRightCollapsed)}
+                                        className="hidden md:block p-1.5 hover:bg-[#E6D5CC]/40 rounded-lg text-[#8a6a5c] transition-colors"
+                                        title={isRightCollapsed ? 'Expand' : 'Collapse'}
+                                    >
+                                        <ChevronRight className="h-4 w-4" />
+                                    </button>
+                                    {/* Close (mobile) */}
+                                    <button
+                                        onClick={() => setIsMobileDocsOpen(false)}
+                                        className="md:hidden p-1.5 hover:bg-[#E6D5CC]/40 rounded-lg text-[#8a6a5c] transition-colors"
+                                    >
+                                        <X className="h-4 w-4" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Upload Section */}
+                        <div className="shrink-0 px-4 pt-3 pb-2">
+                            <button
+                                onClick={() => setShowRightSidebarUpload(!showRightSidebarUpload)}
+                                className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${showRightSidebarUpload
+                                    ? 'bg-[#E6D5CC] text-[#4A3B32] shadow-inner'
+                                    : 'bg-gradient-to-r from-[#C8A288] to-[#B08B72] text-white shadow-md hover:shadow-lg hover:scale-[1.02]'
+                                    }`}
+                            >
+                                <CloudUpload className="h-4 w-4" />
+                                {showRightSidebarUpload ? 'Hide Upload' : 'Upload Documents'}
+                            </button>
+
+                            {/* Inline Upload Zone */}
+                            {showRightSidebarUpload && (
+                                <div className="mt-3 animate-in slide-in-from-top-2 duration-200">
+                                    <UploadZone onFilesSelected={handleFileUpload} uploading={uploading} />
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Select All / Deselect All Controls */}
+                        {documents.length > 0 && (
+                            <div className="shrink-0 px-4 py-2 flex items-center gap-2 border-b border-[#E6D5CC]/30">
                                 <button
-                                    onClick={() => setShowUploadModal(false)}
-                                    className="text-[#8a6a5c] hover:text-[#4A3B32] p-2"
+                                    onClick={() => {
+                                        const readyDocs = documents.filter(d => d.upload_status === 'completed' || d.upload_status === 'ready');
+                                        setSelectedDocuments(readyDocs.map(d => d.id));
+                                    }}
+                                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#C8A288]/10 text-[#C8A288] hover:bg-[#C8A288]/20 transition-colors"
                                 >
-                                    <X className="h-6 w-6" />
+                                    <Eye className="h-3 w-3" />
+                                    Select All
+                                </button>
+                                <button
+                                    onClick={() => setSelectedDocuments([])}
+                                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#FDF6F0] text-[#8a6a5c] hover:bg-[#E6D5CC]/50 transition-colors"
+                                >
+                                    <EyeOff className="h-3 w-3" />
+                                    Deselect All
                                 </button>
                             </div>
+                        )}
 
-                            <UploadZone onFilesSelected={handleFileUpload} uploading={uploading} />
+                        {/* Document List */}
+                        <div className="flex-1 overflow-y-auto custom-scrollbar px-3 py-2 space-y-1.5">
+                            {/* Processing Banner */}
+                            {isProcessingDocs && (
+                                <div className="flex items-center gap-2.5 p-3 mb-2 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200/80">
+                                    <div className="relative shrink-0">
+                                        <div className="h-6 w-6 border-2 border-amber-300 rounded-full"></div>
+                                        <div className="absolute inset-0 h-6 w-6 border-2 border-amber-500 rounded-full border-t-transparent animate-spin"></div>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-bold text-amber-800">Processing...</p>
+                                        <p className="text-[10px] text-amber-600">Generating embeddings</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {documents.length > 0 ? (
+                                documents.map((doc) => {
+                                    const isSelected = selectedDocuments.includes(doc.id);
+                                    const isDeleting = deletingDocIds.has(doc.id);
+                                    const isProcessing = doc.upload_status === 'pending' || doc.upload_status === 'processing' || doc.upload_status === 'embedding' || doc.upload_status === 'queued';
+                                    const isReady = doc.upload_status === 'completed' || doc.upload_status === 'ready';
+                                    const isFailed = doc.upload_status === 'failed' || doc.upload_status === 'error';
+
+                                    return (
+                                        <div
+                                            key={doc.id}
+                                            className={`group relative flex items-start gap-2.5 p-3 rounded-xl cursor-pointer transition-all duration-200 ${isDeleting
+                                                ? 'opacity-40 pointer-events-none scale-95'
+                                                : isSelected
+                                                    ? 'bg-[#C8A288]/15 border border-[#C8A288]/40 shadow-sm'
+                                                    : 'bg-white/60 border border-transparent hover:bg-[#FDF6F0] hover:border-[#E6D5CC]/60'
+                                                }`}
+                                            onClick={() => {
+                                                if (isDeleting || !isReady) return;
+                                                // Toggle multi-select
+                                                setSelectedDocuments(prev =>
+                                                    prev.includes(doc.id)
+                                                        ? prev.filter(id => id !== doc.id)
+                                                        : [...prev, doc.id]
+                                                );
+                                            }}
+                                        >
+                                            {/* Checkbox */}
+                                            <div className={`shrink-0 mt-0.5 h-5 w-5 rounded-md border-2 flex items-center justify-center transition-all ${isSelected
+                                                ? 'bg-[#C8A288] border-[#C8A288] text-white shadow-sm'
+                                                : isReady
+                                                    ? 'border-[#d2bab0] group-hover:border-[#C8A288]'
+                                                    : 'border-[#E6D5CC] opacity-50'
+                                                }`}>
+                                                {isSelected && <Check className="h-3 w-3" />}
+                                            </div>
+
+                                            {/* Document Info */}
+                                            <div className="flex-1 min-w-0">
+                                                <p className={`text-sm font-medium truncate leading-tight ${isSelected ? 'text-[#4A3B32]' : 'text-[#5a4a42]'
+                                                    }`}>
+                                                    {doc.filename}
+                                                </p>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    {isProcessing && (
+                                                        <span className="flex items-center gap-1 text-[10px] text-amber-600 font-medium">
+                                                            <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                                                            Processing
+                                                        </span>
+                                                    )}
+                                                    {isReady && (
+                                                        <span className="flex items-center gap-1 text-[10px] text-emerald-600 font-medium">
+                                                            <div className="h-1.5 w-1.5 bg-emerald-500 rounded-full" />
+                                                            Ready
+                                                        </span>
+                                                    )}
+                                                    {isFailed && (
+                                                        <span className="flex items-center gap-1 text-[10px] text-red-500 font-medium">
+                                                            <div className="h-1.5 w-1.5 bg-red-500 rounded-full" />
+                                                            Failed
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Delete Button */}
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    requestDelete(doc);
+                                                }}
+                                                className="shrink-0 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-500 text-[#8a6a5c]/50 transition-all"
+                                                title="Delete document"
+                                            >
+                                                <Trash2 className="h-3.5 w-3.5" />
+                                            </button>
+                                        </div>
+                                    );
+                                })
+                            ) : (
+                                <div className="flex flex-col items-center justify-center py-12 text-center">
+                                    <div className="h-16 w-16 bg-[#E6D5CC]/30 rounded-2xl flex items-center justify-center mb-4">
+                                        <Upload className="h-7 w-7 text-[#C8A288]/60" />
+                                    </div>
+                                    <p className="text-sm font-medium text-[#8a6a5c]">No documents yet</p>
+                                    <p className="text-xs text-[#8a6a5c]/60 mt-1">Upload PDF, TXT, or DOCX files</p>
+                                    <button
+                                        onClick={() => setShowRightSidebarUpload(true)}
+                                        className="mt-4 px-4 py-2 bg-[#C8A288] text-white text-xs font-semibold rounded-lg hover:bg-[#B08B72] transition-colors shadow-sm"
+                                    >
+                                        Upload First Document
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
-                )
-            }
+                </>
+            )}
+
+
             {/* Delete Confirmation Modal */}
             {
                 deleteConfirmDoc && (
@@ -1604,47 +1769,7 @@ const ProjectView = () => {
                 </div>
             )}
 
-            {/* Documents Panel - Floating Panel */}
-            {showDocumentsPanel && (
-                <div className={`fixed ${leftCollapsed ? 'left-20 top-14' : 'left-4 md:left-80 top-14'} z-50 animate-in slide-in-from-left-4 w-[calc(100vw-2rem)] md:w-80`}>
-                    <div className="bg-white rounded-xl shadow-xl border border-[#E6D5CC] overflow-hidden">
-                        <div className="bg-gradient-to-br from-[#C8A288] to-[#A08072] p-4 text-white flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <FileText className="h-5 w-5" />
-                                <h3 className="font-bold">Documents</h3>
-                            </div>
-                            <button
-                                onClick={() => setShowDocumentsPanel(false)}
-                                className="p-1 hover:bg-white/20 rounded-lg transition-colors"
-                            >
-                                <X className="h-4 w-4" />
-                            </button>
-                        </div>
-                        <div className="p-3 max-h-[60vh] overflow-y-auto space-y-2">
-                            {documents.length > 0 ? (
-                                documents.map((doc) => (
-                                    <button
-                                        key={doc.id}
-                                        onClick={() => {
-                                            setSelectedDocuments([doc.id]);
-                                        }}
-                                        className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors text-left ${
-                                            selectedDocuments.includes(doc.id)
-                                                ? 'bg-[#C8A288] text-white'
-                                                : 'bg-[#FDF6F0] text-[#4A3B32] hover:bg-[#E6D5CC]'
-                                        }`}
-                                    >
-                                        <BookOpen className="h-5 w-5 shrink-0" />
-                                        <span className="truncate text-sm font-medium">{doc.filename}</span>
-                                    </button>
-                                ))
-                            ) : (
-                                <p className="text-center text-[#8a6a5c] py-4 text-sm">No documents uploaded</p>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
+
 
             {/* Gamification Panel — Floating Popup */}
             {showGamification && (
@@ -1657,11 +1782,11 @@ const ProjectView = () => {
             {showProfileMenu && (
                 <>
                     {/* Mobile: Full-screen overlay */}
-                    <div 
+                    <div
                         className="fixed inset-0 bg-black/50 z-[60] md:hidden"
                         onClick={() => setShowProfileMenu(false)}
                     />
-                    
+
                     {/* Profile Menu */}
                     <div className={`profile-dropdown fixed z-[70] animate-in duration-200 slide-in-from-bottom-4 md:slide-in-from-left-2 left-0 right-0 bottom-0 md:left-auto md:right-auto md:bottom-6 ${leftCollapsed ? 'md:left-24' : 'md:left-[340px]'}`}>
                         <div className="bg-white rounded-t-3xl md:rounded-xl shadow-xl border-t md:border border-[#E6D5CC] overflow-hidden min-w-[200px] max-w-full md:max-w-sm">
