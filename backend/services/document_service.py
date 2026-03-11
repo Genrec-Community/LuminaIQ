@@ -9,20 +9,22 @@ from services.embedding_service import embedding_service
 from services.qdrant_service import qdrant_service
 from utils.logger import logger
 from utils.embedding_queue import get_embedding_queue, EmbeddingJob, EmbeddingQueue
+from utils.progress_manager import get_progress_manager
 
 
 class DocumentService:
     """
-    Document processing service with global concurrency control.
+    Unified document processing service.
+
+    Handles the complete pipeline: extract → chunk → embed → topics → knowledge graph.
+    Emits real-time SSE progress events throughout processing.
 
     Features:
-    - Parallel processing of multiple documents
-    - GLOBAL concurrency limits prevent Qdrant timeouts
-    - Progress tracking per document
-    - Automatic retry on transient failures
-
-    Key fix: Uses shared semaphores across all documents to prevent
-    overwhelming Qdrant when multiple PDFs are uploaded together.
+    - Direct file processing (no external pdfprocess service)
+    - Parallel batch embedding with global concurrency control
+    - Real-time SSE progress for frontend
+    - Automatic temp file cleanup
+    - Retry with exponential backoff for transient failures
     """
 
     def __init__(self):
@@ -31,16 +33,22 @@ class DocumentService:
         self.text_chunker = TextChunker(
             chunk_size=settings.CHUNK_SIZE, overlap=settings.CHUNK_OVERLAP
         )
-        # Batch size - kept same as user requested
         self.batch_size = getattr(settings, "EMBEDDING_BATCH_SIZE", 100)
 
     async def process_document(
         self, document_id: str, project_id: str, file_path: str, filename: str
     ):
-        """Process uploaded document: extract text, chunk, embed, and store"""
+        """
+        Process uploaded document: extract text, chunk, embed, generate topics, build graph.
+
+        Emits SSE progress events at each stage for real-time frontend updates.
+        """
+        progress = get_progress_manager()
+
         try:
             # Update status to processing
             await self._update_document_status(document_id, "processing")
+            await progress.emit(document_id, "extracting", 0, "Extracting text...")
 
             loop = asyncio.get_running_loop()
 
@@ -57,13 +65,23 @@ class DocumentService:
                 await self._update_document_status(
                     document_id, "failed", "Failed to extract text"
                 )
+                await progress.emit(
+                    document_id, "failed", 0, "Failed to extract text from document"
+                )
                 return
+
+            await progress.emit(
+                document_id, "extracting", 100,
+                f"Extracted {len(text)} characters"
+            )
 
             # 2. Chunk text (Run in thread pool to avoid blocking)
             logger.info(f"Chunking text from {filename}")
             await self._update_document_status(
                 document_id, "processing", "Chunking text..."
             )
+            await progress.emit(document_id, "chunking", 0, "Splitting into chunks...")
+
             chunks = await loop.run_in_executor(
                 None, lambda: self.text_chunker.chunk_text(text)
             )
@@ -72,72 +90,122 @@ class DocumentService:
                 await self._update_document_status(
                     document_id, "failed", "No chunks generated"
                 )
+                await progress.emit(
+                    document_id, "failed", 0, "No chunks generated from text"
+                )
                 return
 
-            # 3. Create collection
+            await progress.emit(
+                document_id, "chunking", 100,
+                f"Generated {len(chunks)} chunks"
+            )
+
+            # 3. Create Qdrant collection
             collection_name = f"project_{project_id}"
             await qdrant_service.create_collection(collection_name)
 
-            # 4. Process embeddings with global limits
+            # 4. Process embeddings with global limits + progress
+            await progress.emit(
+                document_id, "embedding", 0,
+                f"Embedding {len(chunks)} chunks..."
+            )
             await self._process_embeddings_direct(
                 chunks, document_id, filename, collection_name
             )
 
-            # 5. Generate Topics (BEFORE marking as completed)
+            # 5. Generate Topics
             await self._update_document_status(
                 document_id, "processing", "Generating topics..."
+            )
+            await progress.emit(
+                document_id, "topics", 0, "Generating document topics..."
             )
             try:
                 from services.mcq_service import mcq_service
 
                 await mcq_service.generate_document_topics(project_id, document_id)
                 logger.info(f"Topics generated for {filename}")
+                await progress.emit(
+                    document_id, "topics", 100, "Topics generated"
+                )
             except Exception as topic_err:
                 logger.error(f"Failed to generate topics for {filename}: {topic_err}")
+                await progress.emit(
+                    document_id, "topics", 100, "Topic generation skipped"
+                )
 
-            # 5b. Auto-build knowledge graph from all project topics
+            # 6. Auto-build knowledge graph from all project topics
+            await progress.emit(
+                document_id, "graph", 0, "Building knowledge graph..."
+            )
             try:
                 from services.knowledge_graph_service import knowledge_graph
-                from db.client import get_supabase_client
 
                 docs = await async_db(
-                    lambda: get_supabase_client().table("documents")
+                    lambda: get_supabase_client()
+                    .table("documents")
                     .select("topics")
                     .eq("project_id", project_id)
                     .eq("upload_status", "completed")
                     .execute()
                 )
                 all_topics = []
-                for d in (docs.data or []):
+                for d in docs.data or []:
                     all_topics.extend(d.get("topics") or [])
-                
+
                 # Also include topics from the current doc (not yet marked completed)
                 current_doc = await async_db(
-                    lambda: get_supabase_client().table("documents")
+                    lambda: get_supabase_client()
+                    .table("documents")
                     .select("topics")
                     .eq("id", document_id)
                     .execute()
                 )
                 if current_doc.data:
                     all_topics.extend(current_doc.data[0].get("topics") or [])
-                
+
                 all_topics = list(set(all_topics))
                 if len(all_topics) >= 2:
-                    logger.info(f"Auto-building knowledge graph with {len(all_topics)} topics")
+                    logger.info(
+                        f"Auto-building knowledge graph with {len(all_topics)} topics"
+                    )
                     await knowledge_graph.build_graph_from_topics(
                         project_id, all_topics, force_rebuild=True
                     )
                     logger.info(f"Knowledge graph built for {filename}")
+                await progress.emit(
+                    document_id, "graph", 100, "Knowledge graph updated"
+                )
             except Exception as kg_err:
                 logger.error(f"Failed to build knowledge graph: {kg_err}")
+                await progress.emit(
+                    document_id, "graph", 100, "Knowledge graph skipped"
+                )
 
-            # 6. Update status to completed (ready)
+            # 7. Update status to completed
             await self._update_document_status(document_id, "completed")
+            await progress.emit(
+                document_id, "completed", 100, "Document processed successfully"
+            )
             logger.info(f"Document {filename} processed successfully")
 
         except Exception as e:
             logger.error(f"Error processing document {filename}: {str(e)}")
             await self._update_document_status(document_id, "failed", str(e))
+            await progress.emit(document_id, "failed", 0, str(e))
+
+        finally:
+            # Always clean up temp file
+            self._cleanup_temp_file(file_path)
+
+    def _cleanup_temp_file(self, file_path: str):
+        """Remove temporary file after processing"""
+        try:
+            if file_path and os.path.exists(file_path):
+                os.unlink(file_path)
+                logger.info(f"Cleaned up temp file: {file_path}")
+        except Exception as e:
+            logger.warning(f"Failed to clean up temp file {file_path}: {e}")
 
     async def _process_embeddings_direct(
         self, chunks: List[str], document_id: str, filename: str, collection_name: str
@@ -145,8 +213,10 @@ class DocumentService:
         """
         Process embeddings using GLOBAL concurrency limits.
 
-        This ensures multiple documents don't overwhelm Qdrant.
+        Emits SSE progress events after each batch for real-time frontend updates.
         """
+        progress = get_progress_manager()
+
         # Prepare batches
         batches = []
         for i in range(0, len(chunks), self.batch_size):
@@ -200,6 +270,14 @@ class DocumentService:
 
                     # Update progress
                     completed[0] += 1
+                    pct = int((completed[0] / total_batches) * 100)
+
+                    # Emit SSE progress every batch
+                    await progress.emit(
+                        document_id, "embedding", pct,
+                        f"Batch {completed[0]}/{total_batches}"
+                    )
+
                     if completed[0] % 5 == 0 or completed[0] == total_batches:
                         logger.info(
                             f"[{filename}] Progress: {completed[0]}/{total_batches} batches"
@@ -262,9 +340,10 @@ class DocumentService:
                 update_data["error_message"] = message
 
             await async_db(
-                lambda: self.client.table("documents").update(update_data).eq(
-                    "id", document_id
-                ).execute()
+                lambda: self.client.table("documents")
+                .update(update_data)
+                .eq("id", document_id)
+                .execute()
             )
 
         except Exception as e:
@@ -276,7 +355,10 @@ class DocumentService:
             collection_name = f"project_{project_id}"
             await qdrant_service.delete_vectors(collection_name, document_id)
             await async_db(
-                lambda: self.client.table("documents").delete().eq("id", document_id).execute()
+                lambda: self.client.table("documents")
+                .delete()
+                .eq("id", document_id)
+                .execute()
             )
             logger.info(f"Deleted document {document_id} from project {project_id}")
         except Exception as e:
@@ -287,10 +369,9 @@ class DocumentService:
         self, document_id: str, project_id: str, filename: str, chunks: List[str]
     ):
         """
-        Process chunks received directly from PDF service.
+        Process chunks received directly from PDF service (legacy webhook support).
 
-        Uses parallel processing with global concurrency limits.
-        All documents process simultaneously but share resource limits.
+        Kept for backward compatibility with existing pdfprocess deployments.
         """
         queue = get_embedding_queue()
 
@@ -321,12 +402,12 @@ class DocumentService:
                 collection_name = f"project_{project_id}"
                 await qdrant_service.create_collection(collection_name)
 
-                # Process embeddings with progress tracking
-                await self._process_embeddings_with_progress(
-                    chunks, document_id, filename, collection_name, job
+                # Process embeddings
+                await self._process_embeddings_direct(
+                    chunks, document_id, filename, collection_name
                 )
 
-                # Generate Topics (BEFORE marking as completed)
+                # Generate Topics
                 await self._update_document_status(
                     document_id, "embedding", "Generating topics..."
                 )
@@ -340,24 +421,25 @@ class DocumentService:
                         f"Failed to generate topics for {filename}: {topic_err}"
                     )
 
-                # Auto-build knowledge graph from all project topics
+                # Auto-build knowledge graph
                 try:
                     from services.knowledge_graph_service import knowledge_graph
-                    from db.client import get_supabase_client
 
                     docs = await async_db(
-                        lambda: get_supabase_client().table("documents")
+                        lambda: get_supabase_client()
+                        .table("documents")
                         .select("topics")
                         .eq("project_id", project_id)
                         .eq("upload_status", "completed")
                         .execute()
                     )
                     all_topics = []
-                    for d in (docs.data or []):
+                    for d in docs.data or []:
                         all_topics.extend(d.get("topics") or [])
 
                     current_doc = await async_db(
-                        lambda: get_supabase_client().table("documents")
+                        lambda: get_supabase_client()
+                        .table("documents")
                         .select("topics")
                         .eq("id", document_id)
                         .execute()
@@ -367,7 +449,9 @@ class DocumentService:
 
                     all_topics = list(set(all_topics))
                     if len(all_topics) >= 2:
-                        logger.info(f"Auto-building knowledge graph with {len(all_topics)} topics")
+                        logger.info(
+                            f"Auto-building knowledge graph with {len(all_topics)} topics"
+                        )
                         await knowledge_graph.build_graph_from_topics(
                             project_id, all_topics, force_rebuild=True
                         )
@@ -375,9 +459,11 @@ class DocumentService:
                 except Exception as kg_err:
                     logger.error(f"Failed to build knowledge graph: {kg_err}")
 
-                # Update status to completed (ready)
+                # Update status to completed
                 await self._update_document_status(document_id, "completed")
-                logger.info(f"Document {filename} embeddings completed successfully")
+                logger.info(
+                    f"Document {filename} embeddings completed successfully"
+                )
 
             except Exception as e:
                 logger.error(f"Error processing chunks for {filename}: {str(e)}")
@@ -392,128 +478,6 @@ class DocumentService:
             chunks=chunks,
             process_callback=process_job,
         )
-
-    async def _process_embeddings_with_progress(
-        self,
-        chunks: List[str],
-        document_id: str,
-        filename: str,
-        collection_name: str,
-        job: EmbeddingJob,
-    ):
-        """
-        Process embeddings with progress tracking using GLOBAL limits.
-
-        Key difference from before: Uses shared semaphores so multiple
-        documents don't overwhelm the database.
-        """
-        queue = get_embedding_queue()
-
-        # Prepare batches
-        batches = []
-        for i in range(0, len(chunks), self.batch_size):
-            batch_data = chunks[i : i + self.batch_size]
-            batches.append((i, batch_data))
-
-        total_batches = len(batches)
-        job.total_batches = total_batches
-
-        # Get GLOBAL semaphores
-        embed_semaphore = EmbeddingQueue.get_embed_semaphore()
-        db_semaphore = EmbeddingQueue.get_db_semaphore()
-
-        logger.info(
-            f"[{filename}] Starting embedding: {len(chunks)} chunks, "
-            f"{total_batches} batches (global limits active)"
-        )
-
-        completed = [0]
-        failed_batches = []
-
-        async def process_batch(
-            batch_idx: int, start_index: int, batch_data: List[str]
-        ):
-            retries = 3
-            for attempt in range(retries):
-                try:
-                    # Use GLOBAL embedding semaphore
-                    async with embed_semaphore:
-                        batch_embeddings = await embedding_service.generate_embeddings(
-                            batch_data
-                        )
-
-                    # Prepare metadata
-                    batch_metadata = [
-                        {
-                            "document_id": document_id,
-                            "document_name": filename,
-                            "chunk_id": start_index + k,
-                        }
-                        for k in range(len(batch_data))
-                    ]
-
-                    # Use GLOBAL DB semaphore
-                    async with db_semaphore:
-                        await qdrant_service.upsert_chunks(
-                            collection_name=collection_name,
-                            chunks=batch_data,
-                            embeddings=batch_embeddings,
-                            metadata=batch_metadata,
-                        )
-
-                    # Update progress
-                    completed[0] += 1
-                    queue.update_job_progress(job.job_id, completed[0], total_batches)
-
-                    if completed[0] % 5 == 0 or completed[0] == total_batches:
-                        progress_pct = int((completed[0] / total_batches) * 100)
-                        logger.info(
-                            f"[{filename}] Progress: {completed[0]}/{total_batches} ({progress_pct}%)"
-                        )
-                    return
-
-                except Exception as e:
-                    error_str = str(e).lower()
-                    is_retryable = any(
-                        x in error_str
-                        for x in [
-                            "429",
-                            "too many requests",
-                            "timeout",
-                            "timed out",
-                            "connection",
-                            "temporary",
-                            "unavailable",
-                        ]
-                    )
-
-                    if is_retryable and attempt < retries - 1:
-                        wait_time = (2**attempt) + (0.1 * (batch_idx % 5))
-                        logger.warning(
-                            f"[{filename}] Batch {batch_idx + 1} retry {attempt + 1}/{retries} "
-                            f"in {wait_time:.1f}s"
-                        )
-                        await asyncio.sleep(wait_time)
-                        continue
-
-                    logger.error(f"[{filename}] Batch {batch_idx + 1} error: {e}")
-                    if attempt == retries - 1:
-                        failed_batches.append(batch_idx)
-                        return
-
-        # Run all batches - global semaphores control actual concurrency
-        tasks = [
-            process_batch(idx, start_idx, batch)
-            for idx, (start_idx, batch) in enumerate(batches)
-        ]
-        await asyncio.gather(*tasks)
-
-        if failed_batches:
-            error_msg = f"{len(failed_batches)} batches failed"
-            logger.error(f"[{filename}] {error_msg}")
-            raise Exception(error_msg)
-
-        logger.info(f"[{filename}] Embedding completed: {total_batches} batches")
 
 
 document_service = DocumentService()

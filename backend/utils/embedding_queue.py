@@ -35,6 +35,7 @@ class EmbeddingJob:
     project_id: str
     filename: str
     chunks: List[str]
+    user_id: str = ""  # Track which user owns this job for fairness
     status: JobStatus = JobStatus.PENDING
     position: int = 0
     total_in_queue: int = 0
@@ -79,6 +80,8 @@ class EmbeddingQueue:
         self._lock = asyncio.Lock()
         self._active_tasks: Dict[str, asyncio.Task] = {}  # job_id -> task
         self._ensure_semaphores()
+        # Auto-cleanup stale jobs from previous runs
+        self.cleanup_old_jobs(max_age_hours=1)
 
     def _ensure_semaphores(self):
         """Create semaphores if not already created"""
@@ -136,6 +139,7 @@ class EmbeddingQueue:
         filename: str,
         chunks: List[str],
         process_callback: Callable[[EmbeddingJob], Any],
+        user_id: str = "",
     ) -> str:
         """
         Add a document and start processing immediately.
@@ -160,6 +164,7 @@ class EmbeddingQueue:
                 project_id=project_id,
                 filename=filename,
                 chunks=chunks,
+                user_id=user_id,
                 position=0,
                 total_in_queue=1,
             )

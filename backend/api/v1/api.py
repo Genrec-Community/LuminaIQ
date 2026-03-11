@@ -13,6 +13,7 @@ from api.v1.endpoints import (
     user_data,
     flashcards,
     mindmaps,
+    progress,
 )
 
 api_router = APIRouter()
@@ -30,3 +31,4 @@ api_router.include_router(knowledge_graph.router, prefix="/knowledge-graph", tag
 api_router.include_router(user_data.router, prefix="/user-data", tags=["user-data"])
 api_router.include_router(flashcards.router, prefix="/flashcards", tags=["flashcards"])
 api_router.include_router(mindmaps.router, prefix="/mindmaps", tags=["mindmaps"])
+api_router.include_router(progress.router, prefix="/progress", tags=["progress"])

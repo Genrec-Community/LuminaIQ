@@ -34,7 +34,7 @@ class Settings(BaseSettings):
 
     UPLOAD_DIR: str = "./uploads"
     MAX_FILE_SIZE: int = 10485760  # 10MB
-    ALLOWED_EXTENSIONS: List[str] = ["pdf", "docx", "txt"]
+    ALLOWED_EXTENSIONS: List[str] = ["pdf", "docx", "txt", "html", "md"]
 
     CHUNK_SIZE: int = 800  # Larger chunks = fewer API calls
     CHUNK_OVERLAP: int = 100  # Better context continuity

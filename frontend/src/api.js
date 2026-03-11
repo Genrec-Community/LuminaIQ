@@ -806,3 +806,53 @@ export const generateFlashcardsWithAI = async (projectId, topic, numCards = 10, 
     return response.data;
 };
 
+// ============== Real-Time Document Progress (SSE) ==============
+
+/**
+ * Subscribe to real-time document processing progress via Server-Sent Events.
+ *
+ * @param {string} documentId - The document ID to watch
+ * @param {function} onEvent - Callback for each progress event
+ *   Receives: { stage: string, progress: number, message: string, timestamp: string }
+ *   Stages: extracting → chunking → embedding → topics → graph → completed | failed
+ * @param {function} onError - Optional error callback
+ * @returns {function} cleanup - Call this to close the SSE connection
+ *
+ * Usage:
+ *   const cleanup = subscribeDocumentProgress(docId, (event) => {
+ *     setProgressStage(event.stage);
+ *     setProgressPercent(event.progress);
+ *   });
+ *   // Later: cleanup();
+ */
+export const subscribeDocumentProgress = (documentId, onEvent, onError = null) => {
+    const token = localStorage.getItem('token');
+    const url = `${API_URL}/progress/${documentId}?token=${encodeURIComponent(token)}`;
+
+    const eventSource = new EventSource(url);
+
+    eventSource.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            onEvent(data);
+
+            // Auto-close on terminal events
+            if (data.stage === 'completed' || data.stage === 'failed') {
+                eventSource.close();
+            }
+        } catch (e) {
+            console.warn('Failed to parse SSE event:', e);
+        }
+    };
+
+    eventSource.onerror = (err) => {
+        console.error('SSE connection error:', err);
+        if (onError) onError(err);
+        eventSource.close();
+    };
+
+    // Return cleanup function
+    return () => {
+        eventSource.close();
+    };
+};

@@ -32,20 +32,35 @@ class QdrantService:
     MAX_RETRIES = 3
     RETRY_BASE_DELAY = 1.0  # seconds
 
+    # Connection pool and timeout settings for multi-user load
+    ASYNC_TIMEOUT = 120        # Longer timeout for batch embedding upserts
+    SYNC_TIMEOUT = 30          # Shorter timeout for search queries (user-facing)
+    GRPC_OPTIONS = {
+        "grpc.max_send_message_length": 64 * 1024 * 1024,   # 64MB
+        "grpc.max_receive_message_length": 64 * 1024 * 1024, # 64MB
+        "grpc.keepalive_time_ms": 30000,                     # 30s keepalive
+        "grpc.keepalive_timeout_ms": 10000,                   # 10s timeout
+    }
+
     def __init__(self):
         # Async client for all direct operations — does NOT block the event loop
         self.async_client = AsyncQdrantClient(
             url=settings.QDRANT_URL,
             api_key=settings.QDRANT_API_KEY,
-            timeout=120,
+            timeout=self.ASYNC_TIMEOUT,
+            grpc_options=self.GRPC_OPTIONS,
         )
         # Sync client kept ONLY for LangChain QdrantVectorStore compatibility
         self._sync_client = QdrantClient(
             url=settings.QDRANT_URL,
             api_key=settings.QDRANT_API_KEY,
-            timeout=60,
+            timeout=self.SYNC_TIMEOUT,
+            grpc_options=self.GRPC_OPTIONS,
         )
-        logger.info("[QdrantService] Initialized with AsyncQdrantClient (non-blocking)")
+        logger.info(
+            f"[QdrantService] Initialized with AsyncQdrantClient | "
+            f"async_timeout={self.ASYNC_TIMEOUT}s, sync_timeout={self.SYNC_TIMEOUT}s"
+        )
 
     async def create_collection(self, collection_name: str, vector_size: int = settings.EMBEDDING_DIMENSION):
         """Create a new collection and ensure indexes exist (fully async)"""
