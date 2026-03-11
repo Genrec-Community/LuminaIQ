@@ -1,6 +1,7 @@
 import os
 import asyncio
 from typing import Optional, List
+from concurrent.futures import ThreadPoolExecutor
 from db.client import get_supabase_client, async_db
 from config.settings import settings
 from utils.file_parser import FileParser
@@ -34,6 +35,11 @@ class DocumentService:
             chunk_size=settings.CHUNK_SIZE, overlap=settings.CHUNK_OVERLAP
         )
         self.batch_size = getattr(settings, "EMBEDDING_BATCH_SIZE", 100)
+        # Dedicated thread pool for CPU-heavy file extraction
+        # Prevents extraction from competing with embedding API calls for threads
+        self._extraction_executor = ThreadPoolExecutor(
+            max_workers=3, thread_name_prefix="file_extract"
+        )
 
     async def process_document(
         self, document_id: str, project_id: str, file_path: str, filename: str
@@ -46,19 +52,57 @@ class DocumentService:
         progress = get_progress_manager()
 
         try:
+            # Gate with doc_semaphore: max 3 docs process the heavy pipeline concurrently.
+            # Additional uploads wait here until a slot opens.
+            doc_semaphore = EmbeddingQueue.get_doc_semaphore()
+
+            # Notify frontend if doc is queued (semaphore full)
+            if doc_semaphore.locked():
+                await progress.emit(
+                    document_id, "queued", 0,
+                    "Waiting for other documents to finish..."
+                )
+                await self._update_document_status(
+                    document_id, "queued", "Waiting for processing slot..."
+                )
+                logger.info(f"[{filename}] Queued — waiting for doc_semaphore slot")
+
+            async with doc_semaphore:
+                await self._run_pipeline(
+                    document_id, project_id, file_path, filename, progress
+                )
+
+        except Exception as e:
+            logger.error(f"Error processing document {filename}: {str(e)}")
+            await self._update_document_status(document_id, "failed", str(e))
+            await progress.emit(document_id, "failed", 0, str(e))
+
+        finally:
+            # Always clean up temp file
+            self._cleanup_temp_file(file_path)
+
+    async def _run_pipeline(
+        self, document_id: str, project_id: str, file_path: str,
+        filename: str, progress
+    ):
+        """
+        The actual processing pipeline, called inside doc_semaphore.
+        Separated so the semaphore scope is clear.
+        """
+        try:
             # Update status to processing
             await self._update_document_status(document_id, "processing")
             await progress.emit(document_id, "extracting", 0, "Extracting text...")
 
             loop = asyncio.get_running_loop()
 
-            # 1. Extract text (Run in thread pool to avoid blocking)
+            # 1. Extract text (dedicated thread pool to avoid starving other executors)
             logger.info(f"Extracting text from {filename}")
             await self._update_document_status(
                 document_id, "processing", "Extracting text..."
             )
             text = await loop.run_in_executor(
-                None, self.file_parser.extract_text, file_path
+                self._extraction_executor, self.file_parser.extract_text, file_path
             )
 
             if not text:
@@ -113,17 +157,19 @@ class DocumentService:
                 chunks, document_id, filename, collection_name
             )
 
-            # 5. Generate Topics
+            # 5. Generate Topics (LLM-gated: max 2 concurrent LLM calls)
             await self._update_document_status(
                 document_id, "processing", "Generating topics..."
             )
             await progress.emit(
                 document_id, "topics", 0, "Generating document topics..."
             )
+            llm_semaphore = EmbeddingQueue.get_llm_semaphore()
             try:
                 from services.mcq_service import mcq_service
 
-                await mcq_service.generate_document_topics(project_id, document_id)
+                async with llm_semaphore:
+                    await mcq_service.generate_document_topics(project_id, document_id)
                 logger.info(f"Topics generated for {filename}")
                 await progress.emit(
                     document_id, "topics", 100, "Topics generated"
@@ -169,9 +215,10 @@ class DocumentService:
                     logger.info(
                         f"Auto-building knowledge graph with {len(all_topics)} topics"
                     )
-                    await knowledge_graph.build_graph_from_topics(
-                        project_id, all_topics, force_rebuild=True
-                    )
+                    async with llm_semaphore:
+                        await knowledge_graph.build_graph_from_topics(
+                            project_id, all_topics, force_rebuild=True
+                        )
                     logger.info(f"Knowledge graph built for {filename}")
                 await progress.emit(
                     document_id, "graph", 100, "Knowledge graph updated"
@@ -190,13 +237,9 @@ class DocumentService:
             logger.info(f"Document {filename} processed successfully")
 
         except Exception as e:
-            logger.error(f"Error processing document {filename}: {str(e)}")
+            logger.error(f"Error in pipeline for {filename}: {str(e)}")
             await self._update_document_status(document_id, "failed", str(e))
             await progress.emit(document_id, "failed", 0, str(e))
-
-        finally:
-            # Always clean up temp file
-            self._cleanup_temp_file(file_path)
 
     def _cleanup_temp_file(self, file_path: str):
         """Remove temporary file after processing"""

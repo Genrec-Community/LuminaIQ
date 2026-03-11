@@ -1,4 +1,5 @@
 import os
+import asyncio
 import tempfile
 from typing import List, Optional
 from fastapi import (
@@ -6,7 +7,6 @@ from fastapi import (
     UploadFile,
     File,
     HTTPException,
-    BackgroundTasks,
     Depends,
     Form,
     status,
@@ -41,7 +41,6 @@ class SearchResult(BaseModel):
 
 @router.post("/upload", response_model=DocumentUploadResponse)
 async def upload_document(
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     project_id: str = Form(...),
     current_user: dict = Depends(get_current_user),
@@ -125,13 +124,16 @@ async def upload_document(
         document = response.data[0]
         document_id = document["id"]
 
-        # 4. Start background processing (extract → chunk → embed → topics → graph)
-        background_tasks.add_task(
-            document_service.process_document,
-            document_id=document_id,
-            project_id=project_id,
-            file_path=temp_path,
-            filename=file.filename,
+        # 4. Start CONCURRENT background processing (asyncio.create_task = truly parallel)
+        # This is the key fix: background_tasks.add_task() runs SERIALLY in Starlette,
+        # but asyncio.create_task() creates a truly concurrent coroutine.
+        asyncio.create_task(
+            document_service.process_document(
+                document_id=document_id,
+                project_id=project_id,
+                file_path=temp_path,
+                filename=file.filename,
+            )
         )
 
         logger.info(

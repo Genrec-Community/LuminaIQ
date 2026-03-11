@@ -386,6 +386,7 @@ Here are the introductions/beginnings of the documents in this project:
 
 Please provide a concise and engaging collaborative summary of what these documents are about.
 Highlight the main topics and key themes.
+IMPORTANT: Format the output using standard Markdown. Do NOT use any HTML tags like <br>. Use standard newline characters (\\n) for spacing and line breaks.
 """
             messages = [HumanMessage(content=prompt)]
 
@@ -396,7 +397,8 @@ Highlight the main topics and key themes.
             response = await retry_with_backoff(
                 invoke_llm, max_retries=3, base_delay=1.5
             )
-            summary_text = response.content
+            # Remove any stray HTML break tags the LLM might have still generated
+            summary_text = response.content.replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
 
             # 3. Store in DB only for full project summaries
             if not selected_documents:
