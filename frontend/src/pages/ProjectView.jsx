@@ -75,7 +75,6 @@ import NotesView from '../components/views/NotesView';
 import StudyDashboard from '../components/views/StudyDashboard';
 import LearningPathView from '../components/views/LearningPathView';
 import AdvancedAnalytics from '../components/views/AdvancedAnalytics';
-import ExamPrepMode from '../components/views/ExamPrepMode';
 import KnowledgeGraphView from '../components/views/KnowledgeGraphView';
 import TopicMindmap from '../components/views/TopicMindmap';
 import TopicFlashcards from '../components/views/TopicFlashcards';
@@ -308,7 +307,7 @@ const ProjectView = () => {
     };
 
     useEffect(() => {
-        if (activeTab === 'chat' || activeTab === 'quiz' || activeTab === 'qa' || activeTab === 'notes' || activeTab === 'path' || activeTab === 'exam') {
+        if (activeTab === 'chat' || activeTab === 'quiz' || activeTab === 'qa' || activeTab === 'notes' || activeTab === 'path') {
             fetchTopics();
         }
     }, [activeTab, projectId]);
@@ -894,7 +893,6 @@ const ProjectView = () => {
                                 )}
                             </div>
 
-                            <NavItem id="exam" icon={GraduationCap} label="Exam Prep" />
                             <NavItem id="knowledge" icon={Network} label="Knowledge Graph" />
 
 
@@ -956,7 +954,6 @@ const ProjectView = () => {
                                     {activeTab === 'path' && 'Learning Path'}
                                     {activeTab === 'study' && 'Study'}
                                     {activeTab === 'analytics' && 'Analytics'}
-                                    {activeTab === 'exam' && 'Exam Prep'}
                                     {activeTab === 'knowledge' && 'Knowledge Graph'}
                                 </h2>
 
@@ -1442,21 +1439,6 @@ const ProjectView = () => {
                             documents={documents}
                             selectedDocuments={selectedDocuments}
                             documentTopics={documentTopics}
-                        />
-                    )}
-
-                    {/* Exam Prep Mode View */}
-                    {activeTab === 'exam' && (
-                        <ExamPrepMode
-                            projectId={projectId}
-                            documents={documents}
-                            selectedDocuments={selectedDocuments}
-                            topics={availableTopics}
-                            onStartQuiz={(topic, mode) => {
-                                setPreSelectedTopic(topic);
-                                setPreSelectedQuizMode(mode || 'both');
-                                setActiveTab('quiz');
-                            }}
                         />
                     )}
 

@@ -611,28 +611,6 @@ export const recordStudyActivity = async (projectId, activityType, meta = null) 
     return response.data;
 };
 
-// --- Exams ---
-export const getExams = async (projectId) => {
-    const response = await api.get(`/user-data/exams/${projectId}`);
-    return response.data;
-};
-
-export const saveExam = async (projectId, name, examDate, topics = [], difficulty = 'medium') => {
-    const response = await api.post('/user-data/exams', {
-        project_id: projectId,
-        name,
-        exam_date: examDate,
-        topics,
-        difficulty,
-    });
-    return response.data;
-};
-
-export const deleteExam = async (examId) => {
-    const response = await api.delete(`/user-data/exams/${examId}`);
-    return response.data;
-};
-
 // --- Learning Progress ---
 export const getLearningProgress = async (projectId) => {
     const response = await api.get(`/user-data/progress/${projectId}`);
