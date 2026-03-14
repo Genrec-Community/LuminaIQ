@@ -99,6 +99,13 @@ export const getDocuments = async (projectId) => {
     return response.data;
 };
 
+export const getDocumentUrl = async (projectId, documentId) => {
+    const response = await api.get(`/documents/${documentId}/url`, { 
+        params: { project_id: projectId } 
+    });
+    return response.data;
+};
+
 export const getChatHistory = async (projectId) => {
     const response = await api.get(`/chat/history/${projectId}`);
     return response.data;

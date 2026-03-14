@@ -4,6 +4,7 @@ import { Plus, Search, BookOpen, MoreVertical, Calendar, ArrowRight, LogOut, Upl
 import { createProject, uploadDocument, getProjects, deleteProject } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { getRotatingLoadingMessage } from '../utils/LoadingMessages';
 
 const Dashboard = () => {
     const navigate = useNavigate();
@@ -20,8 +21,19 @@ const Dashboard = () => {
     // Delete Modal State
     const [deleteTargetId, setDeleteTargetId] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
 
     const fileInputRef = useRef(null);
+
+    useEffect(() => {
+        let interval;
+        if (isCreating) {
+            interval = setInterval(() => {
+                setLoadingMsgIdx(i => i + 1);
+            }, 5000);
+        }
+        return () => clearInterval(interval);
+    }, [isCreating]);
 
     useEffect(() => {
         fetchProjects();
@@ -362,9 +374,15 @@ const Dashboard = () => {
                             ) : (
                                 <div className="space-y-4">
                                     <div className="text-center py-4">
-                                        <Loader2 className="h-8 w-8 animate-spin text-[#C8A288] mx-auto mb-2" />
-                                        <h4 className="font-bold text-lg">Creating Project...</h4>
-                                        <p className="text-sm text-[#8a6a5c]">Please wait while we process your documents.</p>
+                                        <div className="relative w-16 h-16 mx-auto mb-4">
+                                            <div className="absolute inset-0 border-4 border-[#E6D5CC] rounded-full"></div>
+                                            <div className="absolute inset-0 border-4 border-[#C8A288] rounded-full border-t-transparent animate-spin"></div>
+                                            <BookOpen className="absolute inset-0 m-auto h-6 w-6 text-[#C8A288] animate-pulse" />
+                                        </div>
+                                        <h4 className="font-bold tracking-tight text-lg text-[#C8A288] mb-1">Synthesizing Project</h4>
+                                        <p className="text-sm font-medium italic text-[#4A3B32] whitespace-pre-line leading-relaxed transition-opacity duration-300 min-h-[40px]">
+                                            {getRotatingLoadingMessage(loadingMsgIdx)}
+                                        </p>
                                     </div>
 
                                     <div className="max-h-60 overflow-y-auto space-y-2 border-t border-[#E6D5CC] pt-4">

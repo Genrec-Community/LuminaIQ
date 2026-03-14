@@ -58,15 +58,18 @@ import {
     getLearningProgress,
     saveLearningProgress,
     generateMindmap,
-    generateFlashcardsWithAI
+    generateFlashcardsWithAI,
+    getDocumentUrl
 } from '../api';
 import { useToast } from '../context/ToastContext';
 import { useSettings } from '../context/SettingsContext';
 import { useGamification } from '../context/GamificationContext';
 import { recordActivity } from '../utils/studyActivity';
+import { supabase } from '../supabaseClient';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import UploadZone from '../components/UploadZone';
+import { getRotatingLoadingMessage, getRandomLoadingMessage } from '../utils/LoadingMessages';
 
 // View Components
 import QuizView from '../components/views/QuizView';
@@ -91,7 +94,8 @@ import GamificationPanel from '../components/GamificationPanel';
 
 // Chat Agentic Components
 import { CommandPicker, CommandParamForm } from '../components/chat/ChatCommands';
-import { ToolLoadingCard, ToolResultCard, ToolErrorCard } from '../components/chat/ToolResultCard';
+import PDFViewer from '../components/chat/PDFViewer';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 const ProjectView = () => {
     const { projectId } = useParams();
@@ -101,7 +105,7 @@ const ProjectView = () => {
     const { data: gamificationData } = useGamification();
     const [showGamification, setShowGamification] = useState(false);
     const [activeTab, setActiveTab] = useState(() => {
-        return sessionStorage.getItem(`lumina_tab_${projectId}`) || 'chat';
+        return sessionStorage.getItem(`lumina_tab_${projectId}`) || 'path';
     });
     const [messages, setMessages] = useState([]);
     const messagesEndRef = useRef(null);
@@ -141,6 +145,7 @@ const ProjectView = () => {
     const [inputMessage, setInputMessage] = useState('');
     const [documents, setDocuments] = useState([]);
     const [selectedDocuments, setSelectedDocuments] = useState([]);
+    const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
     const [deleteConfirmDoc, setDeleteConfirmDoc] = useState(null);
     const [deletingDocIds, setDeletingDocIds] = useState(new Set());
     const [loading, setLoading] = useState(false);
@@ -203,6 +208,9 @@ const ProjectView = () => {
         loadProgress();
     }, [projectId]);
 
+    // PDF Viewer State
+    const [activePDF, setActivePDF] = useState(null);
+
     // Quiz/Q&A Active State (hides sidebars during generation/active)
     const [isQuizActive, setIsQuizActive] = useState(false);
     const [isQAActive, setIsQAActive] = useState(false);
@@ -225,6 +233,10 @@ const ProjectView = () => {
     useEffect(() => {
         let intervalId;
         let timeoutId;
+        
+        const rotationInterval = setInterval(() => {
+            setLoadingMsgIdx(i => i + 1);
+        }, 3000); // Changed to 3 seconds based on request
 
         // Helper to check if any document is still processing
         const isAnyDocProcessing = (docs) => {
@@ -276,10 +288,15 @@ const ProjectView = () => {
             const data = await fetchDocuments();
             if (data && data.documents) {
                 const processing = isAnyDocProcessing(data.documents);
-                setIsProcessingDocs(processing);
-
-                // Don't stop polling - we need to detect new uploads too
-                // Just update the state
+                
+                // If it JUST finished processing, we need to fetch topics right away
+                setIsProcessingDocs((prevProcessing) => {
+                    if (prevProcessing && !processing) {
+                        // It was processing, now it's not -> fetch topics!
+                        fetchTopics();
+                    }
+                    return processing;
+                });
             }
         }, 2000); // Reduced to 2 seconds for faster response
 
@@ -287,10 +304,12 @@ const ProjectView = () => {
         timeoutId = setTimeout(() => {
             clearInterval(intervalId);
             setIsProcessingDocs(false);
+            fetchTopics();
         }, 120000); // 2 minutes
 
         return () => {
             clearInterval(intervalId);
+            clearInterval(rotationInterval);
             clearTimeout(timeoutId);
         };
     }, [projectId]);
@@ -307,10 +326,10 @@ const ProjectView = () => {
     };
 
     useEffect(() => {
-        if (activeTab === 'chat' || activeTab === 'quiz' || activeTab === 'qa' || activeTab === 'notes' || activeTab === 'path') {
+        if (!isProcessingDocs && (activeTab === 'chat' || activeTab === 'quiz' || activeTab === 'qa' || activeTab === 'notes' || activeTab === 'path')) {
             fetchTopics();
         }
-    }, [activeTab, projectId]);
+    }, [activeTab, projectId, isProcessingDocs]);
 
     const fetchTopics = async () => {
         try {
@@ -748,15 +767,42 @@ const ProjectView = () => {
         </button>
     );
 
+    const handleOpenSource = async (source) => {
+        if (!source.doc_id) return;
+        const doc = documents.find(d => d.id === source.doc_id || d.filename === source.doc_name);
+        // Fallback to source.doc_name directly if not found in current documents list
+        const filename = doc ? doc.filename : source.doc_name;
+        
+        try {
+            toast.info(`Loading document: ${filename}`);
+            const { url } = await getDocumentUrl(projectId, source.doc_id);
+            
+            setActivePDF({
+                url: url,
+                title: filename,
+                highlightText: source.chunk_text,
+                initialPage: source.page || 1
+            });
+        } catch (error) {
+            console.error("Failed to generate or fetch document URL", error);
+            toast.error("Could not load the document. It may have been deleted or there is an issue with the server.");
+        }
+    };
+
     if (projectViewLoading) {
         return (
-            <div className="min-h-screen bg-[#FDF6F0] flex flex-col items-center justify-center">
-                <div className="relative w-24 h-24">
+            <div className="min-h-screen bg-[#FDF6F0] flex flex-col items-center justify-center p-6 text-center">
+                <div className="relative w-24 h-24 mb-6">
                     <div className="absolute inset-0 border-4 border-[#E6D5CC] rounded-full"></div>
                     <div className="absolute inset-0 border-4 border-[#C8A288] rounded-full border-t-transparent animate-spin"></div>
                     <BookOpen className="absolute inset-0 m-auto h-8 w-8 text-[#C8A288] animate-pulse" />
                 </div>
-                <p className="mt-6 text-[#4A3B32] font-medium animate-pulse">Opening Project...</p>
+                <h3 className="text-[#C8A288] font-bold uppercase tracking-widest text-xs mb-3">
+                    Opening Project
+                </h3>
+                <p className="text-[#4A3B32] font-medium italic whitespace-pre-line leading-relaxed text-sm max-w-lg transition-opacity duration-300">
+                    {getRotatingLoadingMessage(loadingMsgIdx)}
+                </p>
             </div>
         );
     }
@@ -1144,7 +1190,17 @@ const ProjectView = () => {
 
                     {/* Chat View */}
                     {activeTab === 'chat' && (
-                        <div className="h-full flex flex-col">
+                        <div className="h-full flex flex-col relative">
+                            {activePDF && (
+                                <ErrorBoundary>
+                                    <PDFViewer
+                                        url={activePDF.url}
+                                        title={activePDF.title}
+                                        highlightText={activePDF.highlightText}
+                                        onClose={() => setActivePDF(null)}
+                                    />
+                                </ErrorBoundary>
+                            )}
                             <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-4 md:p-6 space-y-6">
                                 {messages.map((msg, idx) => (
                                     <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
@@ -1180,7 +1236,28 @@ const ProjectView = () => {
                                                 }`}>
                                                 {msg.content ? (
                                                     <div className={`text-sm leading-relaxed ${msg.role === 'assistant' ? 'prose prose-sm max-w-none overflow-x-auto prose-p:my-2 prose-headings:text-[#4A3B32] prose-a:text-[#C8A288]' : ''}`}>
-                                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                                        <ReactMarkdown 
+                                                            remarkPlugins={[remarkGfm]}
+                                                            components={{
+                                                                a: ({node, ...props}) => {
+                                                                    if (props.href && props.href.startsWith('http') && !props.href.includes(window.location.origin)) {
+                                                                        return <a {...props} target="_blank" rel="noopener noreferrer" />;
+                                                                    }
+                                                                    return (
+                                                                        <button 
+                                                                            onClick={(e) => {
+                                                                                e.preventDefault();
+                                                                                handleOpenSource({ doc_name: String(props.children) });
+                                                                            }}
+                                                                            className="text-[#C8A288] hover:underline hover:text-[#A08072] cursor-pointer bg-transparent border-none p-0 inline font-medium"
+                                                                            title={`Open document: ${props.children}`}
+                                                                        >
+                                                                            {props.children}
+                                                                        </button>
+                                                                    );
+                                                                }
+                                                            }}
+                                                        >
                                                             {msg.content}
                                                         </ReactMarkdown>
                                                     </div>
@@ -1194,11 +1271,23 @@ const ProjectView = () => {
                                                         <p className="text-xs font-bold mb-2 opacity-70 flex items-center gap-1">
                                                             <BookOpen className="h-3 w-3" /> Sources:
                                                         </p>
-                                                        <div className="flex flex-wrap gap-2">
+                                                        <div className="flex flex-col gap-2">
                                                             {msg.sources.map((source, i) => (
-                                                                <div key={i} className="text-xs bg-white/50 px-2 py-1 rounded border border-black/5 max-w-xs truncate cursor-help" title={source.chunk_text}>
-                                                                    <span className="font-medium">{source.doc_name}</span>
-                                                                </div>
+                                                                <button 
+                                                                    key={i} 
+                                                                    onClick={() => handleOpenSource(source)}
+                                                                    className="group flex flex-col gap-1.5 text-left bg-white/60 p-3 rounded-xl border border-[#C8A288]/30 cursor-pointer hover:bg-[#FDF6F0] hover:border-[#C8A288]/60 transition-all hover:shadow-md"
+                                                                >
+                                                                    <div className="flex items-center justify-between w-full">
+                                                                        <div className="flex items-center gap-1.5 text-xs text-[#8a6a5c] font-medium truncate pr-2">
+                                                                            <FileText className="h-3 w-3 text-[#C8A288] shrink-0" />
+                                                                            <span className="truncate">{source.doc_name}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                    <p className="text-xs text-[#4A3B32] line-clamp-2 leading-relaxed opacity-90 italic">
+                                                                        "{source.chunk_text ? source.chunk_text.replace(/\.\.\.$/, '') : ''}..."
+                                                                    </p>
+                                                                </button>
                                                             ))}
                                                         </div>
                                                     </div>
@@ -1209,17 +1298,17 @@ const ProjectView = () => {
                                 ))}
                                 <div ref={messagesEndRef} />
                                 {isProcessingDocs && (
-                                    <div className="flex justify-center my-4">
-                                        <div className="bg-gradient-to-r from-amber-50 to-orange-50 text-amber-700 px-5 py-4 rounded-xl text-sm flex items-center gap-3 border border-amber-200 shadow-md max-w-lg">
-                                            <div className="relative">
+                                    <div className="flex justify-center my-4 animate-in fade-in slide-in-from-bottom-2">
+                                        <div className="bg-gradient-to-r from-amber-50 to-orange-50 text-amber-700 px-5 py-4 rounded-xl text-sm flex items-start gap-3 border border-amber-200 shadow-md max-w-lg w-full">
+                                            <div className="relative shrink-0 mt-0.5">
                                                 <div className="h-8 w-8 border-2 border-amber-300 rounded-full"></div>
                                                 <div className="absolute inset-0 h-8 w-8 border-2 border-amber-500 rounded-full border-t-transparent animate-spin"></div>
                                             </div>
-                                            <div>
-                                                <p className="font-bold text-amber-800">Processing Documents</p>
-                                                <p className="text-xs text-amber-600 mt-0.5">
-                                                    Extracting text and generating embeddings. This will complete automatically.
-                                                </p>
+                                            <div className="flex-1">
+                                                <p className="font-bold text-amber-800 tracking-wide text-xs uppercase mb-1.5">Processing Documents</p>
+                                                <div className="text-[11px] leading-relaxed italic text-amber-700/90 whitespace-pre-line transition-opacity duration-300 font-medium">
+                                                    {getRotatingLoadingMessage(loadingMsgIdx)}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -1579,16 +1668,18 @@ const ProjectView = () => {
 
                         {/* Document List */}
                         <div className="flex-1 overflow-y-auto custom-scrollbar px-3 py-2 space-y-1.5">
-                            {/* Processing Banner */}
-                            {isProcessingDocs && (
+                            {/* Processing Banner (Only show if > 1 document processing) */}
+                            {documents.filter(d => d.upload_status === 'pending' || d.upload_status === 'processing' || d.upload_status === 'embedding' || d.upload_status === 'queued').length > 1 && (
                                 <div className="flex items-center gap-2.5 p-3 mb-2 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200/80">
                                     <div className="relative shrink-0">
                                         <div className="h-6 w-6 border-2 border-amber-300 rounded-full"></div>
                                         <div className="absolute inset-0 h-6 w-6 border-2 border-amber-500 rounded-full border-t-transparent animate-spin"></div>
                                     </div>
                                     <div>
-                                        <p className="text-xs font-bold text-amber-800">Processing...</p>
-                                        <p className="text-[10px] text-amber-600">Generating embeddings</p>
+                                        <p className="text-xs font-bold text-amber-800">
+                                            Processing {documents.filter(d => d.upload_status === 'pending' || d.upload_status === 'processing' || d.upload_status === 'embedding' || d.upload_status === 'queued').length} Documents
+                                        </p>
+                                        <p className="text-[10px] text-amber-600">{getRotatingLoadingMessage(loadingMsgIdx)}</p>
                                     </div>
                                 </div>
                             )}
@@ -1639,8 +1730,8 @@ const ProjectView = () => {
                                                 <div className="flex items-center gap-2 mt-1">
                                                     {isProcessing && (
                                                         <span className="flex items-center gap-1 text-[10px] text-amber-600 font-medium">
-                                                            <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                                                            Processing
+                                                            <Loader2 className="h-2.5 w-2.5 animate-spin shrink-0" />
+                                                            <span className="truncate" key={loadingMsgIdx}>{getRandomLoadingMessage()}</span>
                                                         </span>
                                                     )}
                                                     {isReady && (

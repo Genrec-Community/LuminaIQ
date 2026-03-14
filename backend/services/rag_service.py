@@ -172,6 +172,7 @@ Context:
                             "doc_id": doc_id,
                             "doc_name": doc_name,
                             "chunk_text": doc.page_content[:100] + "...",
+                            "page": doc.metadata.get("page"),
                         }
                     )
 
@@ -258,6 +259,7 @@ Context:
                                     "doc_id": doc_id,
                                     "doc_name": doc_name,
                                     "chunk_text": doc.page_content[:100] + "...",
+                                    "page": doc.metadata.get("page"),
                                 }
                             )
 
