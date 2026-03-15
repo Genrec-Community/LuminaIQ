@@ -1,5 +1,7 @@
 from pydantic_settings import BaseSettings
+from pydantic import Field
 from typing import Optional, List
+from typing_extensions import Annotated
 
 
 class Settings(BaseSettings):
@@ -24,7 +26,7 @@ class Settings(BaseSettings):
     QDRANT_API_KEY: Optional[str] = None
 
     # Together AI (optional - for some services)
-    TOGETHER_API_KEY: Optional[str] = None
+    TOGETHER_API_KEY: str = Field(default="")
 
     # Application Configuration
     ENVIRONMENT: str = "development"
