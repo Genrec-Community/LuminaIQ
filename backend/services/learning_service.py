@@ -17,7 +17,7 @@ import heapq
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Tuple
 from collections import defaultdict
-from db.client import supabase_client
+from db.client import get_supabase_client
 from utils.logger import logger
 from uuid import uuid4
 import math
@@ -37,7 +37,7 @@ class PerformanceTracker:
     """
 
     def __init__(self):
-        self.client = supabase_client
+        self.client = get_supabase_client()
 
     async def record_performance(
         self, user_id: str, project_id: str, topic: str, correct: int, wrong: int
@@ -169,7 +169,7 @@ class WeaknessDetector:
     """
 
     def __init__(self):
-        self.client = supabase_client
+        self.client = get_supabase_client()
 
     def calculate_weakness_score(
         self, record: Dict[str, Any], window_size: int = 10
@@ -331,7 +331,7 @@ class SpacedRepetition:
     """
 
     def __init__(self):
-        self.client = supabase_client
+        self.client = get_supabase_client()
         self.MIN_EF = 1.3
         self.DEFAULT_EF = 2.5
 

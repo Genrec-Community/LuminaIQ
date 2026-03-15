@@ -35,6 +35,7 @@ class EmbeddingJob:
     project_id: str
     filename: str
     chunks: List[str]
+    user_id: str = ""  # Track which user owns this job for fairness
     status: JobStatus = JobStatus.PENDING
     position: int = 0
     total_in_queue: int = 0
@@ -63,15 +64,18 @@ class EmbeddingQueue:
         status = queue.get_job_status(job_id)
     """
 
-    # Global limits - shared across ALL documents
-    MAX_CONCURRENT_DOCUMENTS = 5  # Max docs processing at once
-    MAX_GLOBAL_DB_OPERATIONS = 8  # Total concurrent Qdrant writes
-    MAX_GLOBAL_EMBEDDINGS = 10  # Total concurrent embedding API calls
+    # Global limits - tuned for multi-user production load
+    # 3 docs process the heavy pipeline concurrently, rest wait in queue
+    MAX_CONCURRENT_DOCUMENTS = 3
+    MAX_GLOBAL_DB_OPERATIONS = 6   # Concurrent Qdrant writes (shared across all docs)
+    MAX_GLOBAL_EMBEDDINGS = 8      # Concurrent embedding API calls
+    MAX_CONCURRENT_LLM = 2         # Concurrent LLM calls (topics/graph generation)
 
     # Singleton semaphores - created once, shared by all
     _doc_semaphore: Optional[asyncio.Semaphore] = None
     _db_semaphore: Optional[asyncio.Semaphore] = None
     _embed_semaphore: Optional[asyncio.Semaphore] = None
+    _llm_semaphore: Optional[asyncio.Semaphore] = None
 
     def __init__(self):
         self._jobs: Dict[str, EmbeddingJob] = {}  # job_id -> job
@@ -79,6 +83,8 @@ class EmbeddingQueue:
         self._lock = asyncio.Lock()
         self._active_tasks: Dict[str, asyncio.Task] = {}  # job_id -> task
         self._ensure_semaphores()
+        # Auto-cleanup stale jobs from previous runs
+        self.cleanup_old_jobs(max_age_hours=1)
 
     def _ensure_semaphores(self):
         """Create semaphores if not already created"""
@@ -94,10 +100,15 @@ class EmbeddingQueue:
             EmbeddingQueue._embed_semaphore = asyncio.Semaphore(
                 self.MAX_GLOBAL_EMBEDDINGS
             )
+        if EmbeddingQueue._llm_semaphore is None:
+            EmbeddingQueue._llm_semaphore = asyncio.Semaphore(
+                self.MAX_CONCURRENT_LLM
+            )
 
         logger.info(
             f"[EmbeddingQueue] Limits: {self.MAX_CONCURRENT_DOCUMENTS} docs, "
-            f"{self.MAX_GLOBAL_DB_OPERATIONS} DB ops, {self.MAX_GLOBAL_EMBEDDINGS} embed calls"
+            f"{self.MAX_GLOBAL_DB_OPERATIONS} DB ops, {self.MAX_GLOBAL_EMBEDDINGS} embed, "
+            f"{self.MAX_CONCURRENT_LLM} LLM calls"
         )
 
     @classmethod
@@ -113,6 +124,20 @@ class EmbeddingQueue:
         if cls._embed_semaphore is None:
             cls._embed_semaphore = asyncio.Semaphore(cls.MAX_GLOBAL_EMBEDDINGS)
         return cls._embed_semaphore
+
+    @classmethod
+    def get_doc_semaphore(cls) -> asyncio.Semaphore:
+        """Get the global document concurrency semaphore"""
+        if cls._doc_semaphore is None:
+            cls._doc_semaphore = asyncio.Semaphore(cls.MAX_CONCURRENT_DOCUMENTS)
+        return cls._doc_semaphore
+
+    @classmethod
+    def get_llm_semaphore(cls) -> asyncio.Semaphore:
+        """Get the global LLM concurrency semaphore for topics/graph generation"""
+        if cls._llm_semaphore is None:
+            cls._llm_semaphore = asyncio.Semaphore(cls.MAX_CONCURRENT_LLM)
+        return cls._llm_semaphore
 
     async def start(self):
         """No-op - processing starts immediately on enqueue"""
@@ -136,6 +161,7 @@ class EmbeddingQueue:
         filename: str,
         chunks: List[str],
         process_callback: Callable[[EmbeddingJob], Any],
+        user_id: str = "",
     ) -> str:
         """
         Add a document and start processing immediately.
@@ -160,6 +186,7 @@ class EmbeddingQueue:
                 project_id=project_id,
                 filename=filename,
                 chunks=chunks,
+                user_id=user_id,
                 position=0,
                 total_in_queue=1,
             )

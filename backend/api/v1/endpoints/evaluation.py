@@ -8,10 +8,46 @@ from models.schemas import (
     SubjectiveTestSubmitRequest,
     SubjectiveTestResult,
 )
-from typing import Any
+from typing import Any, List, Dict
 from api.deps import get_current_user
 
 router = APIRouter()
+
+
+@router.get("/saved/{project_id}")
+async def get_saved_tests(
+    project_id: str, current_user: dict = Depends(get_current_user)
+):
+    """Get all saved Q&A tests for a project"""
+    try:
+        tests = await evaluation_service.get_saved_tests(project_id)
+        return tests
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@router.get("/saved/view/{test_id}")
+async def get_saved_test(
+    test_id: str, current_user: dict = Depends(get_current_user)
+):
+    """Get a specific saved Q&A test with full questions and results"""
+    try:
+        test = await evaluation_service.get_saved_test(test_id)
+        return test
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@router.delete("/saved/{test_id}")
+async def delete_saved_test(
+    test_id: str, current_user: dict = Depends(get_current_user)
+):
+    """Delete a saved Q&A test"""
+    try:
+        await evaluation_service.delete_saved_test(test_id)
+        return {"message": "Test deleted successfully"}
+    except Exception as e:
+        raise HTTPException(500, str(e))
 
 
 @router.post("/generate-test", response_model=SubjectiveTestResponse)

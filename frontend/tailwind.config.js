@@ -30,9 +30,8 @@ export default {
                     hover: '#B08B72',
                 }
             },
-            fontFamily: {
-                sans: ['Inter', 'sans-serif'], // Keep clean sans-serif
-            }
+            // fontFamily is defined via @theme in index.css (Tailwind v4):
+            // --font-sans: "Outfit", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif
         },
     },
     plugins: [],

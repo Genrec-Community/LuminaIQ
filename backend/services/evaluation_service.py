@@ -2,8 +2,7 @@ from typing import Dict, Any, List
 from services.embedding_service import embedding_service
 from services.qdrant_service import qdrant_service
 from services.llm_service import llm_service
-from supabase import create_client, Client
-from config.settings import settings
+from db.client import get_supabase_client
 from utils.logger import logger
 from uuid import uuid4
 import json
@@ -13,9 +12,11 @@ from models.schemas import SubjectiveQuestion, SubjectiveEvaluationResult
 
 class EvaluationService:
     def __init__(self):
-        self.client: Client = create_client(
-            settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY
-        )
+        pass
+
+    @property
+    def client(self):
+        return get_supabase_client()
 
     async def generate_subjective_test(
         self,
@@ -494,6 +495,76 @@ Be constructive and specific in your feedback. Respond ONLY with the JSON object
         except Exception as e:
             logger.error(f"JSON repair failed: {str(e)}")
             return None
+
+    async def get_saved_tests(self, project_id: str) -> List[Dict[str, Any]]:
+        """Get all saved subjective tests for a project"""
+        try:
+            response = (
+                self.client.table("subjective_tests")
+                .select("id, project_id, topic, created_at, results")
+                .eq("project_id", project_id)
+                .order("created_at", desc=True)
+                .execute()
+            )
+            tests = response.data or []
+            # Parse results JSON and add summary info
+            for test in tests:
+                if test.get("results"):
+                    try:
+                        results = json.loads(test["results"]) if isinstance(test["results"], str) else test["results"]
+                        test["score"] = results.get("total_score")
+                        test["max_score"] = results.get("max_score")
+                        test["percentage"] = results.get("percentage")
+                        test["has_results"] = True
+                    except (json.JSONDecodeError, TypeError):
+                        test["has_results"] = False
+                else:
+                    test["has_results"] = False
+                # Don't send full results in listing
+                test.pop("results", None)
+            return tests
+        except Exception as e:
+            logger.error(f"Error getting saved tests: {str(e)}")
+            raise
+
+    async def get_saved_test(self, test_id: str) -> Dict[str, Any]:
+        """Get a specific saved subjective test with full questions and results"""
+        try:
+            response = (
+                self.client.table("subjective_tests")
+                .select("*")
+                .eq("id", test_id)
+                .execute()
+            )
+            if not response.data:
+                raise Exception("Test not found")
+
+            test = response.data[0]
+            # Parse JSON fields
+            if test.get("questions") and isinstance(test["questions"], str):
+                test["questions"] = json.loads(test["questions"])
+            if test.get("results") and isinstance(test["results"], str):
+                test["results"] = json.loads(test["results"])
+            return test
+        except Exception as e:
+            logger.error(f"Error getting saved test: {str(e)}")
+            raise
+
+    async def delete_saved_test(self, test_id: str):
+        """Delete a saved subjective test"""
+        try:
+            response = (
+                self.client.table("subjective_tests")
+                .delete()
+                .eq("id", test_id)
+                .execute()
+            )
+            if not response.data:
+                raise Exception("Test not found")
+            logger.info(f"Deleted subjective test {test_id}")
+        except Exception as e:
+            logger.error(f"Error deleting test: {str(e)}")
+            raise
 
     async def get_evaluation(self, evaluation_id: str) -> Dict[str, Any]:
         """Retrieve evaluation by ID"""

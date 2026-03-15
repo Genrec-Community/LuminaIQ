@@ -24,6 +24,48 @@
   body {
     @apply bg-[#FDF6F0] text-[#4A3B32] font-sans antialiased;
   }
+
+  /* Global markdown table styles — ensures tables are visible everywhere */
+  .prose table,
+  .markdown-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1em 0;
+    font-size: 0.875em;
+  }
+
+  .prose thead th,
+  .markdown-content thead th {
+    background: #C8A288;
+    color: white;
+    font-weight: 600;
+    padding: 0.625rem 0.75rem;
+    text-align: left;
+    border: 1px solid #b0917a;
+  }
+
+  .prose tbody td,
+  .markdown-content tbody td {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #E6D5CC;
+    color: #4A3B32;
+  }
+
+  .prose tbody tr:nth-child(even) td,
+  .markdown-content tbody tr:nth-child(even) td {
+    background: #FDF6F0;
+  }
+
+  .prose tbody tr:hover td,
+  .markdown-content tbody tr:hover td {
+    background: #f3ebe4;
+  }
+
+  /* Scrollable table wrapper — prevents overflow on narrow containers */
+  .prose-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
 @layer utilities {
@@ -50,4 +92,26 @@
   .skeleton {
     @apply bg-gray-200 animate-pulse rounded-md;
   }
+
+  /* Compact Mode — reduces spacing across the app */
+  .compact .p-4 { padding: 0.625rem; }
+  .compact .p-5 { padding: 0.75rem; }
+  .compact .p-6 { padding: 1rem; }
+  .compact .p-8 { padding: 1.25rem; }
+  .compact .py-3 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+  .compact .py-4 { padding-top: 0.625rem; padding-bottom: 0.625rem; }
+  .compact .gap-3 { gap: 0.5rem; }
+  .compact .gap-4 { gap: 0.625rem; }
+  .compact .gap-6 { gap: 0.75rem; }
+  .compact .mb-4 { margin-bottom: 0.625rem; }
+  .compact .mb-6 { margin-bottom: 0.75rem; }
+  .compact .mb-8 { margin-bottom: 1rem; }
+  .compact .space-y-3 > :not([hidden]) ~ :not([hidden]) { margin-top: 0.5rem; }
+  .compact .space-y-4 > :not([hidden]) ~ :not([hidden]) { margin-top: 0.625rem; }
+  .compact .space-y-6 > :not([hidden]) ~ :not([hidden]) { margin-top: 0.75rem; }
+  .compact .text-2xl { font-size: 1.25rem; }
+  .compact .text-xl { font-size: 1.1rem; }
+  .compact .text-lg { font-size: 0.975rem; }
+  .compact .rounded-2xl { border-radius: 0.75rem; }
+  .compact .rounded-3xl { border-radius: 1rem; }
 }

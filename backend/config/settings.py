@@ -1,19 +1,38 @@
 from pydantic_settings import BaseSettings
+from pydantic import Field, ConfigDict
 from typing import Optional, List
+from typing_extensions import Annotated
 
 
 class Settings(BaseSettings):
+    model_config = ConfigDict(
+        extra='ignore',  # Ignore extra fields from env
+        case_sensitive=True,
+        env_file='.env'
+    )
+
     # Supabase Configuration
     SUPABASE_URL: str
     SUPABASE_KEY: str
     SUPABASE_SERVICE_KEY: str
 
-    # Together AI Configuration
-    TOGETHER_API_KEY: str
+    # OpenAI-compatible API Configuration (LLM)
+    LLM_API_KEY: str
+    LLM_BASE_URL: str
+    LLM_MODEL: str
+
+    # OpenAI-compatible API Configuration (Embeddings)
+    EMBEDDING_API_KEY: str
+    EMBEDDING_BASE_URL: str
+    EMBEDDING_MODEL: str
+    EMBEDDING_DIMENSION: int = 1024
 
     # Qdrant Configuration
     QDRANT_URL: str = "http://localhost:6333"
     QDRANT_API_KEY: Optional[str] = None
+
+    # Together AI (optional - for some services)
+    TOGETHER_API_KEY: str = Field(default="")
 
     # Application Configuration
     ENVIRONMENT: str = "development"
@@ -26,25 +45,18 @@ class Settings(BaseSettings):
 
     UPLOAD_DIR: str = "./uploads"
     MAX_FILE_SIZE: int = 10485760  # 10MB
-    ALLOWED_EXTENSIONS: List[str] = ["pdf", "docx", "txt"]
+    ALLOWED_EXTENSIONS: List[str] = ["pdf", "docx", "txt", "html", "md"]
 
-    # LLM Configuration
-    LLM_MODEL: str = "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo"
-    EMBEDDING_MODEL: str = "BAAI/bge-large-en-v1.5"
     CHUNK_SIZE: int = 800  # Larger chunks = fewer API calls
     CHUNK_OVERLAP: int = 100  # Better context continuity
 
-    # Rate Limiting for Together AI (600 req/min = 10 req/sec)
+    # Rate Limiting for LLM API (adjust based on your plan limits)
     EMBEDDING_BATCH_SIZE: int = 50  # Chunks per API call
     EMBEDDING_CONCURRENCY: int = 5  # Max parallel requests
     EMBEDDING_DELAY_MS: int = 200  # Delay between batches (ms)
 
     # Webhook Configuration (for PDF service communication)
     WEBHOOK_SECRET: str = "supersecretwebhook"
-
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
 
 
 settings = Settings()

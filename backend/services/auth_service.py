@@ -1,9 +1,10 @@
 from datetime import datetime, timedelta
 import re
+import time
 from typing import Optional, Dict, Any
 from jose import jwt, JWTError
 from passlib.context import CryptContext
-from db.client import supabase_client
+from db.client import get_supabase_client
 from config.settings import settings
 from utils.logger import logger
 
@@ -13,7 +14,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 class AuthService:
     def __init__(self):
         # Use the singleton client instead of creating a new one
-        self.client = supabase_client
+        self.client = get_supabase_client()
 
     def verify_password(self, plain_password, hashed_password):
         return pwd_context.verify(plain_password, hashed_password)
@@ -32,7 +33,7 @@ class AuthService:
         return encoded_jwt
 
     async def signup(self, email: str, password: str, full_name: str) -> Dict[str, Any]:
-        """Register a new user (via Supabase Auth)"""
+        """Register a new user (via Supabase Auth) with retry logic"""
         try:
             # Validate password strength
             if len(password) < 8:
@@ -46,67 +47,126 @@ class AuthService:
             if not re.search(r"[\W_]", password):
                 raise ValueError("Password must contain at least one symbol")
 
-            # Use Standard Sign Up (triggers confirmation email if enabled in Supabase)
-            response = self.client.auth.sign_up({
-                "email": email,
-                "password": password,
-                "options": {
-                    "data": {"full_name": full_name}
-                }
-            })
+            # Retry logic for transient failures
+            max_retries = 3
+            retry_delay = 1  # seconds
+            last_error = None
             
-            if response.user:
-                logger.info(f"User signed up: {email}")
-                return {
-                    "id": response.user.id,
-                    "email": response.user.email,
-                    "created_at": response.user.created_at,
-                    "full_name": full_name
-                }
-            else:
-                raise Exception("User registration failed")
+            for attempt in range(max_retries):
+                try:
+                    logger.info(f"Signup attempt {attempt + 1}/{max_retries} for: {email}")
+                    
+                    # Use Standard Sign Up (triggers confirmation email if enabled in Supabase)
+                    response = self.client.auth.sign_up({
+                        "email": email,
+                        "password": password,
+                        "options": {
+                            "data": {"full_name": full_name}
+                        }
+                    })
+                    
+                    if response.user:
+                        logger.info(f"User signed up successfully: {email}")
+                        return {
+                            "id": response.user.id,
+                            "email": response.user.email,
+                            "created_at": response.user.created_at,
+                            "full_name": full_name
+                        }
+                    else:
+                        raise Exception("User registration failed - no user returned")
+                        
+                except Exception as e:
+                    error_msg = str(e).lower()
+                    last_error = e
+                    
+                    # Check if it's a timeout or network error
+                    if any(keyword in error_msg for keyword in ['timeout', 'timed out', 'connection', 'network']):
+                        if attempt < max_retries - 1:
+                            logger.warning(f"Signup timeout on attempt {attempt + 1}, retrying in {retry_delay}s...")
+                            time.sleep(retry_delay)
+                            retry_delay *= 2  # Exponential backoff
+                            continue
+                        else:
+                            logger.error(f"Signup failed after {max_retries} attempts: {str(e)}")
+                            raise Exception("Authentication service is temporarily unavailable. Please try again in a few moments.")
+                    else:
+                        # Non-timeout error, don't retry
+                        raise
+            
+            # If we get here, all retries failed
+            raise last_error if last_error else Exception("Signup failed")
                 
         except Exception as e:
             logger.error(f"Signup error: {str(e)}")
             raise
     
     async def login(self, email: str, password: str) -> Dict[str, Any]:
-        """Login user and return our custom JWT"""
+        """Login user and return our custom JWT with retry logic"""
         try:
             logger.info(f"Attempting login for: {email}")
-            # Authenticate with Supabase to verify credentials
-            response = self.client.auth.sign_in_with_password({
-                "email": email,
-                "password": password
-            })
+            
+            # Retry logic for transient failures
+            max_retries = 3
+            retry_delay = 1  # seconds
+            last_error = None
+            
+            for attempt in range(max_retries):
+                try:
+                    # Authenticate with Supabase to verify credentials
+                    response = self.client.auth.sign_in_with_password({
+                        "email": email,
+                        "password": password
+                    })
 
-            logger.info(f"Supabase response: {response}")
+                    logger.info(f"Supabase response received for: {email}")
 
-            if response.user:
-                # Retrieve full_name from metadata
-                full_name = response.user.user_metadata.get("full_name", "")
-                logger.info(f"User found: {response.user.id}, full_name: {full_name}")
+                    if response.user:
+                        # Retrieve full_name from metadata
+                        full_name = response.user.user_metadata.get("full_name", "")
+                        logger.info(f"User found: {response.user.id}, full_name: {full_name}")
 
-                # Generate OUR access token
-                access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-                access_token = self.create_access_token(
-                    data={"sub": response.user.id, "email": email, "full_name": full_name},
-                    expires_delta=access_token_expires
-                )
+                        # Generate OUR access token
+                        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+                        access_token = self.create_access_token(
+                            data={"sub": response.user.id, "email": email, "full_name": full_name},
+                            expires_delta=access_token_expires
+                        )
 
-                logger.info(f"User logged in successfully: {email}")
-                return {
-                    "access_token": access_token,
-                    "token_type": "bearer",
-                    "user": {
-                        "id": response.user.id,
-                        "email": response.user.email,
-                        "full_name": full_name
-                    }
-                }
-            else:
-                logger.error("No user in response")
-                raise Exception("Invalid credentials")
+                        logger.info(f"User logged in successfully: {email}")
+                        return {
+                            "access_token": access_token,
+                            "token_type": "bearer",
+                            "user": {
+                                "id": response.user.id,
+                                "email": response.user.email,
+                                "full_name": full_name
+                            }
+                        }
+                    else:
+                        logger.error("No user in response")
+                        raise Exception("Invalid credentials")
+                        
+                except Exception as e:
+                    error_msg = str(e).lower()
+                    last_error = e
+                    
+                    # Check if it's a timeout or network error
+                    if any(keyword in error_msg for keyword in ['timeout', 'timed out', 'connection', 'network']):
+                        if attempt < max_retries - 1:
+                            logger.warning(f"Login timeout on attempt {attempt + 1}, retrying in {retry_delay}s...")
+                            time.sleep(retry_delay)
+                            retry_delay *= 2  # Exponential backoff
+                            continue
+                        else:
+                            logger.error(f"Login failed after {max_retries} attempts: {str(e)}")
+                            raise Exception("Authentication service is temporarily unavailable. Please try again in a few moments.")
+                    else:
+                        # Non-timeout error (like invalid credentials), don't retry
+                        raise
+            
+            # If we get here, all retries failed
+            raise last_error if last_error else Exception("Login failed")
 
         except Exception as e:
             logger.error(f"Login error: {str(e)}")

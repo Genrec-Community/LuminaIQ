@@ -1,4 +1,4 @@
-from db.client import supabase_client
+from db.client import get_supabase_client
 from config.settings import settings
 from utils.logger import logger
 from typing import List, Dict, Any, Optional
@@ -6,7 +6,7 @@ from uuid import uuid4
 
 class ProjectService:
     def __init__(self):
-        self.client = supabase_client
+        self.client = get_supabase_client()
     
     async def create_project(self, user_id: str, name: str) -> Dict[str, Any]:
         """Create a new project"""

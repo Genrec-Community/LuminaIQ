@@ -1,4 +1,4 @@
-from langchain_together import TogetherEmbeddings
+from langchain_openai import OpenAIEmbeddings
 from config.settings import settings
 from typing import List
 from utils.logger import logger
@@ -18,24 +18,41 @@ class EmbeddingService:
     """
 
     # Optimal workers for I/O-bound embedding API calls
-    MAX_WORKERS = 10
+    MAX_WORKERS_BATCH = 8
+    MAX_WORKERS_SEARCH = 4
 
     def __init__(self):
-        os.environ["TOGETHER_API_KEY"] = settings.TOGETHER_API_KEY
-        self.embeddings = TogetherEmbeddings(
-            model=settings.EMBEDDING_MODEL, together_api_key=settings.TOGETHER_API_KEY
+        os.environ["OPENAI_API_KEY"] = settings.EMBEDDING_API_KEY
+        
+        self.embeddings = OpenAIEmbeddings(
+            model=settings.EMBEDDING_MODEL,
+            openai_api_key=settings.EMBEDDING_API_KEY,
+            openai_api_base=settings.EMBEDDING_BASE_URL
         )
-        # Dedicated thread pool for embedding calls - much faster than default
-        self._executor = ThreadPoolExecutor(
-            max_workers=self.MAX_WORKERS, thread_name_prefix="embedding_worker"
+        # Dedicated thread pool for batch embedding calls (document processing)
+        self._batch_executor = ThreadPoolExecutor(
+            max_workers=self.MAX_WORKERS_BATCH, thread_name_prefix="embed_batch"
         )
-        logger.info(f"[EmbeddingService] Initialized with {self.MAX_WORKERS} workers")
+        # Dedicated thread pool for search queries (user-facing, prevents starvation)
+        self._search_executor = ThreadPoolExecutor(
+            max_workers=self.MAX_WORKERS_SEARCH, thread_name_prefix="embed_search"
+        )
+        logger.info(f"[EmbeddingService] Initialized with {self.MAX_WORKERS_BATCH} batch workers and {self.MAX_WORKERS_SEARCH} search workers")
+    
+    def _add_passage_prefix(self, texts: List[str]) -> List[str]:
+        """Add 'passage: ' prefix for E5 instruct models (document/passage embedding)."""
+        return [f"passage: {t}" for t in texts]
+
+    def _add_query_prefix(self, text: str) -> str:
+        """Add 'query: ' prefix for E5 instruct models (search query embedding)."""
+        return f"query: {text}"
 
     async def generate_embeddings(self, texts: List[str]) -> List[List[float]]:
         """
-        Generate embeddings for a batch of texts.
+        Generate embeddings for a batch of texts (documents/passages).
 
         Uses dedicated thread pool for faster concurrent API calls.
+        E5 instruct models require 'passage: ' prefix for document chunks.
         """
         try:
             if not texts:
@@ -43,12 +60,12 @@ class EmbeddingService:
 
             loop = asyncio.get_running_loop()
 
-            # Run embedding in dedicated thread pool (Together API is sync)
-            texts_copy = list(texts)
+            # Add E5 instruction prefix for passages
+            prefixed_texts = self._add_passage_prefix(texts)
             embeddings = await loop.run_in_executor(
-                self._executor,  # Use dedicated pool, not None (default)
+                self._batch_executor,  # Use dedicated batch pool
                 self.embeddings.embed_documents,
-                texts_copy,
+                prefixed_texts,
             )
             return embeddings
 
@@ -57,23 +74,29 @@ class EmbeddingService:
             raise
 
     async def generate_embedding(self, text: str) -> List[float]:
-        """Generate embedding for a single text"""
+        """Generate embedding for a single text (search query).
+        
+        E5 instruct models require 'query: ' prefix for search queries.
+        """
         try:
             loop = asyncio.get_running_loop()
+            prefixed_text = self._add_query_prefix(text)
             return await loop.run_in_executor(
-                self._executor,  # Use dedicated pool
+                self._search_executor,  # Use dedicated search pool
                 self.embeddings.embed_query,
-                text,
+                prefixed_text,
             )
         except Exception as e:
             logger.error(f"Error generating embedding: {str(e)}")
             raise
 
     def shutdown(self):
-        """Cleanup thread pool on shutdown"""
-        if self._executor:
-            self._executor.shutdown(wait=False)
-            logger.info("[EmbeddingService] Thread pool shut down")
+        """Cleanup thread pools on shutdown"""
+        if hasattr(self, '_batch_executor') and self._batch_executor:
+            self._batch_executor.shutdown(wait=False)
+        if hasattr(self, '_search_executor') and self._search_executor:
+            self._search_executor.shutdown(wait=False)
+        logger.info("[EmbeddingService] Thread pools shut down")
 
 
 embedding_service = EmbeddingService()
