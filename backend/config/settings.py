@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     QDRANT_URL: str = "http://localhost:6333"
     QDRANT_API_KEY: Optional[str] = None
 
+    # Together AI (optional - for some services)
+    TOGETHER_API_KEY: Optional[str] = None
+
     # Application Configuration
     ENVIRONMENT: str = "development"
     SECRET_KEY: str  # Ensure this is set in .env
