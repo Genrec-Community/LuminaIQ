@@ -49,9 +49,15 @@ const Login = () => {
             console.error("Auth error:", err);
             // Extract meaningful message
             let errorMsg = err.response?.data?.detail || 'An error occurred. Please try again.';
+            const status = err.response?.status;
 
             if (errorMsg.includes('already registered')) {
                 errorMsg = "This email is already registered. Please log in.";
+            } else if (status === 503 || errorMsg.includes('timed out') || errorMsg.includes('timeout') || err.code === 'ECONNABORTED') {
+                errorMsg = "Connection to authentication service timed out. Please check your internet connection and try again.";
+            } else if (!err.response && err.message) {
+                // Network error (no response at all)
+                errorMsg = "Unable to reach the server. Please check your connection and try again.";
             }
 
             setMessage({ type: 'error', text: errorMsg });

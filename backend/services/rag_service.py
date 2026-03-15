@@ -1,4 +1,5 @@
 from typing import List, Dict, Any, Optional
+import asyncio
 from services.embedding_service import embedding_service
 from services.qdrant_service import qdrant_service
 from services.llm_service import llm_service
@@ -8,12 +9,46 @@ from utils.logger import logger
 
 # LangChain Imports
 from langchain_qdrant import QdrantVectorStore
-from langchain_together import ChatTogether
+from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.runnables import RunnableConfig
+
+
+# Retry decorator for handling 503 and transient errors
+async def retry_with_backoff(func, max_retries=3, base_delay=1.0, max_delay=10.0):
+    """Retry async function with exponential backoff"""
+    last_exception = None
+    for attempt in range(max_retries):
+        try:
+            return await func()
+        except Exception as e:
+            last_exception = e
+            error_str = str(e).lower()
+            # Check if it's a retryable error (503, rate limit, service unavailable)
+            if any(
+                x in error_str
+                for x in [
+                    "503",
+                    "service unavailable",
+                    "rate limit",
+                    "overloaded",
+                    "529",
+                    "too many requests",
+                ]
+            ):
+                if attempt < max_retries - 1:
+                    delay = min(base_delay * (2**attempt), max_delay)
+                    logger.warning(
+                        f"Retryable error (attempt {attempt + 1}/{max_retries}): {e}. Retrying in {delay}s..."
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+            # Non-retryable error, raise immediately
+            raise
+    raise last_exception
 
 
 class RAGService:
@@ -23,9 +58,10 @@ class RAGService:
         )
 
         # Initialize LLM
-        self.llm = ChatTogether(
+        self.llm = ChatOpenAI(
             model=settings.LLM_MODEL,
-            together_api_key=settings.TOGETHER_API_KEY,
+            openai_api_key=settings.LLM_API_KEY,
+            openai_api_base=settings.LLM_BASE_URL,
             temperature=0.7,
         )
 
@@ -86,7 +122,7 @@ Context:
         selected_documents: Optional[List[str]] = None,
         chat_history: List[Dict[str, str]] = [],
     ) -> Dict[str, Any]:
-        """Generate answer using RAG pipeline (LangChain)"""
+        """Generate answer using RAG pipeline (LangChain) with retry logic"""
         try:
             collection_name = f"project_{project_id}"
             chain = self._get_retrieval_chain(collection_name, selected_documents)
@@ -99,9 +135,14 @@ Context:
                 elif msg["role"] == "assistant":
                     history_messages.append(AIMessage(content=msg["content"]))
 
-            # Invoke
-            response = await chain.ainvoke(
-                {"input": question, "chat_history": history_messages}
+            # Invoke with retry logic
+            async def invoke_chain():
+                return await chain.ainvoke(
+                    {"input": question, "chat_history": history_messages}
+                )
+
+            response = await retry_with_backoff(
+                invoke_chain, max_retries=3, base_delay=1.5
             )
 
             # Process sources from 'context' in response
@@ -147,77 +188,138 @@ Context:
         selected_documents: Optional[List[str]] = None,
         chat_history: List[Dict[str, str]] = [],
     ):
-        """Generate answer using RAG pipeline with streaming (LangChain)"""
-        try:
-            collection_name = f"project_{project_id}"
-            chain = self._get_retrieval_chain(collection_name, selected_documents)
+        """Generate answer using RAG pipeline with streaming (LangChain) - Optimized with retry"""
+        max_retries = 3
+        base_delay = 2.0
 
-            history_messages = []
-            for msg in chat_history:
-                if msg["role"] == "user":
-                    history_messages.append(HumanMessage(content=msg["content"]))
-                elif msg["role"] == "assistant":
-                    history_messages.append(AIMessage(content=msg["content"]))
+        collection_name = f"project_{project_id}"
 
-            # Stream
-            # We need to capture context/sources which usually come in the final output or as events
-            # 'astream_events' or 'astream_log' is useful, but 'astream' usually just yields the answer chunks.
-            # create_retrieval_chain returns a dict with 'answer' and 'context'.
-            # Standard astream yields the output dict chunks. For 'answer' key it yields chunks of the string.
+        # Preload document names in batch to avoid multiple DB calls during streaming
+        doc_name_cache = {}
+        if selected_documents:
+            try:
+                res = (
+                    self.client.table("documents")
+                    .select("id, filename")
+                    .in_("id", selected_documents)
+                    .execute()
+                )
+                for doc in res.data:
+                    doc_name_cache[doc["id"]] = doc["filename"]
+            except Exception as cache_err:
+                logger.warning(f"Failed to preload doc names: {cache_err}")
 
-            sources_sent = False
-            sources_data = []
+        history_messages = []
+        for msg in chat_history:
+            if msg["role"] == "user":
+                history_messages.append(HumanMessage(content=msg["content"]))
+            elif msg["role"] == "assistant":
+                history_messages.append(AIMessage(content=msg["content"]))
 
-            async for chunk in chain.astream(
-                {"input": question, "chat_history": history_messages}
-            ):
-                # Check for answer chunks
-                if "answer" in chunk:
-                    yield chunk["answer"]
+        for attempt in range(max_retries):
+            try:
+                chain = self._get_retrieval_chain(collection_name, selected_documents)
+                sources_data = []
+                has_yielded = False
 
-                # Capture context when available (usually at start or end)
-                if "context" in chunk and not sources_sent:
-                    for doc in chunk["context"]:
-                        doc_name = doc.metadata.get("document_name", "Unknown")
-                        doc_id = doc.metadata.get("document_id", "")
-                        if doc_name == "Unknown" and doc_id:
-                            try:
-                                res = (
-                                    self.client.table("documents")
-                                    .select("filename")
-                                    .eq("id", doc_id)
-                                    .execute()
-                                )
-                                if res.data:
-                                    doc_name = res.data[0]["filename"]
-                            except:
-                                pass
+                async for chunk in chain.astream(
+                    {"input": question, "chat_history": history_messages}
+                ):
+                    # Check for answer chunks
+                    if "answer" in chunk:
+                        has_yielded = True
+                        yield chunk["answer"]
 
-                        sources_data.append(
-                            {
-                                "doc_id": doc_id,
-                                "doc_name": doc_name,
-                                "chunk_text": doc.page_content[:100] + "...",
-                            }
+                    # Capture context when available (usually at start or end)
+                    if "context" in chunk:
+                        for doc in chunk["context"]:
+                            doc_name = doc.metadata.get("document_name", "Unknown")
+                            doc_id = doc.metadata.get("document_id", "")
+
+                            # Use cached name first, then metadata, then "Unknown"
+                            if doc_id and doc_id in doc_name_cache:
+                                doc_name = doc_name_cache[doc_id]
+                            elif doc_name == "Unknown" and doc_id:
+                                try:
+                                    res = (
+                                        self.client.table("documents")
+                                        .select("filename")
+                                        .eq("id", doc_id)
+                                        .execute()
+                                    )
+                                    if res.data:
+                                        doc_name = res.data[0]["filename"]
+                                        doc_name_cache[doc_id] = doc_name
+                                except:
+                                    pass
+
+                            sources_data.append(
+                                {
+                                    "doc_id": doc_id,
+                                    "doc_name": doc_name,
+                                    "chunk_text": doc.page_content[:100] + "...",
+                                }
+                            )
+
+                # Send sources at the end
+                import json
+
+                yield f"\n\n__SOURCES__:{json.dumps(sources_data)}"
+                return  # Success, exit retry loop
+
+            except Exception as e:
+                error_str = str(e).lower()
+                is_retryable = any(
+                    x in error_str
+                    for x in [
+                        "503",
+                        "service unavailable",
+                        "rate limit",
+                        "overloaded",
+                        "529",
+                        "too many requests",
+                    ]
+                )
+
+                if is_retryable and attempt < max_retries - 1:
+                    delay = min(base_delay * (2**attempt), 15.0)
+                    logger.warning(
+                        f"Retryable streaming error (attempt {attempt + 1}/{max_retries}): {e}. Retrying in {delay}s..."
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+
+                # On final failure, try non-streaming fallback
+                if attempt == max_retries - 1:
+                    logger.warning(
+                        f"Streaming failed after {max_retries} attempts, trying non-streaming fallback..."
+                    )
+                    try:
+                        # Use non-streaming as fallback
+                        result = await self.get_answer(
+                            project_id=project_id,
+                            question=question,
+                            selected_documents=selected_documents,
+                            chat_history=chat_history,
                         )
+                        yield result["answer"]
+                        import json
 
-            # Send sources at the end
-            import json
+                        yield f"\n\n__SOURCES__:{json.dumps(result.get('sources', []))}"
+                        return
+                    except Exception as fallback_err:
+                        logger.error(f"Fallback also failed: {fallback_err}")
+                        yield f"Error: Service temporarily unavailable. Please try again in a moment."
+                        return
 
-            yield f"\n\n__SOURCES__:{json.dumps(sources_data)}"
-
-        except Exception as e:
-            logger.error(f"Error in RAG stream: {str(e)}")
-            yield f"Error: {str(e)}"
+                logger.error(f"Error in RAG stream: {str(e)}")
+                yield f"Error: {str(e)}"
+                return
 
     async def generate_summary(
         self, project_id: str, selected_documents: Optional[List[str]] = None
     ) -> Dict[str, Any]:
-        # Reuse existing logic or adapt to LangChain.
-        # Existing logic does manual retrieval of N chunks.
-        # We can keep using qdrant_service.get_initial_chunks for this specific task
-        # as it's not a standard semantic search.
-        # Just update the LLM call to use LangChain chat model.
+        """Generate summary with retry logic for reliability"""
         try:
             # 1. Check if summary already exists in DB (skip cache for selected docs)
             if not selected_documents:
@@ -234,7 +336,7 @@ Context:
                         )
                         return {
                             "answer": cached_res.data[0]["summary"],
-                            "sources": [],  # Sources not stored in simple cache, acceptable for summary
+                            "sources": [],
                         }
                 except Exception as cache_err:
                     logger.warning(f"Failed to fetch cached summary: {cache_err}")
@@ -284,10 +386,19 @@ Here are the introductions/beginnings of the documents in this project:
 
 Please provide a concise and engaging collaborative summary of what these documents are about.
 Highlight the main topics and key themes.
+IMPORTANT: Format the output using standard Markdown. Do NOT use any HTML tags like <br>. Use standard newline characters (\\n) for spacing and line breaks.
 """
             messages = [HumanMessage(content=prompt)]
-            response = await self.llm.ainvoke(messages)
-            summary_text = response.content
+
+            # Use retry logic for LLM call
+            async def invoke_llm():
+                return await self.llm.ainvoke(messages)
+
+            response = await retry_with_backoff(
+                invoke_llm, max_retries=3, base_delay=1.5
+            )
+            # Remove any stray HTML break tags the LLM might have still generated
+            summary_text = response.content.replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
 
             # 3. Store in DB only for full project summaries
             if not selected_documents:

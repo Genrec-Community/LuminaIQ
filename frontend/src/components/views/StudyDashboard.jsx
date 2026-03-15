@@ -13,6 +13,7 @@ import {
     getWeakTopics
 } from '../../api';
 import { useToast } from '../../context/ToastContext';
+import { recordActivity } from '../../utils/studyActivity';
 
 const StudyDashboard = ({ projectId, availableTopics }) => {
     const toast = useToast();
@@ -70,6 +71,9 @@ const StudyDashboard = ({ projectId, availableTopics }) => {
         setSubmittingReview(true);
         try {
             await recordReview(currentCard.id, quality);
+            
+            // Track review activity for heatmap
+            recordActivity(projectId, 'review');
             
             // Move to next card
             const nextIndex = reviewIndex + 1;
@@ -197,7 +201,7 @@ const StudyDashboard = ({ projectId, availableTopics }) => {
                 <div className="bg-white rounded-2xl border border-[#E6D5CC] shadow-sm p-6 mb-6">
                     <div className="text-xs font-bold text-[#8a6a5c] uppercase mb-2">{currentCard.topic}</div>
                     
-                    <div className="prose prose-lg max-w-none text-[#4A3B32] mb-6">
+                    <div className="prose prose-lg max-w-none text-[#4A3B32] mb-6 overflow-x-auto">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
                             {currentCard.question}
                         </ReactMarkdown>
@@ -212,7 +216,7 @@ const StudyDashboard = ({ projectId, availableTopics }) => {
                         </button>
                     ) : (
                         <div className="space-y-4">
-                            <div className="bg-[#FDF6F0] rounded-xl p-4 prose prose-sm max-w-none">
+                            <div className="bg-[#FDF6F0] rounded-xl p-4 prose prose-sm max-w-none overflow-x-auto">
                                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                     {currentCard.answer}
                                 </ReactMarkdown>
@@ -253,7 +257,7 @@ const StudyDashboard = ({ projectId, availableTopics }) => {
     }
 
     return (
-        <div className="max-w-4xl mx-auto p-4 space-y-6">
+        <div className="h-full overflow-y-auto custom-scrollbar p-4 md:p-8"><div className="max-w-4xl mx-auto space-y-6">
             {/* Header */}
             <div className="flex justify-between items-center">
                 <div>
@@ -503,6 +507,7 @@ const StudyDashboard = ({ projectId, availableTopics }) => {
                     )}
                 </div>
             )}
+        </div>
         </div>
     );
 };

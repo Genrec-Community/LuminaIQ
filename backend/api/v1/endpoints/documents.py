@@ -1,56 +1,72 @@
-import shutil
 import os
-import uuid
+import asyncio
 import tempfile
-from typing import List
+from typing import List, Optional
 from fastapi import (
     APIRouter,
     UploadFile,
     File,
     HTTPException,
-    BackgroundTasks,
     Depends,
     Form,
     status,
 )
+from pydantic import BaseModel
 from services.document_service import document_service
+from services.embedding_service import embedding_service
+from services.qdrant_service import qdrant_service
 from models.schemas import DocumentUploadResponse, DocumentList
 from config.settings import settings
 from api.deps import get_current_user
 from utils.embedding_queue import get_embedding_queue
-import httpx
 from utils.logger import logger
+from db.client import async_db, get_supabase_client
 
 router = APIRouter()
 
 
+class SearchRequest(BaseModel):
+    query: str
+    document_ids: Optional[List[str]] = None
+    limit: int = 10
+
+
+class SearchResult(BaseModel):
+    text: str
+    document_id: str
+    document_name: Optional[str] = None
+    chunk_id: Optional[int] = None
+    score: float
+
+
 @router.post("/upload", response_model=DocumentUploadResponse)
 async def upload_document(
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     project_id: str = Form(...),
     current_user: dict = Depends(get_current_user),
 ):
     """
-    Upload a document and start processing it.
-    Securely handles file uploads.
-    """
-    temp_file = None
-    try:
-        # 1. Validate Project Access (Check ownership)
-        # Ideally we check if project exists and belongs to user first.
-        # For now, relying on RLS at database level or simple check.
+    Upload a document and start processing directly.
 
-        # 2. Validate File Type (MIME & Extension)
+    UNIFIED FLOW (no external pdfprocess service):
+    1. Validate file → 2. Save temp file → 3. Create DB record
+    4. Background: extract text → chunk → embed to Qdrant → topics → knowledge graph
+    5. Real-time SSE progress via /api/v1/progress/{document_id}
+    """
+    temp_path = None
+    try:
+        # 1. Validate File Type (MIME & Extension)
         allowed_mimes = [
             "application/pdf",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             "text/plain",
+            "text/html",
+            "text/markdown",
         ]
         if file.content_type not in allowed_mimes:
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
-                "Invalid file type. Only PDF, DOCX, and TXT are supported.",
+                "Invalid file type. Only PDF, DOCX, TXT, HTML, and MD are supported.",
             )
 
         file_ext = os.path.splitext(file.filename)[1].lower().replace(".", "")
@@ -60,58 +76,86 @@ async def upload_document(
                 f"Invalid file extension. Allowed: {settings.ALLOWED_EXTENSIONS}",
             )
 
-        # 3. Read file content to check size
-        file_content = await file.read()
-        file_size = len(file_content)
-        if file_size > settings.MAX_FILE_SIZE:
-            raise HTTPException(
-                status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                f"File size exceeds limit of {settings.MAX_FILE_SIZE} bytes",
-            )
+        # 2. Stream to temp file (memory-efficient for large files)
+        os.makedirs("temp", exist_ok=True)
+        temp_file = tempfile.NamedTemporaryFile(
+            delete=False, suffix=f".{file_ext}", dir="temp"
+        )
 
-        # 4. Send to PDF processing service
-        try:
-            logger.info(f"Sending {file.filename} to PDF service")
-            async with httpx.AsyncClient() as client:
-                from io import BytesIO
+        file_size = 0
+        chunk_size = 1024 * 1024  # 1MB chunks
 
-                files = {
-                    "file": (file.filename, BytesIO(file_content), file.content_type)
-                }
-                data = {"project_id": project_id}
-                response = await client.post(
-                    "http://localhost:8001/upload", files=files, data=data, timeout=30.0
+        while True:
+            chunk = await file.read(chunk_size)
+            if not chunk:
+                break
+            file_size += len(chunk)
+            if file_size > settings.MAX_FILE_SIZE:
+                temp_file.close()
+                os.unlink(temp_file.name)
+                raise HTTPException(
+                    status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    f"File size exceeds limit of {settings.MAX_FILE_SIZE} bytes",
                 )
+            temp_file.write(chunk)
 
-            logger.info(f"PDF service response: {response.status_code}")
-            if response.status_code == 200:
-                document = response.json()
-                logger.info(f"Document created: {document['id']}")
-                return document
-            else:
-                logger.error(f"PDF service error: {response.text}")
-                raise HTTPException(500, f"PDF service error: {response.text}")
+        temp_file.close()
+        temp_path = temp_file.name
 
-        except httpx.RequestError as e:
-            logger.error(f"Failed to connect to PDF service: {str(e)}")
-            raise HTTPException(500, f"Failed to connect to PDF service: {str(e)}")
-        except Exception as e:
-            logger.error(f"Unexpected error sending to PDF service: {str(e)}")
-            raise HTTPException(500, f"Unexpected error: {str(e)}")
+        # 3. Create document record in Supabase
+        doc_data = {
+            "project_id": project_id,
+            "filename": file.filename,
+            "file_type": file.content_type,
+            "file_size": file_size,
+            "upload_status": "pending",
+        }
 
-    except HTTPException as he:
-        if temp_file and os.path.exists(temp_file.name):
+        response = await async_db(
+            lambda: get_supabase_client()
+            .table("documents")
+            .insert(doc_data)
+            .execute()
+        )
+
+        if not response.data:
+            raise HTTPException(500, "Failed to create document record")
+
+        document = response.data[0]
+        document_id = document["id"]
+
+        # 4. Start CONCURRENT background processing (asyncio.create_task = truly parallel)
+        # This is the key fix: background_tasks.add_task() runs SERIALLY in Starlette,
+        # but asyncio.create_task() creates a truly concurrent coroutine.
+        asyncio.create_task(
+            document_service.process_document(
+                document_id=document_id,
+                project_id=project_id,
+                file_path=temp_path,
+                filename=file.filename,
+            )
+        )
+
+        logger.info(
+            f"Document {file.filename} upload started, processing in background"
+        )
+
+        return document
+
+    except HTTPException:
+        if temp_path and os.path.exists(temp_path):
             try:
-                os.unlink(temp_file.name)
-            except:
+                os.unlink(temp_path)
+            except Exception:
                 pass
-        raise he
+        raise
     except Exception as e:
-        if temp_file and os.path.exists(temp_file.name):
+        if temp_path and os.path.exists(temp_path):
             try:
-                os.unlink(temp_file.name)
-            except:
+                os.unlink(temp_path)
+            except Exception:
                 pass
+        logger.error(f"Upload error: {str(e)}")
         raise HTTPException(500, str(e))
 
 
@@ -119,16 +163,10 @@ async def upload_document(
 async def list_documents(
     project_id: str, current_user: dict = Depends(get_current_user)
 ):
-    """
-    List all documents for a project
-    """
+    """List all documents for a project"""
     try:
-        # Verify project access first ideally, but RLS should handle filtering if configured.
-        # Adding manual check for extra safety.
-
-        # Basic query
-        response = (
-            document_service.client.table("documents")
+        response = await async_db(
+            lambda: document_service.client.table("documents")
             .select("*")
             .eq("project_id", project_id)
             .execute()
@@ -142,9 +180,7 @@ async def list_documents(
 async def delete_document(
     document_id: str, project_id: str, current_user: dict = Depends(get_current_user)
 ):
-    """
-    Delete a document
-    """
+    """Delete a document"""
     try:
         await document_service.delete_document(project_id, document_id)
         return {"message": "Document deleted successfully"}
@@ -159,9 +195,8 @@ async def get_queue_status(current_user: dict = Depends(get_current_user)):
 
     Returns:
         - queued: Number of documents waiting
-        - processing: Currently processing (0 or 1)
+        - processing: Currently processing
         - current_job: Filename being processed
-        - queue: List of waiting documents with positions
     """
     try:
         queue = get_embedding_queue()
@@ -174,19 +209,78 @@ async def get_queue_status(current_user: dict = Depends(get_current_user)):
 async def get_document_queue_status(
     document_id: str, current_user: dict = Depends(get_current_user)
 ):
-    """
-    Get queue status for a specific document.
-
-    Returns:
-        - status: queued/processing/completed/failed
-        - position: Position in queue (0 = processing)
-        - progress: Embedding progress percentage
-    """
+    """Get queue status for a specific document."""
     try:
         queue = get_embedding_queue()
-        status = queue.get_document_status(document_id)
-        if not status:
+        doc_status = queue.get_document_status(document_id)
+        if not doc_status:
             return {"status": "not_in_queue", "message": "Document not found in queue"}
-        return status
+        return doc_status
     except Exception as e:
         raise HTTPException(500, str(e))
+
+
+@router.post("/{project_id}/search")
+async def search_documents(
+    project_id: str,
+    request: SearchRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Semantic search across documents in a project."""
+    try:
+        collection_name = f"project_{project_id}"
+
+        # Generate embedding for the search query
+        query_embedding = await embedding_service.generate_embedding(request.query)
+
+        # Build filter conditions
+        filter_conditions = None
+        if request.document_ids and len(request.document_ids) > 0:
+            filter_conditions = {"document_ids": request.document_ids}
+
+        # Search in Qdrant
+        results = await qdrant_service.search(
+            collection_name=collection_name,
+            query_vector=query_embedding,
+            limit=request.limit,
+            filter_conditions=filter_conditions,
+        )
+
+        # Get document names from the database for richer results
+        doc_names = {}
+        if results:
+            doc_ids = list(
+                set(r.get("document_id") for r in results if r.get("document_id"))
+            )
+            if doc_ids:
+                try:
+                    docs_response = await async_db(
+                        lambda: document_service.client.table("documents")
+                        .select("id, filename")
+                        .in_("id", doc_ids)
+                        .execute()
+                    )
+                    for doc in docs_response.data:
+                        doc_names[doc["id"]] = doc["filename"]
+                except Exception as e:
+                    logger.warning(f"Could not fetch document names: {e}")
+
+        # Format results
+        search_results = []
+        for result in results:
+            doc_id = result.get("document_id")
+            search_results.append(
+                {
+                    "text": result.get("text", ""),
+                    "document_id": doc_id,
+                    "document_name": doc_names.get(doc_id, "Unknown"),
+                    "chunk_id": result.get("chunk_id"),
+                    "score": result.get("score", 0),
+                }
+            )
+
+        return {"results": search_results, "query": request.query}
+
+    except Exception as e:
+        logger.error(f"Search error: {str(e)}")
+        raise HTTPException(500, f"Search failed: {str(e)}")

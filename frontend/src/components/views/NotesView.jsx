@@ -1,25 +1,114 @@
-import React, { useState } from 'react';
-import { BookOpen, Copy, Download, Loader2, ChevronDown } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { BookOpen, Copy, Loader2, ChevronDown, FileDown, Trash2, Clock, Eye, Plus, ArrowLeft } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { generateNotes } from '../../api';
+import { generateNotes, getSavedNotes, getSavedNote, deleteSavedNote } from '../../api';
 import { useToast } from '../../context/ToastContext';
+import { recordActivity } from '../../utils/studyActivity';
 
-const NotesView = ({ projectId, availableTopics, selectedDocuments }) => {
+const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopic = null, preGeneratedData = null, onConsumePreGenerated = null }) => {
     const toast = useToast();
+
+    // View mode: 'list' | 'form' | 'viewing'
+    const [viewMode, setViewMode] = useState('list');
+
+    // Saved notes
+    const [savedNotes, setSavedNotes] = useState([]);
+    const [savedLoading, setSavedLoading] = useState(true);
+
     // Notes State
     const [notesType, setNotesType] = useState('Comprehensive Summary');
     const [notesTopic, setNotesTopic] = useState('');
     const [notesTopicSelection, setNotesTopicSelection] = useState('');
     const [notesContent, setNotesContent] = useState('');
+    const [notesTitle, setNotesTitle] = useState('');
     const [notesLoading, setNotesLoading] = useState(false);
+    const [pdfLoading, setPdfLoading] = useState(false);
+
+    // Ref for the rendered notes content
+    const notesRef = useRef(null);
+
+    // Pre-select topic when navigating from Learning Path
+    useEffect(() => {
+        if (preSelectedTopic && availableTopics?.includes(preSelectedTopic)) {
+            setNotesTopicSelection(preSelectedTopic);
+            setNotesTopic(preSelectedTopic);
+        }
+    }, [preSelectedTopic]);
+
+    // Load pre-generated notes from chat @ command "Open" button
+    useEffect(() => {
+        if (preGeneratedData && preGeneratedData.content) {
+            setNotesContent(preGeneratedData.content);
+            setNotesType(preGeneratedData.noteType || 'Comprehensive Summary');
+            const topic = preGeneratedData.topic || '';
+            setNotesTopic(topic);
+            setNotesTopicSelection(topic);
+            setNotesTitle(preGeneratedData.title || preGeneratedData.noteType || 'Notes');
+            setViewMode('viewing');
+            if (onConsumePreGenerated) onConsumePreGenerated();
+        }
+    }, [preGeneratedData]);
+
+    // Fetch saved notes on mount
+    useEffect(() => {
+        fetchSavedNotes();
+    }, [projectId]);
+
+    const fetchSavedNotes = async () => {
+        setSavedLoading(true);
+        try {
+            const data = await getSavedNotes(projectId);
+            setSavedNotes(data || []);
+        } catch (error) {
+            console.error('Failed to fetch saved notes:', error);
+        } finally {
+            setSavedLoading(false);
+        }
+    };
+
+    const handleViewSavedNote = async (noteId) => {
+        try {
+            setNotesLoading(true);
+            setViewMode('viewing');
+            const data = await getSavedNote(noteId);
+            setNotesContent(data.content || '');
+            setNotesType(data.note_type || 'Comprehensive Summary');
+            setNotesTopic(data.topic || '');
+            setNotesTopicSelection(data.topic || '');
+            setNotesTitle(data.title || data.note_type || 'Notes');
+        } catch (error) {
+            console.error('Failed to load saved note:', error);
+            toast.error('Failed to load saved note');
+            setViewMode('list');
+        } finally {
+            setNotesLoading(false);
+        }
+    };
+
+    const handleDeleteNote = async (noteId, e) => {
+        if (e) e.stopPropagation();
+        try {
+            await deleteSavedNote(noteId);
+            toast.success('Note deleted');
+            setSavedNotes(prev => prev.filter(n => n.id !== noteId));
+        } catch (error) {
+            console.error('Failed to delete note:', error);
+            toast.error('Failed to delete note');
+        }
+    };
+
+    const formatDate = (dateStr) => {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    };
 
     const handleGenerateNotes = async () => {
         setNotesLoading(true);
         setNotesContent('');
+        setViewMode('viewing');
 
-        // If specific topic selected/entered, use it. Otherwise general.
-        // Actually backend expects `topic` for targeted notes.
         const effectiveTopic = notesTopicSelection === '__custom__' ? notesTopic : notesTopicSelection;
 
         try {
@@ -29,26 +118,196 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments }) => {
                 effectiveTopic,
                 selectedDocuments
             );
-            // Assuming data is an object with { notes: "..." } or just the text
-            // Based on other endpoints, it likely returns an object. 
-            // If it returns raw text, data would be the string.
-            // Let's assume it returns { notes: "..." } for now, but if it just returns the string from api.js (response.data), check structure.
-            // Actually, let's look at api.js again. It returns response.data.
-            // If the backend returns { notes: "content" }, then we use data.notes.
-            // If the backend returns "content", we use data.
-            // API returns { content: "..." } based on user report
             setNotesContent(typeof data === 'string' ? data : (data.notes || data.content || JSON.stringify(data)));
+            setNotesTitle(data.title || notesType);
+
+            // Track notes generation activity for heatmap
+            recordActivity(projectId, 'notes');
+
+            // Refresh saved list since new note was auto-saved
+            fetchSavedNotes();
         } catch (error) {
             console.error("Notes gen error", error);
             toast.error('Failed to generate notes');
+            setViewMode('form');
         } finally {
             setNotesLoading(false);
         }
     };
 
+    const handleBackToList = () => {
+        setNotesContent('');
+        setNotesTopic('');
+        setNotesTopicSelection('');
+        setNotesTitle('');
+        setViewMode('list');
+    };
+
     const copyToClipboard = () => {
         navigator.clipboard.writeText(notesContent);
         toast.success('Notes copied to clipboard!');
+    };
+
+    const handleDownloadPDF = async () => {
+        if (!notesRef.current || !notesContent) return;
+
+        setPdfLoading(true);
+        try {
+            const html2pdf = (await import('html2pdf.js')).default;
+
+            // Build a clean filename
+            const topicLabel = notesTopic || notesTopicSelection || 'General';
+            const safeFilename = `${notesType} - ${topicLabel}`
+                .replace(/[^a-zA-Z0-9 _-]/g, '')
+                .replace(/\s+/g, '_')
+                .substring(0, 80);
+
+            // Create a temporary container with PDF-optimized styles
+            const container = document.createElement('div');
+            container.innerHTML = `
+                <style>
+                    .pdf-wrapper {
+                        font-family: 'Georgia', 'Times New Roman', serif;
+                        color: #1a1a1a;
+                        line-height: 1.7;
+                        padding: 0;
+                    }
+                    .pdf-header {
+                        text-align: center;
+                        margin-bottom: 24px;
+                        padding-bottom: 16px;
+                        border-bottom: 2px solid #C8A288;
+                    }
+                    .pdf-header h1 {
+                        font-size: 22px;
+                        font-weight: 700;
+                        color: #4A3B32;
+                        margin: 0 0 4px 0;
+                    }
+                    .pdf-header p {
+                        font-size: 13px;
+                        color: #8a6a5c;
+                        margin: 0;
+                    }
+                    .pdf-body h1 { font-size: 20px; font-weight: 700; color: #4A3B32; margin: 24px 0 10px 0; border-bottom: 1px solid #E6D5CC; padding-bottom: 6px; }
+                    .pdf-body h2 { font-size: 17px; font-weight: 700; color: #4A3B32; margin: 20px 0 8px 0; }
+                    .pdf-body h3 { font-size: 15px; font-weight: 600; color: #5a4a42; margin: 16px 0 6px 0; }
+                    .pdf-body p { font-size: 12px; margin: 6px 0; }
+                    .pdf-body ul, .pdf-body ol { font-size: 12px; padding-left: 22px; margin: 6px 0; }
+                    .pdf-body li { margin-bottom: 4px; }
+                    .pdf-body strong { color: #4A3B32; }
+                    .pdf-body blockquote {
+                        border-left: 3px solid #C8A288;
+                        padding: 8px 14px;
+                        margin: 10px 0;
+                        background: #FDF6F0;
+                        font-size: 12px;
+                    }
+                    .pdf-body code {
+                        background: #f0ebe6;
+                        padding: 1px 5px;
+                        border-radius: 3px;
+                        font-size: 11px;
+                        font-family: 'Courier New', monospace;
+                    }
+                    .pdf-body pre {
+                        background: #f8f4f0;
+                        padding: 12px;
+                        border-radius: 6px;
+                        overflow-x: auto;
+                        font-size: 11px;
+                        border: 1px solid #E6D5CC;
+                    }
+                    .pdf-body pre code {
+                        background: none;
+                        padding: 0;
+                    }
+                    .pdf-body table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin: 12px 0;
+                        font-size: 11px;
+                    }
+                    .pdf-body th {
+                        background: #C8A288;
+                        color: white;
+                        font-weight: 600;
+                        padding: 8px 10px;
+                        text-align: left;
+                        border: 1px solid #b0917a;
+                    }
+                    .pdf-body td {
+                        padding: 7px 10px;
+                        border: 1px solid #E6D5CC;
+                    }
+                    .pdf-body tr:nth-child(even) td {
+                        background: #FDF6F0;
+                    }
+                    .pdf-body hr {
+                        border: none;
+                        border-top: 1px solid #E6D5CC;
+                        margin: 16px 0;
+                    }
+                    .pdf-footer {
+                        margin-top: 24px;
+                        padding-top: 12px;
+                        border-top: 1px solid #E6D5CC;
+                        text-align: center;
+                        font-size: 10px;
+                        color: #8a6a5c;
+                    }
+                </style>
+                <div class="pdf-wrapper">
+                    <div class="pdf-header">
+                        <h1>${notesType}</h1>
+                        <p>${topicLabel !== 'General' ? topicLabel + ' | ' : ''}Generated by Lumina IQ | ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                    </div>
+                    <div class="pdf-body">
+                        ${notesRef.current.innerHTML}
+                    </div>
+                    <div class="pdf-footer">
+                        Generated with Lumina IQ &mdash; AI-Powered Study Notes
+                    </div>
+                </div>
+            `;
+
+            const opt = {
+                margin: [12, 14, 12, 14],
+                filename: `${safeFilename}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    letterRendering: true,
+                },
+                jsPDF: {
+                    unit: 'mm',
+                    format: 'a4',
+                    orientation: 'portrait',
+                },
+                pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
+            };
+
+            await html2pdf().set(opt).from(container).save();
+            toast.success('PDF downloaded successfully!');
+        } catch (error) {
+            console.error('PDF generation error:', error);
+            toast.error('Failed to generate PDF. Please try again.');
+        } finally {
+            setPdfLoading(false);
+        }
+    };
+
+    // Note type badge color
+    const getNoteTypeBadge = (type) => {
+        const map = {
+            'Comprehensive Summary': { bg: 'bg-blue-50', text: 'text-blue-700' },
+            'Bullet Point Key Facts': { bg: 'bg-green-50', text: 'text-green-700' },
+            'Glossary of Terms': { bg: 'bg-purple-50', text: 'text-purple-700' },
+            'Exam Cheat Sheet': { bg: 'bg-orange-50', text: 'text-orange-700' },
+        };
+        return map[type] || { bg: 'bg-gray-50', text: 'text-gray-700' };
     };
 
     return (
@@ -73,8 +332,101 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments }) => {
                 </div>
             )}
 
-            {!notesContent && !notesLoading ? (
+            {/* ========== LIST VIEW: Show saved notes ========== */}
+            {!notesLoading && viewMode === 'list' && (
+                <div className="animate-in fade-in slide-in-from-bottom-4">
+                    <div className="flex items-center justify-between mb-8">
+                        <div>
+                            <h2 className="text-2xl font-bold text-[#4A3B32]">Study Notes</h2>
+                            <p className="text-[#8a6a5c]">Generate comprehensive summaries or targeted study guides</p>
+                        </div>
+                        <button
+                            onClick={() => setViewMode('form')}
+                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#C8A288] to-[#A08072] text-white rounded-lg hover:opacity-90 transition-opacity shadow-sm"
+                        >
+                            <Plus className="h-4 w-4" />
+                            New Notes
+                        </button>
+                    </div>
+
+                    {savedLoading ? (
+                        <div className="flex items-center justify-center py-16">
+                            <Loader2 className="h-8 w-8 text-[#C8A288] animate-spin" />
+                        </div>
+                    ) : savedNotes.length === 0 ? (
+                        <div className="text-center py-16">
+                            <div className="h-20 w-20 bg-[#FDF6F0] rounded-full flex items-center justify-center mx-auto mb-6">
+                                <BookOpen className="h-10 w-10 text-[#C8A288]" />
+                            </div>
+                            <h3 className="text-xl font-bold text-[#4A3B32] mb-2">No Notes Yet</h3>
+                            <p className="text-[#8a6a5c] mb-6">Generate your first set of study notes</p>
+                            <button
+                                onClick={() => setViewMode('form')}
+                                className="px-6 py-3 bg-gradient-to-r from-[#C8A288] to-[#A08072] text-white rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2 mx-auto"
+                            >
+                                <BookOpen className="h-5 w-5" />
+                                Generate Notes
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {savedNotes.map((note) => {
+                                const badge = getNoteTypeBadge(note.note_type);
+                                return (
+                                    <div
+                                        key={note.id}
+                                        onClick={() => handleViewSavedNote(note.id)}
+                                        className="bg-white rounded-xl border border-[#E6D5CC] p-5 hover:shadow-lg transition-all cursor-pointer group"
+                                    >
+                                        <div className="flex items-start justify-between mb-3">
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className="font-bold text-[#4A3B32] mb-1 truncate">{note.title || note.note_type || 'Notes'}</h3>
+                                                <div className="flex items-center gap-1.5 text-xs text-[#8a6a5c]">
+                                                    <Clock className="h-3 w-3" />
+                                                    {formatDate(note.created_at)}
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={(e) => handleDeleteNote(note.id, e)}
+                                                className="text-red-400 hover:text-red-600 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                        {note.note_type && (
+                                            <div className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium mb-2 ${badge.bg} ${badge.text}`}>
+                                                {note.note_type}
+                                            </div>
+                                        )}
+                                        {note.topic && (
+                                            <p className="text-xs text-[#8a6a5c] mb-3 truncate">{note.topic}</p>
+                                        )}
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handleViewSavedNote(note.id); }}
+                                            className="w-full py-2 bg-[#C8A288] text-white rounded-lg hover:bg-[#B08B72] transition-colors text-sm font-medium flex items-center justify-center gap-1.5"
+                                        >
+                                            <Eye className="h-3.5 w-3.5" />
+                                            View
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ========== FORM VIEW: Generate new notes ========== */}
+            {!notesLoading && viewMode === 'form' && (
                 <div className="text-center py-12 animate-in fade-in slide-in-from-bottom-4">
+                    <button
+                        onClick={() => setViewMode('list')}
+                        className="flex items-center gap-2 px-4 py-2 mb-4 text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30 rounded-lg font-medium transition-colors"
+                    >
+                        <ArrowLeft className="h-4 w-4" />
+                        Back to Saved
+                    </button>
+
                     <div className="h-20 w-20 bg-[#FDF6F0] rounded-full flex items-center justify-center mx-auto mb-6">
                         <BookOpen className="h-10 w-10 text-[#C8A288]" />
                     </div>
@@ -152,31 +504,79 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments }) => {
                         </button>
                     </div>
                 </div>
-            ) : (
-                <div className="pb-12 animate-in fade-in slide-in-from-bottom-8 duration-500 h-full flex flex-col">
-                    <div className="flex justify-between items-center mb-6">
+            )}
+
+            {/* ========== VIEWING MODE: Show notes content ========== */}
+            {!notesLoading && viewMode === 'viewing' && notesContent && (
+                <div className="pb-6 animate-in fade-in slide-in-from-bottom-8 duration-500">
+                    {/* Action Bar */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-[#E6D5CC]">
                         <div>
-                            <h3 className="text-2xl font-bold text-[#4A3B32]">{notesType}</h3>
-                            <p className="text-sm text-[#8a6a5c] font-medium">{notesTopic || notesTopicSelection || 'General'}</p>
+                            <button
+                                onClick={handleBackToList}
+                                className="flex items-center gap-1.5 text-sm text-[#8a6a5c] hover:text-[#4A3B32] mb-2 transition-colors"
+                            >
+                                <ArrowLeft className="h-3.5 w-3.5" />
+                                Back to Saved
+                            </button>
+                            <h3 className="text-xl md:text-2xl font-bold text-[#4A3B32]">{notesTitle || notesType}</h3>
+                            {(notesTopic || notesTopicSelection) && (
+                                <p className="text-sm text-[#8a6a5c] font-medium mt-1">{notesTopic || notesTopicSelection}</p>
+                            )}
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                             <button
                                 onClick={copyToClipboard}
-                                className="p-2 border border-[#E6D5CC] rounded-lg hover:bg-[#FDF6F0] text-[#8a6a5c] transition-colors"
+                                className="flex items-center gap-2 px-3 py-2 border border-[#E6D5CC] rounded-lg hover:bg-[#FDF6F0] text-[#8a6a5c] transition-colors text-sm"
                                 title="Copy to Clipboard"
                             >
-                                <Copy className="h-5 w-5" />
+                                <Copy className="h-4 w-4" />
+                                <span className="hidden sm:inline">Copy</span>
                             </button>
                             <button
-                                onClick={() => { setNotesContent(''); setNotesTopic(''); setNotesTopicSelection(''); }}
-                                className="px-4 py-2 bg-[#C8A288] text-white rounded-lg hover:bg-[#B08B72] font-medium transition-colors"
+                                onClick={handleDownloadPDF}
+                                disabled={pdfLoading || notesLoading}
+                                className="flex items-center gap-2 px-3 py-2 border border-[#C8A288] text-[#C8A288] rounded-lg hover:bg-[#C8A288] hover:text-white font-medium transition-colors disabled:opacity-50 text-sm"
+                                title="Download as PDF"
+                            >
+                                {pdfLoading ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <FileDown className="h-4 w-4" />
+                                )}
+                                <span className="hidden sm:inline">{pdfLoading ? 'Generating...' : 'PDF'}</span>
+                            </button>
+                            <button
+                                onClick={() => { setNotesContent(''); setNotesTopic(''); setNotesTopicSelection(''); setNotesTitle(''); setViewMode('form'); }}
+                                className="px-3 py-2 bg-[#C8A288] text-white rounded-lg hover:bg-[#B08B72] font-medium transition-colors text-sm"
                             >
                                 New Notes
                             </button>
                         </div>
                     </div>
 
-                    <div className="bg-white p-8 rounded-3xl border border-[#E6D5CC] shadow-sm flex-1 overflow-y-auto prose prose-lg max-w-none text-[#4A3B32]">
+                    {/* Notes Content */}
+                    <div
+                        ref={notesRef}
+                        className="bg-white p-6 md:p-10 rounded-2xl border border-[#E6D5CC] shadow-sm prose prose-base md:prose-lg max-w-none text-[#4A3B32] overflow-x-auto
+                        prose-headings:text-[#4A3B32] prose-headings:font-bold
+                        prose-h1:text-2xl prose-h1:mb-4 prose-h1:pb-2 prose-h1:border-b prose-h1:border-[#E6D5CC]
+                        prose-h2:text-xl prose-h2:mb-3 prose-h2:mt-6
+                        prose-h3:text-lg prose-h3:mb-2 prose-h3:mt-4
+                        prose-p:leading-relaxed prose-p:mb-4
+                        prose-ul:my-4 prose-ul:list-disc prose-ul:pl-6
+                        prose-ol:my-4 prose-ol:list-decimal prose-ol:pl-6
+                        prose-li:mb-2
+                        prose-strong:text-[#4A3B32] prose-strong:font-semibold
+                        prose-code:bg-[#FDF6F0] prose-code:px-2 prose-code:py-1 prose-code:rounded prose-code:text-sm prose-code:text-[#C8A288]
+                        prose-pre:bg-[#FDF6F0] prose-pre:border prose-pre:border-[#E6D5CC] prose-pre:rounded-xl prose-pre:p-4
+                        prose-blockquote:border-l-4 prose-blockquote:border-[#C8A288] prose-blockquote:pl-4 prose-blockquote:italic prose-blockquote:text-[#8a6a5c]
+                        prose-a:text-[#C8A288] prose-a:no-underline hover:prose-a:underline
+                        prose-table:border-collapse prose-table:w-full
+                        prose-th:bg-[#C8A288] prose-th:text-white prose-th:p-3 prose-th:text-left prose-th:font-semibold
+                        prose-td:border prose-td:border-[#E6D5CC] prose-td:p-3
+                        prose-tr:even:bg-[#FDF6F0]"
+                    >
                         {notesLoading && !notesContent ? (
                             <div className="flex items-center justify-center h-40 gap-3 text-[#8a6a5c]">
                                 <Loader2 className="h-6 w-6 animate-spin" />

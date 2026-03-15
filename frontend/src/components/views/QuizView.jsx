@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { HelpCircle, FileText, LogOut, CheckSquare, X, ChevronDown, Loader2, BookMarked, Brain, Zap, Sparkles, ArrowLeft, Target, Trophy, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { HelpCircle, FileText, LogOut, CheckSquare, X, ChevronDown, Loader2, BookMarked, Brain, Zap, Sparkles, ArrowLeft, Target, Trophy, AlertTriangle, Clock, Trash2, Eye, Plus } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { generateMCQ, generateSubjectiveTest, submitEvaluation, submitSubjectiveTest, generateNotes, recordPerformance, createCardsFromQuiz, getSuggestedTopic } from '../../api';
+import { generateMCQ, generateSubjectiveTest, submitEvaluation, submitSubjectiveTest, generateNotes, recordPerformance, createCardsFromQuiz, getSuggestedTopic, getPerformance, getSavedQuizzes, getSavedQuiz, deleteSavedQuiz } from '../../api';
 import { useToast } from '../../context/ToastContext';
+import { recordActivity } from '../../utils/studyActivity';
+import { useSettings } from '../../context/SettingsContext';
 
 const QuizView = ({ 
     projectId, 
@@ -12,19 +14,33 @@ const QuizView = ({
     // Learning Path integration props
     preSelectedTopic = null,
     preSelectedMode = null,
+    preGeneratedData = null,
+    onConsumePreGenerated = null,
     cameFromPath = false,
     onReturnToPath = null,
     onQuizComplete = null,
-    onQuizActiveChange = null // NEW: Callback to notify parent when quiz is active
+    onQuizActiveChange = null, // NEW: Callback to notify parent when quiz is active
+    onBack = null // NEW: Back button to return to chat
 }) => {
     const toast = useToast();
+    const { settings } = useSettings();
     const [quizMode, setQuizMode] = useState('mcq'); // 'mcq' | 'subjective' | 'both'
+    
+    // Saved quizzes state
+    const [savedQuizzes, setSavedQuizzes] = useState([]);
+    const [savedLoading, setSavedLoading] = useState(true);
+    const [showSavedList, setShowSavedList] = useState(true); // Show list by default
 
     // MCQ State
     const [mcqTopic, setMcqTopic] = useState('');
     const [mcqTopicSelection, setMcqTopicSelection] = useState('');
     const [mcqNumQuestions, setMcqNumQuestions] = useState(5);
     const [mcqDifficulty, setMcqDifficulty] = useState('medium'); // 'easy' | 'medium' | 'hard'
+    
+    // Adaptive Difficulty State
+    const [isAdaptiveMode, setIsAdaptiveMode] = useState(false);
+    const [adaptiveComputed, setAdaptiveComputed] = useState(null); // { difficulty, avgScore, quizCount }
+    const [adaptiveLoading, setAdaptiveLoading] = useState(false);
     const [mcqTest, setMcqTest] = useState(null);
     const [mcqLoading, setMcqLoading] = useState(false);
     const [mcqUserAnswers, setMcqUserAnswers] = useState({});
@@ -57,6 +73,76 @@ const QuizView = ({
     const [bothSubjectiveScore, setBothSubjectiveScore] = useState(null);
     const [bothCombinedScore, setBothCombinedScore] = useState(null);
     
+    // ==================== ADAPTIVE DIFFICULTY ENGINE ====================
+    
+    // Initialize adaptive mode from settings on mount
+    useEffect(() => {
+        if (settings.quizDifficulty === 'adaptive') {
+            setIsAdaptiveMode(true);
+            computeAdaptiveDifficulty();
+        } else {
+            setIsAdaptiveMode(false);
+            setAdaptiveComputed(null);
+            setMcqDifficulty(settings.quizDifficulty || 'medium');
+        }
+    }, [settings.quizDifficulty, projectId]);
+    
+    // Compute adaptive difficulty from recent performance
+    const computeAdaptiveDifficulty = async () => {
+        setAdaptiveLoading(true);
+        try {
+            const perfData = await getPerformance(projectId);
+            
+            // perfData is an array of { topic, correct, wrong, ... }
+            // Calculate average score across all recent quizzes
+            let totalCorrect = 0;
+            let totalWrong = 0;
+            let quizCount = 0;
+            
+            if (perfData && Array.isArray(perfData)) {
+                // Use up to last 10 entries for adaptive calculation
+                const recent = perfData.slice(-10);
+                recent.forEach(entry => {
+                    totalCorrect += (entry.correct || 0);
+                    totalWrong += (entry.wrong || 0);
+                    quizCount++;
+                });
+            }
+            
+            const totalAttempted = totalCorrect + totalWrong;
+            let avgScore = totalAttempted > 0 ? (totalCorrect / totalAttempted) * 100 : 50;
+            
+            // Determine difficulty:
+            // < 50% average => easy (student is struggling)
+            // 50-80% average => medium (student is learning)
+            // > 80% average => hard (student is excelling)
+            let computedDifficulty = 'medium';
+            if (quizCount === 0) {
+                // No history — use self-assessed level from profile
+                const levelMap = { beginner: 'easy', intermediate: 'medium', advanced: 'hard' };
+                computedDifficulty = levelMap[settings.selfLevel] || 'medium';
+            } else if (avgScore < 50) {
+                computedDifficulty = 'easy';
+            } else if (avgScore > 80) {
+                computedDifficulty = 'hard';
+            } else {
+                computedDifficulty = 'medium';
+            }
+            
+            setAdaptiveComputed({ difficulty: computedDifficulty, avgScore: Math.round(avgScore), quizCount });
+            setMcqDifficulty(computedDifficulty);
+        } catch (error) {
+            console.log('Adaptive difficulty: no performance data, using medium', error);
+            // Fallback to self-assessed level
+            const levelMap = { beginner: 'easy', intermediate: 'medium', advanced: 'hard' };
+            const fallback = levelMap[settings.selfLevel] || 'medium';
+            setAdaptiveComputed({ difficulty: fallback, avgScore: 0, quizCount: 0 });
+            setMcqDifficulty(fallback);
+        } finally {
+            setAdaptiveLoading(false);
+        }
+    };
+    
     // Notify parent when quiz is active (loading or test exists)
     useEffect(() => {
         if (onQuizActiveChange) {
@@ -85,13 +171,34 @@ const QuizView = ({
                 setMcqNumQuestions(5);
                 setEvalNumQuestions(2);
             }
+            setShowSavedList(false);
         }
     }, [preSelectedTopic, preSelectedMode]);
+
+    // Load pre-generated quiz from chat @ command "Open" button
+    useEffect(() => {
+        if (preGeneratedData && preGeneratedData.questions) {
+            setMcqTest(preGeneratedData);
+            const topic = preGeneratedData.topic || '';
+            setMcqTopic(topic);
+            setMcqTopicSelection(topic);
+            setQuizMode('mcq');
+            setMcqUserAnswers({});
+            setMcqSubmitted(false);
+            setMcqScore(null);
+            setCurrentQuestionIndex(0);
+            setPerformanceSaved(false);
+            setCardsCreated(null);
+            setShowSavedList(false);
+            if (onConsumePreGenerated) onConsumePreGenerated();
+        }
+    }, [preGeneratedData]);
     
     // Load suggested topic on mount (only if not coming from path)
     useEffect(() => {
         if (!cameFromPath) {
             loadSuggestedTopic();
+            fetchSavedQuizzes();
         }
     }, [projectId, cameFromPath]);
     
@@ -105,6 +212,64 @@ const QuizView = ({
         } finally {
             setLoadingSuggestion(false);
         }
+    };
+
+    const fetchSavedQuizzes = async () => {
+        setSavedLoading(true);
+        try {
+            const data = await getSavedQuizzes(projectId);
+            setSavedQuizzes(data || []);
+        } catch (error) {
+            console.error('Failed to fetch saved quizzes:', error);
+        } finally {
+            setSavedLoading(false);
+        }
+    };
+
+    const handleViewSavedQuiz = async (testId) => {
+        try {
+            setMcqLoading(true);
+            setShowSavedList(false);
+            const data = await getSavedQuiz(testId);
+            setMcqTest({
+                test_id: data.id,
+                topic: data.chapter_name,
+                questions: data.questions || [],
+            });
+            setMcqTopic(data.chapter_name || '');
+            setMcqTopicSelection(data.chapter_name || '');
+            setQuizMode('mcq');
+            setMcqUserAnswers({});
+            setMcqSubmitted(false);
+            setMcqScore(null);
+            setCurrentQuestionIndex(0);
+            setPerformanceSaved(false);
+            setCardsCreated(null);
+        } catch (error) {
+            console.error('Failed to load saved quiz:', error);
+            toast.error('Failed to load saved quiz');
+            setShowSavedList(true);
+        } finally {
+            setMcqLoading(false);
+        }
+    };
+
+    const handleDeleteSavedQuiz = async (testId, e) => {
+        if (e) e.stopPropagation();
+        try {
+            await deleteSavedQuiz(testId);
+            toast.success('Quiz deleted');
+            setSavedQuizzes(prev => prev.filter(t => t.id !== testId));
+        } catch (error) {
+            console.error('Failed to delete quiz:', error);
+            toast.error('Failed to delete quiz');
+        }
+    };
+
+    const formatDate = (dateStr) => {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     };
     
     const useSuggestedTopic = () => {
@@ -191,6 +356,9 @@ const QuizView = ({
             await recordPerformance(projectId, topic, score, wrong);
             setPerformanceSaved(true);
             
+            // Track quiz activity with score for heatmap & trend
+            recordActivity(projectId, 'quiz', { score: Math.round(percentage), num_questions: total });
+            
             // Notify parent about quiz completion
             if (onQuizComplete) {
                 const passed = percentage >= 80;
@@ -242,13 +410,13 @@ const QuizView = ({
             setMcqTopicSelection('');
         }
         setMcqNumQuestions(5);
-        setMcqDifficulty('medium');
         setMcqUserAnswers({});
         setMcqSubmitted(false);
         setMcqScore(null);
         setCurrentQuestionIndex(0);
         setPerformanceSaved(false);
         setCardsCreated(null);
+        setShowSavedList(true);
         
         // Reset both mode state
         setBothModePhase('mcq');
@@ -258,6 +426,16 @@ const QuizView = ({
         setEvalTest(null);
         setEvalResult(null);
         setEvalUserAnswers({});
+        
+        // Refresh saved quizzes list
+        fetchSavedQuizzes();
+        
+        // Re-compute adaptive difficulty if in adaptive mode (picks up new quiz results)
+        if (isAdaptiveMode) {
+            computeAdaptiveDifficulty();
+        } else {
+            setMcqDifficulty(settings.quizDifficulty || 'medium');
+        }
     };
 
     // ==================== SUBJECTIVE HANDLERS ====================
@@ -335,6 +513,9 @@ const QuizView = ({
                     const wrongEquiv = evalTest.questions.length - correctEquiv;
                     await recordPerformance(projectId, topic, correctEquiv, wrongEquiv);
                     
+                    // Track quiz activity for heatmap
+                    recordActivity(projectId, 'quiz', { score: Math.round(subjectivePercent), num_questions: evalTest.questions.length });
+                    
                     if (onQuizComplete) {
                         onQuizComplete(topic, subjectivePercent, passed);
                     }
@@ -376,6 +557,9 @@ const QuizView = ({
         const totalWrong = (mcqScoreData.total - mcqScoreData.score) + Math.round(((subjectiveResult.max_score - subjectiveResult.total_score) / subjectiveResult.max_score) * 2);
         
         recordPerformance(projectId, topic, totalCorrect, totalWrong).catch(console.error);
+        
+        // Track combined quiz activity for heatmap
+        recordActivity(projectId, 'quiz', { score: Math.round(combined), num_questions: (mcqScoreData?.total || 5) + (subjectiveResult?.questions?.length || 2) });
         
         if (onQuizComplete) {
             onQuizComplete(topic, combined, passed);
@@ -439,6 +623,19 @@ const QuizView = ({
 
     return (
         <div className="h-full flex flex-col relative w-full">
+            {/* Back Button - shown when no quiz is active and not loading */}
+            {onBack && !mcqLoading && !evalLoading && !mcqTest && !evalTest && !cameFromPath && (
+                <div className="px-4 pt-4 md:px-8 md:pt-6">
+                    <button
+                        onClick={onBack}
+                        className="flex items-center gap-2 px-4 py-2 text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30 rounded-lg font-medium transition-colors"
+                    >
+                        <ArrowLeft className="h-4 w-4" />
+                        Back to Chat
+                    </button>
+                </div>
+            )}
+
             {/* Full-screen Loading State for MCQ */}
             {mcqLoading && (
                 <div className="h-full flex flex-col items-center justify-center animate-in fade-in duration-300">
@@ -480,7 +677,7 @@ const QuizView = ({
 
             {/* Main Content - Only show when not loading */}
             {!mcqLoading && !evalLoading && (
-            <div className="flex-1 overflow-y-auto w-full max-w-3xl mx-auto pb-24 custom-scrollbar p-2 md:p-8">
+            <div className="flex-1 overflow-y-auto w-full max-w-4xl mx-auto pb-24 custom-scrollbar p-4 md:p-8">
                 
                 {/* Return to Path Button (if came from path) */}
                 {cameFromPath && !mcqTest && !evalTest && (
@@ -489,12 +686,105 @@ const QuizView = ({
                     </div>
                 )}
 
+                {/* ==================== SAVED QUIZZES LIST ==================== */}
+                {showSavedList && !mcqTest && !evalTest && !cameFromPath && (
+                    <div className="animate-in fade-in slide-in-from-bottom-4">
+                        <div className="flex items-center justify-between mb-8">
+                            <div>
+                                <h2 className="text-2xl font-bold text-[#4A3B32]">Quizzes</h2>
+                                <p className="text-[#8a6a5c]">Test your knowledge with AI-generated quizzes</p>
+                            </div>
+                            <button
+                                onClick={() => setShowSavedList(false)}
+                                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#C8A288] to-[#A08072] text-white rounded-lg hover:opacity-90 transition-opacity shadow-sm"
+                            >
+                                <Plus className="h-4 w-4" />
+                                New Quiz
+                            </button>
+                        </div>
+
+                        {savedLoading ? (
+                            <div className="flex items-center justify-center py-16">
+                                <Loader2 className="h-8 w-8 text-[#C8A288] animate-spin" />
+                            </div>
+                        ) : savedQuizzes.length === 0 ? (
+                            <div className="text-center py-16">
+                                <div className="h-20 w-20 bg-[#FDF6F0] rounded-full flex items-center justify-center mx-auto mb-6">
+                                    <CheckSquare className="h-10 w-10 text-[#C8A288]" />
+                                </div>
+                                <h3 className="text-xl font-bold text-[#4A3B32] mb-2">No Quizzes Yet</h3>
+                                <p className="text-[#8a6a5c] mb-6">Generate your first quiz to test your knowledge</p>
+                                <button
+                                    onClick={() => setShowSavedList(false)}
+                                    className="px-6 py-3 bg-gradient-to-r from-[#C8A288] to-[#A08072] text-white rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2 mx-auto"
+                                >
+                                    <CheckSquare className="h-5 w-5" />
+                                    Create Quiz
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {savedQuizzes.map((quiz) => {
+                                    let questionCount = null;
+                                    try {
+                                        const q = quiz.questions;
+                                        if (Array.isArray(q)) questionCount = q.length;
+                                        else if (typeof q === 'string') questionCount = JSON.parse(q).length;
+                                    } catch {}
+                                    return (
+                                        <div
+                                            key={quiz.id}
+                                            onClick={() => handleViewSavedQuiz(quiz.id)}
+                                            className="bg-white rounded-xl border border-[#E6D5CC] p-5 hover:shadow-lg transition-all cursor-pointer group"
+                                        >
+                                            <div className="flex items-start justify-between mb-3">
+                                                <div className="flex-1 min-w-0">
+                                                    <h3 className="font-bold text-[#4A3B32] mb-1 truncate">{quiz.chapter_name || 'General Quiz'}</h3>
+                                                    <div className="flex items-center gap-1.5 text-xs text-[#8a6a5c]">
+                                                        <Clock className="h-3 w-3" />
+                                                        {formatDate(quiz.created_at)}
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={(e) => handleDeleteSavedQuiz(quiz.id, e)}
+                                                    className="text-red-400 hover:text-red-600 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                            {questionCount && (
+                                                <p className="text-xs text-[#8a6a5c] mb-3">{questionCount} questions</p>
+                                            )}
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); handleViewSavedQuiz(quiz.id); }}
+                                                className="w-full py-2 bg-[#C8A288] text-white rounded-lg hover:bg-[#B08B72] transition-colors text-sm font-medium flex items-center justify-center gap-1.5"
+                                            >
+                                                <Eye className="h-3.5 w-3.5" />
+                                                Take Quiz
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* ==================== BOTH MODE ==================== */}
-                {quizMode === 'both' && (
+                {quizMode === 'both' && (!showSavedList || mcqTest || evalTest) && (
                     <>
                         {/* Setup Phase */}
                         {!mcqTest && bothModePhase === 'mcq' && (
                             <div className="mt-8 text-center animate-in fade-in slide-in-from-bottom-4">
+                                {!cameFromPath && (
+                                    <button
+                                        onClick={() => setShowSavedList(true)}
+                                        className="flex items-center gap-2 px-4 py-2 mb-4 text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30 rounded-lg font-medium transition-colors"
+                                    >
+                                        <ArrowLeft className="h-4 w-4" />
+                                        Back to Saved
+                                    </button>
+                                )}
                                 <div className="inline-flex items-center justify-center p-4 bg-white rounded-2xl shadow-sm border border-[#E6D5CC] mb-6">
                                     <Brain className="h-8 w-8 text-[#C8A288]" />
                                 </div>
@@ -552,6 +842,30 @@ const QuizView = ({
                                     
                                     <div>
                                         <label className="block text-sm font-bold mb-2 text-[#4A3B32] uppercase tracking-wide opacity-80">Difficulty</label>
+                                        
+                                        {/* Adaptive Mode Banner */}
+                                        {isAdaptiveMode && adaptiveComputed && (
+                                            <div className="mb-3 p-3 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl animate-in fade-in">
+                                                <div className="flex items-center gap-2 text-purple-700">
+                                                    <Sparkles className="h-4 w-4" />
+                                                    <span className="text-xs font-bold uppercase tracking-wide">Adaptive Mode</span>
+                                                </div>
+                                                <p className="text-xs text-purple-600 mt-1">
+                                                    {adaptiveComputed.quizCount === 0 
+                                                        ? `Set to "${adaptiveComputed.difficulty}" based on your profile level`
+                                                        : `Avg score: ${adaptiveComputed.avgScore}% across ${adaptiveComputed.quizCount} quiz${adaptiveComputed.quizCount > 1 ? 'zes' : ''} — auto-set to "${adaptiveComputed.difficulty}"`
+                                                    }
+                                                </p>
+                                                <p className="text-xs text-purple-500 mt-0.5 italic">You can override by selecting below</p>
+                                            </div>
+                                        )}
+                                        {isAdaptiveMode && adaptiveLoading && (
+                                            <div className="mb-3 p-3 bg-purple-50 border border-purple-200 rounded-xl flex items-center gap-2 text-purple-600">
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                <span className="text-xs font-medium">Analyzing your performance...</span>
+                                            </div>
+                                        )}
+                                        
                                         <div className="flex gap-2">
                                             {[
                                                 { value: 'easy', label: 'Easy', icon: Zap, color: 'text-green-600 bg-green-50 border-green-200' },
@@ -611,7 +925,7 @@ const QuizView = ({
 
                                 <div className="flex-1 flex flex-col animate-in fade-in slide-in-from-right-4 duration-300 px-2" key={currentQuestionIndex}>
                                     <div className="bg-white p-6 md:p-8 rounded-3xl border border-[#E6D5CC] shadow-sm mb-6">
-                                        <div className="prose prose-lg max-w-none text-[#4A3B32] font-medium mb-6">
+                                        <div className="prose prose-lg max-w-none text-[#4A3B32] font-medium mb-6 overflow-x-auto">
                                             <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                                 {mcqTest.questions[currentQuestionIndex].question}
                                             </ReactMarkdown>
@@ -781,10 +1095,19 @@ const QuizView = ({
                 )}
 
                 {/* ==================== MCQ ONLY MODE ==================== */}
-                {quizMode === 'mcq' && (
+                {quizMode === 'mcq' && (!showSavedList || mcqTest) && (
                     <>
                         {!mcqTest ? (
                             <div className="mt-8 text-center animate-in fade-in slide-in-from-bottom-4">
+                                {!cameFromPath && (
+                                    <button
+                                        onClick={() => setShowSavedList(true)}
+                                        className="flex items-center gap-2 px-4 py-2 mb-4 text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30 rounded-lg font-medium transition-colors"
+                                    >
+                                        <ArrowLeft className="h-4 w-4" />
+                                        Back to Saved
+                                    </button>
+                                )}
                                 <div className="inline-flex items-center justify-center p-4 bg-white rounded-2xl shadow-sm border border-[#E6D5CC] mb-6">
                                     <HelpCircle className="h-8 w-8 text-[#C8A288]" />
                                 </div>
@@ -881,6 +1204,30 @@ const QuizView = ({
                                     
                                     <div>
                                         <label className="block text-sm font-bold mb-2 text-[#4A3B32] uppercase tracking-wide opacity-80">Difficulty</label>
+                                        
+                                        {/* Adaptive Mode Banner */}
+                                        {isAdaptiveMode && adaptiveComputed && (
+                                            <div className="mb-3 p-3 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl animate-in fade-in">
+                                                <div className="flex items-center gap-2 text-purple-700">
+                                                    <Sparkles className="h-4 w-4" />
+                                                    <span className="text-xs font-bold uppercase tracking-wide">Adaptive Mode</span>
+                                                </div>
+                                                <p className="text-xs text-purple-600 mt-1">
+                                                    {adaptiveComputed.quizCount === 0 
+                                                        ? `Set to "${adaptiveComputed.difficulty}" based on your profile level`
+                                                        : `Avg score: ${adaptiveComputed.avgScore}% across ${adaptiveComputed.quizCount} quiz${adaptiveComputed.quizCount > 1 ? 'zes' : ''} — auto-set to "${adaptiveComputed.difficulty}"`
+                                                    }
+                                                </p>
+                                                <p className="text-xs text-purple-500 mt-0.5 italic">You can override by selecting below</p>
+                                            </div>
+                                        )}
+                                        {isAdaptiveMode && adaptiveLoading && (
+                                            <div className="mb-3 p-3 bg-purple-50 border border-purple-200 rounded-xl flex items-center gap-2 text-purple-600">
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                <span className="text-xs font-medium">Analyzing your performance...</span>
+                                            </div>
+                                        )}
+                                        
                                         <div className="flex gap-2">
                                             {[
                                                 { value: 'easy', label: 'Easy', icon: Zap, color: 'text-green-600 bg-green-50 border-green-200' },
@@ -1076,7 +1423,7 @@ const QuizView = ({
                                                             {q.explanation && (
                                                                 <div className="mt-3 p-3 bg-white/60 rounded-lg border border-[#E6D5CC]/50">
                                                                     <span className="font-semibold text-[#4A3B32] block mb-1">Explanation:</span>
-                                                                    <div className="text-[#5a4a42] prose prose-sm max-w-none">
+                                                                    <div className="text-[#5a4a42] prose prose-sm max-w-none overflow-x-auto">
                                                                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{q.explanation}</ReactMarkdown>
                                                                     </div>
                                                                 </div>
@@ -1158,10 +1505,19 @@ const QuizView = ({
                 )}
 
                 {/* ==================== SUBJECTIVE ONLY MODE ==================== */}
-                {quizMode === 'subjective' && (
+                {quizMode === 'subjective' && (!showSavedList || evalTest) && (
                     <>
                         {!evalTest ? (
                             <div className="mt-8 text-center animate-in fade-in slide-in-from-bottom-4">
+                                {!cameFromPath && (
+                                    <button
+                                        onClick={() => setShowSavedList(true)}
+                                        className="flex items-center gap-2 px-4 py-2 mb-4 text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30 rounded-lg font-medium transition-colors"
+                                    >
+                                        <ArrowLeft className="h-4 w-4" />
+                                        Back to Saved
+                                    </button>
+                                )}
                                 <div className="inline-flex items-center justify-center p-4 bg-white rounded-2xl shadow-sm border border-[#E6D5CC] mb-6">
                                     <FileText className="h-8 w-8 text-[#C8A288]" />
                                 </div>
@@ -1357,7 +1713,7 @@ const QuizView = ({
             )}
 
             {/* Quiz Mode Toggle - Sticky Bottom Footer */}
-            {!mcqLoading && !evalLoading && !mcqTest && !evalTest && !cameFromPath && (
+            {!mcqLoading && !evalLoading && !mcqTest && !evalTest && !cameFromPath && !showSavedList && (
                 <div className="flex-none p-4 bottom-0 w-full border-t border-[#E6D5CC] bg-[#FDF6F0]/95 backdrop-blur-md z-10">
                     <div className="flex justify-center">
                         <div className="bg-[#E6D5CC]/40 p-1.5 rounded-xl flex gap-1 shadow-inner">
