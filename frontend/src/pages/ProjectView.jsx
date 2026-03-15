@@ -1240,8 +1240,29 @@ const ProjectView = () => {
                                                             remarkPlugins={[remarkGfm]}
                                                             components={{
                                                                 a: ({node, ...props}) => {
+                                                                    // Check for inline citation links (e.g. href="1")
+                                                                    if (props.href && !isNaN(props.href) && msg.sources) {
+                                                                        const sourceIdx = parseInt(props.href) - 1;
+                                                                        const source = msg.sources[sourceIdx];
+                                                                        if (source) {
+                                                                            return (
+                                                                                <button 
+                                                                                    onClick={(e) => {
+                                                                                        e.preventDefault();
+                                                                                        handleOpenSource(source);
+                                                                                    }}
+                                                                                    className="inline-flex items-center justify-center gap-0.5 min-w-[32px] h-[20px] px-1.5 mx-0.5 text-[10px] font-bold text-white bg-[#C8A288]/90 hover:bg-[#A08072] rounded shadow-sm transition-all cursor-pointer align-text-top"
+                                                                                    title={`Source ${props.href}: ${source.doc_name}`}
+                                                                                >
+                                                                                    <FileText className="h-2.5 w-2.5 opacity-80 shrink-0" />
+                                                                                    <span>{props.href}</span>
+                                                                                </button>
+                                                                            );
+                                                                        }
+                                                                    }
+
                                                                     if (props.href && props.href.startsWith('http') && !props.href.includes(window.location.origin)) {
-                                                                        return <a {...props} target="_blank" rel="noopener noreferrer" />;
+                                                                        return <a {...props} target="_blank" rel="noopener noreferrer" className="text-[#C8A288] hover:underline" />;
                                                                     }
                                                                     return (
                                                                         <button 
@@ -1265,33 +1286,7 @@ const ProjectView = () => {
                                                     <Loader2 className="h-5 w-5 animate-spin text-[#8a6a5c]" />
                                                 )}
 
-                                                {/* Citations Rendering */}
-                                                {msg.sources && msg.sources.length > 0 && (
-                                                    <div className="mt-4 pt-3 border-t border-black/10">
-                                                        <p className="text-xs font-bold mb-2 opacity-70 flex items-center gap-1">
-                                                            <BookOpen className="h-3 w-3" /> Sources:
-                                                        </p>
-                                                        <div className="flex flex-col gap-2">
-                                                            {msg.sources.map((source, i) => (
-                                                                <button 
-                                                                    key={i} 
-                                                                    onClick={() => handleOpenSource(source)}
-                                                                    className="group flex flex-col gap-1.5 text-left bg-white/60 p-3 rounded-xl border border-[#C8A288]/30 cursor-pointer hover:bg-[#FDF6F0] hover:border-[#C8A288]/60 transition-all hover:shadow-md"
-                                                                >
-                                                                    <div className="flex items-center justify-between w-full">
-                                                                        <div className="flex items-center gap-1.5 text-xs text-[#8a6a5c] font-medium truncate pr-2">
-                                                                            <FileText className="h-3 w-3 text-[#C8A288] shrink-0" />
-                                                                            <span className="truncate">{source.doc_name}</span>
-                                                                        </div>
-                                                                    </div>
-                                                                    <p className="text-xs text-[#4A3B32] line-clamp-2 leading-relaxed opacity-90 italic">
-                                                                        "{source.chunk_text ? source.chunk_text.replace(/\.\.\.$/, '') : ''}..."
-                                                                    </p>
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
+                                                {/* Citations are now rendered inline within ReactMarkdown */}
                                             </div>
                                         )}
                                     </div>
