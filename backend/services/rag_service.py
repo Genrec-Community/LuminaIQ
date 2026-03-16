@@ -62,7 +62,7 @@ class RAGService:
             model=settings.LLM_MODEL,
             openai_api_key=settings.LLM_API_KEY,
             openai_api_base=settings.LLM_BASE_URL,
-            temperature=0.7,
+            temperature=0.1,  # Lower temperature for strict factuality and less hallucination
         )
 
     def _get_retrieval_chain(
@@ -89,14 +89,24 @@ class RAGService:
         retriever = vector_store.as_retriever(search_kwargs=search_kwargs)
 
         # 2. Prompt
-        system_prompt = """You are an expert educational assistant. 
-Your goal is to provide accurate, well-structured, and comprehensive answers based strictly on the provided context.
+        system_prompt = """You are an expert educational assistant answering a user's question. 
+Your primary directive is to provide accurate, well-structured, and comprehensive answers based STRICTLY on the provided context.
 
-Guidelines:
+The context contains multiple source excerpts. Each excerpt represents a source in order (1st excerpt is Source 1, 2nd is Source 2, etc.).
+
+CRITICAL INSTRUCTIONS:
 1. **Format:** Use **Markdown** for all responses. Use headers, bullet points, and bold text to improve readability.
-2. **Citations:** Always cite your sources implicitly or explicitly if relevant (e.g., "According to [Source 1]...").
-3. **Accuracy:** If the answer is not in the context, state clearly: "I couldn't find the answer in the provided documents."
-4. **Tone:** Professional, encouraging, and educational.
+2. **Citations (MANDATORY):** You MUST cite your sources. You MUST use EXACTLY this markdown link syntax: `[1](1)` to cite Source 1, `[2](2)` to cite Source 2. 
+   - DO NOT use plain numbers like `1.` or `[1]`.
+   - DO NOT append outer brackets like `[[1]](1)`.
+   - Always place the inline markdown link `[source_number](source_number)` next to the facts you are citing.
+   - DO NOT create a "Sources" list at the bottom of your response.
+3. **Accuracy (NO HALLUCINATIONS):** You must ONLY base your answer on the provided context. 
+   - If the context does not logically contain the answer to the user's question, you MUST state clearly: "I couldn't find the answer in the provided documents."
+   - DO NOT hallucinate, guess, or force a connection if the content is unrelated to the question.
+   - If a source is irrelevant to the question, ignore it entirely.
+4. **Reasoning:** Clearly explain how the cited information answers the question so the logical connection is obvious to the user. Do not state facts without showing how they connect to the query.
+5. **Tone:** Professional, encouraging, and educational.
 
 Context:
 {context}"""
@@ -171,7 +181,8 @@ Context:
                         {
                             "doc_id": doc_id,
                             "doc_name": doc_name,
-                            "chunk_text": doc.page_content[:100] + "...",
+                            "chunk_text": doc.page_content,
+                            "page": doc.metadata.get("page"),
                         }
                     )
 
@@ -257,7 +268,8 @@ Context:
                                 {
                                     "doc_id": doc_id,
                                     "doc_name": doc_name,
-                                    "chunk_text": doc.page_content[:100] + "...",
+                                    "chunk_text": doc.page_content,
+                                    "page": doc.metadata.get("page"),
                                 }
                             )
 

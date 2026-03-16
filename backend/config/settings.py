@@ -1,16 +1,10 @@
 from pydantic_settings import BaseSettings
-from pydantic import Field, ConfigDict
+from pydantic import Field
 from typing import Optional, List
 from typing_extensions import Annotated
 
 
 class Settings(BaseSettings):
-    model_config = ConfigDict(
-        extra='ignore',  # Ignore extra fields from env
-        case_sensitive=True,
-        env_file='.env'
-    )
-
     # Supabase Configuration
     SUPABASE_URL: str
     SUPABASE_KEY: str
@@ -57,6 +51,10 @@ class Settings(BaseSettings):
 
     # Webhook Configuration (for PDF service communication)
     WEBHOOK_SECRET: str = "supersecretwebhook"
+
+    class Config:
+        env_file = ".env"
+        case_sensitive = True
 
 
 settings = Settings()
