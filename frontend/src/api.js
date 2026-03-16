@@ -55,7 +55,7 @@ export const signup = async (email, password, fullName) => {
 };
 
 export const loginWithGoogle = async (accessToken) => {
-    const response = await api.post('/auth/google', { access_token: accessToken });
+    const response = await api.post('/api/v1/auth/google', { access_token: accessToken });
     return response.data;
 };
 
