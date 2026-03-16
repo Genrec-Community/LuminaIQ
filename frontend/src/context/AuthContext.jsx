@@ -7,6 +7,8 @@ const AuthContext = createContext(null);
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
+    // Guard against multiple token exchanges
+    const tokenExchanged = React.useRef(false);
 
     useEffect(() => {
         // Initialize auth - wait for Supabase session to be ready
@@ -23,12 +25,13 @@ export const AuthProvider = ({ children }) => {
             // Wait for Supabase session to initialize (handles OAuth callback)
             const { data: { session } } = await supabase.auth.getSession();
             
-            if (session) {
+            if (session && !tokenExchanged.current) {
                 console.log("Supabase session found, exchanging token...");
                 const currentToken = localStorage.getItem('token');
                 
                 // If we don't have our app token yet, exchange the Supabase one
                 if (!currentToken) {
+                    tokenExchanged.current = true;
                     try {
                         const data = await apiLoginGoogle(session.access_token);
                         if (data.access_token) {
@@ -39,6 +42,7 @@ export const AuthProvider = ({ children }) => {
                         }
                     } catch (e) {
                         console.error("Google Token Exchange Failed:", e);
+                        tokenExchanged.current = false; // Reset on failure
                     }
                 }
             }
@@ -52,7 +56,11 @@ export const AuthProvider = ({ children }) => {
         const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
             console.log("Auth event:", event, session ? "with session" : "no session");
             
-            if (event === 'SIGNED_IN' && session) {
+            if (event === 'SIGNED_IN' && session && !tokenExchanged.current) {
+                // Mark as exchanged immediately to prevent multiple exchanges
+                tokenExchanged.current = true;
+                
+                console.log("Supabase Signed In via OAuth, exchanging token...");
                 const currentToken = localStorage.getItem('token');
 
                 // If we don't have our app token yet, exchange the Supabase one
@@ -72,6 +80,7 @@ export const AuthProvider = ({ children }) => {
                         }
                     } catch (e) {
                         console.error("Google Token Exchange Failed:", e);
+                        tokenExchanged.current = false; // Reset on failure to allow retry
                         await supabase.auth.signOut(); // Clear invalid supabase session
                     }
                 }
