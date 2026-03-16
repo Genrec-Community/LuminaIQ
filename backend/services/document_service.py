@@ -393,10 +393,32 @@ class DocumentService:
             logger.error(f"Error updating document status: {str(e)}")
 
     async def delete_document(self, project_id: str, document_id: str):
-        """Delete document from DB and Vector Store (non-blocking)"""
+        """Delete document from DB, Vector Store, and Storage (non-blocking)"""
         try:
             collection_name = f"project_{project_id}"
             await qdrant_service.delete_vectors(collection_name, document_id)
+            
+            # Delete from Supabase Storage
+            try:
+                doc_record = await async_db(
+                    lambda: self.client.table("documents")
+                    .select("filename")
+                    .eq("id", document_id)
+                    .execute()
+                )
+                if doc_record.data and len(doc_record.data) > 0:
+                    filename = doc_record.data[0].get("filename")
+                    if filename:
+                        storage_path = f"{project_id}/{document_id}_{filename}"
+                        
+                        def _delete_storage():
+                            self.client.storage.from_("documents").remove([storage_path])
+                            
+                        await async_db(_delete_storage)
+                        logger.info(f"Deleted {storage_path} from storage")
+            except Exception as storage_err:
+                logger.error(f"Failed to delete document from storage: {storage_err}")
+
             await async_db(
                 lambda: self.client.table("documents")
                 .delete()

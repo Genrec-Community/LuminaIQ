@@ -58,7 +58,10 @@ class LLMService:
             
             response = await client.ainvoke(lc_messages)
             
-            answer = response.content if response.content else ""
+            answer = response.content if getattr(response, 'content', None) else ""
+            if not answer:
+                logger.warning(f"[LLMService] Empty response detected. Metadata: {getattr(response, 'response_metadata', 'No metadata')}")
+
             logger.info(f"Generated completion with {len(answer)} characters")
             
             return answer

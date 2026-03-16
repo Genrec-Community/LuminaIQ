@@ -124,6 +124,32 @@ async def upload_document(
         document = response.data[0]
         document_id = document["id"]
 
+        # 3.5 Upload file to Supabase Storage for reading later
+        try:
+            storage_path = f"{project_id}/{document_id}_{file.filename}"
+            with open(temp_path, "rb") as f:
+                file_bytes = f.read()
+
+            def _upload_to_storage():
+                supabase = get_supabase_client()
+                supabase.storage.from_("documents").upload(
+                    file=file_bytes,
+                    path=storage_path,
+                    file_options={"content-type": file.content_type}
+                )
+
+            await async_db(_upload_to_storage)
+            logger.info(f"File {file.filename} uploaded to Supabase Storage as {storage_path}")
+            
+            # (Optional) generate URL and put it in response just in case
+            def _get_url():
+                return get_supabase_client().storage.from_("documents").get_public_url(storage_path)
+            document["file_url"] = await async_db(_get_url)
+            
+        except Exception as storage_err:
+            logger.error(f"Failed to upload {file.filename} to storage: {storage_err}")
+            # Non-fatal issue, allow the text pipeline to continue
+
         # 4. Start CONCURRENT background processing (asyncio.create_task = truly parallel)
         # This is the key fix: background_tasks.add_task() runs SERIALLY in Starlette,
         # but asyncio.create_task() creates a truly concurrent coroutine.
@@ -186,6 +212,40 @@ async def delete_document(
         return {"message": "Document deleted successfully"}
     except Exception as e:
         raise HTTPException(500, str(e))
+
+
+@router.get("/{document_id}/url")
+async def get_document_url(
+    document_id: str, project_id: str, current_user: dict = Depends(get_current_user)
+):
+    """Get a signed URL for reading the document PDF"""
+    try:
+        # First get the filename
+        res = await async_db(
+            lambda: document_service.client.table("documents")
+            .select("filename")
+            .eq("id", document_id)
+            .execute()
+        )
+        if not res.data:
+            raise HTTPException(404, "Document not found")
+            
+        filename = res.data[0]["filename"]
+        storage_path = f"{project_id}/{document_id}_{filename}"
+        
+        # Determine signed URL using service key
+        def _get_url():
+            return get_supabase_client().storage.from_("documents").create_signed_url(storage_path, 3600 * 24)
+            
+        signed_url_res = await async_db(_get_url)
+        
+        # Supabase Python SDK usually returns a dict like {'signedURL': '...'} or just a string
+        url = signed_url_res.get('signedURL') if isinstance(signed_url_res, dict) else signed_url_res
+        
+        return {"url": url}
+    except Exception as e:
+        logger.error(f"Failed to generate signed URL for {document_id}: {str(e)}")
+        raise HTTPException(500, f"Could not generate secure URL: {str(e)}")
 
 
 @router.get("/queue/status")

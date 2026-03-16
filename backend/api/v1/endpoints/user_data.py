@@ -2,7 +2,7 @@
 User Data API Endpoints
 
 Provides REST endpoints for all user data previously stored in localStorage:
-  - Settings, Bookmarks, Study Activity, Exams,
+  - Settings, Bookmarks, Study Activity,
   - Learning Progress, Pomodoro, Recent Searches, Streaks
 """
 
@@ -45,14 +45,6 @@ class RecordActivityRequest(BaseModel):
     project_id: str
     activity_type: str  # quiz, review, notes, qa, pomodoro, chat
     meta: Optional[Dict[str, Any]] = None
-
-
-class SaveExamRequest(BaseModel):
-    project_id: str
-    name: str
-    exam_date: str
-    topics: List[str] = []
-    difficulty: str = "medium"
 
 
 class SaveProgressRequest(BaseModel):
@@ -224,51 +216,6 @@ async def record_study_activity(
             meta=request.meta,
         )
         return result
-    except Exception as e:
-        raise HTTPException(500, str(e))
-
-
-# ============== Exam Schedules ==============
-
-@router.get("/exams/{project_id}")
-async def get_exams(
-    project_id: str,
-    current_user: dict = Depends(get_current_user)
-):
-    try:
-        exams = await user_data.get_exams(current_user["id"], project_id)
-        return {"exams": exams}
-    except Exception as e:
-        raise HTTPException(500, str(e))
-
-
-@router.post("/exams")
-async def save_exam(
-    request: SaveExamRequest,
-    current_user: dict = Depends(get_current_user)
-):
-    try:
-        exam = await user_data.save_exam(
-            user_id=current_user["id"],
-            project_id=request.project_id,
-            name=request.name,
-            exam_date=request.exam_date,
-            topics=request.topics,
-            difficulty=request.difficulty,
-        )
-        return exam
-    except Exception as e:
-        raise HTTPException(500, str(e))
-
-
-@router.delete("/exams/{exam_id}")
-async def delete_exam(
-    exam_id: str,
-    current_user: dict = Depends(get_current_user)
-):
-    try:
-        success = await user_data.delete_exam(current_user["id"], exam_id)
-        return {"success": success}
     except Exception as e:
         raise HTTPException(500, str(e))
 

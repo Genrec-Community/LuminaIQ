@@ -32,10 +32,7 @@ class MCQService:
 
             text = "\n".join(chunks)
 
-            prompt = f"""You are an expert curriculum analyst. Analyze this educational content and extract ALL learning topics.
-
-CONTENT:
-{text[:18000]}
+            system_prompt = """You are an expert curriculum analyst. Analyze this educational content and extract ALL learning topics.
 
 INSTRUCTIONS:
 1. Extract EVERY distinct topic, concept, chapter, or learning objective
@@ -51,10 +48,13 @@ EXAMPLES of good topics:
 - "Exception Handling in Python"
 - "Working with Files and I/O"
 
-Return ONLY a JSON array of topic strings:
-[\"Topic 1\", \"Topic 2\", \"Topic 3\"]"""
+Return ONLY a valid JSON array of topic strings:
+["Topic 1", "Topic 2", "Topic 3"]"""
 
-            messages = [{"role": "user", "content": prompt}]
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"CONTENT:\n{text[:14000]}"}
+            ]
             response = await llm_service.chat_completion(messages, temperature=0.3, max_tokens=2000)
             
             logger.info(f"Topic generation response length: {len(response)} chars")

@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     BookOpen, HelpCircle, CheckSquare, GitBranch, Layers,
     ExternalLink, Loader2, FileText, Sparkles
 } from 'lucide-react';
+import { getRandomLoadingMessage } from '../../utils/LoadingMessages';
 
 const TOOL_CONFIG = {
     notes: {
@@ -60,17 +61,19 @@ const TOOL_CONFIG = {
 // --- Loading Card (shown while tool is generating) ---
 export const ToolLoadingCard = ({ toolType, toolParams }) => {
     const config = TOOL_CONFIG[toolType];
+    const [loadingMsg] = useState(() => getRandomLoadingMessage());
+    
     if (!config) return null;
     const Icon = config.icon;
 
     return (
         <div className={`max-w-[95%] md:max-w-[85%] rounded-2xl overflow-hidden border ${config.borderColor} shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-300`}>
             <div className={`bg-gradient-to-r ${config.gradientFrom} ${config.gradientTo} px-5 py-4`}>
-                <div className="flex items-center gap-3">
-                    <div className={`h-10 w-10 ${config.bgColor} rounded-xl flex items-center justify-center`}>
+                <div className="flex items-start gap-4">
+                    <div className={`h-10 w-10 ${config.bgColor} rounded-xl flex items-center justify-center shrink-0`}>
                         <Icon className={`h-5 w-5 ${config.color}`} />
                     </div>
-                    <div className="flex-1">
+                    <div className="flex-1 mt-0.5">
                         <div className="flex items-center gap-2">
                             <span className="font-bold text-[#4A3B32] text-sm">Generating {config.label}</span>
                             <div className="flex gap-1">
@@ -79,9 +82,9 @@ export const ToolLoadingCard = ({ toolType, toolParams }) => {
                                 <div className="h-1.5 w-1.5 bg-[#C8A288] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                             </div>
                         </div>
-                        <p className="text-xs text-[#8a6a5c] mt-0.5">
-                            {toolParams?.topic ? `Topic: ${toolParams.topic}` : 'General — from your documents'}
-                        </p>
+                        <div className="mt-2 text-[11px] leading-relaxed text-[#8a6a5c]/80 italic font-medium whitespace-pre-line pr-4">
+                            {loadingMsg}
+                        </div>
                     </div>
                 </div>
                 {/* Animated progress bar */}

@@ -12,6 +12,7 @@ const COMMANDS = [
         label: 'Notes',
         description: 'Generate study notes from your documents',
         icon: BookOpen,
+        group: 'LEARN',
         color: 'text-emerald-600',
         bgColor: 'bg-emerald-50',
         borderColor: 'border-emerald-200',
@@ -39,6 +40,7 @@ const COMMANDS = [
         label: 'Q&A',
         description: 'Generate questions and answers',
         icon: HelpCircle,
+        group: 'PRACTICE',
         color: 'text-blue-600',
         bgColor: 'bg-blue-50',
         borderColor: 'border-blue-200',
@@ -74,6 +76,7 @@ const COMMANDS = [
         label: 'Quiz',
         description: 'Generate MCQ quiz questions',
         icon: CheckSquare,
+        group: 'TEST',
         color: 'text-purple-600',
         bgColor: 'bg-purple-50',
         borderColor: 'border-purple-200',
@@ -109,6 +112,7 @@ const COMMANDS = [
         label: 'Mindmap',
         description: 'Generate a visual mindmap for a topic',
         icon: Brain,
+        group: 'EXPLORE',
         color: 'text-pink-600',
         bgColor: 'bg-pink-50',
         borderColor: 'border-pink-200',
@@ -136,6 +140,7 @@ const COMMANDS = [
         label: 'Flashcards',
         description: 'Generate flashcards for studying',
         icon: CreditCard,
+        group: 'PRACTICE',
         color: 'text-orange-600',
         bgColor: 'bg-orange-50',
         borderColor: 'border-orange-200',
@@ -196,6 +201,8 @@ export const CommandPicker = ({ filter, onSelect, onClose, visible }) => {
 
     if (!visible || filtered.length === 0) return null;
 
+    const groupOrder = ['LEARN', 'EXPLORE', 'PRACTICE', 'TEST'];
+
     return (
         <div
             ref={ref}
@@ -206,27 +213,39 @@ export const CommandPicker = ({ filter, onSelect, onClose, visible }) => {
                 <span className="text-xs font-bold text-[#8a6a5c] uppercase tracking-wider">AI Tools</span>
             </div>
             <div className="py-1.5 max-h-[280px] overflow-y-auto">
-                {filtered.map((cmd, idx) => {
-                    const Icon = cmd.icon;
+                {groupOrder.map(group => {
+                    const groupCmds = filtered.filter(cmd => cmd.group === group);
+                    if (groupCmds.length === 0) return null;
                     return (
-                        <button
-                            key={cmd.id}
-                            onClick={() => onSelect(cmd)}
-                            className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
-                                idx === selectedIndex ? 'bg-[#FDF6F0]' : 'hover:bg-gray-50'
-                            }`}
-                        >
-                            <div className={`h-9 w-9 rounded-xl ${cmd.bgColor} flex items-center justify-center shrink-0`}>
-                                <Icon className={`h-4.5 w-4.5 ${cmd.color}`} />
+                        <div key={group} className="mb-1">
+                            <div className="px-5 py-1.5 text-[10px] font-bold text-[#8a6a5c]/60 uppercase tracking-widest">
+                                {group}
                             </div>
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                    <span className="font-semibold text-[#4A3B32] text-sm">@{cmd.label}</span>
-                                </div>
-                                <p className="text-xs text-[#8a6a5c] truncate">{cmd.description}</p>
-                            </div>
-                            <ArrowRight className="h-3.5 w-3.5 text-[#C8A288] opacity-0 group-hover:opacity-100 shrink-0" />
-                        </button>
+                            {groupCmds.map(cmd => {
+                                const Icon = cmd.icon;
+                                const idx = filtered.indexOf(cmd);
+                                return (
+                                    <button
+                                        key={cmd.id}
+                                        onClick={() => onSelect(cmd)}
+                                        className={`w-full flex items-center gap-3 px-4 py-2 text-left transition-colors ${
+                                            idx === selectedIndex ? 'bg-[#FDF6F0]' : 'hover:bg-gray-50'
+                                        }`}
+                                    >
+                                        <div className={`h-8 w-8 rounded-xl ${cmd.bgColor} flex items-center justify-center shrink-0`}>
+                                            <Icon className={`h-4 w-4 ${cmd.color}`} />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-semibold text-[#4A3B32] text-sm">@{cmd.label}</span>
+                                            </div>
+                                            <p className="text-xs text-[#8a6a5c] truncate">{cmd.description}</p>
+                                        </div>
+                                        <ArrowRight className="h-3 w-3 text-[#C8A288] opacity-0 group-hover:opacity-100 shrink-0" />
+                                    </button>
+                                );
+                            })}
+                        </div>
                     );
                 })}
             </div>

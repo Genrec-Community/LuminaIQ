@@ -5,7 +5,6 @@ Tables managed:
   1. user_settings
   2. bookmarks
   3. study_activity
-  4. exam_schedules
   5. learning_progress
   6. pomodoro_sessions
   7. recent_searches
@@ -245,53 +244,7 @@ class UserDataService:
             logger.error(f"Error recording study activity: {e}")
             return {}
 
-    # ===================== 4. Exam Schedules =====================
 
-    async def get_exams(self, user_id: str, project_id: str) -> List[Dict[str, Any]]:
-        try:
-            result = (
-                self.client.table("exam_schedules")
-                .select("*")
-                .eq("user_id", user_id)
-                .eq("project_id", project_id)
-                .order("exam_date", desc=False)
-                .execute()
-            )
-            return result.data or []
-        except Exception as e:
-            logger.error(f"Error getting exams: {e}")
-            return []
-
-    async def save_exam(
-        self, user_id: str, project_id: str,
-        name: str, exam_date: str, topics: List[str] = None,
-        difficulty: str = "medium"
-    ) -> Dict[str, Any]:
-        try:
-            record = {
-                "id": str(uuid4()),
-                "user_id": user_id,
-                "project_id": project_id,
-                "name": name,
-                "exam_date": exam_date,
-                "topics": topics or [],
-                "difficulty": difficulty,
-            }
-            result = self.client.table("exam_schedules").insert(record).execute()
-            return result.data[0] if result.data else record
-        except Exception as e:
-            logger.error(f"Error saving exam: {e}")
-            return {}
-
-    async def delete_exam(self, user_id: str, exam_id: str) -> bool:
-        try:
-            self.client.table("exam_schedules").delete().eq("id", exam_id).eq("user_id", user_id).execute()
-            return True
-        except Exception as e:
-            logger.error(f"Error deleting exam: {e}")
-            return False
-
-    # ===================== 5. Learning Progress =====================
 
     async def get_learning_progress(self, user_id: str, project_id: str) -> List[str]:
         """Return list of completed topic strings."""

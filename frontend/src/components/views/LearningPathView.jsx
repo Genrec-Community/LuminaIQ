@@ -14,6 +14,25 @@ import {
 } from '../../api';
 import { useToast } from '../../context/ToastContext';
 import { recordActivity } from '../../utils/studyActivity';
+import { getRotatingLoadingMessage } from '../../utils/LoadingMessages';
+
+const humorReasons = [
+    "Weak topic detected. You skipped leg day on this one.",
+    "Your brain is currently spaghetti on this topic. Let's make it al dente.",
+    "Exam boss fight detected. Recommend weapon: Full Quiz.",
+    "Stop watering every plant at once. Water this specific plant right now.",
+    "Step 1: Chop onions. Step 2: Learn this. Step 3: Ace exam.",
+    "Without this, you're just punching trees for 4 hours in Minecraft.",
+    "If you don't study this, you'll just be eating flour and crying.",
+    "Calculated bullshit go. We fight this chapter first.",
+    "Notes = raw vegetables, ChatGPT = guy yelling recipes. Eat this first."
+];
+
+const getStableHumor = (str) => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    return humorReasons[Math.abs(hash) % humorReasons.length];
+};
 
 const LearningPathView = ({ 
     projectId, 
@@ -45,10 +64,35 @@ const LearningPathView = ({
     const [performance, setPerformance] = useState({});
     const [selectedDoc, setSelectedDoc] = useState('all');
     const [expandedTopic, setExpandedTopic] = useState(null);
+    const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
     
     useEffect(() => {
         loadData();
     }, [projectId]);
+
+    // Handle rotating loading messages
+    useEffect(() => {
+        let interval;
+        if (loading || building) {
+            interval = setInterval(() => {
+                setLoadingMsgIdx(i => i + 1);
+            }, 5000); // Rotate roughly every 5 seconds
+        }
+        return () => clearInterval(interval);
+    }, [loading, building]);
+
+    // Automatically trigger build if there is no path and there are available topics
+    useEffect(() => {
+        if (!loading && !building && availableTopics && availableTopics.length > 0) {
+            if (!learningPath || !learningPath.learning_path || learningPath.learning_path.length === 0) {
+                const autoGenerateKey = `lumina_path_autoun_${projectId}`;
+                if (!sessionStorage.getItem(autoGenerateKey)) {
+                    sessionStorage.setItem(autoGenerateKey, 'true');
+                    handleBuildGraph();
+                }
+            }
+        }
+    }, [loading, building, learningPath, availableTopics, projectId]);
     
     const loadData = async () => {
         // Try to load from sessionStorage cache for instant display
@@ -248,15 +292,22 @@ const LearningPathView = ({
         return docsWithTopic.filter(docId => selectedDocuments.includes(docId)).length;
     };
 
-    if (loading) {
+    if (loading || building) {
         return (
-            <div className="flex flex-col items-center justify-center h-64 gap-4">
+            <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-6 px-4">
                 <div className="relative">
-                    <div className="h-16 w-16 border-4 border-[#E6D5CC] rounded-full"></div>
-                    <div className="absolute inset-0 h-16 w-16 border-4 border-[#C8A288] rounded-full border-t-transparent animate-spin"></div>
-                    <Target className="absolute inset-0 m-auto h-6 w-6 text-[#C8A288]" />
+                    <div className="h-20 w-20 border-4 border-[#E6D5CC] rounded-full"></div>
+                    <div className="absolute inset-0 h-20 w-20 border-4 border-[#C8A288] rounded-full border-t-transparent animate-spin"></div>
+                    <Brain className="absolute inset-0 m-auto h-8 w-8 text-[#C8A288] animate-pulse" />
                 </div>
-                <p className="text-[#8a6a5c] font-medium">Loading learning path...</p>
+                <div className="text-center max-w-[80vw] md:max-w-[60vw]">
+                    <p className="text-[#C8A288] font-bold uppercase tracking-widest text-xs mb-3">
+                        {building ? 'Synthesizing Path' : 'Loading Path'}
+                    </p>
+                    <p className="text-[#4A3B32] font-medium italic whitespace-pre-line leading-relaxed text-sm md:text-base selection:bg-[#C8A288] selection:text-white transition-opacity duration-300">
+                        {getRotatingLoadingMessage(loadingMsgIdx)}
+                    </p>
+                </div>
             </div>
         );
     }
@@ -332,12 +383,12 @@ const LearningPathView = ({
                             {building ? (
                                 <>
                                     <Loader2 className="h-5 w-5 animate-spin" />
-                                    Building...
+                                    Synthesizing...
                                 </>
                             ) : (
                                 <>
                                     <Brain className="h-5 w-5" />
-                                    {learningPath?.learning_path?.length > 0 ? 'Rebuild Path' : 'Generate Path'}
+                                    Regenerate Path
                                 </>
                             )}
                         </button>
@@ -476,13 +527,41 @@ const LearningPathView = ({
                                         </div>
                                         
                                         {/* Expanded Actions Section -- Study Hub */}
-                                        {isExpanded && (
+                                        {isExpanded && (() => {
+                                            const isFirstUncompleted = learningPath.learning_path.findIndex(t => getTopicStatus(t.topic).status !== 'completed') === idx;
+                                            
+                                            return (
                                             <div className="px-4 pb-4 pt-2 border-t border-[#E6D5CC] mt-2">
-                                                <div className="bg-[#FDF6F0] rounded-xl p-4">
-                                                    <h5 className="font-bold text-[#4A3B32] mb-4 flex items-center gap-2">
-                                                        <Play className="h-4 w-4 text-[#C8A288]" />
-                                                        Study Hub: {item.topic}
-                                                    </h5>
+                                                <div className="bg-[#FDF6F0] rounded-xl p-4 shadow-inner">
+                                                    
+                                                    {isFirstUncompleted ? (
+                                                        <div className="bg-white rounded-xl p-5 mb-5 border-2 border-[#C8A288] shadow-md relative overflow-hidden">
+                                                            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-[#FDF6F0] to-[#E6D5CC] rounded-bl-full -z-10 opacity-50"></div>
+                                                            <h5 className="font-black text-[#C8A288] text-[10px] uppercase tracking-[0.2em] mb-3 flex items-center gap-1.5">
+                                                                <Target className="h-3 w-3" />
+                                                                Next Step in Your Learning Path
+                                                            </h5>
+                                                            <h3 className="text-xl font-black text-[#4A3B32] mb-3">{item.topic}</h3>
+                                                            
+                                                            <div className="flex gap-6 text-sm mt-3 mb-4">
+                                                                <div className="flex flex-col"><span className="text-[10px] uppercase font-bold text-[#8a6a5c]">Difficulty</span> <span className="font-bold text-[#4A3B32]">Dynamic</span></div>
+                                                                <div className="flex flex-col"><span className="text-[10px] uppercase font-bold text-[#8a6a5c]">Study time</span> <span className="font-bold text-[#4A3B32]">~20 mins</span></div>
+                                                            </div>
+                                                            
+                                                            <div className="bg-red-50 text-red-800 p-3 rounded-lg text-sm border border-red-100 flex gap-3 items-start mt-2">
+                                                                <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5 text-red-500" />
+                                                                <div>
+                                                                    <span className="font-black block mb-0.5 text-xs uppercase tracking-wider text-red-900">Why learn this now?</span>
+                                                                    <span className="font-medium text-red-700">{getStableHumor(item.topic)}</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <h5 className="font-bold text-[#4A3B32] mb-4 flex items-center gap-2">
+                                                            <Play className="h-4 w-4 text-[#C8A288]" />
+                                                            Study Hub: {item.topic}
+                                                        </h5>
+                                                    )}
                                                     
                                                     {/* Context Selection */}
                                                     {docsWithTopic.length > 0 && docsInContext < docsWithTopic.length && (
@@ -505,185 +584,153 @@ const LearningPathView = ({
                                                         </div>
                                                     )}
 
-                                                    {/* Study Actions -- Learn Section */}
+                                                    {/* LEARN Section */}
                                                     <div className="mb-4">
                                                         <p className="text-[10px] font-bold text-[#8a6a5c] uppercase tracking-wider mb-2 flex items-center gap-1.5">
                                                             <BookOpen className="h-3 w-3" />
-                                                            Learn & Review
+                                                            Learn
                                                         </p>
-                                                        <div className="grid grid-cols-3 gap-2">
+                                                        <div className="grid grid-cols-2 gap-2">
                                                             <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleGenerateNotes(idx);
-                                                                }}
-                                                                className="p-3 bg-white border-2 border-[#E6D5CC] rounded-xl hover:border-emerald-400 hover:bg-emerald-50/50 transition-all group"
+                                                                onClick={(e) => { e.stopPropagation(); handleGenerateNotes(idx); }}
+                                                                className="p-3 bg-white border border-[#E6D5CC] rounded-xl hover:border-emerald-400 hover:bg-emerald-50/50 transition-all flex items-center gap-3 group shadow-sm"
                                                             >
-                                                                <div className="flex flex-col items-center text-center">
-                                                                    <div className="h-9 w-9 bg-emerald-100 rounded-lg flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
-                                                                        <FileText className="h-4 w-4 text-emerald-600" />
-                                                                    </div>
-                                                                    <span className="font-bold text-xs text-[#4A3B32]">Notes</span>
-                                                                    <span className="text-[10px] text-[#8a6a5c]">Generate</span>
+                                                                <div className="h-10 w-10 bg-emerald-100 rounded-lg flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                                                    <FileText className="h-5 w-5 text-emerald-600" />
+                                                                </div>
+                                                                <div className="text-left">
+                                                                    <div className="font-bold text-sm text-[#4A3B32]">Notes</div>
+                                                                    <div className="text-[10px] text-[#8a6a5c]">Generate readables</div>
                                                                 </div>
                                                             </button>
 
                                                             <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleStartQA(idx);
-                                                                }}
-                                                                className="p-3 bg-white border-2 border-[#E6D5CC] rounded-xl hover:border-amber-400 hover:bg-amber-50/50 transition-all group"
+                                                                onClick={(e) => { e.stopPropagation(); handleOpenTutor(idx); }}
+                                                                className="p-3 bg-white border border-[#E6D5CC] rounded-xl hover:border-blue-400 hover:bg-blue-50/50 transition-all flex items-center gap-3 group shadow-sm"
                                                             >
-                                                                <div className="flex flex-col items-center text-center">
-                                                                    <div className="h-9 w-9 bg-amber-100 rounded-lg flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
-                                                                        <HelpCircle className="h-4 w-4 text-amber-600" />
-                                                                    </div>
-                                                                    <span className="font-bold text-xs text-[#4A3B32]">Q&A</span>
-                                                                    <span className="text-[10px] text-[#8a6a5c]">Study</span>
+                                                                <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                                                    <MessageSquare className="h-5 w-5 text-blue-600" />
                                                                 </div>
-                                                            </button>
-
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleOpenTutor(idx);
-                                                                }}
-                                                                className="p-3 bg-white border-2 border-[#E6D5CC] rounded-xl hover:border-blue-400 hover:bg-blue-50/50 transition-all group"
-                                                            >
-                                                                <div className="flex flex-col items-center text-center">
-                                                                    <div className="h-9 w-9 bg-blue-100 rounded-lg flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
-                                                                        <MessageSquare className="h-4 w-4 text-blue-600" />
-                                                                    </div>
-                                                                    <span className="font-bold text-xs text-[#4A3B32]">AI Tutor</span>
-                                                                    <span className="text-[10px] text-[#8a6a5c]">Chat</span>
+                                                                <div className="text-left">
+                                                                    <div className="font-bold text-sm text-[#4A3B32]">AI Tutor</div>
+                                                                    <div className="text-[10px] text-[#8a6a5c]">Chat & Ask</div>
                                                                 </div>
                                                             </button>
                                                         </div>
                                                     </div>
 
-                                                    {/* Explore & Visualize Section */}
+                                                    {/* EXPLORE Section */}
                                                     <div className="mb-4">
                                                         <p className="text-[10px] font-bold text-[#8a6a5c] uppercase tracking-wider mb-2 flex items-center gap-1.5">
                                                             <GitBranch className="h-3 w-3" />
-                                                            Explore & Visualize
+                                                            Explore
                                                         </p>
                                                         <div className="grid grid-cols-2 gap-2">
                                                             {onOpenMindmap && (
                                                                 <button
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        handleOpenMindmap(idx);
-                                                                    }}
-                                                                    className="p-3 bg-white border-2 border-[#E6D5CC] rounded-xl hover:border-indigo-400 hover:bg-indigo-50/50 transition-all group"
+                                                                    onClick={(e) => { e.stopPropagation(); handleOpenMindmap(idx); }}
+                                                                    className="p-3 bg-white border border-[#E6D5CC] rounded-xl hover:border-indigo-400 hover:bg-indigo-50/50 transition-all flex items-center gap-3 group shadow-sm"
                                                                 >
-                                                                    <div className="flex flex-col items-center text-center">
-                                                                        <div className="h-9 w-9 bg-indigo-100 rounded-lg flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
-                                                                            <GitBranch className="h-4 w-4 text-indigo-600" />
-                                                                        </div>
-                                                                        <span className="font-bold text-xs text-[#4A3B32]">Mindmap</span>
-                                                                        <span className="text-[10px] text-[#8a6a5c]">Visualize</span>
+                                                                    <div className="h-10 w-10 bg-indigo-100 rounded-lg flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                                                        <GitBranch className="h-5 w-5 text-indigo-600" />
+                                                                    </div>
+                                                                    <div className="text-left flex-1">
+                                                                        <div className="font-bold text-sm text-[#4A3B32]">Mindmap</div>
+                                                                        <div className="text-[10px] text-[#8a6a5c]">Visualize concepts visually</div>
                                                                     </div>
                                                                 </button>
                                                             )}
+                                                            
+                                                            {onOpenKnowledgeGraph && (
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); onOpenKnowledgeGraph(); }}
+                                                                    className="p-3 bg-white border border-[#E6D5CC] rounded-xl hover:border-emerald-400 hover:bg-emerald-50/50 transition-all flex items-center gap-3 group shadow-sm"
+                                                                >
+                                                                    <div className="h-10 w-10 bg-emerald-100 rounded-lg flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                                                        <Network className="h-5 w-5 text-emerald-600" />
+                                                                    </div>
+                                                                    <div className="text-left flex-1">
+                                                                        <div className="font-bold text-sm text-[#4A3B32]">Knowledge Graph</div>
+                                                                        <div className="text-[10px] text-[#8a6a5c]">Explore relation paths</div>
+                                                                    </div>
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* PRACTICE Section */}
+                                                    <div className="mb-4">
+                                                        <p className="text-[10px] font-bold text-[#8a6a5c] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                                            <Layers className="h-3 w-3" />
+                                                            Practice
+                                                        </p>
+                                                        <div className="grid grid-cols-2 gap-2">
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); handleStartQA(idx); }}
+                                                                className="p-3 bg-white border border-[#E6D5CC] rounded-xl hover:border-amber-400 hover:bg-amber-50/50 transition-all flex items-center gap-3 group shadow-sm"
+                                                            >
+                                                                <div className="h-10 w-10 bg-amber-100 rounded-lg flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                                                    <HelpCircle className="h-5 w-5 text-amber-600" />
+                                                                </div>
+                                                                <div className="text-left">
+                                                                    <div className="font-bold text-sm text-[#4A3B32]">Q&A</div>
+                                                                    <div className="text-[10px] text-[#8a6a5c]">Direct questions</div>
+                                                                </div>
+                                                            </button>
 
                                                             {onOpenFlashcards && (
                                                                 <button
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        handleOpenFlashcards(idx);
-                                                                    }}
-                                                                    className="p-3 bg-white border-2 border-[#E6D5CC] rounded-xl hover:border-orange-400 hover:bg-orange-50/50 transition-all group"
+                                                                    onClick={(e) => { e.stopPropagation(); handleOpenFlashcards(idx); }}
+                                                                    className="p-3 bg-white border border-[#E6D5CC] rounded-xl hover:border-orange-400 hover:bg-orange-50/50 transition-all flex items-center gap-3 group shadow-sm"
                                                                 >
-                                                                    <div className="flex flex-col items-center text-center">
-                                                                        <div className="h-9 w-9 bg-orange-100 rounded-lg flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
-                                                                            <Layers className="h-4 w-4 text-orange-600" />
-                                                                        </div>
-                                                                        <span className="font-bold text-xs text-[#4A3B32]">Flashcards</span>
-                                                                        <span className="text-[10px] text-[#8a6a5c]">Study</span>
+                                                                    <div className="h-10 w-10 bg-orange-100 rounded-lg flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                                                        <Layers className="h-5 w-5 text-orange-600" />
+                                                                    </div>
+                                                                    <div className="text-left">
+                                                                        <div className="font-bold text-sm text-[#4A3B32]">Flashcards</div>
+                                                                        <div className="text-[10px] text-[#8a6a5c]">Spaced study</div>
                                                                     </div>
                                                                 </button>
                                                             )}
                                                         </div>
                                                     </div>
                                                     
-                                                    {/* Test Yourself -- Quiz Section */}
+                                                    {/* TEST Section */}
                                                     <div className="mb-3">
                                                         <p className="text-[10px] font-bold text-[#8a6a5c] uppercase tracking-wider mb-2 flex items-center gap-1.5">
                                                             <Zap className="h-3 w-3" />
-                                                            Test Your Knowledge
+                                                            Test
                                                         </p>
                                                         <div className="grid grid-cols-3 gap-2">
                                                             <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleStartQuiz(idx, 'mcq');
-                                                                }}
-                                                                className="p-3 bg-white border-2 border-[#E6D5CC] rounded-xl hover:border-purple-400 hover:bg-purple-50/50 transition-all group"
+                                                                onClick={(e) => { e.stopPropagation(); handleStartQuiz(idx, 'mcq'); }}
+                                                                className="p-3 bg-white border border-[#E6D5CC] rounded-xl hover:border-purple-400 hover:bg-purple-50/50 transition-all flex flex-col items-center justify-center group shadow-sm"
                                                             >
-                                                                <div className="flex flex-col items-center text-center">
-                                                                    <div className="h-9 w-9 bg-purple-100 rounded-lg flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
-                                                                        <CheckSquare className="h-4 w-4 text-purple-600" />
-                                                                    </div>
-                                                                    <span className="font-bold text-xs text-[#4A3B32]">MCQ</span>
-                                                                    <span className="text-[10px] text-[#8a6a5c]">10 questions</span>
-                                                                </div>
+                                                                <CheckSquare className="h-5 w-5 text-purple-600 mb-1 group-hover:scale-110 transition-transform" />
+                                                                <span className="font-bold text-[11px] text-[#4A3B32]">MCQ</span>
                                                             </button>
                                                             
                                                             <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleStartQuiz(idx, 'subjective');
-                                                                }}
-                                                                className="p-3 bg-white border-2 border-[#E6D5CC] rounded-xl hover:border-blue-400 hover:bg-blue-50/50 transition-all group"
+                                                                onClick={(e) => { e.stopPropagation(); handleStartQuiz(idx, 'subjective'); }}
+                                                                className="p-3 bg-white border border-[#E6D5CC] rounded-xl hover:border-blue-400 hover:bg-blue-50/50 transition-all flex flex-col items-center justify-center group shadow-sm"
                                                             >
-                                                                <div className="flex flex-col items-center text-center">
-                                                                    <div className="h-9 w-9 bg-blue-100 rounded-lg flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
-                                                                        <FileText className="h-4 w-4 text-blue-600" />
-                                                                    </div>
-                                                                    <span className="font-bold text-xs text-[#4A3B32]">Subjective</span>
-                                                                    <span className="text-[10px] text-[#8a6a5c]">2 questions</span>
-                                                                </div>
+                                                                <FileText className="h-5 w-5 text-blue-600 mb-1 group-hover:scale-110 transition-transform" />
+                                                                <span className="font-bold text-[11px] text-[#4A3B32]">Subjective</span>
                                                             </button>
                                                             
                                                             <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleStartQuiz(idx, 'both');
-                                                                }}
-                                                                className="p-3 bg-gradient-to-br from-[#C8A288] to-[#A08072] text-white border-2 border-transparent rounded-xl hover:shadow-lg transition-all group"
+                                                                onClick={(e) => { e.stopPropagation(); handleStartQuiz(idx, 'both'); }}
+                                                                className="p-3 bg-gradient-to-br from-[#C8A288] to-[#A08072] text-white border-2 border-transparent rounded-xl hover:shadow-lg transition-all flex flex-col items-center justify-center group"
                                                             >
-                                                                <div className="flex flex-col items-center text-center">
-                                                                    <div className="h-9 w-9 bg-white/20 rounded-lg flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
-                                                                        <Brain className="h-4 w-4" />
-                                                                    </div>
-                                                                    <span className="font-bold text-xs">Full Quiz</span>
-                                                                    <span className="text-[10px] opacity-80">5 + 2</span>
-                                                                </div>
+                                                                <Brain className="h-5 w-5 mb-1 group-hover:scale-110 transition-transform" />
+                                                                <span className="font-bold text-[11px]">Full Quiz</span>
                                                             </button>
                                                         </div>
                                                     </div>
-
-                                                    {/* Explore */}
-                                                    {onOpenKnowledgeGraph && (
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                onOpenKnowledgeGraph();
-                                                            }}
-                                                            className="w-full p-2.5 bg-white border border-[#E6D5CC] rounded-xl hover:border-[#C8A288] transition-all flex items-center justify-center gap-2 text-sm font-medium text-[#8a6a5c] hover:text-[#4A3B32]"
-                                                        >
-                                                            <Network className="h-4 w-4 text-[#C8A288]" />
-                                                            View Knowledge Graph
-                                                        </button>
-                                                    )}
-                                                    
-                                                    <p className="text-[10px] text-[#8a6a5c] mt-3 text-center">
-                                                        Take quizzes to track your progress on each topic
-                                                    </p>
-                                                </div>
+                                                    </div>
                                             </div>
-                                        )}
+                                            );
+                                        })()}
                                     </div>
                                     
                                     {/* Arrow connector */}
