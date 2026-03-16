@@ -209,7 +209,7 @@ Guidelines:
 - If the student seems confused, try explaining differently
 - Provide examples from the document context when possible`;
 
-            const response = await fetch(`${import.meta.env.VITE_MAIN_API_URL}/chat/stream`, {
+            const response = await fetch(`${import.meta.env.VITE_MAIN_API_URL}/api/v1/chat/stream`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

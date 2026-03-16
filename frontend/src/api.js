@@ -45,12 +45,12 @@ api.interceptors.response.use(
 );
 
 export const login = async (email, password) => {
-    const response = await api.post('/auth/login', { email, password });
+    const response = await api.post('/api/v1/auth/login', { email, password });
     return response.data;
 };
 
 export const signup = async (email, password, fullName) => {
-    const response = await api.post('/auth/signup', { email, password, full_name: fullName });
+    const response = await api.post('/api/v1/auth/signup', { email, password, full_name: fullName });
     return response.data;
 };
 
@@ -60,16 +60,16 @@ export const loginWithGoogle = async (accessToken) => {
 };
 
 export const createProject = async (name) => {
-    const response = await api.post('/projects/', { name });
+    const response = await api.post('/api/v1/projects/', { name });
     return response.data;
 };
 
 export const deleteProject = async (projectId) => {
-    await api.delete(`/projects/${projectId}`);
+    await api.delete(`/api/v1/projects/${projectId}`);
 };
 
 export const getProjects = async () => {
-    const response = await api.get('/projects/');
+    const response = await api.get('/api/v1/projects/');
     return response.data;
 };
 
@@ -78,7 +78,7 @@ export const uploadDocument = async (projectId, file, onProgress) => {
     formData.append('file', file);
     formData.append('project_id', projectId);
 
-    const response = await axios.post(`${API_URL}/documents/upload`, formData, {
+    const response = await axios.post(`${API_URL}/api/v1/documents/upload`, formData, {
         headers: {
             'Content-Type': 'multipart/form-data',
             // Forward auth token if it exists (axios interceptor might handle this, but good to be explicit if not using the instance)
@@ -95,17 +95,17 @@ export const uploadDocument = async (projectId, file, onProgress) => {
 };
 
 export const getDocuments = async (projectId) => {
-    const response = await api.get(`/documents/${projectId}`, { params: { _: Date.now() } });
+    const response = await api.get(`/api/v1/documents/${projectId}`, { params: { _: Date.now() } });
     return response.data;
 };
 
 export const getChatHistory = async (projectId) => {
-    const response = await api.get(`/chat/history/${projectId}`);
+    const response = await api.get(`/api/v1/chat/history/${projectId}`);
     return response.data;
 };
 
 export const chatMessage = async (projectId, message, history = []) => {
-    const response = await api.post('/chat/message', {
+    const response = await api.post('/api/v1/chat/message', {
         project_id: projectId,
         message,
         session_history: history
@@ -120,7 +120,7 @@ export const chatMessageStream = async (projectId, message, history = [], select
     for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch(`${API_URL}/chat/stream`, {
+            const response = await fetch(`${API_URL}/api/v1/chat/stream`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -220,7 +220,7 @@ export const chatMessageStream = async (projectId, message, history = [], select
 };
 
 export const getProjectSummary = async (projectId, selectedDocuments = []) => {
-    const response = await api.post('/chat/summary', {
+    const response = await api.post('/api/v1/chat/summary', {
         project_id: projectId,
         selected_documents: selectedDocuments
     });
@@ -231,7 +231,7 @@ export const getProjectSummary = async (projectId, selectedDocuments = []) => {
 
 
 export const generateMCQ = async (projectId, topic, numQuestions, selectedDocuments = [], difficulty = 'medium') => {
-    const response = await api.post('/mcq/generate', {
+    const response = await api.post('/api/v1/mcq/generate', {
         project_id: projectId,
         topic: topic,
         num_questions: parseInt(numQuestions),
@@ -242,12 +242,12 @@ export const generateMCQ = async (projectId, topic, numQuestions, selectedDocume
 };
 
 export const getTopics = async (projectId) => {
-    const response = await api.get(`/mcq/topics/${projectId}`);
+    const response = await api.get(`/api/v1/mcq/topics/${projectId}`);
     return response.data;
 };
 
 export const submitEvaluation = async (projectId, question, userAnswer) => {
-    const response = await api.post('/evaluation/submit', {
+    const response = await api.post('/api/v1/evaluation/submit', {
         project_id: projectId,
         question,
         user_answer: userAnswer
@@ -256,7 +256,7 @@ export const submitEvaluation = async (projectId, question, userAnswer) => {
 };
 
 export const generateSubjectiveTest = async (projectId, topic, numQuestions, selectedDocuments = [], answerSize = 'medium') => {
-    const response = await api.post('/evaluation/generate-test', {
+    const response = await api.post('/api/v1/evaluation/generate-test', {
         project_id: projectId,
         topic: topic,
         num_questions: parseInt(numQuestions),
@@ -267,7 +267,7 @@ export const generateSubjectiveTest = async (projectId, topic, numQuestions, sel
 };
 
 export const submitSubjectiveTest = async (testId, answers) => {
-    const response = await api.post('/evaluation/submit-test', {
+    const response = await api.post('/api/v1/evaluation/submit-test', {
         test_id: testId,
         answers: answers
     });
@@ -275,14 +275,14 @@ export const submitSubjectiveTest = async (testId, answers) => {
 };
 
 export const deleteDocument = async (projectId, documentId) => {
-    const response = await api.delete(`/documents/${documentId}`, {
+    const response = await api.delete(`/api/v1/documents/${documentId}`, {
         params: { project_id: projectId }
     });
     return response.data;
 };
 
 export const generateNotes = async (projectId, noteType, topic, selectedDocuments = []) => {
-    const response = await api.post('/notes/generate', {
+    const response = await api.post('/api/v1/notes/generate', {
         project_id: projectId,
         note_type: noteType,
         topic: topic,
@@ -295,51 +295,51 @@ export const generateNotes = async (projectId, noteType, topic, selectedDocument
 // ============== Saved Q&A (Subjective Tests) API ==============
 
 export const getSavedQATests = async (projectId) => {
-    const response = await api.get(`/evaluation/saved/${projectId}`);
+    const response = await api.get(`/api/v1/evaluation/saved/${projectId}`);
     return response.data;
 };
 
 export const getSavedQATest = async (testId) => {
-    const response = await api.get(`/evaluation/saved/view/${testId}`);
+    const response = await api.get(`/api/v1/evaluation/saved/view/${testId}`);
     return response.data;
 };
 
 export const deleteSavedQATest = async (testId) => {
-    const response = await api.delete(`/evaluation/saved/${testId}`);
+    const response = await api.delete(`/api/v1/evaluation/saved/${testId}`);
     return response.data;
 };
 
 // ============== Saved Quiz (MCQ Tests) API ==============
 
 export const getSavedQuizzes = async (projectId) => {
-    const response = await api.get(`/mcq/saved/${projectId}`);
+    const response = await api.get(`/api/v1/mcq/saved/${projectId}`);
     return response.data;
 };
 
 export const getSavedQuiz = async (testId) => {
-    const response = await api.get(`/mcq/saved/view/${testId}`);
+    const response = await api.get(`/api/v1/mcq/saved/view/${testId}`);
     return response.data;
 };
 
 export const deleteSavedQuiz = async (testId) => {
-    const response = await api.delete(`/mcq/saved/${testId}`);
+    const response = await api.delete(`/api/v1/mcq/saved/${testId}`);
     return response.data;
 };
 
 // ============== Saved Notes API ==============
 
 export const getSavedNotes = async (projectId) => {
-    const response = await api.get(`/notes/saved/${projectId}`);
+    const response = await api.get(`/api/v1/notes/saved/${projectId}`);
     return response.data;
 };
 
 export const getSavedNote = async (noteId) => {
-    const response = await api.get(`/notes/saved/view/${noteId}`);
+    const response = await api.get(`/api/v1/notes/saved/view/${noteId}`);
     return response.data;
 };
 
 export const deleteSavedNote = async (noteId) => {
-    const response = await api.delete(`/notes/saved/${noteId}`);
+    const response = await api.delete(`/api/v1/notes/saved/${noteId}`);
     return response.data;
 };
 
@@ -347,7 +347,7 @@ export const deleteSavedNote = async (noteId) => {
 
 // Performance Tracking
 export const recordPerformance = async (projectId, topic, correct, wrong) => {
-    const response = await api.post('/learning/performance/record', {
+    const response = await api.post('/api/v1/learning/performance/record', {
         project_id: projectId,
         topic,
         correct,
@@ -358,13 +358,13 @@ export const recordPerformance = async (projectId, topic, correct, wrong) => {
 
 export const getPerformance = async (projectId, topic = null) => {
     const params = topic ? { topic } : {};
-    const response = await api.get(`/learning/performance/${projectId}`, { params });
+    const response = await api.get(`/api/v1/learning/performance/${projectId}`, { params });
     return response.data;
 };
 
 // Weakness Detection
 export const getWeakTopics = async (projectId, topK = 5, threshold = 0.3) => {
-    const response = await api.get(`/learning/weak-topics/${projectId}`, {
+    const response = await api.get(`/api/v1/learning/weak-topics/${projectId}`, {
         params: { top_k: topK, threshold }
     });
     return response.data;
@@ -372,7 +372,7 @@ export const getWeakTopics = async (projectId, topK = 5, threshold = 0.3) => {
 
 // Spaced Repetition
 export const createReviewCard = async (projectId, topic, question, answer) => {
-    const response = await api.post('/learning/review-cards', {
+    const response = await api.post('/api/v1/learning/review-cards', {
         project_id: projectId,
         topic,
         question,
@@ -382,7 +382,7 @@ export const createReviewCard = async (projectId, topic, question, answer) => {
 };
 
 export const createCardsFromQuiz = async (projectId, topic, questions, wrongOnly = true) => {
-    const response = await api.post('/learning/review-cards/from-quiz', {
+    const response = await api.post('/api/v1/learning/review-cards/from-quiz', {
         project_id: projectId,
         topic,
         questions,
@@ -394,7 +394,7 @@ export const createCardsFromQuiz = async (projectId, topic, questions, wrongOnly
 export const getDueCards = async (projectId = null, limit = 20) => {
     const params = { limit };
     if (projectId) params.project_id = projectId;
-    const response = await api.get('/learning/review-cards/due', { params });
+    const response = await api.get('/api/v1/learning/review-cards/due', { params });
     return response.data;
 };
 
@@ -412,7 +412,7 @@ export const deleteReviewCard = async (cardId) => {
 
 export const getReviewStats = async (projectId = null) => {
     const params = projectId ? { project_id: projectId } : {};
-    const response = await api.get('/learning/review-stats', { params });
+    const response = await api.get('/api/v1/learning/review-stats', { params });
     return response.data;
 };
 
@@ -423,13 +423,13 @@ export const getLearningDashboard = async (projectId) => {
 };
 
 export const getAllLearningStats = async () => {
-    const response = await api.get('/learning/stats/all');
+    const response = await api.get('/api/v1/learning/stats/all');
     return response.data;
 };
 
 // Knowledge Graph
 export const buildKnowledgeGraph = async (projectId, topics, forceRebuild = false) => {
-    const response = await api.post(`/learning/knowledge-graph/${projectId}/build`, {
+    const response = await api.post(`/api/v1/learning/knowledge-graph/${projectId}/build`, {
         topics,
         force_rebuild: forceRebuild
     });
@@ -437,13 +437,13 @@ export const buildKnowledgeGraph = async (projectId, topics, forceRebuild = fals
 };
 
 export const getKnowledgeGraph = async (projectId) => {
-    const response = await api.get(`/learning/knowledge-graph/${projectId}`);
+    const response = await api.get(`/api/v1/learning/knowledge-graph/${projectId}`);
     return response.data;
 };
 
 export const getRelatedTopics = async (projectId, topic, maxDistance = 2) => {
     const response = await api.get(
-        `/learning/knowledge-graph/${projectId}/related/${encodeURIComponent(topic)}`,
+        `/api/v1/learning/knowledge-graph/${projectId}/related/${encodeURIComponent(topic)}`,
         { params: { max_distance: maxDistance } }
     );
     return response.data;
@@ -451,13 +451,13 @@ export const getRelatedTopics = async (projectId, topic, maxDistance = 2) => {
 
 export const getLearningPath = async (projectId, targetTopics = null) => {
     const params = targetTopics ? { target_topics: targetTopics.join(',') } : {};
-    const response = await api.get(`/learning/knowledge-graph/${projectId}/learning-path`, { params });
+    const response = await api.get(`/api/v1/learning/knowledge-graph/${projectId}/learning-path`, { params });
     return response.data;
 };
 
 export const getTopicPrerequisites = async (projectId, topic) => {
     const response = await api.get(
-        `/learning/knowledge-graph/${projectId}/prerequisites/${encodeURIComponent(topic)}`
+        `/api/v1/learning/knowledge-graph/${projectId}/prerequisites/${encodeURIComponent(topic)}`
     );
     return response.data;
 };
@@ -470,7 +470,7 @@ export const getSuggestedTopic = async (projectId) => {
 // ============== Search API ==============
 
 export const searchDocuments = async (projectId, query, documentIds = null, limit = 10) => {
-    const response = await api.post(`/documents/${projectId}/search`, {
+    const response = await api.post(`/api/v1/documents/${projectId}/search`, {
         query,
         document_ids: documentIds,
         limit
@@ -482,13 +482,13 @@ export const searchDocuments = async (projectId, query, documentIds = null, limi
 
 // Get full knowledge graph for visualization
 export const getKnowledgeGraphVisualization = async (projectId) => {
-    const response = await api.get(`/knowledge-graph/graph/${projectId}`);
+    const response = await api.get(`/api/v1/knowledge-graph/graph/${projectId}`);
     return response.data;
 };
 
 // Get topic summary using RAG
 export const getTopicSummary = async (projectId, topic, forceRegenerate = false) => {
-    const response = await api.post('/knowledge-graph/topic-summary', {
+    const response = await api.post('/api/v1/knowledge-graph/topic-summary', {
         project_id: projectId,
         topic,
         force_regenerate: forceRegenerate
@@ -498,7 +498,7 @@ export const getTopicSummary = async (projectId, topic, forceRegenerate = false)
 
 // Record user interaction with graph
 export const recordGraphInteraction = async (projectId, topic, eventType, durationMs = 0, metadata = null) => {
-    const response = await api.post('/knowledge-graph/analytics/record', {
+    const response = await api.post('/api/v1/knowledge-graph/analytics/record', {
         project_id: projectId,
         topic,
         event_type: eventType,
@@ -510,7 +510,7 @@ export const recordGraphInteraction = async (projectId, topic, eventType, durati
 
 // Record batch interactions
 export const recordBatchInteractions = async (projectId, interactions) => {
-    const response = await api.post('/knowledge-graph/analytics/record-batch', {
+    const response = await api.post('/api/v1/knowledge-graph/analytics/record-batch', {
         project_id: projectId,
         interactions
     });
@@ -519,7 +519,7 @@ export const recordBatchInteractions = async (projectId, interactions) => {
 
 // Get user analytics
 export const getGraphAnalytics = async (projectId, days = 7) => {
-    const response = await api.get(`/knowledge-graph/analytics/${projectId}`, {
+    const response = await api.get(`/api/v1/knowledge-graph/analytics/${projectId}`, {
         params: { days }
     });
     return response.data;
@@ -527,7 +527,7 @@ export const getGraphAnalytics = async (projectId, days = 7) => {
 
 // Get learning suggestions
 export const getLearningSuggestions = async (projectId, currentTopic = null, limit = 3) => {
-    const response = await api.post('/knowledge-graph/suggestions', {
+    const response = await api.post('/api/v1/knowledge-graph/suggestions', {
         project_id: projectId,
         current_topic: currentTopic,
         limit
@@ -537,7 +537,7 @@ export const getLearningSuggestions = async (projectId, currentTopic = null, lim
 
 // Start learning session
 export const startLearningSession = async (projectId) => {
-    const response = await api.post('/knowledge-graph/session/start', {
+    const response = await api.post('/api/v1/knowledge-graph/session/start', {
         project_id: projectId
     });
     return response.data;
@@ -545,7 +545,7 @@ export const startLearningSession = async (projectId) => {
 
 // End learning session
 export const endLearningSession = async (sessionId, topicsVisited, totalTimeMs) => {
-    const response = await api.post('/knowledge-graph/session/end', {
+    const response = await api.post('/api/v1/knowledge-graph/session/end', {
         session_id: sessionId,
         topics_visited: topicsVisited,
         total_time_ms: totalTimeMs
@@ -557,18 +557,18 @@ export const endLearningSession = async (sessionId, topicsVisited, totalTimeMs) 
 
 // --- Settings ---
 export const getUserSettings = async () => {
-    const response = await api.get('/user-data/settings');
+    const response = await api.get('/api/v1/user-data/settings');
     return response.data;
 };
 
 export const saveUserSettings = async (settings) => {
-    const response = await api.put('/user-data/settings', { settings });
+    const response = await api.put('/api/v1/user-data/settings', { settings });
     return response.data;
 };
 
 // --- Bookmarks ---
 export const getBookmarks = async (projectId) => {
-    const response = await api.get(`/user-data/bookmarks/${projectId}`);
+    const response = await api.get(`/api/v1/user-data/bookmarks/${projectId}`);
     return response.data;
 };
 
@@ -582,28 +582,28 @@ export const addBookmark = async (projectId, title, note = '', documentId = null
     };
     if (highlightText) body.highlight_text = highlightText;
     if (color) body.color = color;
-    const response = await api.post('/user-data/bookmarks', body);
+    const response = await api.post('/api/v1/user-data/bookmarks', body);
     return response.data;
 };
 
 export const updateBookmark = async (bookmarkId, updates) => {
-    const response = await api.patch(`/user-data/bookmarks/${bookmarkId}`, updates);
+    const response = await api.patch(`/api/v1/user-data/bookmarks/${bookmarkId}`, updates);
     return response.data;
 };
 
 export const deleteBookmark = async (bookmarkId) => {
-    const response = await api.delete(`/user-data/bookmarks/${bookmarkId}`);
+    const response = await api.delete(`/api/v1/user-data/bookmarks/${bookmarkId}`);
     return response.data;
 };
 
 // --- Study Activity ---
 export const getStudyActivity = async (projectId, days = 90) => {
-    const response = await api.get(`/user-data/activity/${projectId}`, { params: { days } });
+    const response = await api.get(`/api/v1/user-data/activity/${projectId}`, { params: { days } });
     return response.data;
 };
 
 export const recordStudyActivity = async (projectId, activityType, meta = null) => {
-    const response = await api.post('/user-data/activity', {
+    const response = await api.post('/api/v1/user-data/activity', {
         project_id: projectId,
         activity_type: activityType,
         meta,
@@ -613,12 +613,12 @@ export const recordStudyActivity = async (projectId, activityType, meta = null) 
 
 // --- Exams ---
 export const getExams = async (projectId) => {
-    const response = await api.get(`/user-data/exams/${projectId}`);
+    const response = await api.get(`/api/v1/user-data/exams/${projectId}`);
     return response.data;
 };
 
 export const saveExam = async (projectId, name, examDate, topics = [], difficulty = 'medium') => {
-    const response = await api.post('/user-data/exams', {
+    const response = await api.post('/api/v1/user-data/exams', {
         project_id: projectId,
         name,
         exam_date: examDate,
@@ -629,18 +629,18 @@ export const saveExam = async (projectId, name, examDate, topics = [], difficult
 };
 
 export const deleteExam = async (examId) => {
-    const response = await api.delete(`/user-data/exams/${examId}`);
+    const response = await api.delete(`/api/v1/user-data/exams/${examId}`);
     return response.data;
 };
 
 // --- Learning Progress ---
 export const getLearningProgress = async (projectId) => {
-    const response = await api.get(`/user-data/progress/${projectId}`);
+    const response = await api.get(`/api/v1/user-data/progress/${projectId}`);
     return response.data;
 };
 
 export const saveLearningProgress = async (projectId, completedTopics) => {
-    const response = await api.put('/user-data/progress', {
+    const response = await api.put('/api/v1/user-data/progress', {
         project_id: projectId,
         completed_topics: completedTopics,
     });
@@ -652,12 +652,12 @@ export const getPomodoro = async (projectId = null, documentId = null) => {
     const params = {};
     if (projectId) params.project_id = projectId;
     if (documentId) params.document_id = documentId;
-    const response = await api.get('/user-data/pomodoro', { params });
+    const response = await api.get('/api/v1/user-data/pomodoro', { params });
     return response.data;
 };
 
 export const savePomodoro = async (sessions, focusTimeMinutes, projectId = null, documentId = null) => {
-    const response = await api.put('/user-data/pomodoro', {
+    const response = await api.put('/api/v1/user-data/pomodoro', {
         project_id: projectId,
         document_id: documentId,
         sessions,
@@ -668,12 +668,12 @@ export const savePomodoro = async (sessions, focusTimeMinutes, projectId = null,
 
 // --- Recent Searches ---
 export const getRecentSearches = async (projectId) => {
-    const response = await api.get(`/user-data/searches/${projectId}`);
+    const response = await api.get(`/api/v1/user-data/searches/${projectId}`);
     return response.data;
 };
 
 export const saveRecentSearch = async (projectId, query) => {
-    const response = await api.post('/user-data/searches', {
+    const response = await api.post('/api/v1/user-data/searches', {
         project_id: projectId,
         query,
     });
@@ -681,29 +681,29 @@ export const saveRecentSearch = async (projectId, query) => {
 };
 
 export const clearRecentSearches = async (projectId) => {
-    const response = await api.delete(`/user-data/searches/${projectId}`);
+    const response = await api.delete(`/api/v1/user-data/searches/${projectId}`);
     return response.data;
 };
 
 // --- Streaks ---
 export const getStreak = async (projectId) => {
-    const response = await api.get(`/user-data/streaks/${projectId}`);
+    const response = await api.get(`/api/v1/user-data/streaks/${projectId}`);
     return response.data;
 };
 
 export const updateStreak = async (projectId) => {
-    const response = await api.post(`/user-data/streaks/${projectId}`);
+    const response = await api.post(`/api/v1/user-data/streaks/${projectId}`);
     return response.data;
 };
 
 // --- Gamification ---
 export const getGamification = async () => {
-    const response = await api.get('/user-data/gamification');
+    const response = await api.get('/api/v1/user-data/gamification');
     return response.data;
 };
 
 export const awardXP = async (activityType, meta = null) => {
-    const response = await api.post('/user-data/gamification/award-xp', {
+    const response = await api.post('/api/v1/user-data/gamification/award-xp', {
         activity_type: activityType,
         meta,
     });
@@ -713,12 +713,12 @@ export const awardXP = async (activityType, meta = null) => {
 // ============== Flashcard API ==============
 
 export const getFlashcardSets = async (projectId) => {
-    const response = await api.get(`/flashcards/${projectId}`);
+    const response = await api.get(`/api/v1/flashcards/${projectId}`);
     return response.data;
 };
 
 export const createFlashcardSet = async (projectId, title, topic, description, cards) => {
-    const response = await api.post(`/flashcards/${projectId}`, {
+    const response = await api.post(`/api/v1/flashcards/${projectId}`, {
         title,
         topic,
         description,
@@ -728,29 +728,29 @@ export const createFlashcardSet = async (projectId, title, topic, description, c
 };
 
 export const updateFlashcardSet = async (setId, updates) => {
-    const response = await api.put(`/flashcards/${setId}`, updates);
+    const response = await api.put(`/api/v1/flashcards/${setId}`, updates);
     return response.data;
 };
 
 export const deleteFlashcardSet = async (setId) => {
-    const response = await api.delete(`/flashcards/${setId}`);
+    const response = await api.delete(`/api/v1/flashcards/${setId}`);
     return response.data;
 };
 
 export const getFlashcards = async (setId) => {
-    const response = await api.get(`/flashcards/${setId}/cards`);
+    const response = await api.get(`/api/v1/flashcards/${setId}/cards`);
     return response.data;
 };
 
 // ============== Mindmap API ==============
 
 export const getMindmaps = async (projectId) => {
-    const response = await api.get(`/mindmaps/${projectId}`);
+    const response = await api.get(`/api/v1/mindmaps/${projectId}`);
     return response.data;
 };
 
 export const generateMindmap = async (projectId, title, topic, selectedDocuments = []) => {
-    const response = await api.post(`/mindmaps/${projectId}/generate`, {
+    const response = await api.post(`/api/v1/mindmaps/${projectId}/generate`, {
         title,
         topic,
         selected_documents: selectedDocuments
@@ -759,17 +759,17 @@ export const generateMindmap = async (projectId, title, topic, selectedDocuments
 };
 
 export const getMindmap = async (mindmapId) => {
-    const response = await api.get(`/mindmaps/${mindmapId}/view`);
+    const response = await api.get(`/api/v1/mindmaps/${mindmapId}/view`);
     return response.data;
 };
 
 export const updateMindmap = async (mindmapId, updates) => {
-    const response = await api.put(`/mindmaps/${mindmapId}`, updates);
+    const response = await api.put(`/api/v1/mindmaps/${mindmapId}`, updates);
     return response.data;
 };
 
 export const deleteMindmap = async (mindmapId) => {
-    const response = await api.delete(`/mindmaps/${mindmapId}`);
+    const response = await api.delete(`/api/v1/mindmaps/${mindmapId}`);
     return response.data;
 };
 
@@ -778,7 +778,7 @@ export const deleteMindmap = async (mindmapId) => {
 
 export const generateMindmapLegacy = async (projectId, topic, selectedDocuments = []) => {
     // Generate a mindmap with auto-generated title for Learning Path
-    const response = await api.post(`/mindmaps/${projectId}/generate`, {
+    const response = await api.post(`/api/v1/mindmaps/${projectId}/generate`, {
         title: `${topic} - Mindmap`,
         topic,
         selected_documents: selectedDocuments
@@ -827,7 +827,7 @@ export const generateFlashcardsWithAI = async (projectId, topic, numCards = 10, 
  */
 export const subscribeDocumentProgress = (documentId, onEvent, onError = null) => {
     const token = localStorage.getItem('token');
-    const url = `${API_URL}/progress/${documentId}?token=${encodeURIComponent(token)}`;
+    const url = `${API_URL}/api/v1/progress/${documentId}?token=${encodeURIComponent(token)}`;
 
     const eventSource = new EventSource(url);
 
