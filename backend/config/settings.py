@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     # CORS
     BACKEND_CORS_ORIGINS: List[str] = [
         "http://localhost:5173",
-        "https://lumina-iq-livid.vercel.app"
+        "https://lumina-iq-livid.vercel.app",
         "https://luminaiq.fun"
     ]
 
