@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from api.v1.api import api_router
@@ -72,6 +72,12 @@ app.add_middleware(RequestTimeoutMiddleware)
 async def log_all_requests(request: Request, call_next):
     print(f"INCOMING → {request.method} {request.url}")
     return await call_next(request)
+
+
+# Handle CORS preflight requests to prevent hanging
+@app.options("/{full_path:path}")
+async def options_handler(full_path: str):
+    return Response(status_code=200)
 
 
 app.include_router(api_router, prefix="/api/v1")
