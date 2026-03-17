@@ -1,10 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, BookOpen, MoreVertical, Calendar, ArrowRight, LogOut, Upload, FileText, Loader2, X, Trash2 } from 'lucide-react';
 import { createProject, uploadDocument, getProjects, deleteProject } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getRotatingLoadingMessage } from '../utils/LoadingMessages';
+import { DashboardSkeleton, CardSkeleton, ListItemSkeleton } from '../components/Skeleton';
 
 const Dashboard = () => {
     const navigate = useNavigate();
@@ -17,7 +18,7 @@ const Dashboard = () => {
     const [dragActive, setDragActive] = useState(false);
     const [uploadStatus, setUploadStatus] = useState({}); // { fileName: 'pending' | 'uploading' | 'success' | 'error' }
     const [projects, setProjects] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [isLoadingProjects, setIsLoadingProjects] = useState(true); // Track data loading separately
     // Delete Modal State
     const [deleteTargetId, setDeleteTargetId] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -46,38 +47,16 @@ const Dashboard = () => {
         } catch (error) {
             console.error("Failed to fetch projects:", error);
         } finally {
-            setLoading(false);
+            setIsLoadingProjects(false);
         }
     };
 
     // ... handlers ...
 
-    if (loading) {
-        return (
-            <div className="min-h-screen bg-[#FDF6F0] font-sans text-[#4A3B32]">
-                <header className="bg-white border-b border-[#E6D5CC] sticky top-0 z-10">
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-                        <div className="skeleton h-10 w-40"></div>
-                        <div className="skeleton h-10 w-10 full-rounded"></div>
-                    </div>
-                </header>
-                <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-                    <div className="mb-12">
-                        <div className="skeleton h-8 w-48 mb-2"></div>
-                        <div className="skeleton h-4 w-64"></div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {[1, 2, 3].map(i => (
-                            <div key={i} className="h-48 bg-white rounded-2xl border border-[#E6D5CC] p-6">
-                                <div className="skeleton h-12 w-12 rounded-xl mb-6"></div>
-                                <div className="skeleton h-6 w-3/4 mb-4"></div>
-                                <div className="skeleton h-4 w-1/2"></div>
-                            </div>
-                        ))}
-                    </div>
-                </main>
-            </div>
-        );
+    // Show skeleton while loading, but render UI immediately
+    // This ensures <1 second first paint
+    if (isLoadingProjects && projects.length === 0) {
+        return <DashboardSkeleton />;
     }
 
     const confirmDeleteProject = async () => {

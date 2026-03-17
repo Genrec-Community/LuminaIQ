@@ -14,6 +14,7 @@ from api.v1.endpoints import (
     flashcards,
     mindmaps,
     progress,
+    jobs,
 )
 
 api_router = APIRouter()
@@ -32,3 +33,6 @@ api_router.include_router(user_data.router, prefix="/user-data", tags=["user-dat
 api_router.include_router(flashcards.router, prefix="/flashcards", tags=["flashcards"])
 api_router.include_router(mindmaps.router, prefix="/mindmaps", tags=["mindmaps"])
 api_router.include_router(progress.router, prefix="/progress", tags=["progress"])
+
+# Background jobs for heavy AI tasks
+api_router.include_router(jobs.router, prefix="/jobs", tags=["jobs"])

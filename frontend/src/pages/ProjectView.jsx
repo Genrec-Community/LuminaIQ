@@ -91,6 +91,7 @@ import AITutorChat from '../components/AITutorChat';
 import BookmarksPanel from '../components/BookmarksPanel';
 import GlobalSearch from '../components/GlobalSearch';
 import GamificationPanel from '../components/GamificationPanel';
+import { ProjectViewSkeleton } from '../components/Skeleton';
 
 // Chat Agentic Components
 import { CommandPicker, CommandParamForm } from '../components/chat/ChatCommands';
@@ -250,7 +251,8 @@ const ProjectView = () => {
         };
 
         const initialLoad = async () => {
-            setProjectViewLoading(true); // Start loading animation
+            // Show skeleton immediately, fetch data in background
+            // Don't block UI - data loads async
             const [docData] = await Promise.all([
                 fetchDocuments()
             ]);
@@ -789,22 +791,8 @@ const ProjectView = () => {
         }
     };
 
-    if (projectViewLoading) {
-        return (
-            <div className="min-h-screen bg-[#FDF6F0] flex flex-col items-center justify-center p-6 text-center">
-                <div className="relative w-24 h-24 mb-6">
-                    <div className="absolute inset-0 border-4 border-[#E6D5CC] rounded-full"></div>
-                    <div className="absolute inset-0 border-4 border-[#C8A288] rounded-full border-t-transparent animate-spin"></div>
-                    <BookOpen className="absolute inset-0 m-auto h-8 w-8 text-[#C8A288] animate-pulse" />
-                </div>
-                <h3 className="text-[#C8A288] font-bold uppercase tracking-widest text-xs mb-3">
-                    Opening Project
-                </h3>
-                <p className="text-[#4A3B32] font-medium italic whitespace-pre-line leading-relaxed text-sm max-w-lg transition-opacity duration-300">
-                    {getRotatingLoadingMessage(loadingMsgIdx)}
-                </p>
-            </div>
-        );
+    if (projectViewLoading && documents.length === 0) {
+        return <ProjectViewSkeleton />;
     }
 
     return (

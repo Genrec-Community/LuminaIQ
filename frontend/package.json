@@ -13,6 +13,8 @@
     "@supabase/supabase-js": "^2.86.2",
     "@tailwindcss/postcss": "^4.1.17",
     "@tailwindcss/typography": "^0.5.19",
+    "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.0.0",
     "autoprefixer": "^10.4.22",
     "axios": "^1.13.2",
     "cytoscape": "^3.33.1",
