@@ -68,6 +68,12 @@ class RequestTimeoutMiddleware(BaseHTTPMiddleware):
 app.add_middleware(RequestTimeoutMiddleware)
 
 
+@app.middleware("http")
+async def log_all_requests(request: Request, call_next):
+    print(f"INCOMING → {request.method} {request.url}")
+    return await call_next(request)
+
+
 app.include_router(api_router, prefix="/api/v1")
 
 
