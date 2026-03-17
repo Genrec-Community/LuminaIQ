@@ -841,3 +841,91 @@ export const subscribeDocumentProgress = (documentId, onEvent, onError = null) =
         eventSource.close();
     };
 };
+
+// ============== Background Jobs API ==============
+
+/**
+ * Submit a heavy AI task to run in background.
+ * Returns immediately with a job_id - UI never blocks.
+ * 
+ * @param {string} jobType - Type of job: 'generate_mcq', 'generate_notes', 'generate_mindmap', 'generate_flashcards'
+ * @param {Object} metadata - Job-specific metadata
+ * @returns {Object} { job_id, status, created_at }
+ */
+export const submitBackgroundJob = async (jobType, metadata = {}) => {
+    const response = await api.post('/jobs/submit', {
+        job_type: jobType,
+        metadata
+    });
+    return response.data;
+};
+
+/**
+ * Get the status of a background job.
+ * @param {string} jobId - The job ID from submitBackgroundJob
+ * @returns {Object} Job status with progress, result, or error
+ */
+export const getJobStatus = async (jobId) => {
+    const response = await api.get(`/jobs/status/${jobId}`);
+    return response.data;
+};
+
+/**
+ * Lightweight polling for job status.
+ * Use this for frequent polling (every 1-2 seconds).
+ * @param {string} jobId - The job ID
+ * @returns {Object} { job_id, status, progress, completed }
+ */
+export const pollJobStatus = async (jobId) => {
+    const response = await api.get(`/jobs/status/${jobId}/poll`);
+    return response.data;
+};
+
+/**
+ * Get all background jobs for current user.
+ * @param {number} limit - Max number of jobs to return
+ * @returns {Array} List of user's jobs
+ */
+export const getMyJobs = async (limit = 10) => {
+    const response = await api.get('/jobs/my-jobs', { params: { limit } });
+    return response.data;
+};
+
+/**
+ * Poll for job completion with automatic cleanup.
+ * Returns when job completes or fails.
+ * 
+ * @param {string} jobId - The job ID
+ * @param {Object} options - { onProgress, interval, timeout }
+ * @returns {Object} Job result when completed
+ */
+export const waitForJob = async (jobId, options = {}) => {
+    const { 
+        onProgress, 
+        interval = 2000,  // Poll every 2 seconds
+        timeout = 120000  // 2 minute timeout
+    } = options;
+    
+    const startTime = Date.now();
+    
+    while (true) {
+        // Check timeout
+        if (Date.now() - startTime > timeout) {
+            throw new Error('Job polling timeout');
+        }
+        
+        const status = await pollJobStatus(jobId);
+        
+        if (onProgress) {
+            onProgress(status);
+        }
+        
+        if (status.completed) {
+            // Get full result
+            return await getJobStatus(jobId);
+        }
+        
+        // Wait before next poll
+        await new Promise(resolve => setTimeout(resolve, interval));
+    }
+};
