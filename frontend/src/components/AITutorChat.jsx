@@ -8,6 +8,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { recordActivity } from '../utils/studyActivity';
 import { useSettings } from '../context/SettingsContext';
+import { API_URL } from '../api';
 
 const AITutorChat = ({
     projectId,
@@ -209,7 +210,7 @@ Guidelines:
 - If the student seems confused, try explaining differently
 - Provide examples from the document context when possible`;
 
-            const response = await fetch(`${import.meta.env.VITE_MAIN_API_URL}/chat/stream`, {
+            const response = await fetch(`${API_URL}/chat/stream`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

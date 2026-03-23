@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, BookOpen, MoreVertical, Calendar, ArrowRight, LogOut, Upload, FileText, Loader2, X, Trash2 } from 'lucide-react';
+import { Plus, Search, BookOpen, Calendar, ArrowRight, LogOut, Upload, FileText, Loader2, X, Trash2, RefreshCw, WifiOff } from 'lucide-react';
 import { createProject, uploadDocument, getProjects, deleteProject } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getRotatingLoadingMessage } from '../utils/LoadingMessages';
-import { DashboardSkeleton, CardSkeleton, ListItemSkeleton } from '../components/Skeleton';
+import { DashboardSkeleton } from '../components/Skeleton';
+import { getCachedProjects, setCachedProjects, clearProjectsCache } from '../utils/projectCache';
 
 const Dashboard = () => {
     const navigate = useNavigate();
@@ -17,14 +18,18 @@ const Dashboard = () => {
     const [isCreating, setIsCreating] = useState(false);
     const [dragActive, setDragActive] = useState(false);
     const [uploadStatus, setUploadStatus] = useState({}); // { fileName: 'pending' | 'uploading' | 'success' | 'error' }
-    const [projects, setProjects] = useState([]);
-    const [isLoadingProjects, setIsLoadingProjects] = useState(true); // Track data loading separately
+    const [projects, setProjects] = useState(() => getCachedProjects() || []);
+    const [isLoadingProjects, setIsLoadingProjects] = useState(true);
+    const [fetchError, setFetchError] = useState(false);
+    const [isSlowLoad, setIsSlowLoad] = useState(false);
     // Delete Modal State
     const [deleteTargetId, setDeleteTargetId] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
     const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
 
     const fileInputRef = useRef(null);
+    const slowLoadTimerRef = useRef(null);
+    const fetchTimeoutRef = useRef(null);
 
     useEffect(() => {
         let interval;
@@ -38,25 +43,87 @@ const Dashboard = () => {
 
     useEffect(() => {
         fetchProjects();
+        return () => {
+            clearTimeout(slowLoadTimerRef.current);
+            clearTimeout(fetchTimeoutRef.current);
+        };
     }, []);
 
     const fetchProjects = async () => {
+        setFetchError(false);
+        setIsLoadingProjects(true);
+
+        // If no cache, start a 5s slow-load warning timer
+        const hasCached = (getCachedProjects() || []).length > 0;
+        if (!hasCached) {
+            slowLoadTimerRef.current = setTimeout(() => setIsSlowLoad(true), 5000);
+        }
+
+        // Hard 8s timeout — never show skeleton forever
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('timeout')), 8000)
+        );
+
         try {
-            const data = await getProjects();
+            const data = await Promise.race([getProjects(), timeoutPromise]);
             setProjects(data);
+            setCachedProjects(data);
+            setFetchError(false);
         } catch (error) {
             console.error("Failed to fetch projects:", error);
+            // Show cached data if available, otherwise show error
+            const cached = getCachedProjects();
+            if (cached && cached.length > 0) {
+                setProjects(cached);
+            } else {
+                setFetchError(true);
+            }
         } finally {
+            clearTimeout(slowLoadTimerRef.current);
+            setIsSlowLoad(false);
             setIsLoadingProjects(false);
         }
     };
 
     // ... handlers ...
 
-    // Show skeleton while loading, but render UI immediately
-    // This ensures <1 second first paint
-    if (isLoadingProjects && projects.length === 0) {
-        return <DashboardSkeleton />;
+    // Show skeleton only when there's no cached data to display
+    if (isLoadingProjects && projects.length === 0 && !fetchError) {
+        return (
+            <div className="relative">
+                <DashboardSkeleton />
+                {isSlowLoad && (
+                    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-[#4A3B32] text-white px-5 py-3 rounded-2xl shadow-xl text-sm">
+                        <WifiOff className="h-4 w-4 shrink-0 text-[#C8A288]" />
+                        <span>Taking longer than expected… backend may be waking up</span>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    // Error state — no cache available
+    if (fetchError) {
+        return (
+            <div className="min-h-screen bg-[#FDF6F0] flex items-center justify-center p-4">
+                <div className="text-center max-w-sm">
+                    <div className="h-16 w-16 bg-[#FDF6F0] border-2 border-[#E6D5CC] rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <WifiOff className="h-8 w-8 text-[#C8A288]" />
+                    </div>
+                    <h2 className="text-xl font-bold text-[#4A3B32] mb-2">Couldn't load projects</h2>
+                    <p className="text-[#8a6a5c] text-sm mb-6">
+                        The backend took too long to respond. It may still be starting up — try again in a moment.
+                    </p>
+                    <button
+                        onClick={fetchProjects}
+                        className="inline-flex items-center gap-2 px-6 py-3 bg-[#C8A288] text-white rounded-xl font-medium hover:bg-[#B08B72] transition-colors shadow-lg shadow-[#C8A288]/20"
+                    >
+                        <RefreshCw className="h-4 w-4" />
+                        Retry
+                    </button>
+                </div>
+            </div>
+        );
     }
 
     const confirmDeleteProject = async () => {
@@ -80,6 +147,7 @@ const Dashboard = () => {
     };
 
     const handleLogout = () => {
+        clearProjectsCache();
         logout();
         navigate('/login');
     };

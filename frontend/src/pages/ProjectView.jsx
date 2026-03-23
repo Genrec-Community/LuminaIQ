@@ -39,7 +39,8 @@ import {
     Check,
     CloudUpload,
     Eye,
-    EyeOff
+    EyeOff,
+    WifiOff
 } from 'lucide-react';
 import {
     uploadDocument,
@@ -230,14 +231,17 @@ const ProjectView = () => {
 
     // Add loading state for ProjectView
     const [projectViewLoading, setProjectViewLoading] = useState(true);
+    const [fetchError, setFetchError] = useState(false);
+
+    // Ref to ensure fetchTopics is only called once per mount, not on every tab change
+    const topicsFetchedRef = useRef(false);
 
     useEffect(() => {
         let intervalId;
-        let timeoutId;
         
         const rotationInterval = setInterval(() => {
             setLoadingMsgIdx(i => i + 1);
-        }, 3000); // Changed to 3 seconds based on request
+        }, 3000);
 
         // Helper to check if any document is still processing
         const isAnyDocProcessing = (docs) => {
@@ -250,12 +254,28 @@ const ProjectView = () => {
             );
         };
 
+        // Helper to check if any document has failed
+        const isAnyDocFailed = (docs) => {
+            if (!docs || docs.length === 0) return false;
+            return docs.some(d => d.upload_status === 'failed');
+        };
+
         const initialLoad = async () => {
-            // Show skeleton immediately, fetch data in background
-            // Don't block UI - data loads async
-            const [docData] = await Promise.all([
-                fetchDocuments()
-            ]);
+            // 10s hard timeout — skeleton must never hang forever
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('timeout')), 10000)
+            );
+
+            let docData = null;
+            try {
+                docData = await Promise.race([fetchDocuments(), timeoutPromise]);
+            } catch (err) {
+                console.warn('Initial document load failed or timed out:', err.message);
+                setFetchError(true);
+                setProjectViewLoading(false);
+                clearInterval(rotationInterval);
+                return;
+            }
 
             // Restore chat messages from session cache, or start fresh
             const cachedMessages = sessionStorage.getItem(`lumina_chat_${projectId}`);
@@ -274,45 +294,61 @@ const ProjectView = () => {
                 setMessages([{ role: 'system', content: 'Ready to chat! Ask me anything about your documents.' }]);
             }
 
-            if (docData && docData.documents) {
-                const processing = isAnyDocProcessing(docData.documents);
-                setIsProcessingDocs(processing);
-            } else {
-                setIsProcessingDocs(false);
+            const docsProcessing = docData?.documents ? isAnyDocProcessing(docData.documents) : false;
+            setIsProcessingDocs(docsProcessing);
+            setProjectViewLoading(false);
+
+            // Only start polling if docs actually need it
+            if (!docsProcessing) {
+                fetchTopics();
+                topicsFetchedRef.current = true;
+                return;
             }
-            setProjectViewLoading(false); // End loading animation
+
+            // Poll every 2 seconds to check document status
+            let pollAttempts = 0;
+            const maxPollAttempts = 30;
+
+            const pollDocuments = async () => {
+                if (pollAttempts >= maxPollAttempts) {
+                    console.log('Max poll attempts reached, stopping');
+                    clearInterval(intervalId);
+                    setIsProcessingDocs(false);
+                    if (!topicsFetchedRef.current) {
+                        fetchTopics();
+                        topicsFetchedRef.current = true;
+                    }
+                    return;
+                }
+
+                const data = await fetchDocuments();
+                if (data?.documents) {
+                    const processing = isAnyDocProcessing(data.documents);
+                    const failed = isAnyDocFailed(data.documents);
+
+                    if (!processing || failed) {
+                        console.log('Document processing complete or failed, stopping poll');
+                        clearInterval(intervalId);
+                        setIsProcessingDocs(false);
+                        if (!topicsFetchedRef.current) {
+                            fetchTopics();
+                            topicsFetchedRef.current = true;
+                        }
+                        return;
+                    }
+
+                    pollAttempts++;
+                }
+            };
+
+            intervalId = setInterval(pollDocuments, 2000);
         };
 
-        initialLoad(); // Call initial load once
-
-        // Poll every 2 seconds to check document status
-        intervalId = setInterval(async () => {
-            const data = await fetchDocuments();
-            if (data && data.documents) {
-                const processing = isAnyDocProcessing(data.documents);
-                
-                // If it JUST finished processing, we need to fetch topics right away
-                setIsProcessingDocs((prevProcessing) => {
-                    if (prevProcessing && !processing) {
-                        // It was processing, now it's not -> fetch topics!
-                        fetchTopics();
-                    }
-                    return processing;
-                });
-            }
-        }, 2000); // Reduced to 2 seconds for faster response
-
-        // Timeout to stop polling after 2 minutes and assume processing is done
-        timeoutId = setTimeout(() => {
-            clearInterval(intervalId);
-            setIsProcessingDocs(false);
-            fetchTopics();
-        }, 120000); // 2 minutes
+        initialLoad();
 
         return () => {
             clearInterval(intervalId);
             clearInterval(rotationInterval);
-            clearTimeout(timeoutId);
         };
     }, [projectId]);
 
@@ -327,29 +363,30 @@ const ProjectView = () => {
         }
     };
 
-    useEffect(() => {
-        if (!isProcessingDocs && (activeTab === 'chat' || activeTab === 'quiz' || activeTab === 'qa' || activeTab === 'notes' || activeTab === 'path')) {
-            fetchTopics();
-        }
-    }, [activeTab, projectId, isProcessingDocs]);
-
     const fetchTopics = async () => {
         try {
             const data = await getTopics(projectId);
-            // Handle new object structure (or fallback for backward compat during dev)
             if (data.all && data.by_doc) {
                 setAllProjectTopics(data.all);
                 setDocumentTopics(data.by_doc);
-                // The useEffect will handle setAvailableTopics
             } else if (Array.isArray(data)) {
-                // Fallback if backend rollout lags
                 setAvailableTopics(data);
                 setAllProjectTopics(data);
             }
         } catch (error) {
-            console.error("Failed to fetch topics", error);
+            console.error('Failed to fetch topics', error);
         }
     };
+
+    // fetchTopics on tab change — only if topics haven't been loaded yet
+    useEffect(() => {
+        if (!isProcessingDocs && !topicsFetchedRef.current) {
+            if (activeTab === 'chat' || activeTab === 'quiz' || activeTab === 'qa' || activeTab === 'notes' || activeTab === 'path') {
+                fetchTopics();
+                topicsFetchedRef.current = true;
+            }
+        }
+    }, [activeTab, projectId, isProcessingDocs]);
 
     // Filter topics based on selected documents
     useEffect(() => {
@@ -793,6 +830,35 @@ const ProjectView = () => {
 
     if (projectViewLoading && documents.length === 0) {
         return <ProjectViewSkeleton />;
+    }
+
+    // Error fallback — initial load timed out and no docs
+    if (fetchError) {
+        return (
+            <div className="min-h-screen bg-[#FDF6F0] flex items-center justify-center p-4">
+                <div className="text-center max-w-sm">
+                    <div className="h-16 w-16 bg-[#FDF6F0] border-2 border-[#E6D5CC] rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <WifiOff className="h-8 w-8 text-[#C8A288]" />
+                    </div>
+                    <h2 className="text-xl font-bold text-[#4A3B32] mb-2">Couldn't load project</h2>
+                    <p className="text-[#8a6a5c] text-sm mb-6">
+                        The backend took too long to respond. It may still be starting up — try again in a moment.
+                    </p>
+                    <button
+                        onClick={() => {
+                            setFetchError(false);
+                            setProjectViewLoading(true);
+                            // Trigger remount by navigating to same route (or just re-run)
+                            window.location.reload();
+                        }}
+                        className="inline-flex items-center gap-2 px-6 py-3 bg-[#C8A288] text-white rounded-xl font-medium hover:bg-[#B08B72] transition-colors shadow-lg shadow-[#C8A288]/20"
+                    >
+                        <RefreshCw className="h-4 w-4" />
+                        Retry
+                    </button>
+                </div>
+            </div>
+        );
     }
 
     return (
@@ -1391,6 +1457,7 @@ const ProjectView = () => {
                             preGeneratedData={preGeneratedQA}
                             onConsumePreGenerated={() => setPreGeneratedQA(null)}
                             onQAActiveChange={setIsQAActive}
+                            autoGenerate={qaAutoGenerate}
                             onBack={() => {
                                 setActiveTab('chat');
                                 setIsQAActive(false);
@@ -1407,6 +1474,7 @@ const ProjectView = () => {
                             preSelectedTopic={preSelectedTopic}
                             preGeneratedData={preGeneratedNotes}
                             onConsumePreGenerated={() => setPreGeneratedNotes(null)}
+                            autoGenerate={notesAutoGenerate}
                         />
                     )}
 
@@ -1471,6 +1539,7 @@ const ProjectView = () => {
                                     setSelectedDocuments(docsToSelect);
                                 }
                                 setPreSelectedTopic(topic);
+                                setNotesAutoGenerate(true);
                                 setActiveTab('notes');
                             }}
                             onStartQA={(topic, docsToSelect) => {
@@ -1478,6 +1547,7 @@ const ProjectView = () => {
                                     setSelectedDocuments(docsToSelect);
                                 }
                                 setPreSelectedTopic(topic);
+                                setQAAutoGenerate(true);
                                 setActiveTab('qa');
                             }}
                             onOpenTutor={(topic) => {

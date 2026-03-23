@@ -1,13 +1,27 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_MAIN_API_URL //|| 'http://localhost:8000/api/v1';
+// Fallback to localhost so a missing VITE_MAIN_API_URL env var doesn't silently
+// send every request to '/undefined/...' on deployed builds.
+export const API_URL = import.meta.env.VITE_MAIN_API_URL || 'http://localhost:8000/api/v1';
 
 export const api = axios.create({
     baseURL: API_URL,
     headers: {
         'Content-Type': 'application/json',
     },
-    timeout: 60000, // 60 second timeout for better reliability
+    timeout: 15000, // 15s — fail fast on cold-start backends
+});
+
+// Inject auth token on every request from localStorage.
+// This avoids a race condition where SettingsContext fires API calls
+// before AuthContext.useEffect has set api.defaults.headers.
+api.interceptors.request.use((config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+        config.headers = config.headers || {};
+        config.headers['Authorization'] = `Bearer ${token}`;
+    }
+    return config;
 });
 
 // Retry interceptor for 503 and transient errors
