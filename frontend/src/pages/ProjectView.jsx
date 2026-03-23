@@ -1457,6 +1457,7 @@ const ProjectView = () => {
                             preGeneratedData={preGeneratedQA}
                             onConsumePreGenerated={() => setPreGeneratedQA(null)}
                             onQAActiveChange={setIsQAActive}
+                            autoGenerate={qaAutoGenerate}
                             onBack={() => {
                                 setActiveTab('chat');
                                 setIsQAActive(false);
@@ -1473,6 +1474,7 @@ const ProjectView = () => {
                             preSelectedTopic={preSelectedTopic}
                             preGeneratedData={preGeneratedNotes}
                             onConsumePreGenerated={() => setPreGeneratedNotes(null)}
+                            autoGenerate={notesAutoGenerate}
                         />
                     )}
 
@@ -1537,6 +1539,7 @@ const ProjectView = () => {
                                     setSelectedDocuments(docsToSelect);
                                 }
                                 setPreSelectedTopic(topic);
+                                setNotesAutoGenerate(true);
                                 setActiveTab('notes');
                             }}
                             onStartQA={(topic, docsToSelect) => {
@@ -1544,6 +1547,7 @@ const ProjectView = () => {
                                     setSelectedDocuments(docsToSelect);
                                 }
                                 setPreSelectedTopic(topic);
+                                setQAAutoGenerate(true);
                                 setActiveTab('qa');
                             }}
                             onOpenTutor={(topic) => {
