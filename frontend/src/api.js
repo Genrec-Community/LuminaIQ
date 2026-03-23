@@ -29,7 +29,7 @@ api.interceptors.response.use(
     (response) => response,
     async (error) => {
         const config = error.config;
-        
+
         // Don't retry if no config or already retried 3 times
         if (!config || config._retryCount >= 3) {
             return Promise.reject(error);
@@ -40,20 +40,20 @@ api.interceptors.response.use(
         if (url.includes('/auth/')) {
             return Promise.reject(error);
         }
-        
+
         // Check if error is retryable (503, 429, network errors)
         const status = error.response?.status;
         const isRetryable = status === 503 || status === 429 || status === 502 || !error.response;
-        
+
         if (isRetryable) {
             config._retryCount = (config._retryCount || 0) + 1;
             const delay = Math.min(1000 * Math.pow(2, config._retryCount - 1), 10000);
             console.log(`Retrying request (attempt ${config._retryCount}/3) in ${delay}ms...`);
-            
+
             await new Promise(resolve => setTimeout(resolve, delay));
             return api(config);
         }
-        
+
         return Promise.reject(error);
     }
 );
@@ -114,8 +114,8 @@ export const getDocuments = async (projectId) => {
 };
 
 export const getDocumentUrl = async (projectId, documentId) => {
-    const response = await api.get(`/documents/${documentId}/url`, { 
-        params: { project_id: projectId } 
+    const response = await api.get(`/documents/${documentId}/url`, {
+        params: { project_id: projectId }
     });
     return response.data;
 };
@@ -137,7 +137,7 @@ export const chatMessage = async (projectId, message, history = []) => {
 export const chatMessageStream = async (projectId, message, history = [], selectedDocuments = [], onChunk, onComplete) => {
     const maxRetries = 3;
     let lastError = null;
-    
+
     for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
             const token = localStorage.getItem('token');
@@ -219,22 +219,22 @@ export const chatMessageStream = async (projectId, message, history = [], select
         } catch (error) {
             lastError = error;
             const errorStr = error.message?.toLowerCase() || '';
-            const isRetryable = errorStr.includes('503') || errorStr.includes('service unavailable') || 
-                               errorStr.includes('network') || errorStr.includes('fetch');
-            
+            const isRetryable = errorStr.includes('503') || errorStr.includes('service unavailable') ||
+                errorStr.includes('network') || errorStr.includes('fetch');
+
             if (isRetryable && attempt < maxRetries - 1) {
                 const delay = Math.min(1500 * Math.pow(2, attempt), 10000);
                 console.log(`Retryable error: ${error.message}. Retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})...`);
                 await new Promise(resolve => setTimeout(resolve, delay));
                 continue;
             }
-            
+
             console.error("Streaming error:", error);
             onComplete({ answer: `Error: ${error.message}. Please try again.`, sources: [] });
             return;
         }
     }
-    
+
     // All retries exhausted
     console.error("All retries exhausted:", lastError);
     onComplete({ answer: "Service temporarily unavailable. Please try again in a moment.", sources: [] });
