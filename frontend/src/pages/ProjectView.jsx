@@ -60,7 +60,8 @@ import {
     saveLearningProgress,
     generateMindmap,
     generateFlashcardsWithAI,
-    getDocumentUrl
+    getDocumentUrl,
+    subscribeDocumentProgress,
 } from '../api';
 import { useToast } from '../context/ToastContext';
 import { useSettings } from '../context/SettingsContext';
@@ -153,6 +154,8 @@ const ProjectView = () => {
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [isProcessingDocs, setIsProcessingDocs] = useState(true);
+    // Per-document SSE stage: { [docId]: 'extracting'|'chunking'|'embedding'|'topics'|'graph'|'completed'|'failed' }
+    const [docStages, setDocStages] = useState({});
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isLeftCollapsed, setIsLeftCollapsed] = useState(false);
     const [showRightSidebarUpload, setShowRightSidebarUpload] = useState(false);
@@ -294,60 +297,73 @@ const ProjectView = () => {
                 setMessages([{ role: 'system', content: 'Ready to chat! Ask me anything about your documents.' }]);
             }
 
-            const docsProcessing = docData?.documents ? isAnyDocProcessing(docData.documents) : false;
+            const docs = docData?.documents || [];
+            const processingDocs = docs.filter(d =>
+                d.upload_status === 'pending' ||
+                d.upload_status === 'processing' ||
+                d.upload_status === 'embedding' ||
+                d.upload_status === 'queued'
+            );
+            const docsProcessing = processingDocs.length > 0;
             setIsProcessingDocs(docsProcessing);
             setProjectViewLoading(false);
 
-            // Only start polling if docs actually need it
             if (!docsProcessing) {
                 fetchTopics();
                 topicsFetchedRef.current = true;
                 return;
             }
 
-            // Poll every 5 seconds to check document status
-            let pollAttempts = 0;
-            const maxPollAttempts = 24;
+            // Open one SSE connection per processing document.
+            // Each stream delivers live stage events: extracting → chunking → embedding → topics → graph → completed/failed.
+            // Topics are fetched exactly once when the FIRST doc completes.
+            const sseCleanups = [];
 
-            const pollDocuments = async () => {
-                if (pollAttempts >= maxPollAttempts) {
-                    console.log('Max poll attempts reached, stopping');
-                    clearInterval(intervalId);
-                    setIsProcessingDocs(false);
-                    if (!topicsFetchedRef.current) {
-                        fetchTopics();
-                        topicsFetchedRef.current = true;
-                    }
-                    return;
-                }
+            processingDocs.forEach((doc) => {
+                const cleanup = subscribeDocumentProgress(
+                    doc.id,
+                    async (event) => {
+                        const { stage } = event;
 
-                const data = await fetchDocuments();
-                if (data?.documents) {
-                    const processing = isAnyDocProcessing(data.documents);
-                    const failed = isAnyDocFailed(data.documents);
+                        // Update per-doc stage label in real time
+                        setDocStages(prev => ({ ...prev, [doc.id]: stage }));
 
-                    if (!processing || failed) {
-                        console.log('Document processing complete or failed, stopping poll');
-                        clearInterval(intervalId);
-                        setIsProcessingDocs(false);
-                        if (!topicsFetchedRef.current) {
-                            fetchTopics();
-                            topicsFetchedRef.current = true;
+                        if (stage === 'completed' || stage === 'failed') {
+                            // Refresh this document's status from DB to get error_message etc.
+                            const refreshed = await fetchDocuments();
+                            const remaining = (refreshed?.documents || []).filter(d =>
+                                d.upload_status === 'pending' ||
+                                d.upload_status === 'processing' ||
+                                d.upload_status === 'embedding' ||
+                                d.upload_status === 'queued'
+                            );
+                            if (remaining.length === 0) {
+                                setIsProcessingDocs(false);
+                                if (!topicsFetchedRef.current) {
+                                    fetchTopics();
+                                    topicsFetchedRef.current = true;
+                                }
+                            }
                         }
-                        return;
+                    },
+                    (err) => {
+                        // SSE failed (network drop etc.) — fall back to one-time poll
+                        console.warn(`SSE connection lost for doc ${doc.id}, falling back to poll`);
+                        setTimeout(() => fetchDocuments(), 5000);
                     }
+                );
+                sseCleanups.push(cleanup);
+            });
 
-                    pollAttempts++;
-                }
-            };
-
-            intervalId = setInterval(pollDocuments, 2000);
+            // Store cleanups so the outer return() can close all SSE connections on unmount
+            intervalId = { close: () => sseCleanups.forEach(fn => fn()) };
         };
 
         initialLoad();
 
         return () => {
-            clearInterval(intervalId);
+            if (intervalId?.close) intervalId.close();
+            else clearInterval(intervalId);
             clearInterval(rotationInterval);
         };
     }, [projectId]);
