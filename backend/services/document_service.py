@@ -106,13 +106,7 @@ class DocumentService:
             )
 
             if not text:
-                await self._update_document_status(
-                    document_id, "failed", "Failed to extract text"
-                )
-                await progress.emit(
-                    document_id, "failed", 0, "Failed to extract text from document"
-                )
-                return
+                raise ValueError("PDF extraction failed: no usable text could be extracted from the document.")
 
             await progress.emit(
                 document_id, "extracting", 100,

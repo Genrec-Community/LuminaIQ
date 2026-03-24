@@ -305,9 +305,9 @@ const ProjectView = () => {
                 return;
             }
 
-            // Poll every 2 seconds to check document status
+            // Poll every 5 seconds to check document status
             let pollAttempts = 0;
-            const maxPollAttempts = 30;
+            const maxPollAttempts = 24;
 
             const pollDocuments = async () => {
                 if (pollAttempts >= maxPollAttempts) {
@@ -1363,6 +1363,26 @@ const ProjectView = () => {
                                     </div>
                                 )}
 
+                                {/* Failed doc banner — shown when any doc fails */}
+                                {!isProcessingDocs && documents.some(d => d.upload_status === 'failed' || d.upload_status === 'error') && (
+                                    <div className="flex justify-center my-4 animate-in fade-in slide-in-from-bottom-2">
+                                        <div className="bg-red-50 text-red-700 px-5 py-4 rounded-xl text-sm flex items-start gap-3 border border-red-200 shadow-md max-w-lg w-full">
+                                            <div className="shrink-0 mt-0.5 h-8 w-8 bg-red-100 rounded-full flex items-center justify-center">
+                                                <X className="h-4 w-4 text-red-500" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <p className="font-bold text-red-800 tracking-wide text-xs uppercase mb-1.5">Document Processing Failed</p>
+                                                <p className="text-[11px] leading-relaxed text-red-700/90">
+                                                    {documents.filter(d => d.upload_status === 'failed' || d.upload_status === 'error').length === 1
+                                                        ? `"${documents.find(d => d.upload_status === 'failed' || d.upload_status === 'error')?.filename}" couldn't be processed. This usually means it's a scanned image PDF with no readable text, encrypted, or corrupted. Delete it and try a different file.`
+                                                        : `${documents.filter(d => d.upload_status === 'failed' || d.upload_status === 'error').length} documents couldn't be processed — likely scanned image PDFs, encrypted, or corrupted. Delete them and try different files.`
+                                                    }
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
                             </div>
 
                             <div className="p-4 border-t border-[#E6D5CC] bg-white">
@@ -1750,9 +1770,11 @@ const ProjectView = () => {
                                             key={doc.id}
                                             className={`group relative flex items-start gap-2.5 p-3 rounded-xl cursor-pointer transition-all duration-200 ${isDeleting
                                                 ? 'opacity-40 pointer-events-none scale-95'
-                                                : isSelected
-                                                    ? 'bg-[#C8A288]/15 border border-[#C8A288]/40 shadow-sm'
-                                                    : 'bg-white/60 border border-transparent hover:bg-[#FDF6F0] hover:border-[#E6D5CC]/60'
+                                                : isFailed
+                                                    ? 'bg-red-50/60 border border-red-200/70 opacity-80'
+                                                    : isSelected
+                                                        ? 'bg-[#C8A288]/15 border border-[#C8A288]/40 shadow-sm'
+                                                        : 'bg-white/60 border border-transparent hover:bg-[#FDF6F0] hover:border-[#E6D5CC]/60'
                                                 }`}
                                             onClick={() => {
                                                 if (isDeleting || !isReady) return;
@@ -1794,9 +1816,12 @@ const ProjectView = () => {
                                                         </span>
                                                     )}
                                                     {isFailed && (
-                                                        <span className="flex items-center gap-1 text-[10px] text-red-500 font-medium">
-                                                            <div className="h-1.5 w-1.5 bg-red-500 rounded-full" />
-                                                            Failed
+                                                        <span
+                                                            className="flex items-center gap-1 text-[10px] text-red-500 font-medium cursor-help"
+                                                            title={doc.error_message || 'This PDF could not be processed. Try a different file.'}
+                                                        >
+                                                            <div className="h-1.5 w-1.5 bg-red-500 rounded-full shrink-0" />
+                                                            Can’t be processed
                                                         </span>
                                                     )}
                                                 </div>
