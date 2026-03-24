@@ -60,7 +60,8 @@ import {
     saveLearningProgress,
     generateMindmap,
     generateFlashcardsWithAI,
-    getDocumentUrl
+    getDocumentUrl,
+    subscribeDocumentProgress,
 } from '../api';
 import { useToast } from '../context/ToastContext';
 import { useSettings } from '../context/SettingsContext';
@@ -153,6 +154,8 @@ const ProjectView = () => {
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [isProcessingDocs, setIsProcessingDocs] = useState(true);
+    // Per-document SSE stage: { [docId]: 'extracting'|'chunking'|'embedding'|'topics'|'graph'|'completed'|'failed' }
+    const [docStages, setDocStages] = useState({});
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isLeftCollapsed, setIsLeftCollapsed] = useState(false);
     const [showRightSidebarUpload, setShowRightSidebarUpload] = useState(false);
@@ -294,60 +297,73 @@ const ProjectView = () => {
                 setMessages([{ role: 'system', content: 'Ready to chat! Ask me anything about your documents.' }]);
             }
 
-            const docsProcessing = docData?.documents ? isAnyDocProcessing(docData.documents) : false;
+            const docs = docData?.documents || [];
+            const processingDocs = docs.filter(d =>
+                d.upload_status === 'pending' ||
+                d.upload_status === 'processing' ||
+                d.upload_status === 'embedding' ||
+                d.upload_status === 'queued'
+            );
+            const docsProcessing = processingDocs.length > 0;
             setIsProcessingDocs(docsProcessing);
             setProjectViewLoading(false);
 
-            // Only start polling if docs actually need it
             if (!docsProcessing) {
                 fetchTopics();
                 topicsFetchedRef.current = true;
                 return;
             }
 
-            // Poll every 2 seconds to check document status
-            let pollAttempts = 0;
-            const maxPollAttempts = 30;
+            // Open one SSE connection per processing document.
+            // Each stream delivers live stage events: extracting → chunking → embedding → topics → graph → completed/failed.
+            // Topics are fetched exactly once when the FIRST doc completes.
+            const sseCleanups = [];
 
-            const pollDocuments = async () => {
-                if (pollAttempts >= maxPollAttempts) {
-                    console.log('Max poll attempts reached, stopping');
-                    clearInterval(intervalId);
-                    setIsProcessingDocs(false);
-                    if (!topicsFetchedRef.current) {
-                        fetchTopics();
-                        topicsFetchedRef.current = true;
-                    }
-                    return;
-                }
+            processingDocs.forEach((doc) => {
+                const cleanup = subscribeDocumentProgress(
+                    doc.id,
+                    async (event) => {
+                        const { stage } = event;
 
-                const data = await fetchDocuments();
-                if (data?.documents) {
-                    const processing = isAnyDocProcessing(data.documents);
-                    const failed = isAnyDocFailed(data.documents);
+                        // Update per-doc stage label in real time
+                        setDocStages(prev => ({ ...prev, [doc.id]: stage }));
 
-                    if (!processing || failed) {
-                        console.log('Document processing complete or failed, stopping poll');
-                        clearInterval(intervalId);
-                        setIsProcessingDocs(false);
-                        if (!topicsFetchedRef.current) {
-                            fetchTopics();
-                            topicsFetchedRef.current = true;
+                        if (stage === 'completed' || stage === 'failed') {
+                            // Refresh this document's status from DB to get error_message etc.
+                            const refreshed = await fetchDocuments();
+                            const remaining = (refreshed?.documents || []).filter(d =>
+                                d.upload_status === 'pending' ||
+                                d.upload_status === 'processing' ||
+                                d.upload_status === 'embedding' ||
+                                d.upload_status === 'queued'
+                            );
+                            if (remaining.length === 0) {
+                                setIsProcessingDocs(false);
+                                if (!topicsFetchedRef.current) {
+                                    fetchTopics();
+                                    topicsFetchedRef.current = true;
+                                }
+                            }
                         }
-                        return;
+                    },
+                    (err) => {
+                        // SSE failed (network drop etc.) — fall back to one-time poll
+                        console.warn(`SSE connection lost for doc ${doc.id}, falling back to poll`);
+                        setTimeout(() => fetchDocuments(), 5000);
                     }
+                );
+                sseCleanups.push(cleanup);
+            });
 
-                    pollAttempts++;
-                }
-            };
-
-            intervalId = setInterval(pollDocuments, 2000);
+            // Store cleanups so the outer return() can close all SSE connections on unmount
+            intervalId = { close: () => sseCleanups.forEach(fn => fn()) };
         };
 
         initialLoad();
 
         return () => {
-            clearInterval(intervalId);
+            if (intervalId?.close) intervalId.close();
+            else clearInterval(intervalId);
             clearInterval(rotationInterval);
         };
     }, [projectId]);
@@ -1363,6 +1379,26 @@ const ProjectView = () => {
                                     </div>
                                 )}
 
+                                {/* Failed doc banner — shown when any doc fails */}
+                                {!isProcessingDocs && documents.some(d => d.upload_status === 'failed' || d.upload_status === 'error') && (
+                                    <div className="flex justify-center my-4 animate-in fade-in slide-in-from-bottom-2">
+                                        <div className="bg-red-50 text-red-700 px-5 py-4 rounded-xl text-sm flex items-start gap-3 border border-red-200 shadow-md max-w-lg w-full">
+                                            <div className="shrink-0 mt-0.5 h-8 w-8 bg-red-100 rounded-full flex items-center justify-center">
+                                                <X className="h-4 w-4 text-red-500" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <p className="font-bold text-red-800 tracking-wide text-xs uppercase mb-1.5">Document Processing Failed</p>
+                                                <p className="text-[11px] leading-relaxed text-red-700/90">
+                                                    {documents.filter(d => d.upload_status === 'failed' || d.upload_status === 'error').length === 1
+                                                        ? `"${documents.find(d => d.upload_status === 'failed' || d.upload_status === 'error')?.filename}" couldn't be processed. This usually means it's a scanned image PDF with no readable text, encrypted, or corrupted. Delete it and try a different file.`
+                                                        : `${documents.filter(d => d.upload_status === 'failed' || d.upload_status === 'error').length} documents couldn't be processed — likely scanned image PDFs, encrypted, or corrupted. Delete them and try different files.`
+                                                    }
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
                             </div>
 
                             <div className="p-4 border-t border-[#E6D5CC] bg-white">
@@ -1750,9 +1786,11 @@ const ProjectView = () => {
                                             key={doc.id}
                                             className={`group relative flex items-start gap-2.5 p-3 rounded-xl cursor-pointer transition-all duration-200 ${isDeleting
                                                 ? 'opacity-40 pointer-events-none scale-95'
-                                                : isSelected
-                                                    ? 'bg-[#C8A288]/15 border border-[#C8A288]/40 shadow-sm'
-                                                    : 'bg-white/60 border border-transparent hover:bg-[#FDF6F0] hover:border-[#E6D5CC]/60'
+                                                : isFailed
+                                                    ? 'bg-red-50/60 border border-red-200/70 opacity-80'
+                                                    : isSelected
+                                                        ? 'bg-[#C8A288]/15 border border-[#C8A288]/40 shadow-sm'
+                                                        : 'bg-white/60 border border-transparent hover:bg-[#FDF6F0] hover:border-[#E6D5CC]/60'
                                                 }`}
                                             onClick={() => {
                                                 if (isDeleting || !isReady) return;
@@ -1794,9 +1832,12 @@ const ProjectView = () => {
                                                         </span>
                                                     )}
                                                     {isFailed && (
-                                                        <span className="flex items-center gap-1 text-[10px] text-red-500 font-medium">
-                                                            <div className="h-1.5 w-1.5 bg-red-500 rounded-full" />
-                                                            Failed
+                                                        <span
+                                                            className="flex items-center gap-1 text-[10px] text-red-500 font-medium cursor-help"
+                                                            title={doc.error_message || 'This PDF could not be processed. Try a different file.'}
+                                                        >
+                                                            <div className="h-1.5 w-1.5 bg-red-500 rounded-full shrink-0" />
+                                                            Can’t be processed
                                                         </span>
                                                     )}
                                                 </div>

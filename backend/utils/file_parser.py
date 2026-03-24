@@ -36,6 +36,8 @@ class FileParser:
                 logger.error(f"[FileParser] Unsupported file type: {ext}")
                 return None
 
+        except ValueError:
+            raise  # Re-raise extraction failures so document_service marks it failed
         except Exception as e:
             logger.error(f"[FileParser] Error extracting from {file_path}: {str(e)}")
             import traceback
@@ -43,39 +45,33 @@ class FileParser:
             return None
 
     @staticmethod
-    def _extract_pdf(file_path: str) -> Optional[str]:
+    def _try_primary_extraction(file_path: str) -> Optional[str]:
         """
-        Extract text from PDF with multiple fallback methods.
+        Attempt text extraction using all standard (non-OCR) methods:
+        1. PyMuPDF4LLM — best for structured/digital PDFs
+        2. PyPDF2      — solid fallback
+        3. Raw PyMuPDF — last resort before OCR
 
-        Order of attempts:
-        1. PyMuPDF4LLM - best quality for structured content
-        2. PyPDF2 - good fallback for various PDFs
-        3. Raw PyMuPDF (fitz) - last resort
+        Returns extracted text (may be short/empty) or None on total failure.
         """
-        text = None
-
-        # Method 1: PyMuPDF4LLM (best for structured PDFs)
+        # Method 1: PyMuPDF4LLM
         try:
             import pymupdf4llm
-
             logger.info("[FileParser] Trying PyMuPDF4LLM...")
             text = pymupdf4llm.to_markdown(file_path)
             if text and text.strip():
-                logger.info(f"[FileParser] PyMuPDF4LLM succeeded: {len(text)} chars")
+                logger.info(f"[FileParser] PyMuPDF4LLM: {len(text)} chars")
                 return text.strip()
-            else:
-                logger.warning("[FileParser] PyMuPDF4LLM returned empty text")
+            logger.warning("[FileParser] PyMuPDF4LLM returned empty text")
         except Exception as e:
             logger.warning(f"[FileParser] PyMuPDF4LLM failed: {e}")
 
-        # Method 2: PyPDF2 (good fallback)
+        # Method 2: PyPDF2
         try:
             from PyPDF2 import PdfReader
-
             logger.info("[FileParser] Trying PyPDF2...")
             reader = PdfReader(file_path)
             pages_text = []
-
             for i, page in enumerate(reader.pages):
                 try:
                     page_text = page.extract_text()
@@ -83,29 +79,22 @@ class FileParser:
                         pages_text.append(page_text)
                 except Exception as page_err:
                     logger.warning(f"[FileParser] PyPDF2 page {i} failed: {page_err}")
-                    continue
-
             if pages_text:
                 text = "\n\n".join(pages_text)
-                logger.info(
-                    f"[FileParser] PyPDF2 succeeded: {len(text)} chars from {len(pages_text)} pages"
-                )
+                logger.info(f"[FileParser] PyPDF2: {len(text)} chars from {len(pages_text)} pages")
                 return text.strip()
-            else:
-                logger.warning("[FileParser] PyPDF2 extracted no text")
+            logger.warning("[FileParser] PyPDF2 extracted no text")
         except ImportError:
             logger.warning("[FileParser] PyPDF2 not installed")
         except Exception as e:
             logger.warning(f"[FileParser] PyPDF2 failed: {e}")
 
-        # Method 3: Raw PyMuPDF/fitz (last resort)
+        # Method 3: Raw PyMuPDF/fitz
         try:
-            import fitz  # PyMuPDF
-
+            import fitz
             logger.info("[FileParser] Trying raw PyMuPDF...")
             doc = fitz.open(file_path)
             pages_text = []
-
             for i, page in enumerate(doc):
                 try:
                     page_text = page.get_text()
@@ -113,24 +102,96 @@ class FileParser:
                         pages_text.append(page_text)
                 except Exception as page_err:
                     logger.warning(f"[FileParser] PyMuPDF page {i} failed: {page_err}")
-                    continue
-
             doc.close()
-
             if pages_text:
                 text = "\n\n".join(pages_text)
-                logger.info(
-                    f"[FileParser] Raw PyMuPDF succeeded: {len(text)} chars from {len(pages_text)} pages"
-                )
+                logger.info(f"[FileParser] Raw PyMuPDF: {len(text)} chars from {len(pages_text)} pages")
                 return text.strip()
-            else:
-                logger.warning("[FileParser] Raw PyMuPDF extracted no text")
+            logger.warning("[FileParser] Raw PyMuPDF extracted no text")
         except Exception as e:
             logger.warning(f"[FileParser] Raw PyMuPDF failed: {e}")
 
-        # All methods failed
-        logger.error(f"[FileParser] All PDF extraction methods failed for {file_path}")
         return None
+
+    @staticmethod
+    def _try_ocr(file_path: str) -> Optional[str]:
+        """
+        OCR fallback using pdf2image + pytesseract.
+        Requires Poppler (pdf2image) and Tesseract (pytesseract) installed on the OS.
+
+        Raises explicitly if OCR produces insufficient text — no silent failures.
+        Returns extracted text or None if dependencies are unavailable.
+        """
+        try:
+            from pdf2image import convert_from_path
+            import pytesseract
+
+            logger.info("[FileParser] Trying OCR fallback (pdf2image + tesseract)...")
+            images = convert_from_path(file_path)
+            pages_text = [pytesseract.image_to_string(img) for img in images]
+            text = "\n\n".join(t for t in pages_text if t.strip())
+
+            if not text or len(text.strip()) < 200:
+                char_count = len(text.strip()) if text else 0
+                raise ValueError(
+                    f"OCR produced insufficient text ({char_count} chars). "
+                    "The file may be a low-quality scan or an image with no readable text."
+                )
+
+            logger.info(f"[FileParser] OCR succeeded: {len(text)} chars from {len(images)} pages")
+            return text.strip()
+
+        except (ImportError, FileNotFoundError) as e:
+            logger.warning(f"[FileParser] OCR unavailable (Tesseract/Poppler not installed): {e}")
+            return None
+        except ValueError:
+            raise  # Re-raise the "insufficient text" error explicitly
+        except Exception as e:
+            logger.error(f"[FileParser] OCR FAILED: {e}")
+            return None
+
+    @staticmethod
+    def _extract_pdf(file_path: str) -> Optional[str]:
+        """
+        2-stage PDF extraction pipeline:
+
+        Stage 1 — Standard extraction (PyMuPDF4LLM → PyPDF2 → raw PyMuPDF).
+        Stage 2 — OCR fallback (pdf2image + tesseract), triggered when stage 1
+                  produces no text OR fewer than 200 chars (likely a scanned PDF).
+
+        Raises ValueError if both stages fail — never silently returns garbage.
+        """
+        MIN_CHARS = 200
+
+        # Stage 1: Standard extraction
+        text = FileParser._try_primary_extraction(file_path)
+
+        if text and len(text.strip()) >= MIN_CHARS:
+            return text
+
+        # Stage 1 produced nothing or too little — try OCR
+        if text:
+            logger.warning(
+                f"[FileParser] Primary extraction yielded only {len(text.strip())} chars "
+                f"(< {MIN_CHARS}). Attempting OCR fallback..."
+            )
+        else:
+            logger.warning(
+                "[FileParser] Primary extraction returned no text. Attempting OCR fallback..."
+            )
+
+        # Stage 2: OCR
+        ocr_text = FileParser._try_ocr(file_path)
+        if ocr_text and len(ocr_text.strip()) >= MIN_CHARS:
+            return ocr_text
+
+        # Both stages failed — raise loudly
+        char_count = len(ocr_text.strip()) if ocr_text else (len(text.strip()) if text else 0)
+        raise ValueError(
+            f"Complete PDF extraction failure: all methods (PyMuPDF, PyPDF2, OCR) yielded "
+            f"only {char_count} chars. The file may be encrypted, corrupt, or a "
+            "scanned image with no readable text and Tesseract is not installed."
+        )
 
     @staticmethod
     def _extract_docx(file_path: str) -> Optional[str]:
