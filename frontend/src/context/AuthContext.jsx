@@ -7,10 +7,13 @@ const AuthContext = createContext(null);
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
+    // Guard against multiple token exchanges
+    const tokenExchanged = React.useRef(false);
 
     useEffect(() => {
-        // init check
+        // Initialize auth - wait for Supabase session to be ready
         const initAuth = async () => {
+            // First, check for existing app token
             const token = localStorage.getItem('token');
             const storedUser = localStorage.getItem('user');
 
@@ -19,22 +22,45 @@ export const AuthProvider = ({ children }) => {
                 api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
             }
 
-            // Waiting for OAuth callback?
-            if (window.location.hash && window.location.hash.includes('access_token')) {
-                console.log("OAuth Redirect detected, waiting for session...");
-                // Safety timeout
-                setTimeout(() => setLoading(false), 5000);
-                return;
+            // Wait for Supabase session to initialize (handles OAuth callback)
+            const { data: { session } } = await supabase.auth.getSession();
+            
+            if (session && !tokenExchanged.current) {
+                console.log("Supabase session found, exchanging token...");
+                const currentToken = localStorage.getItem('token');
+                
+                // If we don't have our app token yet, exchange the Supabase one
+                if (!currentToken) {
+                    tokenExchanged.current = true;
+                    try {
+                        const data = await apiLoginGoogle(session.access_token);
+                        if (data.access_token) {
+                            localStorage.setItem('token', data.access_token);
+                            localStorage.setItem('user', JSON.stringify(data.user));
+                            api.defaults.headers.common['Authorization'] = `Bearer ${data.access_token}`;
+                            setUser(data.user);
+                        }
+                    } catch (e) {
+                        console.error("Google Token Exchange Failed:", e);
+                        tokenExchanged.current = false; // Reset on failure
+                    }
+                }
             }
 
             setLoading(false);
         };
+
         initAuth();
 
-        // Listen for Supabase OAuth Redirects
+        // Listen for Supabase auth changes (including OAuth callbacks)
         const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-            if (event === 'SIGNED_IN' && session) {
-                console.log("Supabase Signed In via OAuth");
+            console.log("Auth event:", event, session ? "with session" : "no session");
+            
+            if (event === 'SIGNED_IN' && session && !tokenExchanged.current) {
+                // Mark as exchanged immediately to prevent multiple exchanges
+                tokenExchanged.current = true;
+                
+                console.log("Supabase Signed In via OAuth, exchanging token...");
                 const currentToken = localStorage.getItem('token');
 
                 // If we don't have our app token yet, exchange the Supabase one
@@ -48,15 +74,21 @@ export const AuthProvider = ({ children }) => {
                             localStorage.setItem('user', JSON.stringify(data.user));
                             api.defaults.headers.common['Authorization'] = `Bearer ${data.access_token}`;
                             setUser(data.user);
+                            
+                            // Redirect to dashboard after successful token exchange
+                            window.location.href = '/dashboard';
                         }
                     } catch (e) {
                         console.error("Google Token Exchange Failed:", e);
+                        tokenExchanged.current = false; // Reset on failure to allow retry
                         await supabase.auth.signOut(); // Clear invalid supabase session
                     }
                 }
             }
             if (event === 'SIGNED_OUT') {
-                // handled by logout function usually
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                setUser(null);
             }
         });
 
@@ -97,7 +129,7 @@ export const AuthProvider = ({ children }) => {
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: window.location.origin
+                    redirectTo: `${window.location.origin}/dashboard`
                 }
             });
             if (error) throw error;
