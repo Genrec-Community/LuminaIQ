@@ -2,8 +2,13 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-COPY . .
+# Install dependencies first (cache optimization)
+COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Copy rest of the code
+COPY . .
+
+# Run with gunicorn (production-grade)
+CMD ["gunicorn", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "main:app", "--bind", "0.0.0.0:8000"]
