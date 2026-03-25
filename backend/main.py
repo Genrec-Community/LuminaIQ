@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from api.v1.api import api_router
 from config.settings import settings
-from utils.logger import setup_uvicorn_log_filter
+from utils.logger import setup_uvicorn_log_filter, logger
 import asyncio
 
 app = FastAPI(
@@ -70,7 +70,7 @@ app.add_middleware(RequestTimeoutMiddleware)
 
 @app.middleware("http")
 async def log_all_requests(request: Request, call_next):
-    print(f"INCOMING → {request.method} {request.url}")
+    logger.debug(f"INCOMING → {request.method} {request.url}")
     return await call_next(request)
 
 

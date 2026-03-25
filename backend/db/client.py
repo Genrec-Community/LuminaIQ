@@ -4,6 +4,7 @@ from config.settings import settings
 from utils.logger import logger
 import time
 import asyncio
+import httpx
 from concurrent.futures import ThreadPoolExecutor
 
 
@@ -26,21 +27,32 @@ class SupabaseClient:
 
     @classmethod
     def _create_client(cls):
-        """Create client with retry logic for DNS resolution issues."""
+        """Create a single shared client with HTTP/1.1 forced to prevent
+        HTTP/2 stream exhaustion on Cloudflare (root cause of all
+        'Server disconnected' and '400 Bad Request' errors)."""
         last_error = None
         for attempt in range(cls._max_retries):
             try:
+                # Force HTTP/1.1: prevents Cloudflare from multiplexing too
+                # many concurrent requests over a single HTTP/2 connection,
+                # which causes ConnectionTerminated and 400 errors under load.
+                http1_client = httpx.Client(
+                    transport=httpx.HTTPTransport(http2=False),
+                    timeout=60.0,
+                )
+
                 options = SyncClientOptions(
                     postgrest_client_timeout=60,
                     storage_client_timeout=60,
                     function_client_timeout=30,
+                    httpx_client=http1_client,
                 )
                 cls._instance = create_client(
                     settings.SUPABASE_URL,
                     settings.SUPABASE_SERVICE_KEY,
                     options=options,
                 )
-                logger.info("Supabase client connected successfully")
+                logger.info("Supabase client connected successfully (HTTP/1.1 singleton)")
                 return
             except Exception as e:
                 last_error = e
@@ -61,19 +73,8 @@ class SupabaseClient:
 
 
 def get_supabase_client() -> Client:
-    """Get the Supabase client instance (lazy, with retry)."""
+    """Get the shared Supabase singleton. Always returns the same instance."""
     return SupabaseClient.get_instance()
-
-
-# Lazy initialization — don't connect at import time.
-supabase_client = None
-
-
-def _get_lazy_client() -> Client:
-    global supabase_client
-    if supabase_client is None:
-        supabase_client = get_supabase_client()
-    return supabase_client
 
 
 # ============================================================================
@@ -85,14 +86,7 @@ async def async_db_execute(func, *args, **kwargs):
     """
     Run a synchronous Supabase operation in a dedicated thread pool.
 
-    This prevents sync DB calls from blocking the asyncio event loop,
-    which is critical for multi-tenant performance.
-
     Usage:
-        # Instead of (BLOCKS event loop):
-        result = client.table("docs").select("*").execute()
-
-        # Use (NON-BLOCKING):
         result = await async_db_execute(
             lambda: client.table("docs").select("*").execute()
         )

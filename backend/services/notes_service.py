@@ -6,6 +6,7 @@ from datetime import datetime
 from services.llm_service import llm_service
 from services.embedding_service import embedding_service
 from services.qdrant_service import qdrant_service
+from utils.performance import PerformanceTracker
 
 class NotesService:
     def __init__(self):
@@ -395,6 +396,8 @@ Respond ONLY with the Markdown content."""
         user_id: str = None
     ) -> str:
         """Generate notes using AI with type-specific prompts and retrieval strategies."""
+        perf = PerformanceTracker()
+        perf.start("notes_generation_total")
         try:
             logger.info(f"Generating notes ({note_type}) for project {project_id}, topic: {topic}")
 
@@ -406,6 +409,7 @@ Respond ONLY with the Markdown content."""
             all_hits = []
             seen_texts = set()
 
+            perf.start("qdrant_search")
             for q in config["queries"]:
                 embedding = await embedding_service.generate_embedding(q)
                 results = await qdrant_service.search(
@@ -418,6 +422,7 @@ Respond ONLY with the Markdown content."""
                     if hit["text"] not in seen_texts:
                         all_hits.append(hit)
                         seen_texts.add(hit["text"])
+            perf.stop("qdrant_search")
 
             if not all_hits:
                 return "No content found to generate notes. Please ensure documents are uploaded and processed."
@@ -434,11 +439,13 @@ Respond ONLY with the Markdown content."""
                 {"role": "system", "content": config["system_prompt"]},
                 {"role": "user", "content": user_prompt}
             ]
+            perf.start("llm_response")
             response = await llm_service.chat_completion(
                 messages,
                 temperature=config["temperature"],
                 max_tokens=config["max_tokens"]
             )
+            perf.stop("llm_response")
 
             # Auto-save generated notes if user_id is provided
             saved_note = None
@@ -453,6 +460,9 @@ Respond ONLY with the Markdown content."""
                     )
                 except Exception as save_err:
                     logger.error(f"Failed to auto-save notes: {save_err}")
+
+            perf.stop("notes_generation_total")
+            perf.log_total(logger)
 
             if saved_note:
                 return {"content": response, "note_id": saved_note.get("id"), "title": saved_note.get("title")}

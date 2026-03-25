@@ -3,6 +3,7 @@ from db.client import get_supabase_client
 from utils.logger import logger
 from services.rag_service import rag_service
 from services.llm_service import llm_service
+from utils.performance import PerformanceTracker
 import json
 import re
 
@@ -182,9 +183,12 @@ class FlashcardService:
         selected_documents: List[str]
     ) -> Dict[str, Any]:
         """Generate flashcards using AI based on document content"""
+        perf = PerformanceTracker()
+        perf.start("flashcard_generation_total")
         try:
             # Get relevant context from documents
             context = ""
+            perf.start("rag_context_fetch")
             if selected_documents:
                 rag_results = await rag_service.get_answer(
                     project_id=project_id,
@@ -193,6 +197,7 @@ class FlashcardService:
                     chat_history=[]
                 )
                 context = rag_results['answer']
+            perf.stop("rag_context_fetch")
             
             # Generate flashcards using LLM with improved prompt
             prompt = f"""You are an expert educator creating high-quality study flashcards. Generate exactly {num_cards} flashcards for the topic: "{topic}"
@@ -218,11 +223,13 @@ Return ONLY a valid JSON array (no markdown, no explanation):
 Generate exactly {num_cards} high-quality flashcards. Return ONLY the JSON array."""
 
             # Call LLM with more tokens for better quality
+            perf.start("llm_response")
             response = await llm_service.chat_completion(
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.7,
                 max_tokens=3000
             )
+            perf.stop("llm_response")
             
             # Parse the response to extract flashcards
             cards_data = self._parse_flashcards_response(response, num_cards)
@@ -244,6 +251,8 @@ Generate exactly {num_cards} high-quality flashcards. Return ONLY the JSON array
             )
             
             logger.info(f"Generated {len(cards_data)} flashcards for topic: {topic}")
+            perf.stop("flashcard_generation_total")
+            perf.log_total(logger)
             return flashcard_set
         
         except Exception as e:

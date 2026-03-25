@@ -48,13 +48,35 @@ class FileParser:
     def _try_primary_extraction(file_path: str) -> Optional[str]:
         """
         Attempt text extraction using all standard (non-OCR) methods:
-        1. PyMuPDF4LLM — best for structured/digital PDFs
-        2. PyPDF2      — solid fallback
-        3. Raw PyMuPDF — last resort before OCR
+        1. Raw PyMuPDF — best for speed and large books
+        2. PyMuPDF4LLM — fallback for structured content
+        3. PyPDF2      — last resort
 
         Returns extracted text (may be short/empty) or None on total failure.
         """
-        # Method 1: PyMuPDF4LLM
+        # Method 1: Raw PyMuPDF/fitz (Fastest)
+        try:
+            import fitz
+            logger.info("[FileParser] Trying raw PyMuPDF...")
+            doc = fitz.open(file_path)
+            pages_text = []
+            for i, page in enumerate(doc):
+                try:
+                    page_text = page.get_text()
+                    if page_text:
+                        pages_text.append(page_text)
+                except Exception as page_err:
+                    logger.warning(f"[FileParser] PyMuPDF page {i} failed: {page_err}")
+            doc.close()
+            if pages_text:
+                text = "\n\n".join(pages_text)
+                logger.info(f"[FileParser] Raw PyMuPDF: {len(text)} chars from {len(pages_text)} pages")
+                return text.strip()
+            logger.warning("[FileParser] Raw PyMuPDF extracted no text")
+        except Exception as e:
+            logger.warning(f"[FileParser] Raw PyMuPDF failed: {e}")
+
+        # Method 2: PyMuPDF4LLM (Layout analysis - slower)
         try:
             import pymupdf4llm
             logger.info("[FileParser] Trying PyMuPDF4LLM...")
@@ -66,7 +88,7 @@ class FileParser:
         except Exception as e:
             logger.warning(f"[FileParser] PyMuPDF4LLM failed: {e}")
 
-        # Method 2: PyPDF2
+        # Method 3: PyPDF2 (Solid fallback)
         try:
             from PyPDF2 import PdfReader
             logger.info("[FileParser] Trying PyPDF2...")
@@ -88,28 +110,6 @@ class FileParser:
             logger.warning("[FileParser] PyPDF2 not installed")
         except Exception as e:
             logger.warning(f"[FileParser] PyPDF2 failed: {e}")
-
-        # Method 3: Raw PyMuPDF/fitz
-        try:
-            import fitz
-            logger.info("[FileParser] Trying raw PyMuPDF...")
-            doc = fitz.open(file_path)
-            pages_text = []
-            for i, page in enumerate(doc):
-                try:
-                    page_text = page.get_text()
-                    if page_text:
-                        pages_text.append(page_text)
-                except Exception as page_err:
-                    logger.warning(f"[FileParser] PyMuPDF page {i} failed: {page_err}")
-            doc.close()
-            if pages_text:
-                text = "\n\n".join(pages_text)
-                logger.info(f"[FileParser] Raw PyMuPDF: {len(text)} chars from {len(pages_text)} pages")
-                return text.strip()
-            logger.warning("[FileParser] Raw PyMuPDF extracted no text")
-        except Exception as e:
-            logger.warning(f"[FileParser] Raw PyMuPDF failed: {e}")
 
         return None
 

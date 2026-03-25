@@ -3,6 +3,7 @@ from db.client import get_supabase_client
 from services.llm_service import LLMService
 from services.rag_service import RAGService
 from utils.logger import logger
+from utils.performance import PerformanceTracker
 import json
 
 class MindmapService:
@@ -45,9 +46,12 @@ class MindmapService:
         selected_documents: List[str]
     ) -> Dict[str, Any]:
         """Generate a new mindmap using LLM"""
+        perf = PerformanceTracker()
+        perf.start("mindmap_generation_total")
         try:
             # Get relevant context from documents
             context = ""
+            perf.start("rag_context_fetch")
             if selected_documents:
                 rag_results = await self.rag_service.get_answer(
                     project_id=project_id,
@@ -56,6 +60,7 @@ class MindmapService:
                     chat_history=[]
                 )
                 context = rag_results['answer']
+            perf.stop("rag_context_fetch")
             
             # Generate mindmap structure using LLM
             prompt = f"""You are a knowledge mapping expert. Generate a detailed, well-structured mindmap for the topic: "{topic}"
@@ -89,11 +94,13 @@ Return ONLY a valid JSON object (no markdown, no explanation) with this exact st
 
 Generate a comprehensive mindmap with at least 15-25 nodes total. Return ONLY the JSON."""
 
+            perf.start("llm_response")
             llm_response = await self.llm_service.chat_completion(
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.7,
                 max_tokens=4000
             )
+            perf.stop("llm_response")
             
             # Parse the LLM response
             try:
@@ -160,6 +167,8 @@ Generate a comprehensive mindmap with at least 15-25 nodes total. Return ONLY th
                 result['data'] = json.loads(result['data'])
             
             logger.info(f"Generated mindmap {result['id']} for topic: {topic} ({node_count} nodes, {edge_count} edges)")
+            perf.stop("mindmap_generation_total")
+            perf.log_total(logger)
             return result
         
         except Exception as e:

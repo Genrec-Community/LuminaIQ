@@ -11,6 +11,7 @@ from services.qdrant_service import qdrant_service
 from utils.logger import logger
 from utils.embedding_queue import get_embedding_queue, EmbeddingJob, EmbeddingQueue
 from utils.progress_manager import get_progress_manager
+from utils.performance import PerformanceTracker
 
 
 class DocumentService:
@@ -89,6 +90,8 @@ class DocumentService:
         The actual processing pipeline, called inside doc_semaphore.
         Separated so the semaphore scope is clear.
         """
+        perf = PerformanceTracker()
+        perf.start("total_pipeline")
         try:
             # Update status to processing
             await self._update_document_status(document_id, "processing")
@@ -101,9 +104,11 @@ class DocumentService:
             await self._update_document_status(
                 document_id, "processing", "Extracting text..."
             )
+            perf.start("pdf_parsing")
             text = await loop.run_in_executor(
                 self._extraction_executor, self.file_parser.extract_text, file_path
             )
+            perf.stop("pdf_parsing")
 
             if not text:
                 raise ValueError("PDF extraction failed: no usable text could be extracted from the document.")
@@ -120,9 +125,11 @@ class DocumentService:
             )
             await progress.emit(document_id, "chunking", 0, "Splitting into chunks...")
 
+            perf.start("text_chunking")
             chunks = await loop.run_in_executor(
                 None, lambda: self.text_chunker.chunk_text(text)
             )
+            perf.stop("text_chunking")
 
             if not chunks:
                 await self._update_document_status(
@@ -147,9 +154,11 @@ class DocumentService:
                 document_id, "embedding", 0,
                 f"Embedding {len(chunks)} chunks..."
             )
+            perf.start("embedding")
             await self._process_embeddings_direct(
                 chunks, document_id, filename, collection_name
             )
+            perf.stop("embedding")
 
             # 5. Generate Topics (LLM-gated: max 2 concurrent LLM calls)
             await self._update_document_status(
@@ -162,8 +171,10 @@ class DocumentService:
             try:
                 from services.mcq_service import mcq_service
 
+                perf.start("topic_generation")
                 async with llm_semaphore:
                     await mcq_service.generate_document_topics(project_id, document_id)
+                perf.stop("topic_generation")
                 logger.info(f"Topics generated for {filename}")
                 await progress.emit(
                     document_id, "topics", 100, "Topics generated"
@@ -182,7 +193,7 @@ class DocumentService:
                 from services.knowledge_graph_service import knowledge_graph
 
                 docs = await async_db(
-                    lambda: get_supabase_client()
+                    lambda: self.client
                     .table("documents")
                     .select("topics")
                     .eq("project_id", project_id)
@@ -195,7 +206,7 @@ class DocumentService:
 
                 # Also include topics from the current doc (not yet marked completed)
                 current_doc = await async_db(
-                    lambda: get_supabase_client()
+                    lambda: self.client
                     .table("documents")
                     .select("topics")
                     .eq("id", document_id)
@@ -209,10 +220,12 @@ class DocumentService:
                     logger.info(
                         f"Auto-building knowledge graph with {len(all_topics)} topics"
                     )
+                    perf.start("knowledge_graph")
                     async with llm_semaphore:
                         await knowledge_graph.build_graph_from_topics(
                             project_id, all_topics, force_rebuild=True
                         )
+                    perf.stop("knowledge_graph")
                     logger.info(f"Knowledge graph built for {filename}")
                 await progress.emit(
                     document_id, "graph", 100, "Knowledge graph updated"
@@ -229,6 +242,9 @@ class DocumentService:
                 document_id, "completed", 100, "Document processed successfully"
             )
             logger.info(f"Document {filename} processed successfully")
+            
+            perf.stop("total_pipeline")
+            perf.log_total(logger)
 
         except Exception as e:
             logger.error(f"Error in pipeline for {filename}: {str(e)}")
@@ -485,7 +501,7 @@ class DocumentService:
                     from services.knowledge_graph_service import knowledge_graph
 
                     docs = await async_db(
-                        lambda: get_supabase_client()
+                        lambda: self.client
                         .table("documents")
                         .select("topics")
                         .eq("project_id", project_id)
@@ -497,7 +513,7 @@ class DocumentService:
                         all_topics.extend(d.get("topics") or [])
 
                     current_doc = await async_db(
-                        lambda: get_supabase_client()
+                        lambda: self.client
                         .table("documents")
                         .select("topics")
                         .eq("id", document_id)

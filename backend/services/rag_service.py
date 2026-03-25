@@ -3,9 +3,10 @@ import asyncio
 from services.embedding_service import embedding_service
 from services.qdrant_service import qdrant_service
 from services.llm_service import llm_service
-from supabase import create_client, Client
+from db.client import get_supabase_client
 from config.settings import settings
 from utils.logger import logger
+from utils.performance import PerformanceTracker
 
 # LangChain Imports
 from langchain_qdrant import QdrantVectorStore
@@ -53,9 +54,7 @@ async def retry_with_backoff(func, max_retries=3, base_delay=1.0, max_delay=10.0
 
 class RAGService:
     def __init__(self):
-        self.client: Client = create_client(
-            settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY
-        )
+        self.client = get_supabase_client()
 
         # Initialize LLM
         self.llm = ChatOpenAI(
@@ -219,6 +218,8 @@ Context:
                     history_messages.append(AIMessage(content=msg["content"]))
 
             # Invoke with retry logic
+            perf = PerformanceTracker()
+            perf.start("qdrant_and_llm_chain")
             async def invoke_chain():
                 return await chain.ainvoke(
                     {"input": question, "chat_history": history_messages}
@@ -227,16 +228,17 @@ Context:
             response = await retry_with_backoff(
                 invoke_chain, max_retries=3, base_delay=1.5
             )
+            perf.stop("qdrant_and_llm_chain")
+            perf.log_total(logger)
 
             # Process sources from 'context' in response
             sources = []
             if "context" in response:
                 # DIAGNOSTIC: Log retrieved chunks
-                print("\n====== RETRIEVED CHUNKS ======")
+                logger.debug("====== RETRIEVED CHUNKS ======")
                 for i, doc in enumerate(response["context"]):
-                    print(f"\n--- Chunk {i+1} ---")
-                    print(doc.page_content[:300])
-                print("\n===========================\n")
+                    logger.debug(f"--- Chunk {i+1} ---\n{doc.page_content[:300]}")
+                logger.debug("===========================")
                 
                 for i, doc in enumerate(response["context"]):
                     # Resolve filename from doc.metadata if available
@@ -482,6 +484,8 @@ IMPORTANT: Format the output using standard Markdown. Do NOT use any HTML tags l
 """
             messages = [HumanMessage(content=prompt)]
 
+            perf = PerformanceTracker()
+            perf.start("llm_response")
             # Use retry logic for LLM call
             async def invoke_llm():
                 return await self.llm.ainvoke(messages)
@@ -489,6 +493,8 @@ IMPORTANT: Format the output using standard Markdown. Do NOT use any HTML tags l
             response = await retry_with_backoff(
                 invoke_llm, max_retries=3, base_delay=1.5
             )
+            perf.stop("llm_response")
+            perf.log_total(logger)
             # Remove any stray HTML break tags the LLM might have still generated
             summary_text = response.content.replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
 

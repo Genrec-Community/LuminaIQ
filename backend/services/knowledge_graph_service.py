@@ -26,6 +26,7 @@ from utils.logger import logger
 from uuid import uuid4
 import json
 import asyncio
+from utils.performance import PerformanceTracker
 
 
 class KnowledgeGraph:
@@ -62,6 +63,8 @@ class KnowledgeGraph:
 
         Handles large topic sets by processing in batches.
         """
+        perf = PerformanceTracker()
+        perf.start("knowledge_graph_build")
         try:
             if not topics or len(topics) < 2:
                 return {"edges_created": 0, "message": "Need at least 2 topics"}
@@ -135,6 +138,9 @@ class KnowledgeGraph:
                 logger.info(
                     f"Created {len(unique_edges)} topic relationships for project {project_id}"
                 )
+
+            perf.stop("knowledge_graph_build")
+            perf.log_total(logger)
 
             return {
                 "edges_created": len(unique_edges),

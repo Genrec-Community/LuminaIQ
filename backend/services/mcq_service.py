@@ -7,6 +7,7 @@ from services.llm_service import llm_service
 from db.client import get_supabase_client, async_db
 from config.settings import settings
 from utils.logger import logger
+from utils.performance import PerformanceTracker
 from uuid import uuid4
 
 
@@ -33,11 +34,9 @@ class MCQService:
             text = "\n".join(chunks)
 
             # DIAGNOSTIC: Log text sample before sending to LLM
-            print("\n====== EXTRACTED TEXT SAMPLE ======\n")
-            print(text[:1000] if text else "EMPTY TEXT")
-            print("\n====================================\n")
-            print(f"TEXT LENGTH: {len(text)} chars")
-            print(f"CHUNK COUNT: {len(chunks)} chunks\n")
+            logger.debug(f"====== EXTRACTED TEXT SAMPLE ======\n{text[:1000] if text else 'EMPTY TEXT'}\n====================================")
+            logger.info(f"TEXT LENGTH: {len(text)} chars")
+            logger.info(f"CHUNK COUNT: {len(chunks)} chunks")
 
             system_prompt = """You are an expert curriculum analyst. Analyze this educational content and extract ALL learning topics.
 
@@ -65,9 +64,7 @@ Return ONLY a valid JSON array of topic strings:
             response = await llm_service.chat_completion(messages, temperature=0.3, max_tokens=2000)
             
             # DIAGNOSTIC: Log raw LLM output
-            print("\n====== RAW LLM OUTPUT ======\n")
-            print(response)
-            print("\n===========================\n")
+            logger.debug(f"====== RAW LLM OUTPUT ======\n{response}\n===========================")
             if not response:
                 logger.error("LLM returned empty response for topic generation")
                 return []
@@ -90,7 +87,7 @@ Return ONLY a valid JSON array of topic strings:
                 except json.JSONDecodeError as e:
                     logger.error(f"Failed to parse topics JSON: {e}")
                     # FALLBACK: Try to extract topics from raw response text
-                    print("FALLBACK: Trying to extract topics from raw text...")
+                    logger.warning("FALLBACK: Trying to extract topics from raw text...")
                     import re
                     # Look for quoted strings in the response
                     matches = re.findall(r'"([^"]+)"', response)
@@ -100,7 +97,7 @@ Return ONLY a valid JSON array of topic strings:
                             topics.append(clean)
                             seen.add(clean.lower())
                     if topics:
-                        print(f"FALLBACK: Extracted {len(topics)} topics from raw text")
+                        logger.info(f"FALLBACK: Extracted {len(topics)} topics from raw text")
 
             # Save to document
             if topics:
@@ -205,15 +202,19 @@ Return ONLY a valid JSON array of topic strings:
         Args:
             difficulty: 'easy', 'medium', or 'hard'
         """
+        perf = PerformanceTracker()
+        perf.start("mcq_generation_total")
         try:
             # 1. Get relevant content for the chapter/topic
             logger.info(
                 f"Retrieving content for topic: {topic if topic else 'General'}"
             )
             # Increased chunks for better context
+            perf.start("qdrant_search")
             content = await self._get_context_content(
                 project_id, topic, num_chunks=15, selected_documents=selected_documents
             )
+            perf.stop("qdrant_search")
 
             if not content:
                 # Fallback if no specific content found
@@ -280,9 +281,11 @@ Format your response as a **JSON array** with this structure:
 Respond ONLY with the valid JSON array. Do not add any markdown formatting (like ```json) around the response."""
 
             messages = [{"role": "user", "content": prompt}]
+            perf.start("llm_response")
             response = await llm_service.chat_completion(
                 messages, temperature=0.7, max_tokens=3000
             )
+            perf.stop("llm_response")
 
             # 3. Parse response
             questions = self._parse_mcq_response(response)
@@ -302,6 +305,9 @@ Respond ONLY with the valid JSON array. Do not add any markdown formatting (like
             ).execute())
 
             logger.info(f"Created MCQ test with ID: {test_id}")
+            
+            perf.stop("mcq_generation_total")
+            perf.log_total(logger)
 
             return {"test_id": test_id, "topic": topic, "questions": questions}
 

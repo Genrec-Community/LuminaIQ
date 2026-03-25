@@ -67,8 +67,8 @@ class EmbeddingQueue:
     # Global limits - tuned for multi-user production load
     # 3 docs process the heavy pipeline concurrently, rest wait in queue
     MAX_CONCURRENT_DOCUMENTS = 3
-    MAX_GLOBAL_DB_OPERATIONS = 6   # Concurrent Qdrant writes (shared across all docs)
-    MAX_GLOBAL_EMBEDDINGS = 8      # Concurrent embedding API calls
+    MAX_GLOBAL_DB_OPERATIONS = 10  # Concurrent Qdrant writes (shared across all docs)
+    MAX_GLOBAL_EMBEDDINGS = 15     # Concurrent embedding API calls
     MAX_CONCURRENT_LLM = 2         # Concurrent LLM calls (topics/graph generation)
 
     # Singleton semaphores - created once, shared by all

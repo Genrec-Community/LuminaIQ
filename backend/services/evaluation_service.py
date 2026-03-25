@@ -4,6 +4,7 @@ from services.qdrant_service import qdrant_service
 from services.llm_service import llm_service
 from db.client import get_supabase_client
 from utils.logger import logger
+from utils.performance import PerformanceTracker
 from uuid import uuid4
 import json
 import re
@@ -33,9 +34,14 @@ class EvaluationService:
         """
         try:
             # 1. Get relevant content
+            perf = PerformanceTracker()
+            perf.start("subjective_test_generation_total")
+            
             logger.info(
                 f"Retrieving content for subjective test on topic: {topic if topic else 'General'}"
             )
+            
+            perf.start("qdrant_search")
             # Use a strategy similar to MCQ but maybe more focused on broad concepts for subjective q's
             content = await self._get_relevant_context(
                 project_id,
@@ -43,6 +49,7 @@ class EvaluationService:
                 num_chunks=15,
                 selected_documents=selected_documents,
             )
+            perf.stop("qdrant_search")
 
             if not content:
                 logger.warning(
@@ -109,9 +116,11 @@ Format your response as a **JSON array**:
 Respond ONLY with the valid JSON array."""
 
             messages = [{"role": "user", "content": prompt}]
+            perf.start("llm_response")
             response = await llm_service.chat_completion(
                 messages, temperature=0.7, max_tokens=max_tokens
             )
+            perf.stop("llm_response")
 
             # 4. Parse response with retry on failure
             questions_data = self._parse_json_response(response)
@@ -148,6 +157,9 @@ Respond ONLY with the valid JSON array."""
                 )
                 for i, q in enumerate(questions_data)
             ]
+            
+            perf.stop("subjective_test_generation_total")
+            perf.log_total(logger)
 
             return {"test_id": test_id, "topic": topic, "questions": client_questions}
 
@@ -159,6 +171,8 @@ Respond ONLY with the valid JSON array."""
         self, test_id: str, answers: Dict[int, str]
     ) -> Dict[str, Any]:
         """Evaluate submitted subjective test answers"""
+        perf = PerformanceTracker()
+        perf.start("subjective_test_evaluation_total")
         try:
             # 1. Get test from database
             response = (
@@ -231,6 +245,9 @@ Respond ONLY with the valid JSON array."""
             self.client.table("subjective_tests").update(
                 {"results": json.dumps(results_data)}
             ).eq("id", test_id).execute()
+            
+            perf.stop("subjective_test_evaluation_total")
+            perf.log_total(logger)
 
             return {"test_id": test_id, **results_data}
 
@@ -266,7 +283,11 @@ Provide output in **valid JSON**:
 Respond ONLY with JSON.
 """
             messages = [{"role": "user", "content": prompt}]
+            perf = PerformanceTracker()
+            perf.start("llm_response")
             response = await llm_service.chat_completion(messages, temperature=0.3)
+            perf.stop("llm_response")
+            perf.log_total(logger)
             result = self._parse_json_response(response)
             if not result:
                 raise ValueError("Failed to parse evaluation response")
@@ -279,10 +300,14 @@ Respond ONLY with JSON.
         self, project_id: str, user_id: str, question: str, user_answer: str
     ) -> Dict[str, Any]:
         """Evaluate subjective answer using AI (Single Question Mode)"""
+        perf = PerformanceTracker()
+        perf.start("single_answer_evaluation_total")
         try:
             # 1. Get relevant context from documents
             logger.info(f"Retrieving context for question: {question[:50]}...")
+            perf.start("qdrant_search")
             context = await self._get_relevant_context(project_id, question)
+            perf.stop("qdrant_search")
 
             # 2. Build evaluation prompt
             prompt = f"""You are an educational evaluator. Evaluate the following student answer based on the provided context.
@@ -307,9 +332,11 @@ Provide a comprehensive evaluation in JSON format:
 Be constructive and specific in your feedback. Respond ONLY with the JSON object."""
 
             messages = [{"role": "user", "content": prompt}]
+            perf.start("llm_response")
             response = await llm_service.chat_completion(
                 messages, temperature=0.3, max_tokens=1500
             )
+            perf.stop("llm_response")
 
             # 3. Parse evaluation
             evaluation = self._parse_json_response(response)
@@ -332,6 +359,9 @@ Be constructive and specific in your feedback. Respond ONLY with the JSON object
             ).execute()
 
             logger.info(f"Created evaluation with ID: {evaluation_id}")
+            
+            perf.stop("single_answer_evaluation_total")
+            perf.log_total(logger)
 
             return {
                 "evaluation_id": evaluation_id,

@@ -16,6 +16,7 @@ from services.llm_service import llm_service
 from services.embedding_service import embedding_service
 from services.qdrant_service import qdrant_service
 from utils.logger import logger
+from utils.performance import PerformanceTracker
 from uuid import uuid4
 import json
 
@@ -107,6 +108,8 @@ class GraphAnalyticsService:
         
         Returns cached summary if available, otherwise generates new one.
         """
+        perf = PerformanceTracker()
+        perf.start("topic_summary_total")
         try:
             # Check cache first
             if not force_regenerate:
@@ -126,6 +129,10 @@ class GraphAnalyticsService:
                         await self.record_interaction(
                             project_id, user_id, topic, "summary_view"
                         )
+                    
+                    
+                    perf.stop("topic_summary_total")
+                    perf.log_total(logger)
                     
                     return {
                         "topic": topic,
@@ -147,13 +154,17 @@ class GraphAnalyticsService:
             collection_name = f"project_{project_id}"
             query_embedding = await embedding_service.generate_embedding(topic)
             
+            perf.start("qdrant_search")
             results = await qdrant_service.search(
                 collection_name=collection_name,
                 query_vector=query_embedding,
                 limit=8
             )
-            
+            perf.stop("qdrant_search")
+
             if not results:
+                perf.stop("topic_summary_total")
+                perf.log_total(logger)
                 return {
                     "topic": topic,
                     "summary": f"No content found for '{topic}' in the uploaded documents.",
@@ -207,9 +218,11 @@ INSTRUCTIONS:
 Generate the summary now:"""
 
             messages = [{"role": "user", "content": prompt}]
+            perf.start("llm_response")
             summary = await llm_service.chat_completion(
                 messages, temperature=0.3, max_tokens=1000
             )
+            perf.stop("llm_response")
             
             # Cache the summary
             try:
@@ -226,6 +239,9 @@ Generate the summary now:"""
             except Exception as cache_err:
                 logger.warning(f"Failed to cache summary: {cache_err}")
             
+            perf.stop("topic_summary_total")
+            perf.log_total(logger)
+
             return {
                 "topic": topic,
                 "summary": summary,
