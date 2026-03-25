@@ -18,8 +18,8 @@ class EmbeddingService:
     """
 
     # Optimal workers for I/O-bound embedding API calls
-    MAX_WORKERS_BATCH = 8
-    MAX_WORKERS_SEARCH = 4
+    MAX_WORKERS_BATCH = 3
+    MAX_WORKERS_SEARCH = 2
 
     def __init__(self):
         os.environ["OPENAI_API_KEY"] = settings.EMBEDDING_API_KEY

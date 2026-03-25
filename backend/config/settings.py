@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     LLM_API_KEY: str
     LLM_BASE_URL: str
     LLM_MODEL: str
+    
+    #Azure-Env
+
+    MAIN_API_WEBHOOK_SECRET: str
+    MAIN_API_WEBHOOK_URL: str
 
     # OpenAI-compatible API Configuration (Embeddings)
     EMBEDDING_API_KEY: str
