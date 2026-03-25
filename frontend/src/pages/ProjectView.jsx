@@ -858,7 +858,7 @@ const ProjectView = () => {
                     </div>
                     <h2 className="text-xl font-bold text-[#4A3B32] mb-2">Couldn't load project</h2>
                     <p className="text-[#8a6a5c] text-sm mb-6">
-                        The backend took too long to respond. It may still be starting up — try again in a moment.
+                        Your world has been paused, kindly wait for it to spin again...
                     </p>
                     <button
                         onClick={() => {

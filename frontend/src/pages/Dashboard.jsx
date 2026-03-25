@@ -110,9 +110,9 @@ const Dashboard = () => {
                     <div className="h-16 w-16 bg-[#FDF6F0] border-2 border-[#E6D5CC] rounded-2xl flex items-center justify-center mx-auto mb-4">
                         <WifiOff className="h-8 w-8 text-[#C8A288]" />
                     </div>
-                    <h2 className="text-xl font-bold text-[#4A3B32] mb-2">Couldn't load projects</h2>
+                    <h2 className="text-xl font-bold text-[#4A3B32] mb-2">The world of LuminaIQ is paused</h2>
                     <p className="text-[#8a6a5c] text-sm mb-6">
-                        The backend took too long to respond. It may still be starting up — try again in a moment.
+                        Your world has been paused, kindly wait for it to spin again...
                     </p>
                     <button
                         onClick={fetchProjects}
