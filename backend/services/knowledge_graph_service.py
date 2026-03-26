@@ -27,6 +27,9 @@ from uuid import uuid4
 import json
 import asyncio
 from utils.performance import PerformanceTracker
+from langchain_openai import AzureChatOpenAI
+from langchain_core.messages import HumanMessage
+from config.settings import settings
 
 
 class KnowledgeGraph:
@@ -48,7 +51,7 @@ class KnowledgeGraph:
 
     # Batch size for processing topics (to avoid token limits)
     BATCH_SIZE = 25
-    MAX_TOKENS = 4000  # Higher limit for JSON output
+    MAX_TOKENS = 1200  # Reduced to prevent empty LLM responses
 
     def __init__(self):
         self.client = get_supabase_client()
@@ -111,10 +114,14 @@ class KnowledgeGraph:
                     logger.info(
                         f"Processing batch {i + 1}/{len(batches)} ({len(batch)} topics)"
                     )
-                    edges = await self._generate_relationships_for_batch(
-                        project_id, batch, unique_topics
-                    )
-                    all_edges.extend(edges)
+                    try:
+                        edges = await self._generate_relationships_for_batch(
+                            project_id, batch, unique_topics
+                        )
+                        all_edges.extend(edges)
+                    except Exception as batch_err:
+                        logger.error(f"Batch {i + 1}/{len(batches)} failed, skipping: {batch_err}")
+                        continue
 
                     # Small delay between batches to avoid rate limits
                     if i < len(batches) - 1:
@@ -198,14 +205,25 @@ OUTPUT FORMAT - Return ONLY valid JSON, no markdown:
   {{"from_topic": "Topic 1 Name", "to_topic": "Topic 2 Name", "relation_type": "prerequisite", "weight": 0.9}}
 ]"""
 
-        messages = [{"role": "user", "content": prompt}]
-
         try:
-            response = await llm_service.chat_completion(
-                messages, temperature=0.2, max_tokens=self.MAX_TOKENS
+            # Use a dedicated no-retry Azure client to fail fast
+            client = AzureChatOpenAI(
+                azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
+                azure_deployment=settings.AZURE_OPENAI_DEPLOYMENT,
+                api_key=settings.AZURE_OPENAI_API_KEY,
+                api_version=settings.AZURE_OPENAI_API_VERSION,
+                temperature=0.2,
+                max_tokens=self.MAX_TOKENS,
+                max_retries=0,
             )
+            response_obj = await client.ainvoke([HumanMessage(content=prompt)])
+            response = response_obj.content if getattr(response_obj, 'content', None) else ""
         except Exception as llm_err:
             logger.error(f"LLM call failed for knowledge graph batch: {llm_err}")
+            return []
+
+        if not response or not response.strip():
+            logger.warning("LLM returned empty response for knowledge graph batch, skipping")
             return []
 
         # Parse with repair logic for truncated JSON
@@ -255,8 +273,17 @@ OUTPUT FORMAT - Return ONLY valid JSON, no markdown:
                     }
                 )
 
-        logger.info(f"Generated {len(edges)} edges from batch")
-        return edges
+        # Deduplicate within this batch by (project_id, from_topic, to_topic)
+        seen = set()
+        deduped_edges = []
+        for edge in edges:
+            key = (edge["project_id"], edge["from_topic"], edge["to_topic"])
+            if key not in seen:
+                seen.add(key)
+                deduped_edges.append(edge)
+
+        logger.info(f"Generated {len(deduped_edges)} edges from batch (before: {len(edges)})")
+        return deduped_edges
 
     def _parse_json_with_repair(self, response: str) -> List[Dict]:
         """Parse JSON with repair logic for truncated responses"""

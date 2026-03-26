@@ -10,10 +10,11 @@ class Settings(BaseSettings):
     SUPABASE_KEY: str
     SUPABASE_SERVICE_KEY: str
 
-    # OpenAI-compatible API Configuration (LLM)
-    LLM_API_KEY: str
-    LLM_BASE_URL: str
-    LLM_MODEL: str
+    # Azure OpenAI Configuration (LLM)
+    AZURE_OPENAI_API_KEY: str
+    AZURE_OPENAI_ENDPOINT: str
+    AZURE_OPENAI_DEPLOYMENT: str
+    AZURE_OPENAI_API_VERSION: str = "2024-12-01-preview"
     
     #Azure-Env
 
@@ -39,8 +40,11 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8  # 8 days
 
-    # CORS
-    BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:3000","https://lumina-iq-livid.vercel.app","https://luminaiq.fun"]
+    # ================================
+    # 🌐 CORS (CRITICAL FIX)
+    # ================================
+    # BACKEND_CORS_ORIGINS=["https://www.luminaiq.fun","https://luminaiq.fun","http://localhost:5173"]
+    BACKEND_CORS_ORIGINS: List[str] = ["*"]
 
     UPLOAD_DIR: str = "./uploads"
     MAX_FILE_SIZE: int = 10485760  # 10MB

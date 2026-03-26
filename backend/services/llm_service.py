@@ -1,23 +1,24 @@
-from langchain_openai import ChatOpenAI
+from langchain_openai import AzureChatOpenAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from config.settings import settings
 from typing import List, Dict, Any
 from utils.logger import logger
-import os
+
 
 class LLMService:
     def __init__(self):
-        os.environ['OPENAI_API_KEY'] = settings.LLM_API_KEY
-        self.model = settings.LLM_MODEL
-        self.api_key = settings.LLM_API_KEY
-        self.base_url = settings.LLM_BASE_URL
+        self.azure_endpoint = settings.AZURE_OPENAI_ENDPOINT
+        self.azure_api_key = settings.AZURE_OPENAI_API_KEY
+        self.azure_deployment = settings.AZURE_OPENAI_DEPLOYMENT
+        self.azure_api_version = settings.AZURE_OPENAI_API_VERSION
     
     def _get_client(self, temperature: float = 0.7, max_tokens: int = 1000):
-        """Create a client with specific settings"""
-        return ChatOpenAI(
-            model=self.model,
-            openai_api_key=self.api_key,
-            openai_api_base=self.base_url,
+        """Create an Azure OpenAI client with specific settings"""
+        return AzureChatOpenAI(
+            azure_endpoint=self.azure_endpoint,
+            azure_deployment=self.azure_deployment,
+            api_key=self.azure_api_key,
+            api_version=self.azure_api_version,
             temperature=temperature,
             max_tokens=max_tokens
         )
@@ -54,7 +55,7 @@ class LLMService:
             # Convert messages to LangChain format
             lc_messages = self._convert_messages(messages)
             
-            logger.info(f"Sending {len(lc_messages)} messages to LLM (temp={temperature}, max_tokens={max_tokens})")
+            logger.info(f"Sending {len(lc_messages)} messages to Azure OpenAI (temp={temperature}, max_tokens={max_tokens})")
             
             response = await client.ainvoke(lc_messages)
             

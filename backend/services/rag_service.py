@@ -10,7 +10,7 @@ from utils.performance import PerformanceTracker
 
 # LangChain Imports
 from langchain_qdrant import QdrantVectorStore
-from langchain_openai import ChatOpenAI
+from langchain_openai import AzureChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
@@ -56,11 +56,12 @@ class RAGService:
     def __init__(self):
         self.client = get_supabase_client()
 
-        # Initialize LLM
-        self.llm = ChatOpenAI(
-            model=settings.LLM_MODEL,
-            openai_api_key=settings.LLM_API_KEY,
-            openai_api_base=settings.LLM_BASE_URL,
+        # Initialize LLM (Azure OpenAI)
+        self.llm = AzureChatOpenAI(
+            azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
+            azure_deployment=settings.AZURE_OPENAI_DEPLOYMENT,
+            api_key=settings.AZURE_OPENAI_API_KEY,
+            api_version=settings.AZURE_OPENAI_API_VERSION,
             temperature=0.1,  # Lower temperature for strict factuality and less hallucination
         )
 

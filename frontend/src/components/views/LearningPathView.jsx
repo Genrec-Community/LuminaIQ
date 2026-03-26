@@ -548,6 +548,7 @@ const LearningPathView = ({
                                                                 <div className="flex flex-col"><span className="text-[10px] uppercase font-bold text-[#8a6a5c]">Study time</span> <span className="font-bold text-[#4A3B32]">~20 mins</span></div>
                                                             </div>
                                                             
+                                                            {perf && perf.attempts > 0 && (
                                                             <div className="bg-red-50 text-red-800 p-3 rounded-lg text-sm border border-red-100 flex gap-3 items-start mt-2">
                                                                 <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5 text-red-500" />
                                                                 <div>
@@ -555,6 +556,7 @@ const LearningPathView = ({
                                                                     <span className="font-medium text-red-700">{getStableHumor(item.topic)}</span>
                                                                 </div>
                                                             </div>
+                                                            )}
                                                         </div>
                                                     ) : (
                                                         <h5 className="font-bold text-[#4A3B32] mb-4 flex items-center gap-2">
