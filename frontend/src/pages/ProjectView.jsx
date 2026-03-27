@@ -153,7 +153,12 @@ const ProjectView = () => {
     const [deletingDocIds, setDeletingDocIds] = useState(new Set());
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
-    const [isProcessingDocs, setIsProcessingDocs] = useState(true);
+    // Progressive loading: 'loading' | 'processing' | 'partial' | 'ready'
+    // loading    = initial skeleton, no docs loaded yet
+    // processing = docs uploading/embedding, chat not yet usable
+    // partial    = ≥1 embedding batch done; chat usable, KG/topics still running
+    // ready      = all pipelines complete
+    const [processingPhase, setProcessingPhase] = useState('loading');
     // Per-document SSE stage: { [docId]: 'extracting'|'chunking'|'embedding'|'topics'|'graph'|'completed'|'failed' }
     const [docStages, setDocStages] = useState({});
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -241,27 +246,12 @@ const ProjectView = () => {
 
     useEffect(() => {
         let intervalId;
+        // Track whether we already transitioned to partial in this mount
+        let didTransitionToPartial = false;
         
         const rotationInterval = setInterval(() => {
             setLoadingMsgIdx(i => i + 1);
         }, 3000);
-
-        // Helper to check if any document is still processing
-        const isAnyDocProcessing = (docs) => {
-            if (!docs || docs.length === 0) return false;
-            return docs.some(d =>
-                d.upload_status === 'pending' ||
-                d.upload_status === 'processing' ||
-                d.upload_status === 'embedding' ||
-                d.upload_status === 'queued'
-            );
-        };
-
-        // Helper to check if any document has failed
-        const isAnyDocFailed = (docs) => {
-            if (!docs || docs.length === 0) return false;
-            return docs.some(d => d.upload_status === 'failed');
-        };
 
         const initialLoad = async () => {
             // 10s hard timeout — skeleton must never hang forever
@@ -305,18 +295,20 @@ const ProjectView = () => {
                 d.upload_status === 'queued'
             );
             const docsProcessing = processingDocs.length > 0;
-            setIsProcessingDocs(docsProcessing);
             setProjectViewLoading(false);
 
             if (!docsProcessing) {
+                // All docs already completed — jump straight to 'ready'
+                setProcessingPhase('ready');
                 fetchTopics();
                 topicsFetchedRef.current = true;
                 return;
             }
 
+            // Some docs still processing
+            setProcessingPhase('processing');
+
             // Open one SSE connection per processing document.
-            // Each stream delivers live stage events: extracting → chunking → embedding → topics → graph → completed/failed.
-            // Topics are fetched exactly once when the FIRST doc completes.
             const sseCleanups = [];
 
             processingDocs.forEach((doc) => {
@@ -328,8 +320,23 @@ const ProjectView = () => {
                         // Update per-doc stage label in real time
                         setDocStages(prev => ({ ...prev, [doc.id]: stage }));
 
+                        // Detect partial readiness: as soon as embedding starts, chat is usable
+                        if (!didTransitionToPartial && (stage === 'embedding' || stage === 'topics' || stage === 'graph' || stage === 'completed')) {
+                            didTransitionToPartial = true;
+                            setProcessingPhase('partial');
+                            // Auto-select this doc so chat has something to query
+                            setSelectedDocuments(prev => {
+                                if (prev.includes(doc.id)) return prev;
+                                return [...prev, doc.id];
+                            });
+                            // Switch to chat tab for immediate usability
+                            setActiveTab('chat');
+                            // Try fetching topics early (some may already exist)
+                            fetchTopics().catch(() => {});
+                        }
+
                         if (stage === 'completed' || stage === 'failed') {
-                            // Refresh this document's status from DB to get error_message etc.
+                            // Refresh documents from DB
                             const refreshed = await fetchDocuments();
                             const remaining = (refreshed?.documents || []).filter(d =>
                                 d.upload_status === 'pending' ||
@@ -338,11 +345,22 @@ const ProjectView = () => {
                                 d.upload_status === 'queued'
                             );
                             if (remaining.length === 0) {
-                                setIsProcessingDocs(false);
-                                if (!topicsFetchedRef.current) {
-                                    fetchTopics();
-                                    topicsFetchedRef.current = true;
-                                }
+                                setProcessingPhase('ready');
+                                // Final topic fetch to get the complete set
+                                fetchTopics();
+                                topicsFetchedRef.current = true;
+                                // Fire completion toast with action button
+                                toast.success(
+                                    '✨ Your learning path is ready!',
+                                    8000,
+                                    {
+                                        label: 'Go to Learning Path',
+                                        onClick: () => setActiveTab('path')
+                                    }
+                                );
+                            } else if (!topicsFetchedRef.current && didTransitionToPartial) {
+                                // Refresh topics as more docs complete
+                                fetchTopics().catch(() => {});
                             }
                         }
                     },
@@ -396,13 +414,13 @@ const ProjectView = () => {
 
     // fetchTopics on tab change — only if topics haven't been loaded yet
     useEffect(() => {
-        if (!isProcessingDocs && !topicsFetchedRef.current) {
+        if ((processingPhase === 'partial' || processingPhase === 'ready') && !topicsFetchedRef.current) {
             if (activeTab === 'chat' || activeTab === 'quiz' || activeTab === 'qa' || activeTab === 'notes' || activeTab === 'path') {
                 fetchTopics();
                 topicsFetchedRef.current = true;
             }
         }
-    }, [activeTab, projectId, isProcessingDocs]);
+    }, [activeTab, projectId, processingPhase]);
 
     // Filter topics based on selected documents
     useEffect(() => {
@@ -1089,6 +1107,18 @@ const ProjectView = () => {
                                 )}
                             </div>
 
+                            {/* Background Processing Indicator */}
+                            {(processingPhase === 'processing' || processingPhase === 'partial') && (
+                                <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200/60 rounded-full animate-in fade-in duration-300">
+                                    <div className="relative h-3.5 w-3.5 shrink-0">
+                                        <div className="absolute inset-0 h-3.5 w-3.5 border-2 border-amber-400 rounded-full border-t-transparent animate-spin"></div>
+                                    </div>
+                                    <span className="text-[11px] font-semibold text-amber-700 whitespace-nowrap">
+                                        {processingPhase === 'processing' ? 'Preparing documents…' : 'Processing in background…'}
+                                    </span>
+                                </div>
+                            )}
+
                             {/* Spacer for mobile */}
                             <div className="flex-1" />
 
@@ -1362,7 +1392,7 @@ const ProjectView = () => {
                                     </div>
                                 ))}
                                 <div ref={messagesEndRef} />
-                                {isProcessingDocs && (
+                                {processingPhase === 'processing' && (
                                     <div className="flex justify-center my-4 animate-in fade-in slide-in-from-bottom-2">
                                         <div className="bg-gradient-to-r from-amber-50 to-orange-50 text-amber-700 px-5 py-4 rounded-xl text-sm flex items-start gap-3 border border-amber-200 shadow-md max-w-lg w-full">
                                             <div className="relative shrink-0 mt-0.5">
@@ -1370,17 +1400,18 @@ const ProjectView = () => {
                                                 <div className="absolute inset-0 h-8 w-8 border-2 border-amber-500 rounded-full border-t-transparent animate-spin"></div>
                                             </div>
                                             <div className="flex-1">
-                                                <p className="font-bold text-amber-800 tracking-wide text-xs uppercase mb-1.5">Processing Documents</p>
+                                                <p className="font-bold text-amber-800 tracking-wide text-xs uppercase mb-1.5">Preparing Your Documents</p>
                                                 <div className="text-[11px] leading-relaxed italic text-amber-700/90 whitespace-pre-line transition-opacity duration-300 font-medium">
                                                     {getRotatingLoadingMessage(loadingMsgIdx)}
                                                 </div>
+                                                <p className="text-[10px] text-amber-600/80 mt-2 font-medium">Chat will be available in a moment…</p>
                                             </div>
                                         </div>
                                     </div>
                                 )}
 
                                 {/* Failed doc banner — shown when any doc fails */}
-                                {!isProcessingDocs && documents.some(d => d.upload_status === 'failed' || d.upload_status === 'error') && (
+                                {processingPhase === 'ready' && documents.some(d => d.upload_status === 'failed' || d.upload_status === 'error') && (
                                     <div className="flex justify-center my-4 animate-in fade-in slide-in-from-bottom-2">
                                         <div className="bg-red-50 text-red-700 px-5 py-4 rounded-xl text-sm flex items-start gap-3 border border-red-200 shadow-md max-w-lg w-full">
                                             <div className="shrink-0 mt-0.5 h-8 w-8 bg-red-100 rounded-full flex items-center justify-center">

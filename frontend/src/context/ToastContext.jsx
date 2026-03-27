@@ -38,9 +38,9 @@ const TOAST_TYPES = {
 export const ToastProvider = ({ children }) => {
     const [toasts, setToasts] = useState([]);
 
-    const addToast = useCallback((message, type = 'info', duration = 4000) => {
+    const addToast = useCallback((message, type = 'info', duration = 4000, action = null) => {
         const id = Date.now() + Math.random();
-        setToasts(prev => [...prev, { id, message, type }]);
+        setToasts(prev => [...prev, { id, message, type, action }]);
 
         if (duration > 0) {
             setTimeout(() => {
@@ -57,10 +57,10 @@ export const ToastProvider = ({ children }) => {
 
     // Convenience methods
     const toast = {
-        success: (message, duration) => addToast(message, 'success', duration),
-        error: (message, duration) => addToast(message, 'error', duration),
-        warning: (message, duration) => addToast(message, 'warning', duration),
-        info: (message, duration) => addToast(message, 'info', duration),
+        success: (message, duration, action) => addToast(message, 'success', duration, action),
+        error: (message, duration, action) => addToast(message, 'error', duration, action),
+        warning: (message, duration, action) => addToast(message, 'warning', duration, action),
+        info: (message, duration, action) => addToast(message, 'info', duration, action),
         dismiss: removeToast
     };
 
@@ -86,9 +86,22 @@ export const ToastProvider = ({ children }) => {
                                 className={`flex items-start gap-3 px-4 py-3 rounded-xl border shadow-lg ${config.bgColor} ${config.borderColor}`}
                             >
                                 <Icon className={`h-5 w-5 flex-shrink-0 mt-0.5 ${config.iconColor}`} />
-                                <p className={`text-sm font-medium flex-1 ${config.textColor}`}>
-                                    {t.message}
-                                </p>
+                                <div className="flex-1 min-w-0">
+                                    <p className={`text-sm font-medium ${config.textColor}`}>
+                                        {t.message}
+                                    </p>
+                                    {t.action && (
+                                        <button
+                                            onClick={() => {
+                                                t.action.onClick();
+                                                removeToast(t.id);
+                                            }}
+                                            className={`mt-1.5 text-xs font-bold ${config.iconColor} hover:underline flex items-center gap-1`}
+                                        >
+                                            {t.action.label} →
+                                        </button>
+                                    )}
+                                </div>
                                 <button
                                     onClick={() => removeToast(t.id)}
                                     className={`p-0.5 hover:bg-black/5 rounded-full transition-colors ${config.iconColor}`}
