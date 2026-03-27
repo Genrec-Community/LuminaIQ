@@ -69,7 +69,7 @@ export const ToastProvider = ({ children }) => {
             {children}
             
             {/* Toast Container */}
-            <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 max-w-sm">
+            <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 max-w-sm">
                 <AnimatePresence mode="popLayout">
                     {toasts.map(t => {
                         const config = TOAST_TYPES[t.type] || TOAST_TYPES.info;
