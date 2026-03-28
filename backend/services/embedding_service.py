@@ -35,7 +35,20 @@ class EmbeddingService:
         self.cache_misses = 0
         self.total_requests = 0
         
+        # Telemetry service (lazy loaded to avoid circular imports)
+        self._telemetry = None
+        
         logger.info("[EmbeddingService] Initialized with async IO native support and Redis caching")
+    
+    def _get_telemetry(self):
+        """Lazy load telemetry service to avoid circular imports."""
+        if self._telemetry is None:
+            try:
+                from core.telemetry import get_telemetry_service
+                self._telemetry = get_telemetry_service()
+            except Exception as e:
+                logger.debug(f"Telemetry service not available: {e}")
+        return self._telemetry
     
     def _add_passage_prefix(self, texts: List[str]) -> List[str]:
         """Add 'passage: ' prefix for E5 instruct models (document/passage embedding)."""
@@ -134,6 +147,9 @@ class EmbeddingService:
             if not texts:
                 return []
 
+            import time
+            start_time = time.time()
+            
             embeddings = []
             texts_to_generate = []
             text_indices = []
@@ -162,6 +178,17 @@ class EmbeddingService:
                     embeddings[idx] = embedding
                     prefixed_text = self._add_passage_prefix([texts[idx]])[0]
                     await self._cache_embedding(prefixed_text, embedding)
+            
+            # Track embedding throughput
+            duration = time.time() - start_time
+            if duration > 0:
+                embeddings_per_second = len(texts) / duration
+                self._track_embedding_throughput(
+                    embeddings_per_second=embeddings_per_second,
+                    batch_size=len(texts),
+                    cache_hits=len(texts) - len(texts_to_generate),
+                    cache_misses=len(texts_to_generate)
+                )
             
             return embeddings
 
@@ -200,6 +227,47 @@ class EmbeddingService:
     def shutdown(self):
         """Cleanup resources on shutdown"""
         logger.info("[EmbeddingService] Shut down")
+    
+    def _track_embedding_throughput(
+        self,
+        embeddings_per_second: float,
+        batch_size: int,
+        cache_hits: int,
+        cache_misses: int
+    ) -> None:
+        """
+        Track embedding throughput to telemetry service.
+        
+        Args:
+            embeddings_per_second: Number of embeddings generated per second
+            batch_size: Size of the batch processed
+            cache_hits: Number of cache hits in this batch
+            cache_misses: Number of cache misses in this batch
+        """
+        telemetry = self._get_telemetry()
+        if not telemetry:
+            return
+        
+        try:
+            cache_hit_rate = (cache_hits / batch_size * 100) if batch_size > 0 else 0.0
+            
+            telemetry.track_embedding_throughput(
+                embeddings_per_second=embeddings_per_second,
+                batch_size=batch_size,
+                properties={
+                    "model": settings.EMBEDDING_MODEL,
+                    "cache_hit_rate": f"{cache_hit_rate:.2f}",
+                    "cache_hits": cache_hits,
+                    "cache_misses": cache_misses
+                }
+            )
+            
+            logger.debug(
+                f"[EmbeddingService] Tracked throughput: {embeddings_per_second:.2f} embeddings/s "
+                f"(batch_size={batch_size}, cache_hit_rate={cache_hit_rate:.2f}%)"
+            )
+        except Exception as e:
+            logger.error(f"Failed to track embedding throughput: {e}")
 
 
 # Initialize with Redis manager when available

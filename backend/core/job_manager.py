@@ -98,9 +98,25 @@ class BackgroundJobManager:
         self.redis_manager = redis_manager
         self.job_ttl = 86400  # 24 hours
         
+        # Telemetry service (lazy loaded to avoid circular imports)
+        self._telemetry = None
+        
+        # Track current queue length
+        self._queue_length = 0
+        
         logger.info(
             f"[BackgroundJobManager] Initialized with job_ttl={self.job_ttl}s (24 hours)"
         )
+    
+    def _get_telemetry(self):
+        """Lazy load telemetry service to avoid circular imports."""
+        if self._telemetry is None:
+            try:
+                from core.telemetry import get_telemetry_service
+                self._telemetry = get_telemetry_service()
+            except Exception as e:
+                logger.debug(f"Telemetry service not available: {e}")
+        return self._telemetry
     
     def _generate_job_key(self, job_id: str) -> str:
         """
@@ -185,6 +201,10 @@ class BackgroundJobManager:
             f"[BackgroundJobManager] Enqueued job {job_id} of type {job_type.value} "
             f"for project={project_id}"
         )
+        
+        # Update queue length and track telemetry
+        self._queue_length += 1
+        self._track_job_queue_length()
         
         # TODO: Actually enqueue to Celery
         # celery_app.send_task(task_name, args=[payload], task_id=job_id)
@@ -286,9 +306,13 @@ class BackgroundJobManager:
                 f"status={job_status.status}, progress={job_status.progress}"
             )
             
-            # If job completed or failed, persist to Supabase
+            # If job completed or failed, persist to Supabase and update queue length
             if status in [JobStatusEnum.COMPLETED, JobStatusEnum.FAILED]:
                 await self._persist_job_to_supabase(job_status)
+                
+                # Decrement queue length
+                self._queue_length = max(0, self._queue_length - 1)
+                self._track_job_queue_length()
         else:
             logger.error(f"[BackgroundJobManager] Failed to update job {job_id}")
         
@@ -419,3 +443,25 @@ class BackgroundJobManager:
         )
         
         return True
+    
+    def _track_job_queue_length(self) -> None:
+        """
+        Track job queue length to telemetry service.
+        
+        Sends current queue length to Application Insights.
+        """
+        telemetry = self._get_telemetry()
+        if not telemetry:
+            return
+        
+        try:
+            telemetry.track_job_queue_length(
+                queue_length=self._queue_length,
+                properties={
+                    "timestamp": datetime.utcnow().isoformat() + "Z"
+                }
+            )
+            
+            logger.debug(f"[BackgroundJobManager] Tracked queue length: {self._queue_length}")
+        except Exception as e:
+            logger.error(f"Failed to track job queue length: {e}")

@@ -91,18 +91,84 @@ async def async_db_execute(func, *args, **kwargs):
             lambda: client.table("docs").select("*").execute()
         )
     """
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(_db_executor, func, *args)
+    start_time = time.time()
+    success = False
+    error_msg = None
+    
+    try:
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(_db_executor, func, *args)
+        success = True
+        return result
+    except Exception as e:
+        error_msg = str(e)
+        raise
+    finally:
+        duration_ms = (time.time() - start_time) * 1000
+        
+        # Track telemetry
+        try:
+            from core.telemetry import get_telemetry_service
+            telemetry = get_telemetry_service()
+            
+            properties = {
+                "operation": "query",
+            }
+            if error_msg:
+                properties["error"] = error_msg
+            
+            telemetry.track_dependency(
+                name=f"Supabase query",
+                dependency_type="supabase",
+                duration=duration_ms,
+                success=success,
+                properties=properties
+            )
+        except Exception as telemetry_err:
+            logger.debug(f"Failed to track telemetry: {telemetry_err}")
 
 
 async def async_db(callable_fn):
     """
-    Shorthand wrapper for async DB execution.
+    Shorthand wrapper for async DB execution with telemetry tracking.
 
     Usage:
         result = await async_db(
             lambda: client.table("docs").select("*").eq("id", doc_id).execute()
         )
     """
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(_db_executor, callable_fn)
+    start_time = time.time()
+    success = False
+    error_msg = None
+    
+    try:
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(_db_executor, callable_fn)
+        success = True
+        return result
+    except Exception as e:
+        error_msg = str(e)
+        raise
+    finally:
+        duration_ms = (time.time() - start_time) * 1000
+        
+        # Track telemetry
+        try:
+            from core.telemetry import get_telemetry_service
+            telemetry = get_telemetry_service()
+            
+            properties = {
+                "operation": "query",
+            }
+            if error_msg:
+                properties["error"] = error_msg
+            
+            telemetry.track_dependency(
+                name=f"Supabase query",
+                dependency_type="supabase",
+                duration=duration_ms,
+                success=success,
+                properties=properties
+            )
+        except Exception as telemetry_err:
+            logger.debug(f"Failed to track telemetry: {telemetry_err}")

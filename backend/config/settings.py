@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     QDRANT_URL: str = "http://localhost:6333"
     QDRANT_API_KEY: Optional[str] = None
 
+    # Azure Application Insights Configuration
+    APPLICATIONINSIGHTS_CONNECTION_STRING: Optional[str] = Field(default=None)
+    APPINSIGHTS_INSTRUMENTATION_KEY: Optional[str] = Field(default=None)
+
     # Redis Configuration
     REDIS_HOST: str = Field(default="localhost")
     REDIS_PORT: int = Field(ge=1, le=65535, default=6379)

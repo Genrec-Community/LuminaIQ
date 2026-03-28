@@ -1,17 +1,93 @@
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from api.v1.api import api_router
 from config.settings import settings
 from utils.logger import setup_uvicorn_log_filter, logger
 from middleware.rate_limit import RateLimitMiddleware
+from middleware.telemetry import TelemetryMiddleware
 import asyncio
+import traceback
 
 app = FastAPI(
     title="Lumina IQ API",
     description="Backend for Lumina IQ Education Platform",
     version="1.0.0",
 )
+
+
+# Global exception handler for telemetry tracking
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """
+    Global exception handler to track all unhandled exceptions in telemetry.
+    
+    This handler ensures that all exceptions are tracked in Application Insights
+    with full stack traces and context, even if they escape other error handling.
+    
+    Requirements:
+    - 20.2: Send exception telemetry with stack traces to Application Insights
+    
+    Args:
+        request: The request that caused the exception
+        exc: The exception that was raised
+        
+    Returns:
+        JSONResponse with error details
+    """
+    from core.telemetry import get_telemetry_service
+    
+    # Get correlation ID from request state if available
+    correlation_id = getattr(request.state, "correlation_id", None)
+    user_id = getattr(request.state, "user_id", None)
+    project_id = getattr(request.state, "project_id", None)
+    
+    # Build context properties
+    properties = {
+        "method": request.method,
+        "path": str(request.url.path),
+        "query_params": str(request.query_params) if request.query_params else None,
+        "exception_type": type(exc).__name__,
+        "exception_message": str(exc),
+        "stack_trace": traceback.format_exc(),
+    }
+    
+    if correlation_id:
+        properties["correlation_id"] = correlation_id
+    if user_id:
+        properties["user_id"] = user_id
+    if project_id:
+        properties["project_id"] = project_id
+    
+    # Track exception in telemetry
+    try:
+        telemetry_service = get_telemetry_service()
+        telemetry_service.track_exception(
+            exception=exc,
+            properties=properties
+        )
+    except Exception as telemetry_error:
+        logger.error(f"Failed to track exception in telemetry: {telemetry_error}")
+    
+    # Log the exception
+    logger.error(
+        f"Unhandled exception in {request.method} {request.url.path}: "
+        f"{type(exc).__name__}: {str(exc)}",
+        exc_info=exc,
+        extra={"properties": properties}
+    )
+    
+    # Return error response
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal server error",
+            "error_type": type(exc).__name__,
+            "correlation_id": correlation_id,
+        },
+    )
+
 
 # CORS Configuration
 # Security Fix: Use explicit origins from settings
@@ -25,6 +101,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Telemetry middleware (should be early in the chain to track all requests)
+app.add_middleware(TelemetryMiddleware)
+
 # Rate limiting middleware
 app.add_middleware(RateLimitMiddleware)
 
@@ -34,6 +113,21 @@ async def startup_event():
     """Initialize on startup"""
     # Apply log filter to reduce noisy HTTP logs
     setup_uvicorn_log_filter()
+    
+    # Initialize telemetry service
+    try:
+        from core.telemetry import initialize_telemetry
+        telemetry_service = initialize_telemetry(
+            service_name="lumina-backend",
+            service_version="1.0.0"
+        )
+        if telemetry_service.enabled:
+            logger.info("Azure Application Insights telemetry initialized successfully")
+        else:
+            logger.warning("Telemetry not configured - set APPLICATIONINSIGHTS_CONNECTION_STRING to enable")
+    except Exception as e:
+        logger.error(f"Failed to initialize telemetry: {e}")
+        logger.warning("Application will continue without telemetry")
     
     # Initialize Redis cache manager
     try:
@@ -81,6 +175,15 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     """Clean up resources on shutdown"""
+    # Flush telemetry before shutdown
+    try:
+        from core.telemetry import get_telemetry_service
+        telemetry_service = get_telemetry_service()
+        telemetry_service.flush()
+        logger.info("Telemetry flushed successfully")
+    except Exception as e:
+        logger.error(f"Error flushing telemetry: {e}")
+    
     # Shutdown Redis manager
     try:
         from core.redis_manager import shutdown_redis_manager
@@ -147,5 +250,98 @@ async def root():
 
 @app.get("/health")
 async def health():
-    """Health check endpoint"""
-    return {"status": "healthy", "service": "lumina-backend"}
+    """
+    Simple health check endpoint for liveness probes.
+    
+    Returns 200 OK if the service is running.
+    Response time: < 100ms
+    No dependency checks performed.
+    
+    Returns:
+        dict: Health status with service name, version, and timestamp
+    """
+    from core.health_check import HealthCheckService
+    from core.redis_manager import get_redis_manager
+    from db.client import get_supabase_client
+    from services.qdrant_service import qdrant_service
+    
+    try:
+        # Create health check service
+        health_service = HealthCheckService(
+            redis_manager=get_redis_manager(),
+            supabase_client=get_supabase_client(),
+            qdrant_client=qdrant_service.async_client,
+        )
+        
+        # Perform simple health check
+        result = await health_service.check_health()
+        return result.to_dict()
+    
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        # Return healthy status even if health service fails
+        # This is a liveness check, not a readiness check
+        from datetime import datetime
+        return {
+            "status": "healthy",
+            "service": "lumina-backend",
+            "version": "1.0.0",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        }
+
+
+@app.get("/health/ready")
+async def health_ready():
+    """
+    Comprehensive readiness check endpoint for load balancer probes.
+    
+    Checks all critical dependencies:
+    - Redis cache
+    - Supabase database
+    - Qdrant vector database
+    - Azure OpenAI API
+    
+    Returns:
+        dict: Readiness status with detailed dependency health information
+        
+    Status Codes:
+        200 OK: All dependencies healthy (ready to serve traffic)
+        503 Service Unavailable: One or more dependencies unhealthy
+        
+    Response time: < 1 second
+    """
+    from fastapi.responses import JSONResponse
+    from core.health_check import HealthCheckService
+    from core.redis_manager import get_redis_manager
+    from db.client import get_supabase_client
+    from services.qdrant_service import qdrant_service
+    
+    try:
+        # Create health check service
+        health_service = HealthCheckService(
+            redis_manager=get_redis_manager(),
+            supabase_client=get_supabase_client(),
+            qdrant_client=qdrant_service.async_client,
+        )
+        
+        # Perform comprehensive readiness check
+        result = await health_service.check_readiness()
+        
+        # Return 503 if not ready, 200 if ready
+        status_code = 200 if result.status.value == "ready" else 503
+        
+        return JSONResponse(
+            status_code=status_code,
+            content=result.to_dict(),
+        )
+    
+    except Exception as e:
+        logger.error(f"Readiness check failed with exception: {e}")
+        # Return 503 if readiness check fails
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "not_ready",
+                "error": f"Readiness check failed: {str(e)}",
+            },
+        )

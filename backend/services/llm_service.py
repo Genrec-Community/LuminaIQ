@@ -3,6 +3,7 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from config.settings import settings
 from typing import List, Dict, Any
 from utils.logger import logger
+import time
 
 
 class LLMService:
@@ -11,6 +12,19 @@ class LLMService:
         self.azure_api_key = settings.AZURE_OPENAI_API_KEY
         self.azure_deployment = settings.AZURE_OPENAI_DEPLOYMENT
         self.azure_api_version = settings.AZURE_OPENAI_API_VERSION
+        
+        # Telemetry service (lazy loaded to avoid circular imports)
+        self._telemetry = None
+    
+    def _get_telemetry(self):
+        """Lazy load telemetry service to avoid circular imports."""
+        if self._telemetry is None:
+            try:
+                from core.telemetry import get_telemetry_service
+                self._telemetry = get_telemetry_service()
+            except Exception as e:
+                logger.debug(f"Telemetry service not available: {e}")
+        return self._telemetry
     
     def _get_client(self, temperature: float = 0.7, max_tokens: int = 1000):
         """Create an Azure OpenAI client with specific settings"""
@@ -48,6 +62,9 @@ class LLMService:
         max_tokens: int = 1000
     ) -> str:
         """Generate chat completion"""
+        start_time = time.time()
+        success = False
+        
         try:
             # Create client with specific settings
             client = self._get_client(temperature=temperature, max_tokens=max_tokens)
@@ -64,6 +81,26 @@ class LLMService:
                 logger.warning(f"[LLMService] Empty response detected. Metadata: {getattr(response, 'response_metadata', 'No metadata')}")
 
             logger.info(f"Generated completion with {len(answer)} characters")
+            success = True
+            
+            # Track successful dependency
+            duration_ms = (time.time() - start_time) * 1000
+            telemetry = self._get_telemetry()
+            if telemetry:
+                telemetry.track_dependency(
+                    name=f"Azure OpenAI chat_completion",
+                    dependency_type="http",
+                    duration=duration_ms,
+                    success=True,
+                    properties={
+                        "operation": "chat_completion",
+                        "deployment": self.azure_deployment,
+                        "temperature": temperature,
+                        "max_tokens": max_tokens,
+                        "message_count": len(lc_messages),
+                        "response_length": len(answer)
+                    }
+                )
             
             return answer
             
@@ -71,6 +108,25 @@ class LLMService:
             logger.error(f"Error in chat completion: {str(e)}")
             import traceback
             logger.error(traceback.format_exc())
+            
+            # Track failed dependency
+            duration_ms = (time.time() - start_time) * 1000
+            telemetry = self._get_telemetry()
+            if telemetry:
+                telemetry.track_dependency(
+                    name=f"Azure OpenAI chat_completion",
+                    dependency_type="http",
+                    duration=duration_ms,
+                    success=False,
+                    properties={
+                        "operation": "chat_completion",
+                        "deployment": self.azure_deployment,
+                        "temperature": temperature,
+                        "max_tokens": max_tokens,
+                        "error": str(e)
+                    }
+                )
+            
             raise
     
     async def chat_completion_stream(

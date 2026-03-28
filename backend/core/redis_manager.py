@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import time
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
@@ -162,6 +163,9 @@ class RedisCacheManager:
         self._client: Optional[redis.Redis] = None
         self._is_available = False
         
+        # Telemetry service (lazy loaded to avoid circular imports)
+        self._telemetry = None
+        
         # Enhanced statistics tracking
         self._stats = {
             "hits": 0,
@@ -177,6 +181,16 @@ class RedisCacheManager:
                 "other": {"hits": 0, "misses": 0, "requests": 0},
             }
         }
+    
+    def _get_telemetry(self):
+        """Lazy load telemetry service to avoid circular imports."""
+        if self._telemetry is None:
+            try:
+                from core.telemetry import get_telemetry_service
+                self._telemetry = get_telemetry_service()
+            except Exception as e:
+                logger.debug(f"Telemetry service not available: {e}")
+        return self._telemetry
 
     async def connect(self) -> None:
         """
@@ -275,6 +289,11 @@ class RedisCacheManager:
             logger.debug("Redis unavailable, skipping operation")
             return None
         
+        # Track telemetry
+        operation_name = kwargs.pop('_telemetry_name', operation.__name__ if hasattr(operation, '__name__') else 'unknown')
+        start_time = time.time()
+        success = False
+        
         for attempt in range(1, self.retry_attempts + 1):
             try:
                 result = await operation(*args, **kwargs)
@@ -283,6 +302,24 @@ class RedisCacheManager:
                 if not self._is_available:
                     self._is_available = True
                     logger.info("Redis connection restored")
+                
+                success = True
+                duration_ms = (time.time() - start_time) * 1000
+                
+                # Track dependency telemetry
+                telemetry = self._get_telemetry()
+                if telemetry:
+                    telemetry.track_dependency(
+                        name=f"Redis {operation_name}",
+                        dependency_type="redis",
+                        duration=duration_ms,
+                        success=True,
+                        properties={
+                            "operation": operation_name,
+                            "host": self.host,
+                            "db": self.db
+                        }
+                    )
                 
                 return result
                 
@@ -300,11 +337,47 @@ class RedisCacheManager:
                         "Redis operation failed after all retries. "
                         "Operating in degraded mode."
                     )
+                    
+                    # Track failed dependency
+                    duration_ms = (time.time() - start_time) * 1000
+                    telemetry = self._get_telemetry()
+                    if telemetry:
+                        telemetry.track_dependency(
+                            name=f"Redis {operation_name}",
+                            dependency_type="redis",
+                            duration=duration_ms,
+                            success=False,
+                            properties={
+                                "operation": operation_name,
+                                "host": self.host,
+                                "db": self.db,
+                                "error": str(e)
+                            }
+                        )
+                    
                     return None
                     
             except RedisError as e:
                 logger.error(f"Redis error: {e}")
                 self._stats["errors"] += 1
+                
+                # Track failed dependency
+                duration_ms = (time.time() - start_time) * 1000
+                telemetry = self._get_telemetry()
+                if telemetry:
+                    telemetry.track_dependency(
+                        name=f"Redis {operation_name}",
+                        dependency_type="redis",
+                        duration=duration_ms,
+                        success=False,
+                        properties={
+                            "operation": operation_name,
+                            "host": self.host,
+                            "db": self.db,
+                            "error": str(e)
+                        }
+                    )
+                
                 return None
 
     async def get(self, key: str) -> Optional[str]:
@@ -323,7 +396,7 @@ class RedisCacheManager:
         cache_type = self._get_cache_type(key)
         self._stats["by_type"][cache_type]["requests"] += 1
         
-        result = await self._execute_with_retry(self._client.get, key)
+        result = await self._execute_with_retry(self._client.get, key, _telemetry_name="GET")
         
         if result is not None:
             self._stats["hits"] += 1
@@ -333,6 +406,10 @@ class RedisCacheManager:
             self._stats["misses"] += 1
             self._stats["by_type"][cache_type]["misses"] += 1
             logger.debug(f"Cache MISS: {key}")
+        
+        # Track cache hit rate every 100 requests
+        if self._stats["total_requests"] % 100 == 0:
+            self._track_cache_hit_rate_telemetry()
         
         return result
     
@@ -358,6 +435,48 @@ class RedisCacheManager:
             return "session"
         else:
             return "other"
+    
+    def _track_cache_hit_rate_telemetry(self) -> None:
+        """
+        Track cache hit rate to telemetry service.
+        
+        Sends overall hit rate and per-type hit rates to Application Insights.
+        """
+        telemetry = self._get_telemetry()
+        if not telemetry:
+            return
+        
+        try:
+            # Track overall hit rate
+            total = self._stats["total_requests"]
+            if total > 0:
+                overall_hit_rate = (self._stats["hits"] / total) * 100
+                telemetry.track_cache_hit_rate(
+                    hit_rate=overall_hit_rate,
+                    cache_type="overall",
+                    properties={
+                        "total_requests": total,
+                        "hits": self._stats["hits"],
+                        "misses": self._stats["misses"]
+                    }
+                )
+            
+            # Track per-type hit rates
+            for cache_type, type_stats in self._stats["by_type"].items():
+                type_total = type_stats["requests"]
+                if type_total > 0:
+                    type_hit_rate = (type_stats["hits"] / type_total) * 100
+                    telemetry.track_cache_hit_rate(
+                        hit_rate=type_hit_rate,
+                        cache_type=cache_type,
+                        properties={
+                            "total_requests": type_total,
+                            "hits": type_stats["hits"],
+                            "misses": type_stats["misses"]
+                        }
+                    )
+        except Exception as e:
+            logger.error(f"Failed to track cache hit rate telemetry: {e}")
 
     async def set(self, key: str, value: str, ttl: Optional[int] = None) -> bool:
         """
@@ -375,7 +494,8 @@ class RedisCacheManager:
             self._client.set,
             key,
             value,
-            ex=ttl
+            ex=ttl,
+            _telemetry_name="SET"
         )
         
         success = result is not None
@@ -394,7 +514,7 @@ class RedisCacheManager:
         Returns:
             True if key was deleted, False otherwise
         """
-        result = await self._execute_with_retry(self._client.delete, key)
+        result = await self._execute_with_retry(self._client.delete, key, _telemetry_name="DELETE")
         
         success = result is not None and result > 0
         if success:
@@ -412,7 +532,7 @@ class RedisCacheManager:
         Returns:
             True if key exists, False otherwise
         """
-        result = await self._execute_with_retry(self._client.exists, key)
+        result = await self._execute_with_retry(self._client.exists, key, _telemetry_name="EXISTS")
         return result is not None and result > 0
 
     async def get_many(self, keys: List[str]) -> Dict[str, str]:
@@ -435,7 +555,7 @@ class RedisCacheManager:
             cache_type = self._get_cache_type(key)
             self._stats["by_type"][cache_type]["requests"] += 1
         
-        values = await self._execute_with_retry(self._client.mget, keys)
+        values = await self._execute_with_retry(self._client.mget, keys, _telemetry_name="MGET")
         
         if values is None:
             self._stats["misses"] += len(keys)
@@ -508,7 +628,7 @@ class RedisCacheManager:
         Returns:
             New counter value, or 0 if Redis unavailable
         """
-        result = await self._execute_with_retry(self._client.incrby, key, amount)
+        result = await self._execute_with_retry(self._client.incrby, key, amount, _telemetry_name="INCRBY")
         return result if result is not None else 0
 
     async def expire(self, key: str, ttl: int) -> bool:
@@ -522,7 +642,7 @@ class RedisCacheManager:
         Returns:
             True if successful, False otherwise
         """
-        result = await self._execute_with_retry(self._client.expire, key, ttl)
+        result = await self._execute_with_retry(self._client.expire, key, ttl, _telemetry_name="EXPIRE")
         return result is not None and result > 0
 
     def get_stats(self) -> Dict[str, Any]:

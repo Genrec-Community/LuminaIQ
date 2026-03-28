@@ -230,20 +230,20 @@ This implementation plan transforms the LuminaIQ backend into a production-grade
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 12. Implement health check and readiness endpoints
-  - [ ] 12.1 Create health check service
+  - [x] 12.1 Create health check service
     - Create backend/core/health_check.py with HealthCheckService class
     - Implement check_health method (returns 200 OK if service running)
     - Implement check_readiness method (checks Redis, Supabase, Qdrant, Azure OpenAI)
     - Return 503 if any dependency unhealthy
     - _Requirements: 23.1, 23.2, 23.3, 23.4_
 
-  - [ ] 12.2 Add health check endpoints to API
+  - [x] 12.2 Add health check endpoints to API
     - Add GET /health endpoint to backend/main.py
     - Add GET /health/ready endpoint with dependency status details
     - Ensure response time < 1 second
     - _Requirements: 23.1, 23.2, 23.5_
 
-  - [ ] 12.3 Add cache status to health checks
+  - [x] 12.3 Add cache status to health checks
     - Include Redis cache status in readiness response
     - Show graceful degradation status when Redis unavailable
     - _Requirements: 29.5_
@@ -255,32 +255,32 @@ This implementation plan transforms the LuminaIQ backend into a production-grade
     - _Requirements: 23.1, 23.2, 23.3_
 
 - [ ] 13. Implement Azure Application Insights integration
-  - [ ] 13.1 Install and configure Application Insights SDK
+  - [x] 13.1 Install and configure Application Insights SDK
     - Add opencensus-ext-azure to requirements.txt
     - Create backend/core/telemetry.py with TelemetryService class
     - Initialize Azure exporter with instrumentation key
     - Configure trace sampling (10% success, 100% errors)
     - _Requirements: 20.1, 20.5, 22.5_
 
-  - [ ] 13.2 Add request telemetry middleware
+  - [x] 13.2 Add request telemetry middleware
     - Create middleware to track request duration, status code, endpoint
     - Include correlation_id, user_id, project_id in custom properties
     - Add cache_status property (HIT/MISS)
     - _Requirements: 20.1, 20.5_
 
-  - [ ] 13.3 Add exception telemetry handler
+  - [x] 13.3 Add exception telemetry handler
     - Create global exception handler to track exceptions
     - Include stack traces and context in telemetry
     - _Requirements: 20.2_
 
-  - [ ] 13.4 Add dependency telemetry for external calls
+  - [x] 13.4 Add dependency telemetry for external calls
     - Wrap Redis operations with dependency tracking
     - Wrap Supabase queries with dependency tracking
     - Wrap Qdrant searches with dependency tracking
     - Wrap LLM API calls with dependency tracking
     - _Requirements: 20.4_
 
-  - [ ] 13.5 Add custom metrics tracking
+  - [x] 13.5 Add custom metrics tracking
     - Track cache hit rate metric
     - Track job queue length metric
     - Track embedding throughput metric
@@ -293,7 +293,7 @@ This implementation plan transforms the LuminaIQ backend into a production-grade
     - _Requirements: 20.1, 20.2, 20.3_
 
 - [ ] 14. Implement structured logging with correlation IDs
-  - [ ] 14.1 Create structured logger with correlation ID support
+  - [x] 14.1 Create structured logger with correlation ID support
     - Modify backend/utils/logger.py to support JSON structured logging
     - Add correlation_id field to all log entries
     - Include timestamp, level, message, context fields
