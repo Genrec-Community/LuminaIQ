@@ -1,5 +1,6 @@
 import os
 import asyncio
+import json
 from typing import Optional, List
 from concurrent.futures import ThreadPoolExecutor
 from db.client import get_supabase_client, async_db
@@ -12,6 +13,7 @@ from utils.logger import logger
 from utils.embedding_queue import get_embedding_queue, EmbeddingJob, EmbeddingQueue
 from utils.progress_manager import get_progress_manager
 from utils.performance import PerformanceTracker
+from core.redis_manager import get_redis_manager
 
 
 class DocumentService:
@@ -27,6 +29,7 @@ class DocumentService:
     - Real-time SSE progress for frontend
     - Automatic temp file cleanup
     - Retry with exponential backoff for transient failures
+    - Document metadata caching with 6-hour TTL
     """
 
     def __init__(self):
@@ -41,6 +44,16 @@ class DocumentService:
         self._extraction_executor = ThreadPoolExecutor(
             max_workers=3, thread_name_prefix="file_extract"
         )
+        
+        # Initialize Redis cache manager for document metadata caching
+        try:
+            self.redis_manager = get_redis_manager()
+            self.cache_enabled = True
+            logger.info("Document metadata caching enabled")
+        except Exception as e:
+            logger.warning(f"Failed to initialize Redis for document caching: {e}")
+            self.redis_manager = None
+            self.cache_enabled = False
 
     async def process_document(
         self, document_id: str, project_id: str, file_path: str, filename: str
@@ -398,6 +411,49 @@ class DocumentService:
                 .eq("id", document_id)
                 .execute()
             )
+            
+            # Invalidate document cache when status changes
+            await self._invalidate_document_cache(document_id)
+            
+            # Invalidate vector search cache when document is completed
+            # New documents change the vector search results
+            if status == "completed" and self.cache_enabled:
+                try:
+                    doc_metadata = await self.get_document_metadata(document_id)
+                    if doc_metadata:
+                        project_id = doc_metadata.get("project_id")
+                        if project_id:
+                            from core.vector_cache import VectorSearchCache
+                            vector_cache = VectorSearchCache(self.redis_manager)
+                            await vector_cache.invalidate_project(project_id)
+                            logger.info(
+                                f"Invalidated vector search cache for project {project_id} "
+                                f"after document {document_id} completed"
+                            )
+                            
+                            # Invalidate query result caches (Requirement 16.3)
+                            await self._invalidate_query_result_caches(project_id)
+                except Exception as cache_err:
+                    logger.warning(f"Failed to invalidate vector search cache on document completion: {cache_err}")
+            
+            # Invalidate semantic query cache when document is completed
+            # New documents change the knowledge base, so cached RAG answers may be stale
+            if status == "completed" and self.cache_enabled:
+                try:
+                    # Get project_id for this document
+                    doc_metadata = await self.get_document_metadata(document_id)
+                    if doc_metadata:
+                        project_id = doc_metadata.get("project_id")
+                        if project_id:
+                            from core.semantic_cache import SemanticCacheService
+                            semantic_cache = SemanticCacheService(self.redis_manager)
+                            await semantic_cache.invalidate_project_cache(project_id)
+                            logger.info(
+                                f"Invalidated semantic cache for project {project_id} "
+                                f"after document {document_id} completed"
+                            )
+                except Exception as cache_err:
+                    logger.warning(f"Failed to invalidate semantic cache on document completion: {cache_err}")
 
         except Exception as e:
             logger.error(f"Error updating document status: {str(e)}")
@@ -435,10 +491,297 @@ class DocumentService:
                 .eq("id", document_id)
                 .execute()
             )
+            
+            # Invalidate document metadata cache
+            await self._invalidate_document_cache(document_id)
+            await self._invalidate_project_documents_cache(project_id)
+            
+            # Invalidate vector search cache for project
+            # Deleted documents change vector search results
+            if self.cache_enabled:
+                try:
+                    from core.vector_cache import VectorSearchCache
+                    vector_cache = VectorSearchCache(self.redis_manager)
+                    await vector_cache.invalidate_project(project_id)
+                    logger.info(
+                        f"Invalidated vector search cache for project {project_id} "
+                        f"after document {document_id} deleted"
+                    )
+                    
+                    # Invalidate query result caches (Requirement 16.3)
+                    await self._invalidate_query_result_caches(project_id)
+                except Exception as cache_err:
+                    logger.warning(f"Failed to invalidate vector search cache on document deletion: {cache_err}")
+            
+            # Invalidate semantic query cache for project
+            try:
+                from core.semantic_cache import SemanticCacheService
+                semantic_cache = SemanticCacheService(self.redis_manager)
+                await semantic_cache.invalidate_project_cache(project_id)
+            except Exception as cache_err:
+                logger.warning(f"Failed to invalidate semantic cache: {cache_err}")
+            
             logger.info(f"Deleted document {document_id} from project {project_id}")
         except Exception as e:
             logger.error(f"Error deleting document: {str(e)}")
             raise
+    
+    async def get_document_metadata(self, document_id: str) -> Optional[dict]:
+        """
+        Get document metadata with caching.
+        
+        Checks Redis cache first, falls back to database if not found.
+        Caches result with 6-hour TTL.
+        
+        Args:
+            document_id: Document identifier
+            
+        Returns:
+            Document metadata dict or None if not found
+        """
+        # Try cache first
+        if self.cache_enabled:
+            cache_key = f"doc:{document_id}"
+            cached_data = await self.redis_manager.get(cache_key)
+            
+            if cached_data:
+                try:
+                    metadata = json.loads(cached_data)
+                    logger.debug(f"Document metadata cache HIT for {document_id}")
+                    return metadata
+                except json.JSONDecodeError:
+                    logger.warning(f"Failed to decode cached document metadata for {document_id}")
+        
+        # Cache miss - query database
+        try:
+            result = await async_db(
+                lambda: self.client.table("documents")
+                .select("id, filename, project_id, topics, upload_status, created_at")
+                .eq("id", document_id)
+                .execute()
+            )
+            
+            if not result.data:
+                return None
+            
+            metadata = result.data[0]
+            
+            # Cache the result
+            if self.cache_enabled:
+                cache_key = f"doc:{document_id}"
+                await self.redis_manager.set(
+                    cache_key,
+                    json.dumps(metadata),
+                    ttl=21600  # 6 hours
+                )
+                logger.debug(f"Cached document metadata for {document_id}")
+            
+            return metadata
+            
+        except Exception as e:
+            logger.error(f"Error fetching document metadata: {e}")
+            return None
+    
+    async def get_documents_metadata_batch(self, document_ids: List[str]) -> dict:
+        """
+        Get metadata for multiple documents in a single operation.
+        
+        Uses batch cache retrieval for efficiency.
+        
+        Args:
+            document_ids: List of document identifiers
+            
+        Returns:
+            Dictionary mapping document_id to metadata
+        """
+        if not document_ids:
+            return {}
+        
+        result = {}
+        uncached_ids = []
+        
+        # Try to get from cache first
+        if self.cache_enabled:
+            cache_keys = [f"doc:{doc_id}" for doc_id in document_ids]
+            cached_data = await self.redis_manager.get_many(cache_keys)
+            
+            for doc_id, cache_key in zip(document_ids, cache_keys):
+                if cache_key in cached_data:
+                    try:
+                        metadata = json.loads(cached_data[cache_key])
+                        result[doc_id] = metadata
+                    except json.JSONDecodeError:
+                        uncached_ids.append(doc_id)
+                else:
+                    uncached_ids.append(doc_id)
+            
+            logger.debug(
+                f"Document metadata batch: {len(result)}/{len(document_ids)} from cache, "
+                f"{len(uncached_ids)} from database"
+            )
+        else:
+            uncached_ids = document_ids
+        
+        # Fetch uncached documents from database
+        if uncached_ids:
+            try:
+                db_result = await async_db(
+                    lambda: self.client.table("documents")
+                    .select("id, filename, project_id, topics, upload_status, created_at")
+                    .in_("id", uncached_ids)
+                    .execute()
+                )
+                
+                # Cache the results
+                if self.cache_enabled and db_result.data:
+                    cache_items = {}
+                    for doc in db_result.data:
+                        doc_id = doc["id"]
+                        result[doc_id] = doc
+                        cache_key = f"doc:{doc_id}"
+                        cache_items[cache_key] = json.dumps(doc)
+                    
+                    await self.redis_manager.set_many(cache_items, ttl=21600)  # 6 hours
+                else:
+                    for doc in db_result.data:
+                        result[doc["id"]] = doc
+                        
+            except Exception as e:
+                logger.error(f"Error fetching documents metadata batch: {e}")
+        
+        return result
+    
+    async def get_project_documents(self, project_id: str) -> List[dict]:
+        """
+        Get all documents for a project with caching.
+        
+        Args:
+            project_id: Project identifier
+            
+        Returns:
+            List of document metadata dicts
+        """
+        # Try cache first
+        if self.cache_enabled:
+            cache_key = f"docs:{project_id}"
+            cached_data = await self.redis_manager.get(cache_key)
+            
+            if cached_data:
+                try:
+                    documents = json.loads(cached_data)
+                    logger.debug(f"Project documents cache HIT for {project_id}")
+                    return documents
+                except json.JSONDecodeError:
+                    logger.warning(f"Failed to decode cached project documents for {project_id}")
+        
+        # Cache miss - query database
+        try:
+            result = await async_db(
+                lambda: self.client.table("documents")
+                .select("id, filename, project_id, topics, upload_status, created_at")
+                .eq("project_id", project_id)
+                .execute()
+            )
+            
+            documents = result.data or []
+            
+            # Cache the result
+            if self.cache_enabled:
+                cache_key = f"docs:{project_id}"
+                await self.redis_manager.set(
+                    cache_key,
+                    json.dumps(documents),
+                    ttl=21600  # 6 hours
+                )
+                logger.debug(f"Cached project documents for {project_id}")
+            
+            return documents
+            
+        except Exception as e:
+            logger.error(f"Error fetching project documents: {e}")
+            return []
+    
+    async def _invalidate_document_cache(self, document_id: str) -> None:
+        """
+        Invalidate cache for a specific document.
+        
+        Args:
+            document_id: Document identifier
+        """
+        if self.cache_enabled:
+            cache_key = f"doc:{document_id}"
+            await self.redis_manager.delete(cache_key)
+            logger.debug(f"Invalidated document cache for {document_id}")
+    
+    async def _invalidate_project_documents_cache(self, project_id: str) -> None:
+        """
+        Invalidate cache for project documents list.
+        
+        Args:
+            project_id: Project identifier
+        """
+        if self.cache_enabled:
+            cache_key = f"docs:{project_id}"
+            await self.redis_manager.delete(cache_key)
+            logger.debug(f"Invalidated project documents cache for {project_id}")
+    
+    async def _invalidate_query_result_caches(self, project_id: str) -> None:
+        """
+        Invalidate query result caches for a project.
+        
+        This invalidates caches for endpoints like:
+        - GET /api/v1/documents/{project_id}
+        - GET /api/v1/mcq/topics/{project_id}
+        
+        Args:
+            project_id: Project identifier
+        """
+        if self.cache_enabled:
+            # Invalidate documents list cache (Requirement 16.3)
+            documents_cache_key = f"query:documents:{project_id}"
+            await self.redis_manager.delete(documents_cache_key)
+            
+            # Invalidate topics list cache (Requirement 16.3)
+            topics_cache_key = f"query:topics:{project_id}"
+            await self.redis_manager.delete(topics_cache_key)
+            
+            logger.debug(f"Invalidated query result caches for project {project_id}")
+    
+    async def warm_cache_for_projects(self, project_ids: List[str]) -> None:
+        """
+        Preload document metadata for multiple projects into cache.
+        
+        This is called on application startup to warm the cache.
+        
+        Args:
+            project_ids: List of project identifiers to warm cache for
+        """
+        if not self.cache_enabled:
+            logger.info("Cache warming skipped - caching disabled")
+            return
+        
+        logger.info(f"Warming document metadata cache for {len(project_ids)} projects")
+        
+        for project_id in project_ids:
+            try:
+                # Fetch and cache project documents
+                documents = await self.get_project_documents(project_id)
+                
+                # Also cache individual document metadata
+                if documents:
+                    cache_items = {}
+                    for doc in documents:
+                        cache_key = f"doc:{doc['id']}"
+                        cache_items[cache_key] = json.dumps(doc)
+                    
+                    await self.redis_manager.set_many(cache_items, ttl=21600)
+                
+                logger.debug(f"Warmed cache for project {project_id}: {len(documents)} documents")
+                
+            except Exception as e:
+                logger.error(f"Error warming cache for project {project_id}: {e}")
+        
+        logger.info("Document metadata cache warming completed")
 
     async def process_chunks_direct(
         self, document_id: str, project_id: str, filename: str, chunks: List[str]

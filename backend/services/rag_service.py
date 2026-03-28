@@ -7,6 +7,8 @@ from db.client import get_supabase_client
 from config.settings import settings
 from utils.logger import logger
 from utils.performance import PerformanceTracker
+from core.redis_manager import get_redis_manager
+from core.semantic_cache import SemanticCacheService
 
 # LangChain Imports
 from langchain_qdrant import QdrantVectorStore
@@ -64,6 +66,18 @@ class RAGService:
             api_version=settings.AZURE_OPENAI_API_VERSION,
             temperature=0.1,  # Lower temperature for strict factuality and less hallucination
         )
+        
+        # Initialize semantic cache service
+        try:
+            redis_manager = get_redis_manager()
+            self.semantic_cache = SemanticCacheService(
+                redis_manager=redis_manager,
+                similarity_threshold=0.95
+            )
+            logger.info("Semantic cache service initialized")
+        except Exception as e:
+            logger.warning(f"Failed to initialize semantic cache: {e}. Operating without semantic caching.")
+            self.semantic_cache = None
 
     def _get_retrieval_chain(
         self, collection_name: str, selected_documents: Optional[List[str]] = None
@@ -205,8 +219,56 @@ Context:
         selected_documents: Optional[List[str]] = None,
         chat_history: List[Dict[str, str]] = [],
     ) -> Dict[str, Any]:
-        """Generate answer using RAG pipeline (LangChain) with retry logic"""
+        """Generate answer using RAG pipeline (LangChain) with retry logic and semantic caching"""
         try:
+            perf = PerformanceTracker()
+            perf.start("total_rag_pipeline")
+            
+            # Check semantic cache first
+            cache_hit = False
+            similarity_score = None
+            
+            if self.semantic_cache:
+                perf.start("semantic_cache_check")
+                
+                # Generate query embedding for cache lookup
+                query_embedding = await embedding_service.generate_embeddings([question])
+                query_embedding = query_embedding[0] if query_embedding else None
+                
+                if query_embedding:
+                    cached_response = await self.semantic_cache.get_cached_response(
+                        project_id=project_id,
+                        query=question,
+                        query_embedding=query_embedding
+                    )
+                    
+                    if cached_response:
+                        cache_hit = True
+                        similarity_score = 1.0  # Exact match or above threshold
+                        
+                        perf.stop("semantic_cache_check")
+                        perf.stop("total_rag_pipeline")
+                        
+                        logger.info(
+                            f"Semantic cache HIT for project {project_id}, "
+                            f"returning cached answer in {perf.get_duration('total_rag_pipeline'):.2f}ms"
+                        )
+                        
+                        return {
+                            "answer": cached_response.answer,
+                            "sources": cached_response.sources,
+                            "cache_metadata": {
+                                "cached": True,
+                                "cached_at": cached_response.cached_at,
+                                "similarity_score": similarity_score,
+                                "hit_count": cached_response.hit_count
+                            }
+                        }
+                
+                perf.stop("semantic_cache_check")
+                logger.debug(f"Semantic cache MISS for project {project_id}, executing RAG pipeline")
+            
+            # Cache miss - execute full RAG pipeline
             collection_name = f"project_{project_id}"
             chain = self._get_retrieval_chain(collection_name, selected_documents)
 
@@ -219,7 +281,6 @@ Context:
                     history_messages.append(AIMessage(content=msg["content"]))
 
             # Invoke with retry logic
-            perf = PerformanceTracker()
             perf.start("qdrant_and_llm_chain")
             async def invoke_chain():
                 return await chain.ainvoke(
@@ -230,7 +291,6 @@ Context:
                 invoke_chain, max_retries=3, base_delay=1.5
             )
             perf.stop("qdrant_and_llm_chain")
-            perf.log_total(logger)
 
             # Process sources from 'context' in response
             sources = []
@@ -268,8 +328,32 @@ Context:
                             "page": doc.metadata.get("page"),
                         }
                     )
+            
+            answer = response["answer"]
+            
+            # Cache the response for future queries
+            if self.semantic_cache and query_embedding:
+                perf.start("semantic_cache_store")
+                await self.semantic_cache.cache_response(
+                    project_id=project_id,
+                    query=question,
+                    query_embedding=query_embedding,
+                    answer=answer,
+                    sources=sources
+                )
+                perf.stop("semantic_cache_store")
+            
+            perf.stop("total_rag_pipeline")
+            perf.log_total(logger)
 
-            return {"answer": response["answer"], "sources": sources}
+            return {
+                "answer": answer,
+                "sources": sources,
+                "cache_metadata": {
+                    "cached": False,
+                    "similarity_score": None
+                }
+            }
 
         except Exception as e:
             logger.error(f"Error in RAG pipeline: {str(e)}")

@@ -105,6 +105,21 @@ Return ONLY a valid JSON array of topic strings:
                     "id", document_id
                 ).execute())
                 logger.info(f"Generated {len(topics)} topics for doc {document_id}")
+                
+                # Invalidate document metadata cache when topics are updated
+                try:
+                    from core.redis_manager import get_redis_manager
+                    redis_manager = get_redis_manager()
+                    cache_key = f"doc:{document_id}"
+                    await redis_manager.delete(cache_key)
+                    logger.debug(f"Invalidated document cache for {document_id} after topic update")
+                    
+                    # Also invalidate project documents cache
+                    project_cache_key = f"docs:{project_id}"
+                    await redis_manager.delete(project_cache_key)
+                    logger.debug(f"Invalidated project documents cache for {project_id}")
+                except Exception as cache_err:
+                    logger.warning(f"Failed to invalidate document cache after topic update: {cache_err}")
             else:
                 logger.warning(f"No topics generated for doc {document_id}")
 

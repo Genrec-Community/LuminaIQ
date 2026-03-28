@@ -462,16 +462,52 @@ async def build_knowledge_graph(
     - subtopic: Topic A is a broader category containing Topic B
 
     DSA: Adjacency List graph representation
+    
+    **Validates: Requirements 12.2, 12.3, 12.5**
+    - Acquires distributed lock before building
+    - Returns 409 Conflict if lock cannot be acquired within 5 seconds
+    - Lock TTL set to 5 minutes for auto-expiration
     """
     try:
-        result = await knowledge_graph.build_graph_from_topics(
-            project_id=project_id,
-            topics=request.topics,
-            force_rebuild=request.force_rebuild,
+        # Get lock manager
+        from core.redis_manager import get_redis_manager
+        from core.lock_manager import DistributedLockManager
+        
+        redis_manager = get_redis_manager()
+        lock_manager = DistributedLockManager(redis_manager)
+        
+        # Try to acquire lock for this project's knowledge graph build
+        resource_id = f"kg_build:{project_id}"
+        lock_token = await lock_manager.acquire_lock(
+            resource_id=resource_id,
+            timeout=5,  # 5 seconds timeout (Requirement 12.3)
+            ttl=300     # 5 minutes TTL (Requirement 12.5)
         )
+        
+        if lock_token is None:
+            # Lock could not be acquired - another build is in progress
+            raise HTTPException(
+                status_code=409,
+                detail="Knowledge graph build already in progress for this project. Please try again later."
+            )
+        
+        try:
+            # Build the knowledge graph with lock held
+            result = await knowledge_graph.build_graph_from_topics(
+                project_id=project_id,
+                topics=request.topics,
+                force_rebuild=request.force_rebuild,
+            )
+            
+            return result
+            
+        finally:
+            # Always release the lock, even if build fails
+            await lock_manager.release_lock(resource_id, lock_token)
 
-        return result
-
+    except HTTPException:
+        # Re-raise HTTP exceptions (like 409 Conflict)
+        raise
     except Exception as e:
         logger.error(f"Error building knowledge graph: {e}")
         raise HTTPException(500, str(e))

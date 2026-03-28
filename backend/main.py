@@ -4,6 +4,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from api.v1.api import api_router
 from config.settings import settings
 from utils.logger import setup_uvicorn_log_filter, logger
+from middleware.rate_limit import RateLimitMiddleware
 import asyncio
 
 app = FastAPI(
@@ -24,22 +25,78 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Rate limiting middleware
+app.add_middleware(RateLimitMiddleware)
+
 
 @app.on_event("startup")
 async def startup_event():
     """Initialize on startup"""
     # Apply log filter to reduce noisy HTTP logs
     setup_uvicorn_log_filter()
+    
+    # Initialize Redis cache manager
+    try:
+        from core.redis_manager import initialize_redis_manager, get_redis_manager
+        redis_manager = initialize_redis_manager()
+        await redis_manager.connect()
+        logger.info("Redis cache manager initialized successfully")
+        
+        # Inject Redis manager into embedding service
+        try:
+            from services.embedding_service import embedding_service
+            embedding_service.redis_manager = get_redis_manager()
+            logger.info("Redis manager injected into embedding service")
+        except Exception as e:
+            logger.warning(f"Failed to inject Redis manager into embedding service: {e}")
+        
+        # Warm cache with top 10 active projects
+        try:
+            from core.vector_cache import VectorSearchCache
+            vector_cache = VectorSearchCache(redis_manager)
+            warming_result = await vector_cache.warm_cache()
+            
+            if warming_result.get("success"):
+                logger.info(
+                    f"Cache warming completed successfully: "
+                    f"{warming_result.get('projects_warmed', 0)} projects, "
+                    f"{warming_result.get('documents_cached', 0)} documents, "
+                    f"{warming_result.get('topics_cached', 0)} topics, "
+                    f"{warming_result.get('knowledge_graphs_cached', 0)} knowledge graphs "
+                    f"in {warming_result.get('duration_seconds', 0)}s"
+                )
+            else:
+                logger.warning(
+                    f"Cache warming failed: {warming_result.get('error', 'unknown error')}"
+                )
+        except Exception as e:
+            logger.warning(f"Cache warming failed: {e}")
+            logger.info("Application will continue without cache warming")
+            
+    except Exception as e:
+        logger.error(f"Failed to initialize Redis cache manager: {e}")
+        logger.warning("Application will continue without Redis caching")
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Clean up resources on shutdown"""
+    # Shutdown Redis manager
+    try:
+        from core.redis_manager import shutdown_redis_manager
+        await shutdown_redis_manager()
+        logger.info("Redis manager shutdown complete")
+    except Exception as e:
+        logger.error(f"Error shutting down Redis manager: {e}")
+    
+    # Shutdown embedding service
     try:
         from services.embedding_service import embedding_service
         embedding_service.shutdown()
     except Exception:
         pass
+    
+    # Stop embedding queue
     try:
         from utils.embedding_queue import get_embedding_queue
         queue = get_embedding_queue()
