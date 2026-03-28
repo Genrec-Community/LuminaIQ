@@ -31,6 +31,130 @@ import {
 import { useSettings } from '../context/SettingsContext';
 import { useGamification } from '../context/GamificationContext';
 
+// --- Reusable Components (defined outside to maintain stable identity) ---
+
+const ToggleSwitch = ({ enabled, onChange, label, description, icon: Icon, comingSoon = false }) => (
+    <div className={`flex items-center justify-between p-4 bg-white rounded-2xl border border-[#E6D5CC]/80 hover:border-[#C8A288]/50 transition-all group ${comingSoon ? 'opacity-70' : ''}`}>
+        <div className="flex items-center gap-3.5 min-w-0">
+            <div className="h-10 w-10 bg-[#FDF6F0] rounded-xl flex items-center justify-center shrink-0 group-hover:bg-[#C8A288]/10 transition-colors">
+                <Icon className="h-5 w-5 text-[#C8A288]" />
+            </div>
+            <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                    <p className="font-semibold text-[#4A3B32] text-sm">{label}</p>
+                    {comingSoon && (
+                        <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[9px] font-bold rounded-full uppercase tracking-wider">Soon</span>
+                    )}
+                </div>
+                <p className="text-xs text-[#8a6a5c] mt-0.5 leading-relaxed">{description}</p>
+            </div>
+        </div>
+        <button
+            onClick={() => !comingSoon && onChange(!enabled)}
+            disabled={comingSoon}
+            className={`relative w-12 h-7 rounded-full transition-all shrink-0 ml-3 ${
+                comingSoon ? 'bg-gray-200 cursor-not-allowed' :
+                enabled ? 'bg-[#C8A288] shadow-inner' : 'bg-[#E6D5CC]'
+            }`}
+        >
+            <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-transform ${
+                enabled && !comingSoon ? 'translate-x-[22px]' : 'translate-x-0.5'
+            }`}>
+                {enabled && !comingSoon && <Check className="h-3.5 w-3.5 text-[#C8A288] m-[5px]" />}
+            </div>
+        </button>
+    </div>
+);
+
+const SelectOption = ({ value, onChange, label, description, icon: Icon, options }) => (
+    <div className="p-4 bg-white rounded-2xl border border-[#E6D5CC]/80">
+        <div className="flex items-center gap-3.5 mb-3">
+            <div className="h-10 w-10 bg-[#FDF6F0] rounded-xl flex items-center justify-center shrink-0">
+                <Icon className="h-5 w-5 text-[#C8A288]" />
+            </div>
+            <div>
+                <p className="font-semibold text-[#4A3B32] text-sm">{label}</p>
+                <p className="text-xs text-[#8a6a5c] mt-0.5">{description}</p>
+            </div>
+        </div>
+        <select
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-full px-4 py-2.5 bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl focus:ring-2 focus:ring-[#C8A288] focus:border-transparent outline-none text-[#4A3B32] font-medium text-sm cursor-pointer"
+        >
+            {options.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+        </select>
+    </div>
+);
+
+const NumberInput = ({ value, onChange, label, description, icon: Icon, min, max, suffix }) => (
+    <div className="p-4 bg-white rounded-2xl border border-[#E6D5CC]/80">
+        <div className="flex items-center gap-3.5">
+            <div className="h-10 w-10 bg-[#FDF6F0] rounded-xl flex items-center justify-center shrink-0">
+                <Icon className="h-5 w-5 text-[#C8A288]" />
+            </div>
+            <div className="flex-1 min-w-0">
+                <p className="font-semibold text-[#4A3B32] text-sm">{label}</p>
+                <p className="text-xs text-[#8a6a5c] mt-0.5">{description}</p>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                    onClick={() => onChange(Math.max(min, value - 5))}
+                    className="h-8 w-8 bg-[#FDF6F0] rounded-lg flex items-center justify-center text-[#4A3B32] hover:bg-[#E6D5CC] transition-colors font-bold text-lg"
+                >
+                    -
+                </button>
+                <span className="w-14 text-center font-bold text-[#4A3B32] text-sm tabular-nums">
+                    {value}{suffix}
+                </span>
+                <button
+                    onClick={() => onChange(Math.min(max, value + 5))}
+                    className="h-8 w-8 bg-[#FDF6F0] rounded-lg flex items-center justify-center text-[#4A3B32] hover:bg-[#E6D5CC] transition-colors font-bold text-lg"
+                >
+                    +
+                </button>
+            </div>
+        </div>
+    </div>
+);
+
+const TextInput = ({ value, onChange, label, description, icon: Icon, placeholder }) => (
+    <div className="p-4 bg-white rounded-2xl border border-[#E6D5CC]/80">
+        <div className="flex items-center gap-3.5 mb-3">
+            <div className="h-10 w-10 bg-[#FDF6F0] rounded-xl flex items-center justify-center shrink-0">
+                <Icon className="h-5 w-5 text-[#C8A288]" />
+            </div>
+            <div>
+                <p className="font-semibold text-[#4A3B32] text-sm">{label}</p>
+                <p className="text-xs text-[#8a6a5c] mt-0.5">{description}</p>
+            </div>
+        </div>
+        <input
+            type="text"
+            value={value || ''}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={placeholder}
+            className="w-full px-4 py-2.5 bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl focus:ring-2 focus:ring-[#C8A288] focus:border-transparent outline-none text-[#4A3B32] font-medium text-sm placeholder-[#8a6a5c]/40"
+        />
+    </div>
+);
+
+const SectionHeader = ({ icon: Icon, title, subtitle }) => (
+    <div className="flex items-center gap-3 mb-5">
+        <div className="h-9 w-9 bg-gradient-to-br from-[#C8A288] to-[#A08072] rounded-xl flex items-center justify-center shadow-sm">
+            <Icon className="h-4.5 w-4.5 text-white" />
+        </div>
+        <div>
+            <h2 className="text-base font-bold text-[#4A3B32]">{title}</h2>
+            {subtitle && <p className="text-xs text-[#8a6a5c] mt-0.5">{subtitle}</p>}
+        </div>
+    </div>
+);
+
+// --- Main Settings Component ---
+
 const Settings = () => {
     const navigate = useNavigate();
     const { settings, updateSetting, resetSettings } = useSettings();
@@ -45,130 +169,6 @@ const Settings = () => {
         { id: 'appearance', label: 'Display', icon: Sun },
         { id: 'notifications', label: 'Alerts', icon: Bell },
     ];
-
-    // --- Reusable Components ---
-
-    const ToggleSwitch = ({ enabled, onChange, label, description, icon: Icon, comingSoon = false }) => (
-        <div className={`flex items-center justify-between p-4 bg-white rounded-2xl border border-[#E6D5CC]/80 hover:border-[#C8A288]/50 transition-all group ${comingSoon ? 'opacity-70' : ''}`}>
-            <div className="flex items-center gap-3.5 min-w-0">
-                <div className="h-10 w-10 bg-[#FDF6F0] rounded-xl flex items-center justify-center shrink-0 group-hover:bg-[#C8A288]/10 transition-colors">
-                    <Icon className="h-5 w-5 text-[#C8A288]" />
-                </div>
-                <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                        <p className="font-semibold text-[#4A3B32] text-sm">{label}</p>
-                        {comingSoon && (
-                            <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[9px] font-bold rounded-full uppercase tracking-wider">Soon</span>
-                        )}
-                    </div>
-                    <p className="text-xs text-[#8a6a5c] mt-0.5 leading-relaxed">{description}</p>
-                </div>
-            </div>
-            <button
-                onClick={() => !comingSoon && onChange(!enabled)}
-                disabled={comingSoon}
-                className={`relative w-12 h-7 rounded-full transition-all shrink-0 ml-3 ${
-                    comingSoon ? 'bg-gray-200 cursor-not-allowed' :
-                    enabled ? 'bg-[#C8A288] shadow-inner' : 'bg-[#E6D5CC]'
-                }`}
-            >
-                <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-transform ${
-                    enabled && !comingSoon ? 'translate-x-[22px]' : 'translate-x-0.5'
-                }`}>
-                    {enabled && !comingSoon && <Check className="h-3.5 w-3.5 text-[#C8A288] m-[5px]" />}
-                </div>
-            </button>
-        </div>
-    );
-
-    const SelectOption = ({ value, onChange, label, description, icon: Icon, options }) => (
-        <div className="p-4 bg-white rounded-2xl border border-[#E6D5CC]/80">
-            <div className="flex items-center gap-3.5 mb-3">
-                <div className="h-10 w-10 bg-[#FDF6F0] rounded-xl flex items-center justify-center shrink-0">
-                    <Icon className="h-5 w-5 text-[#C8A288]" />
-                </div>
-                <div>
-                    <p className="font-semibold text-[#4A3B32] text-sm">{label}</p>
-                    <p className="text-xs text-[#8a6a5c] mt-0.5">{description}</p>
-                </div>
-            </div>
-            <select
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                className="w-full px-4 py-2.5 bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl focus:ring-2 focus:ring-[#C8A288] focus:border-transparent outline-none text-[#4A3B32] font-medium text-sm cursor-pointer"
-            >
-                {options.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-            </select>
-        </div>
-    );
-
-    const NumberInput = ({ value, onChange, label, description, icon: Icon, min, max, suffix }) => (
-        <div className="p-4 bg-white rounded-2xl border border-[#E6D5CC]/80">
-            <div className="flex items-center gap-3.5">
-                <div className="h-10 w-10 bg-[#FDF6F0] rounded-xl flex items-center justify-center shrink-0">
-                    <Icon className="h-5 w-5 text-[#C8A288]" />
-                </div>
-                <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-[#4A3B32] text-sm">{label}</p>
-                    <p className="text-xs text-[#8a6a5c] mt-0.5">{description}</p>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                        onClick={() => onChange(Math.max(min, value - 5))}
-                        className="h-8 w-8 bg-[#FDF6F0] rounded-lg flex items-center justify-center text-[#4A3B32] hover:bg-[#E6D5CC] transition-colors font-bold text-lg"
-                    >
-                        -
-                    </button>
-                    <span className="w-14 text-center font-bold text-[#4A3B32] text-sm tabular-nums">
-                        {value}{suffix}
-                    </span>
-                    <button
-                        onClick={() => onChange(Math.min(max, value + 5))}
-                        className="h-8 w-8 bg-[#FDF6F0] rounded-lg flex items-center justify-center text-[#4A3B32] hover:bg-[#E6D5CC] transition-colors font-bold text-lg"
-                    >
-                        +
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-
-    const TextInput = ({ value, onChange, label, description, icon: Icon, placeholder }) => (
-        <div className="p-4 bg-white rounded-2xl border border-[#E6D5CC]/80">
-            <div className="flex items-center gap-3.5 mb-3">
-                <div className="h-10 w-10 bg-[#FDF6F0] rounded-xl flex items-center justify-center shrink-0">
-                    <Icon className="h-5 w-5 text-[#C8A288]" />
-                </div>
-                <div>
-                    <p className="font-semibold text-[#4A3B32] text-sm">{label}</p>
-                    <p className="text-xs text-[#8a6a5c] mt-0.5">{description}</p>
-                </div>
-            </div>
-            <input
-                type="text"
-                value={value || ''}
-                onChange={(e) => onChange(e.target.value)}
-                placeholder={placeholder}
-                className="w-full px-4 py-2.5 bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl focus:ring-2 focus:ring-[#C8A288] focus:border-transparent outline-none text-[#4A3B32] font-medium text-sm placeholder-[#8a6a5c]/40"
-            />
-        </div>
-    );
-
-    const SectionHeader = ({ icon: Icon, title, subtitle }) => (
-        <div className="flex items-center gap-3 mb-5">
-            <div className="h-9 w-9 bg-gradient-to-br from-[#C8A288] to-[#A08072] rounded-xl flex items-center justify-center shadow-sm">
-                <Icon className="h-4.5 w-4.5 text-white" />
-            </div>
-            <div>
-                <h2 className="text-base font-bold text-[#4A3B32]">{title}</h2>
-                {subtitle && <p className="text-xs text-[#8a6a5c] mt-0.5">{subtitle}</p>}
-            </div>
-        </div>
-    );
-
-    // --- Section Renderers ---
 
     const renderProfile = () => (
         <div className="space-y-5">

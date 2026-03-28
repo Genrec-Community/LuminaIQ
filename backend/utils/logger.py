@@ -48,7 +48,7 @@ class EndpointFilter(logging.Filter):
         message = record.getMessage()
         for pattern in self.FILTER_PATTERNS:
             if pattern in message:
-                return False
+                return True
         return True
 
 
