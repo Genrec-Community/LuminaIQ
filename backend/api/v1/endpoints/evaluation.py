@@ -8,7 +8,6 @@ from models.schemas import (
     SubjectiveTestSubmitRequest,
     SubjectiveTestResult,
 )
-from typing import Any, List, Dict
 from api.deps import get_current_user
 
 router = APIRouter()

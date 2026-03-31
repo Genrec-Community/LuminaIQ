@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
-from typing import Any, List
+from typing import Any
 from services.notes_service import notes_service
-from models.schemas import NotesGenerateRequest, NotesGenerateResponse
+from models.schemas import NotesGenerateRequest
 from api.deps import get_current_user
 
 router = APIRouter()

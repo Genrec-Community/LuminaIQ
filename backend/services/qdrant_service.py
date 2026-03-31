@@ -7,7 +7,6 @@ from qdrant_client.models import (
     Filter,
     FieldCondition,
     MatchValue,
-    Range,
     PayloadSchemaType,
 )
 from config.settings import settings
@@ -169,7 +168,7 @@ class QdrantService:
                 telemetry = self._get_telemetry()
                 if telemetry:
                     telemetry.track_dependency(
-                        name=f"Qdrant upsert",
+                        name="Qdrant upsert",
                         dependency_type="qdrant",
                         duration=duration_ms,
                         success=True,
@@ -213,7 +212,7 @@ class QdrantService:
                     telemetry = self._get_telemetry()
                     if telemetry:
                         telemetry.track_dependency(
-                            name=f"Qdrant upsert",
+                            name="Qdrant upsert",
                             dependency_type="qdrant",
                             duration=duration_ms,
                             success=False,
@@ -305,7 +304,7 @@ class QdrantService:
             telemetry = self._get_telemetry()
             if telemetry:
                 telemetry.track_dependency(
-                    name=f"Qdrant search",
+                    name="Qdrant search",
                     dependency_type="qdrant",
                     duration=duration_ms,
                     success=True,
@@ -330,7 +329,7 @@ class QdrantService:
                 telemetry = self._get_telemetry()
                 if telemetry:
                     telemetry.track_dependency(
-                        name=f"Qdrant search",
+                        name="Qdrant search",
                         dependency_type="qdrant",
                         duration=duration_ms,
                         success=True,
@@ -352,7 +351,7 @@ class QdrantService:
             telemetry = self._get_telemetry()
             if telemetry:
                 telemetry.track_dependency(
-                    name=f"Qdrant search",
+                    name="Qdrant search",
                     dependency_type="qdrant",
                     duration=duration_ms,
                     success=False,

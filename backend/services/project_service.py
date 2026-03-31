@@ -1,8 +1,6 @@
 from db.client import get_supabase_client
-from config.settings import settings
 from utils.logger import logger
 from typing import List, Dict, Any, Optional
-from uuid import uuid4
 
 class ProjectService:
     def __init__(self):

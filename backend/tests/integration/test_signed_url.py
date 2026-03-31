@@ -2,7 +2,6 @@
 
 import pytest
 from db.client import get_supabase_client
-from config.settings import settings
 
 
 @pytest.mark.integration
@@ -26,7 +25,7 @@ def test_signed_url_generation():
     # Check for expected keys
     if "signedURL" in result:
         assert result["signedURL"], "Signed URL should not be empty"
-        print(f"✓ Signed URL generated successfully")
+        print("✓ Signed URL generated successfully")
     elif "error" in result:
         pytest.skip(f"Supabase storage error: {result['error']}")
     else:

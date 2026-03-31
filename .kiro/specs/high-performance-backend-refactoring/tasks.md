@@ -160,22 +160,22 @@ This implementation plan transforms the LuminaIQ backend into a production-grade
     - Test job persistence
     - _Requirements: 7.1, 7.2, 10.1_
 
-- [ ] 8. Implement background job tasks
-  - [ ] 8.1 Create knowledge graph build background task
+- [x] 8. Implement background job tasks
+  - [x] 8.1 Create knowledge graph build background task
     - Create backend/tasks/knowledge_graph_tasks.py with build_knowledge_graph Celery task
     - Implement progress tracking (update Redis every 10%)
     - Add distributed lock acquisition for project_id
     - Return job_id immediately to client
     - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
 
-  - [ ] 8.2 Create batch notes generation background task
+  - [x] 8.2 Create batch notes generation background task
     - Create backend/tasks/notes_tasks.py with generate_batch_notes Celery task
     - Implement concurrency limit of 2 LLM calls
     - Track progress (current/total * 100)
     - Store completed notes in Supabase
     - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5_
 
-  - [ ] 8.3 Create document reprocessing background task
+  - [x] 8.3 Create document reprocessing background task
     - Create backend/tasks/document_tasks.py with reprocess_document Celery task
     - Implement batch embedding generation (50 chunks per API call)
     - Implement batch vector upsert (100 vectors per operation)
@@ -299,7 +299,7 @@ This implementation plan transforms the LuminaIQ backend into a production-grade
     - Include timestamp, level, message, context fields
     - _Requirements: 21.2, 21.3_
 
-  - [ ] 14.2 Add correlation ID middleware
+  - [x] 14.2 Add correlation ID middleware
     - Create middleware to generate unique correlation_id for each request
     - Store correlation_id in request.state
     - Add X-Correlation-ID response header

@@ -3,8 +3,7 @@
 **Validates: Requirements 8.1, 8.2, 8.3, 8.4, 8.5, 9.1, 9.2, 9.3, 9.4, 9.5**
 """
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from tasks.knowledge_graph_tasks import build_knowledge_graph
 from tasks.notes_tasks import generate_batch_notes

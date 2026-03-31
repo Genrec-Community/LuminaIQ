@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 import re
 import time
 from typing import Optional, Dict, Any
-from jose import jwt, JWTError
+from jose import jwt
 from passlib.context import CryptContext
 from db.client import get_supabase_client
 from config.settings import settings

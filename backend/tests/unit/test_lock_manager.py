@@ -4,7 +4,6 @@
 """
 
 import pytest
-import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 from core.lock_manager import DistributedLockManager

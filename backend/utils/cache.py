@@ -12,10 +12,8 @@ For production, use Redis. This provides in-memory caching with TTL.
 
 import time
 import hashlib
-import json
-from typing import Any, Optional, Dict, Callable
+from typing import Any, Optional, Dict
 from dataclasses import dataclass
-from datetime import datetime, timedelta
 import logging
 import asyncio
 from functools import wraps

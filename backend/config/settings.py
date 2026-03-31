@@ -1,7 +1,6 @@
 from pydantic_settings import BaseSettings
 from pydantic import Field, field_validator
 from typing import Optional, List
-from typing_extensions import Annotated
 
 
 class Settings(BaseSettings):
@@ -136,6 +135,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "ignore"  # Silently drop unknown env vars (e.g. stale LLM_* keys)
 
 
 settings = Settings()

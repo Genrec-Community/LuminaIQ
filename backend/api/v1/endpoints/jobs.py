@@ -9,7 +9,7 @@ Provides endpoints for async AI processing:
 These endpoints NEVER block - they return immediately with a job_id
 """
 
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
 from datetime import datetime

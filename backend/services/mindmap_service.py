@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from db.client import get_supabase_client
 from services.llm_service import LLMService
 from services.rag_service import RAGService

@@ -1,7 +1,7 @@
 from langchain_openai import AzureChatOpenAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from config.settings import settings
-from typing import List, Dict, Any
+from typing import List, Dict
 from utils.logger import logger
 import time
 
@@ -88,7 +88,7 @@ class LLMService:
             telemetry = self._get_telemetry()
             if telemetry:
                 telemetry.track_dependency(
-                    name=f"Azure OpenAI chat_completion",
+                    name="Azure OpenAI chat_completion",
                     dependency_type="http",
                     duration=duration_ms,
                     success=True,
@@ -114,7 +114,7 @@ class LLMService:
             telemetry = self._get_telemetry()
             if telemetry:
                 telemetry.track_dependency(
-                    name=f"Azure OpenAI chat_completion",
+                    name="Azure OpenAI chat_completion",
                     dependency_type="http",
                     duration=duration_ms,
                     success=False,

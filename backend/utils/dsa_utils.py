@@ -10,7 +10,7 @@ This module contains optimized data structures for:
 These can be integrated for production optimization.
 """
 
-from typing import Dict, List, Any, Optional, Callable
+from typing import Dict, List, Any, Optional
 from collections import OrderedDict
 import hashlib
 import asyncio
@@ -133,7 +133,6 @@ class BloomFilter:
     """
 
     def __init__(self, expected_items: int = 10000, fp_rate: float = 0.01):
-        import math
 
         # Calculate optimal size and hash functions
         self.size = self._optimal_size(expected_items, fp_rate)
@@ -183,7 +182,6 @@ class BloomFilter:
 
     def get_stats(self) -> Dict[str, Any]:
         """Get filter statistics"""
-        import math
 
         # Estimate current false positive rate
         bits_set = sum(bin(byte).count("1") for byte in self.bit_array)
@@ -225,7 +223,6 @@ class PriorityQueue:
     """
 
     def __init__(self):
-        import heapq
 
         self._heap: List[tuple] = []
         self._counter = 0  # Tie-breaker for equal priorities
@@ -412,7 +409,6 @@ class ConsistentHash:
     """
 
     def __init__(self, nodes: List[str] = None, replicas: int = 100):
-        import bisect
 
         self.replicas = replicas
         self.ring: Dict[int, str] = {}

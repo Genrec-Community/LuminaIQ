@@ -1,0 +1,392 @@
+backend v0.1.0
+├── aiofiles v23.2.1
+├── aiohappyeyeballs v2.6.1
+├── aiohttp v3.13.2
+│   ├── aiohappyeyeballs v2.6.1
+│   ├── aiosignal v1.4.0
+│   │   ├── frozenlist v1.8.0
+│   │   └── typing-extensions v4.15.0
+│   ├── attrs v25.4.0
+│   ├── frozenlist v1.8.0
+│   ├── multidict v6.7.0
+│   ├── propcache v0.4.1
+│   └── yarl v1.22.0
+│       ├── idna v3.11
+│       ├── multidict v6.7.0
+│       └── propcache v0.4.1
+├── aiosignal v1.4.0 (*)
+├── annotated-types v0.7.0
+├── anyio v4.12.0
+│   ├── idna v3.11
+│   └── typing-extensions v4.15.0
+├── attrs v25.4.0
+├── bcrypt v5.0.0
+├── beautifulsoup4 v4.12.3
+│   └── soupsieve v2.8
+├── black v25.11.0
+│   ├── click v8.3.1
+│   ├── mypy-extensions v1.1.0
+│   ├── packaging v25.0
+│   ├── pathspec v0.12.1
+│   ├── platformdirs v4.5.0
+│   └── pytokens v0.3.0
+├── celery[redis] v5.4.0
+│   ├── billiard v4.2.4
+│   ├── click v8.3.1
+│   ├── click-didyoumean v0.3.1
+│   │   └── click v8.3.1
+│   ├── click-plugins v1.1.1.2
+│   │   └── click v8.3.1
+│   ├── click-repl v0.3.0
+│   │   ├── click v8.3.1
+│   │   └── prompt-toolkit v3.0.52
+│   │       └── wcwidth v0.6.0
+│   ├── kombu v5.6.2
+│   │   ├── amqp v5.3.1
+│   │   │   └── vine v5.1.0
+│   │   ├── packaging v25.0
+│   │   ├── tzdata v2025.3
+│   │   └── vine v5.1.0
+│   ├── python-dateutil v2.9.0.post0
+│   │   └── six v1.17.0
+│   ├── tzdata v2025.3
+│   ├── vine v5.1.0
+│   └── redis v5.0.1 (extra: redis)
+├── certifi v2025.11.12
+├── cffi v2.0.0
+│   └── pycparser v2.23
+├── charset-normalizer v3.4.4
+├── click v8.3.1
+├── colorama v0.4.6
+├── cryptography v46.0.3
+│   └── cffi v2.0.0 (*)
+├── dataclasses-json v0.6.7
+│   ├── marshmallow v3.26.1
+│   │   └── packaging v25.0
+│   └── typing-inspect v0.9.0
+│       ├── mypy-extensions v1.1.0
+│       └── typing-extensions v4.15.0
+├── deprecation v2.1.0
+│   └── packaging v25.0
+├── distro v1.9.0
+├── dnspython v2.8.0
+├── ecdsa v0.19.1
+│   └── six v1.17.0
+├── email-validator v2.3.0
+│   ├── dnspython v2.8.0
+│   └── idna v3.11
+├── eval-type-backport v0.2.2
+├── fastapi v0.115.0
+│   ├── pydantic v2.12.5
+│   │   ├── annotated-types v0.7.0
+│   │   ├── pydantic-core v2.41.5
+│   │   │   └── typing-extensions v4.15.0
+│   │   ├── typing-extensions v4.15.0
+│   │   └── typing-inspection v0.4.2
+│   │       └── typing-extensions v4.15.0
+│   ├── starlette v0.38.6
+│   │   └── anyio v4.12.0 (*)
+│   └── typing-extensions v4.15.0
+├── filelock v3.20.0
+├── frozenlist v1.8.0
+├── gotrue v2.9.1
+│   ├── httpx[http2] v0.27.0
+│   │   ├── anyio v4.12.0 (*)
+│   │   ├── certifi v2025.11.12
+│   │   ├── httpcore v1.0.9
+│   │   │   ├── certifi v2025.11.12
+│   │   │   └── h11 v0.16.0
+│   │   ├── idna v3.11
+│   │   ├── sniffio v1.3.1
+│   │   └── h2 v4.3.0 (extra: http2)
+│   │       ├── hpack v4.1.0
+│   │       └── hyperframe v6.1.0
+│   └── pydantic v2.12.5 (*)
+├── greenlet v3.3.0
+├── grpcio v1.76.0
+│   └── typing-extensions v4.15.0
+├── grpcio-tools v1.76.0
+│   ├── grpcio v1.76.0 (*)
+│   ├── protobuf v6.33.1
+│   └── setuptools v80.9.0
+├── gunicorn v21.2.0
+│   └── packaging v25.0
+├── h11 v0.16.0
+├── h2 v4.3.0 (*)
+├── hiredis v2.3.2
+├── hpack v4.1.0
+├── httpcore v1.0.9 (*)
+├── httptools v0.7.1
+├── httpx v0.27.0 (*)
+├── httpx-sse v0.4.3
+├── hyperframe v6.1.0
+├── idna v3.11
+├── jiter v0.12.0
+├── jsonpatch v1.33
+│   └── jsonpointer v3.0.0
+├── jsonpointer v3.0.0
+├── langchain v0.3.27
+│   ├── langchain-core v0.3.80
+│   │   ├── jsonpatch v1.33 (*)
+│   │   ├── langsmith v0.4.55
+│   │   │   ├── httpx v0.27.0 (*)
+│   │   │   ├── orjson v3.11.4
+│   │   │   ├── packaging v25.0
+│   │   │   ├── pydantic v2.12.5 (*)
+│   │   │   ├── requests v2.32.5
+│   │   │   │   ├── certifi v2025.11.12
+│   │   │   │   ├── charset-normalizer v3.4.4
+│   │   │   │   ├── idna v3.11
+│   │   │   │   └── urllib3 v1.26.20
+│   │   │   ├── requests-toolbelt v1.0.0
+│   │   │   │   └── requests v2.32.5 (*)
+│   │   │   ├── uuid-utils v0.12.0
+│   │   │   └── zstandard v0.25.0
+│   │   ├── packaging v25.0
+│   │   ├── pydantic v2.12.5 (*)
+│   │   ├── pyyaml v6.0.3
+│   │   ├── tenacity v9.1.2
+│   │   └── typing-extensions v4.15.0
+│   ├── langchain-text-splitters v0.3.11
+│   │   └── langchain-core v0.3.80 (*)
+│   ├── langsmith v0.4.55 (*)
+│   ├── pydantic v2.12.5 (*)
+│   ├── pyyaml v6.0.3
+│   ├── requests v2.32.5 (*)
+│   └── sqlalchemy v2.0.44
+│       ├── greenlet v3.3.0
+│       └── typing-extensions v4.15.0
+├── langchain-core v0.3.80 (*)
+├── langchain-openai v0.3.35
+│   ├── langchain-core v0.3.80 (*)
+│   ├── openai v2.9.0
+│   │   ├── anyio v4.12.0 (*)
+│   │   ├── distro v1.9.0
+│   │   ├── httpx v0.27.0 (*)
+│   │   ├── jiter v0.12.0
+│   │   ├── pydantic v2.12.5 (*)
+│   │   ├── sniffio v1.3.1
+│   │   ├── tqdm v4.67.1
+│   │   └── typing-extensions v4.15.0
+│   └── tiktoken v0.12.0
+│       ├── regex v2025.11.3
+│       └── requests v2.32.5 (*)
+├── langchain-qdrant v0.2.1
+│   ├── langchain-core v0.3.80 (*)
+│   ├── pydantic v2.12.5 (*)
+│   └── qdrant-client v1.16.1
+│       ├── grpcio v1.76.0 (*)
+│       ├── httpx[http2] v0.27.0 (*)
+│       ├── numpy v2.3.5
+│       ├── portalocker v2.10.1
+│       ├── protobuf v6.33.1
+│       ├── pydantic v2.12.5 (*)
+│       └── urllib3 v1.26.20
+├── langchain-text-splitters v0.3.11 (*)
+├── langchain-together v0.3.1
+│   ├── aiohttp v3.13.2 (*)
+│   ├── langchain-core v0.3.80 (*)
+│   ├── langchain-openai v0.3.35 (*)
+│   └── requests v2.32.5 (*)
+├── langsmith v0.4.55 (*)
+├── loguru v0.7.2
+├── lxml v6.0.2
+├── markdown v3.5.2
+├── markdown-it-py v4.0.0
+│   └── mdurl v0.1.2
+├── marshmallow v3.26.1 (*)
+├── mdurl v0.1.2
+├── multidict v6.7.0
+├── mypy-extensions v1.1.0
+├── numpy v2.3.5
+├── openai v2.9.0 (*)
+├── opentelemetry-api v1.40.0
+│   ├── importlib-metadata v8.7.1
+│   │   └── zipp v3.23.0
+│   └── typing-extensions v4.15.0
+├── opentelemetry-exporter-otlp v1.40.0
+│   ├── opentelemetry-exporter-otlp-proto-grpc v1.40.0
+│   │   ├── googleapis-common-protos v1.73.1
+│   │   │   └── protobuf v6.33.1
+│   │   ├── grpcio v1.76.0 (*)
+│   │   ├── opentelemetry-api v1.40.0 (*)
+│   │   ├── opentelemetry-exporter-otlp-proto-common v1.40.0
+│   │   │   └── opentelemetry-proto v1.40.0
+│   │   │       └── protobuf v6.33.1
+│   │   ├── opentelemetry-proto v1.40.0 (*)
+│   │   ├── opentelemetry-sdk v1.40.0
+│   │   │   ├── opentelemetry-api v1.40.0 (*)
+│   │   │   ├── opentelemetry-semantic-conventions v0.61b0
+│   │   │   │   ├── opentelemetry-api v1.40.0 (*)
+│   │   │   │   └── typing-extensions v4.15.0
+│   │   │   └── typing-extensions v4.15.0
+│   │   └── typing-extensions v4.15.0
+│   └── opentelemetry-exporter-otlp-proto-http v1.40.0
+│       ├── googleapis-common-protos v1.73.1 (*)
+│       ├── opentelemetry-api v1.40.0 (*)
+│       ├── opentelemetry-exporter-otlp-proto-common v1.40.0 (*)
+│       ├── opentelemetry-proto v1.40.0 (*)
+│       ├── opentelemetry-sdk v1.40.0 (*)
+│       ├── requests v2.32.5 (*)
+│       └── typing-extensions v4.15.0
+├── opentelemetry-exporter-otlp-proto-grpc v1.40.0 (*)
+├── opentelemetry-exporter-otlp-proto-http v1.40.0 (*)
+├── opentelemetry-instrumentation v0.61b0
+│   ├── opentelemetry-api v1.40.0 (*)
+│   ├── opentelemetry-semantic-conventions v0.61b0 (*)
+│   ├── packaging v25.0
+│   └── wrapt v1.17.3
+├── opentelemetry-instrumentation-asgi v0.61b0
+│   ├── asgiref v3.11.1
+│   ├── opentelemetry-api v1.40.0 (*)
+│   ├── opentelemetry-instrumentation v0.61b0 (*)
+│   ├── opentelemetry-semantic-conventions v0.61b0 (*)
+│   └── opentelemetry-util-http v0.61b0
+├── opentelemetry-instrumentation-fastapi v0.61b0
+│   ├── opentelemetry-api v1.40.0 (*)
+│   ├── opentelemetry-instrumentation v0.61b0 (*)
+│   ├── opentelemetry-instrumentation-asgi v0.61b0 (*)
+│   ├── opentelemetry-semantic-conventions v0.61b0 (*)
+│   └── opentelemetry-util-http v0.61b0
+├── opentelemetry-instrumentation-httpx v0.61b0
+│   ├── opentelemetry-api v1.40.0 (*)
+│   ├── opentelemetry-instrumentation v0.61b0 (*)
+│   ├── opentelemetry-semantic-conventions v0.61b0 (*)
+│   ├── opentelemetry-util-http v0.61b0
+│   └── wrapt v1.17.3
+├── opentelemetry-instrumentation-redis v0.61b0
+│   ├── opentelemetry-api v1.40.0 (*)
+│   ├── opentelemetry-instrumentation v0.61b0 (*)
+│   ├── opentelemetry-semantic-conventions v0.61b0 (*)
+│   └── wrapt v1.17.3
+├── opentelemetry-proto v1.40.0 (*)
+├── opentelemetry-sdk v1.40.0 (*)
+├── opentelemetry-semantic-conventions v0.61b0 (*)
+├── opentelemetry-util-http v0.61b0
+├── orjson v3.11.4
+├── ormsgpack v1.12.0
+├── packaging v25.0
+├── passlib v1.7.4
+├── pathspec v0.12.1
+├── pdf2image v1.17.0
+│   └── pillow v11.3.0
+├── pillow v11.3.0
+├── platformdirs v4.5.0
+├── portalocker v2.10.1
+├── postgrest v2.24.0
+│   ├── deprecation v2.1.0 (*)
+│   ├── httpx[http2] v0.27.0 (*)
+│   ├── pydantic v2.12.5 (*)
+│   └── yarl v1.22.0 (*)
+├── propcache v0.4.1
+├── protobuf v6.33.1
+├── pyasn1 v0.6.1
+├── pycparser v2.23
+├── pydantic v2.12.5 (*)
+├── pydantic-core v2.41.5 (*)
+├── pydantic-settings v2.12.0
+│   ├── pydantic v2.12.5 (*)
+│   ├── python-dotenv v1.0.0
+│   └── typing-inspection v0.4.2 (*)
+├── pygments v2.19.2
+├── pyjwt v2.10.1
+│   └── cryptography v46.0.3 (extra: crypto) (*)
+├── pymupdf v1.26.6
+├── pymupdf4llm v0.2.5
+│   ├── pymupdf v1.26.6
+│   └── tabulate v0.9.0
+├── pypdf2 v3.0.1
+├── pytesseract v0.3.13
+│   ├── packaging v25.0
+│   └── pillow v11.3.0
+├── pytest v8.3.4
+│   ├── iniconfig v2.3.0
+│   ├── packaging v25.0
+│   └── pluggy v1.6.0
+├── pytest-asyncio v0.24.0
+│   └── pytest v8.3.4 (*)
+├── python-dateutil v2.9.0.post0 (*)
+├── python-docx v1.1.0
+│   ├── lxml v6.0.2
+│   └── typing-extensions v4.15.0
+├── python-dotenv v1.0.0
+├── python-jose v3.5.0
+│   ├── ecdsa v0.19.1 (*)
+│   ├── pyasn1 v0.6.1
+│   └── rsa v4.9.1
+│       └── pyasn1 v0.6.1
+├── python-multipart v0.0.9
+├── pytokens v0.3.0
+├── pyyaml v6.0.3
+├── qdrant-client v1.16.1 (*)
+├── realtime v2.24.0
+│   ├── pydantic v2.12.5 (*)
+│   ├── typing-extensions v4.15.0
+│   └── websockets v15.0.1
+├── redis v5.0.1
+├── regex v2025.11.3
+├── requests v2.32.5 (*)
+├── requests-toolbelt v1.0.0 (*)
+├── rich v14.2.0
+│   ├── markdown-it-py v4.0.0 (*)
+│   └── pygments v2.19.2
+├── rsa v4.9.1 (*)
+├── setuptools v80.9.0
+├── six v1.17.0
+├── sniffio v1.3.1
+├── soupsieve v2.8
+├── sqlalchemy v2.0.44 (*)
+├── sseclient-py v1.8.0
+├── starlette v0.38.6 (*)
+├── storage3 v2.24.0
+│   ├── deprecation v2.1.0 (*)
+│   ├── httpx[http2] v0.27.0 (*)
+│   ├── pydantic v2.12.5 (*)
+│   └── yarl v1.22.0 (*)
+├── strenum v0.4.15
+├── supabase v2.24.0
+│   ├── httpx v0.27.0 (*)
+│   ├── postgrest v2.24.0 (*)
+│   ├── realtime v2.24.0 (*)
+│   ├── storage3 v2.24.0 (*)
+│   ├── supabase-auth v2.24.0
+│   │   ├── httpx[http2] v0.27.0 (*)
+│   │   ├── pydantic v2.12.5 (*)
+│   │   └── pyjwt[crypto] v2.10.1 (*)
+│   └── supabase-functions v2.24.0
+│       ├── httpx[http2] v0.27.0 (*)
+│       ├── strenum v0.4.15
+│       └── yarl v1.22.0 (*)
+├── supabase-auth v2.24.0 (*)
+├── supabase-functions v2.24.0 (*)
+├── tabulate v0.9.0
+├── tenacity v9.1.2
+├── tiktoken v0.12.0 (*)
+├── together v0.2.11
+│   ├── aiohttp v3.13.2 (*)
+│   ├── pydantic v2.12.5 (*)
+│   ├── requests v2.32.5 (*)
+│   ├── sseclient-py v1.8.0
+│   ├── tabulate v0.9.0
+│   ├── tqdm v4.67.1
+│   └── typer v0.9.4
+│       ├── click v8.3.1
+│       └── typing-extensions v4.15.0
+├── tqdm v4.67.1
+├── typer v0.9.4 (*)
+├── typing-extensions v4.15.0
+├── typing-inspect v0.9.0 (*)
+├── typing-inspection v0.4.2 (*)
+├── urllib3 v1.26.20
+├── uuid-utils v0.12.0
+├── uvicorn v0.27.0
+│   ├── click v8.3.1
+│   └── h11 v0.16.0
+├── watchfiles v1.1.1
+│   └── anyio v4.12.0 (*)
+├── websocket-client v1.9.0
+├── websockets v15.0.1
+├── xxhash v3.6.0
+├── yarl v1.22.0 (*)
+└── zstandard v0.25.0
+(*) Package tree already displayed

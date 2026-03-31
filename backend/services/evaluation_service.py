@@ -7,7 +7,6 @@ from utils.logger import logger
 from utils.performance import PerformanceTracker
 from uuid import uuid4
 import json
-import re
 from models.schemas import SubjectiveQuestion, SubjectiveEvaluationResult
 
 

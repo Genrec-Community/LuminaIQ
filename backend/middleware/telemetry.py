@@ -139,10 +139,11 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
         Returns:
             Response with correlation ID header
         """
-        # Generate unique correlation ID for this request
-        correlation_id = str(uuid.uuid4())
-        
-        # Store correlation ID in request state for access by other components
+        # Read the correlation ID already set by CorrelationIDMiddleware (which runs
+        # before this middleware in the chain). Fall back to generating a new UUID
+        # only when running without CorrelationIDMiddleware (e.g. in isolated tests).
+        correlation_id = getattr(request.state, "correlation_id", None) or str(uuid.uuid4())
+        # Persist in request.state for any downstream handler that reads it directly.
         request.state.correlation_id = correlation_id
         
         # Record start time

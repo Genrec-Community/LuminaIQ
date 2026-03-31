@@ -93,7 +93,7 @@ async def test_redis_integration():
     
     # Get stats
     stats = manager.get_stats()
-    print(f"\n📊 Cache Statistics:")
+    print("\n📊 Cache Statistics:")
     print(f"   Total Requests: {stats['total_requests']}")
     print(f"   Hits: {stats['hits']}")
     print(f"   Misses: {stats['misses']}")

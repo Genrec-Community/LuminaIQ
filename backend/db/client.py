@@ -118,7 +118,7 @@ async def async_db_execute(func, *args, **kwargs):
                 properties["error"] = error_msg
             
             telemetry.track_dependency(
-                name=f"Supabase query",
+                name="Supabase query",
                 dependency_type="supabase",
                 duration=duration_ms,
                 success=success,
@@ -164,7 +164,7 @@ async def async_db(callable_fn):
                 properties["error"] = error_msg
             
             telemetry.track_dependency(
-                name=f"Supabase query",
+                name="Supabase query",
                 dependency_type="supabase",
                 duration=duration_ms,
                 success=success,

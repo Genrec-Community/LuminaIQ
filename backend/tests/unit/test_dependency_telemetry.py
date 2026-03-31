@@ -7,8 +7,7 @@ success status, and relevant properties.
 """
 
 import pytest
-import asyncio
-from unittest.mock import Mock, patch, AsyncMock, MagicMock
+from unittest.mock import Mock, patch, AsyncMock
 from core.redis_manager import RedisCacheManager
 from services.qdrant_service import QdrantService
 from services.llm_service import LLMService

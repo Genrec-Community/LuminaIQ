@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, Response
 from fastapi.responses import StreamingResponse
 from services.rag_service import rag_service
 from models.schemas import ChatRequest, ChatResponse, ChatMessage, SummaryRequest
-from typing import Any, List, Optional
+from typing import List, Optional
 from api.deps import get_current_user
 from db.client import get_supabase_client, async_db
 from utils.performance import PerformanceTracker

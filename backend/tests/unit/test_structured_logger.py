@@ -1,15 +1,13 @@
 """
 Unit tests for structured logger with correlation ID support.
 """
-import pytest
 import json
 from utils.logger import (
     set_correlation_id,
     get_correlation_id,
     clear_correlation_id,
     log_with_context,
-    json_formatter,
-    logger
+    json_formatter
 )
 
 
@@ -42,7 +40,6 @@ class TestJSONFormatter:
         """Test JSON formatter produces correct structure."""
         # Create a mock record
         from datetime import datetime
-        from loguru import logger as loguru_logger
         
         # Set correlation ID
         test_correlation_id = "corr-123"

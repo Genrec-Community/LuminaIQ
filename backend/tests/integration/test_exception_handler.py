@@ -8,7 +8,7 @@ in telemetry with full stack traces and context.
 
 import pytest
 from unittest.mock import Mock, patch
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 
