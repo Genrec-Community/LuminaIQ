@@ -337,14 +337,14 @@ This implementation plan transforms the LuminaIQ backend into a production-grade
 - [x] 16. Checkpoint - Verify observability infrastructure
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 17. Implement database connection pooling
-  - [ ] 17.1 Configure Supabase connection pool
+- [x] 17. Implement database connection pooling
+  - [x] 17.1 Configure Supabase connection pool
     - Modify backend/db/client.py to use connection pooling
     - Set min_size=5, max_size=20, timeout=10 seconds
     - Monitor connection pool metrics (active, idle, waiting)
     - _Requirements: 15.1, 15.2, 15.3_
 
-  - [ ] 17.2 Add connection pool monitoring
+  - [x] 17.2 Add connection pool monitoring
     - Log warning when pool utilization > 80%
     - Track connection pool metrics in telemetry
     - _Requirements: 15.4, 15.5_

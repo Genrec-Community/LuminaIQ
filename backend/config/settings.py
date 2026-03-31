@@ -88,6 +88,11 @@ class Settings(BaseSettings):
     EMBEDDING_CONCURRENCY: int = 5  # Max parallel requests
     EMBEDDING_DELAY_MS: int = 200  # Delay between batches (ms)
 
+    # Database Connection Pool Configuration
+    DB_POOL_MIN_SIZE: int = Field(ge=1, le=20, default=5)
+    DB_POOL_MAX_SIZE: int = Field(ge=5, le=100, default=20)
+    DB_POOL_TIMEOUT: float = Field(ge=1.0, le=60.0, default=10.0)
+
     # Webhook Configuration (for PDF service communication)
     WEBHOOK_SECRET: str = "supersecretwebhook"
 
