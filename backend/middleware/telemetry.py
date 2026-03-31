@@ -159,95 +159,129 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
         if project_id:
             request.state.project_id = project_id
         
-        # Process request
+        # Process request within a root trace span for context propagation
+        endpoint_name = f"{request.method} {request.url.path}"
         try:
-            response = await call_next(request)
-            
-            # Calculate duration in milliseconds
-            duration_ms = (time.time() - start_time) * 1000
-            
-            # Extract cache status from response
-            cache_status = get_cache_status_from_response(response)
-            
-            # Build custom properties
-            properties = {
-                "correlation_id": correlation_id,
-                "method": request.method,
-                "path": request.url.path,
-                "query_params": str(request.query_params) if request.query_params else None,
-            }
-            
-            # Add user_id if present
-            if user_id:
-                properties["user_id"] = user_id
-            
-            # Add project_id if present
-            if project_id:
-                properties["project_id"] = project_id
-            
-            # Add cache_status if present
-            if cache_status:
-                properties["cache_status"] = cache_status
-            
-            # Track request telemetry
-            endpoint_name = f"{request.method} {request.url.path}"
-            self.telemetry_service.track_request(
-                name=endpoint_name,
-                duration=duration_ms,
-                status_code=response.status_code,
-                properties=properties
+            from opentelemetry.trace import SpanKind
+            span_ctx = self.telemetry_service.start_span(
+                endpoint_name,
+                kind=SpanKind.SERVER,
+                properties={
+                    "correlation_id": correlation_id,
+                    "http.method": request.method,
+                    "http.url": str(request.url),
+                    "http.route": request.url.path,
+                }
             )
-            
-            # Add correlation ID to response headers
-            response.headers["X-Correlation-ID"] = correlation_id
-            
-            # Log slow requests (> 500ms)
-            if duration_ms > 500:
-                logger.warning(
-                    f"[TelemetryMiddleware] Slow request detected: "
-                    f"{endpoint_name} took {duration_ms:.2f}ms "
-                    f"(correlation_id={correlation_id})"
+        except Exception:
+            from contextlib import nullcontext
+            span_ctx = nullcontext(None)
+
+        with span_ctx as root_span:
+            try:
+                response = await call_next(request)
+                
+                # Calculate duration in milliseconds
+                duration_ms = (time.time() - start_time) * 1000
+                
+                # Extract cache status from response
+                cache_status = get_cache_status_from_response(response)
+                
+                # Build custom properties
+                properties = {
+                    "correlation_id": correlation_id,
+                    "method": request.method,
+                    "path": request.url.path,
+                    "query_params": str(request.query_params) if request.query_params else None,
+                }
+                
+                # Add user_id if present
+                if user_id:
+                    properties["user_id"] = user_id
+                
+                # Add project_id if present
+                if project_id:
+                    properties["project_id"] = project_id
+                
+                # Add cache_status if present
+                if cache_status:
+                    properties["cache_status"] = cache_status
+                
+                # Annotate root span with response info
+                if root_span:
+                    try:
+                        root_span.set_attribute("http.status_code", response.status_code)
+                        if cache_status:
+                            root_span.set_attribute("cache_status", cache_status)
+                    except Exception:
+                        pass
+                
+                # Track request telemetry
+                self.telemetry_service.track_request(
+                    name=endpoint_name,
+                    duration=duration_ms,
+                    status_code=response.status_code,
+                    properties=properties
                 )
-            
-            return response
-            
-        except Exception as e:
-            # Calculate duration even for failed requests
-            duration_ms = (time.time() - start_time) * 1000
-            
-            # Build custom properties for exception
-            properties = {
-                "correlation_id": correlation_id,
-                "method": request.method,
-                "path": request.url.path,
-                "exception_type": type(e).__name__,
-            }
-            
-            if user_id:
-                properties["user_id"] = user_id
-            if project_id:
-                properties["project_id"] = project_id
-            
-            # Track exception telemetry
-            self.telemetry_service.track_exception(
-                exception=e,
-                properties=properties
-            )
-            
-            # Track failed request telemetry (status code 500)
-            endpoint_name = f"{request.method} {request.url.path}"
-            self.telemetry_service.track_request(
-                name=endpoint_name,
-                duration=duration_ms,
-                status_code=500,
-                properties=properties
-            )
-            
-            logger.error(
-                f"[TelemetryMiddleware] Request failed: {endpoint_name} "
-                f"(correlation_id={correlation_id})",
-                exc_info=e
-            )
-            
-            # Re-raise exception to be handled by FastAPI exception handlers
-            raise
+                
+                # Add correlation ID to response headers
+                response.headers["X-Correlation-ID"] = correlation_id
+                
+                # Log slow requests (> 500ms)
+                if duration_ms > 500:
+                    logger.warning(
+                        f"[TelemetryMiddleware] Slow request detected: "
+                        f"{endpoint_name} took {duration_ms:.2f}ms "
+                        f"(correlation_id={correlation_id})"
+                    )
+                
+                return response
+                
+            except Exception as e:
+                # Calculate duration even for failed requests
+                duration_ms = (time.time() - start_time) * 1000
+                
+                # Build custom properties for exception
+                properties = {
+                    "correlation_id": correlation_id,
+                    "method": request.method,
+                    "path": request.url.path,
+                    "exception_type": type(e).__name__,
+                }
+                
+                if user_id:
+                    properties["user_id"] = user_id
+                if project_id:
+                    properties["project_id"] = project_id
+                
+                # Annotate root span with error
+                if root_span:
+                    try:
+                        from opentelemetry.trace import Status, StatusCode
+                        root_span.set_status(Status(StatusCode.ERROR, str(e)))
+                        root_span.record_exception(e)
+                    except Exception:
+                        pass
+                
+                # Track exception telemetry
+                self.telemetry_service.track_exception(
+                    exception=e,
+                    properties=properties
+                )
+                
+                # Track failed request telemetry (status code 500)
+                self.telemetry_service.track_request(
+                    name=endpoint_name,
+                    duration=duration_ms,
+                    status_code=500,
+                    properties=properties
+                )
+                
+                logger.error(
+                    f"[TelemetryMiddleware] Request failed: {endpoint_name} "
+                    f"(correlation_id={correlation_id})",
+                    exc_info=e
+                )
+                
+                # Re-raise exception to be handled by FastAPI exception handlers
+                raise

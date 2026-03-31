@@ -1,6 +1,6 @@
 """Batch notes generation background tasks.
 
-**Validates: Requirements 9.1, 9.2, 9.3, 9.4, 9.5**
+**Validates: Requirements 9.1, 9.2, 9.3, 9.4, 9.5, 21.4**
 
 This module contains Celery tasks for generating notes for multiple topics
 concurrently, with a concurrency limit of 2 LLM calls and progress tracking.
@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional
 from core.celery_app import celery_app
 from core.job_manager import BackgroundJobManager, JobStatusEnum
 from core.redis_manager import get_redis_manager
+from utils.logger import set_correlation_id, clear_correlation_id
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +74,10 @@ def generate_batch_notes(
         f"{log_prefix} Starting batch notes generation, "
         f"topics={len(topic_ids)}, note_types={note_types}"
     )
+
+    # Propagate correlation_id into the logger ContextVar for this task (Requirement 21.4)
+    if correlation_id:
+        set_correlation_id(correlation_id)
 
     async def _generate():
         redis_manager = get_redis_manager()
@@ -210,3 +215,6 @@ def generate_batch_notes(
     except Exception as exc:
         logger.error(f"[NotesTask job={job_id}] Retrying due to: {exc}")
         raise self.retry(exc=exc, countdown=2 ** self.request.retries)
+    finally:
+        if correlation_id:
+            clear_correlation_id()

@@ -12,7 +12,7 @@ Tests:
 """
 
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, MagicMock, patch
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
@@ -31,6 +31,12 @@ def mock_telemetry_service():
     service.enabled = True
     service.track_request = Mock()
     service.track_exception = Mock()
+    # start_span must be a context manager
+    from unittest.mock import MagicMock
+    span_cm = MagicMock()
+    span_cm.__enter__ = Mock(return_value=None)
+    span_cm.__exit__ = Mock(return_value=False)
+    service.start_span = Mock(return_value=span_cm)
     return service
 
 
@@ -38,26 +44,32 @@ def mock_telemetry_service():
 def app_with_telemetry(mock_telemetry_service):
     """Create a FastAPI app with telemetry middleware."""
     app = FastAPI()
-    
-    # Patch get_telemetry_service to return our mock
-    with patch("middleware.telemetry.get_telemetry_service", return_value=mock_telemetry_service):
-        app.add_middleware(TelemetryMiddleware)
-    
+
+    # Patch must stay active for the entire fixture lifetime so the middleware
+    # (constructed at add_middleware time) and every subsequent request all use
+    # the same mock service.
+    patcher = patch("middleware.telemetry.get_telemetry_service", return_value=mock_telemetry_service)
+    patcher.start()
+
+    app.add_middleware(TelemetryMiddleware)
+
     @app.get("/test")
     async def test_endpoint():
         return {"message": "test"}
-    
+
     @app.get("/test-cache")
     async def test_cache_endpoint():
         response = JSONResponse(content={"message": "cached"})
         response.headers["X-Cache-Status"] = "HIT"
         return response
-    
+
     @app.get("/test-error")
     async def test_error_endpoint():
         raise ValueError("Test error")
-    
-    return app
+
+    yield app
+
+    patcher.stop()
 
 
 class TestTelemetryMiddleware:
@@ -316,6 +328,7 @@ class TestHelperFunctions:
         request = Mock(spec=Request)
         request.state = Mock(spec=[])
         request.query_params = {}
+        request.path_params = {}
         
         project_id = get_project_id_from_request(request)
         assert project_id is None
@@ -353,19 +366,22 @@ class TestGlobalExceptionHandler:
         # Create app with global exception handler
         app = FastAPI()
         
-        # Import and register the exception handler with patched telemetry
-        with patch("core.telemetry.get_telemetry_service", return_value=mock_service):
-            from main import global_exception_handler
-            app.add_exception_handler(Exception, global_exception_handler)
-            
-            @app.get("/test-error")
-            async def test_error():
-                raise ValueError("Test exception")
-            
-            client = TestClient(app)
-            
-            # Make request that raises exception
+        from main import global_exception_handler
+        app.add_exception_handler(Exception, global_exception_handler)
+        
+        @app.get("/test-error")
+        async def test_error():
+            raise ValueError("Test exception")
+        
+        # Patch must stay active during the request
+        patcher = patch("core.telemetry.get_telemetry_service", return_value=mock_service)
+        patcher.start()
+        try:
+            # raise_server_exceptions=False so the handler returns a 500 response
+            client = TestClient(app, raise_server_exceptions=False)
             response = client.get("/test-error")
+        finally:
+            patcher.stop()
         
         # Verify response
         assert response.status_code == 500
@@ -405,25 +421,32 @@ class TestGlobalExceptionHandler:
         mock_service.enabled = True
         mock_service.track_exception = Mock()
         mock_service.track_request = Mock()
+        span_cm = MagicMock()
+        span_cm.__enter__ = Mock(return_value=None)
+        span_cm.__exit__ = Mock(return_value=False)
+        mock_service.start_span = Mock(return_value=span_cm)
         
         # Create app with middleware and exception handler
         app = FastAPI()
         
-        with patch("middleware.telemetry.get_telemetry_service", return_value=mock_service):
-            app.add_middleware(TelemetryMiddleware)
+        from main import global_exception_handler
+        app.add_exception_handler(Exception, global_exception_handler)
         
-        with patch("core.telemetry.get_telemetry_service", return_value=mock_service):
-            from main import global_exception_handler
-            app.add_exception_handler(Exception, global_exception_handler)
-            
-            @app.get("/test-error")
-            async def test_error():
-                raise RuntimeError("Test error with correlation")
-            
-            client = TestClient(app)
-            
-            # Make request
+        @app.get("/test-error")
+        async def test_error():
+            raise RuntimeError("Test error with correlation")
+        
+        mw_patcher = patch("middleware.telemetry.get_telemetry_service", return_value=mock_service)
+        core_patcher = patch("core.telemetry.get_telemetry_service", return_value=mock_service)
+        mw_patcher.start()
+        core_patcher.start()
+        app.add_middleware(TelemetryMiddleware)
+        try:
+            client = TestClient(app, raise_server_exceptions=False)
             response = client.get("/test-error")
+        finally:
+            mw_patcher.stop()
+            core_patcher.stop()
         
         # Verify correlation ID in response
         assert "correlation_id" in response.json()
@@ -450,21 +473,23 @@ class TestGlobalExceptionHandler:
         # Create app
         app = FastAPI()
         
-        with patch("core.telemetry.get_telemetry_service", return_value=mock_service):
-            from main import global_exception_handler
-            app.add_exception_handler(Exception, global_exception_handler)
-            
-            @app.get("/test-error")
-            async def test_error(request: Request):
-                # Simulate middleware setting user and project IDs
-                request.state.user_id = "user_123"
-                request.state.project_id = "proj_456"
-                raise ValueError("Test with context")
-            
-            client = TestClient(app)
-            
-            # Make request
+        from main import global_exception_handler
+        app.add_exception_handler(Exception, global_exception_handler)
+        
+        @app.get("/test-error")
+        async def test_error(request: Request):
+            # Simulate middleware setting user and project IDs
+            request.state.user_id = "user_123"
+            request.state.project_id = "proj_456"
+            raise ValueError("Test with context")
+        
+        patcher = patch("core.telemetry.get_telemetry_service", return_value=mock_service)
+        patcher.start()
+        try:
+            client = TestClient(app, raise_server_exceptions=False)
             response = client.get("/test-error")
+        finally:
+            patcher.stop()
         
         # Verify exception telemetry includes context
         assert mock_service.track_exception.called
@@ -489,18 +514,20 @@ class TestGlobalExceptionHandler:
         # Create app
         app = FastAPI()
         
-        with patch("core.telemetry.get_telemetry_service", return_value=mock_service):
-            from main import global_exception_handler
-            app.add_exception_handler(Exception, global_exception_handler)
-            
-            @app.get("/test-error")
-            async def test_error():
-                raise ValueError("Test exception")
-            
-            client = TestClient(app)
-            
-            # Make request - should still return error response
+        from main import global_exception_handler
+        app.add_exception_handler(Exception, global_exception_handler)
+        
+        @app.get("/test-error")
+        async def test_error():
+            raise ValueError("Test exception")
+        
+        patcher = patch("core.telemetry.get_telemetry_service", return_value=mock_service)
+        patcher.start()
+        try:
+            client = TestClient(app, raise_server_exceptions=False)
             response = client.get("/test-error")
+        finally:
+            patcher.stop()
         
         # Verify response is still returned despite telemetry failure
         assert response.status_code == 500

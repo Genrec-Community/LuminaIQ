@@ -7,11 +7,23 @@ success status, and relevant properties.
 """
 
 import pytest
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import Mock, MagicMock, patch, AsyncMock
 from core.redis_manager import RedisCacheManager
 from services.qdrant_service import QdrantService
 from services.llm_service import LLMService
 from db.client import async_db
+
+
+def make_mock_telemetry():
+    """Create a mock telemetry service with a context-manager-compatible start_span."""
+    mock_telemetry = Mock()
+    mock_telemetry.track_dependency = Mock()
+    # start_span is used as a context manager: `with telemetry.start_span(...) as span:`
+    span_cm = MagicMock()
+    span_cm.__enter__ = Mock(return_value=None)
+    span_cm.__exit__ = Mock(return_value=False)
+    mock_telemetry.start_span = Mock(return_value=span_cm)
+    return mock_telemetry
 
 
 class TestRedisTelemetry:
@@ -29,8 +41,7 @@ class TestRedisTelemetry:
         )
         
         # Mock telemetry service
-        mock_telemetry = Mock()
-        mock_telemetry.track_dependency = Mock()
+        mock_telemetry = make_mock_telemetry()
         redis_manager._telemetry = mock_telemetry
         
         # Mock Redis client
@@ -61,8 +72,7 @@ class TestRedisTelemetry:
             retry_attempts=1
         )
         
-        mock_telemetry = Mock()
-        mock_telemetry.track_dependency = Mock()
+        mock_telemetry = make_mock_telemetry()
         redis_manager._telemetry = mock_telemetry
         
         mock_client = AsyncMock()
@@ -90,8 +100,7 @@ class TestQdrantTelemetry:
             qdrant_service = QdrantService()
             
             # Mock telemetry service
-            mock_telemetry = Mock()
-            mock_telemetry.track_dependency = Mock()
+            mock_telemetry = make_mock_telemetry()
             qdrant_service._telemetry = mock_telemetry
             
             # Mock async client
@@ -122,8 +131,7 @@ class TestQdrantTelemetry:
              patch('services.qdrant_service.QdrantClient'):
             qdrant_service = QdrantService()
             
-            mock_telemetry = Mock()
-            mock_telemetry.track_dependency = Mock()
+            mock_telemetry = make_mock_telemetry()
             qdrant_service._telemetry = mock_telemetry
             
             qdrant_service.async_client.upsert = AsyncMock()
@@ -150,8 +158,7 @@ class TestLLMTelemetry:
         llm_service = LLMService()
         
         # Mock telemetry service
-        mock_telemetry = Mock()
-        mock_telemetry.track_dependency = Mock()
+        mock_telemetry = make_mock_telemetry()
         llm_service._telemetry = mock_telemetry
         
         # Mock LLM client
@@ -185,9 +192,8 @@ class TestSupabaseTelemetry:
     @pytest.mark.asyncio
     async def test_async_db_tracks_telemetry(self):
         """Test that async_db wrapper tracks telemetry."""
-        # Mock telemetry service
-        mock_telemetry = Mock()
-        mock_telemetry.track_dependency = Mock()
+        # Mock telemetry service with context-manager-compatible start_span
+        mock_telemetry = make_mock_telemetry()
         
         with patch('core.telemetry.get_telemetry_service', return_value=mock_telemetry):
             # Mock database query
@@ -217,8 +223,7 @@ class TestTelemetryFailureTracking:
             retry_attempts=1
         )
         
-        mock_telemetry = Mock()
-        mock_telemetry.track_dependency = Mock()
+        mock_telemetry = make_mock_telemetry()
         redis_manager._telemetry = mock_telemetry
         
         # Mock Redis client to raise RedisError (not generic Exception)
@@ -242,8 +247,7 @@ class TestTelemetryFailureTracking:
         """Test that LLM API failures track telemetry."""
         llm_service = LLMService()
         
-        mock_telemetry = Mock()
-        mock_telemetry.track_dependency = Mock()
+        mock_telemetry = make_mock_telemetry()
         llm_service._telemetry = mock_telemetry
         
         with patch.object(llm_service, '_get_client') as mock_get_client:

@@ -1,6 +1,6 @@
 """Celery application configuration for background job processing.
 
-**Validates: Requirements 7.1, 7.2, 7.5**
+**Validates: Requirements 7.1, 7.2, 7.5, 21.4**
 
 This module configures Celery with Redis as broker and result backend for
 persistent, distributed background job processing.
@@ -11,6 +11,7 @@ from celery import Celery
 from kombu import Exchange, Queue
 
 from config.settings import settings
+from utils.logger import clear_correlation_id, set_correlation_id
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +95,10 @@ celery_app.conf.update(
 class BaseTask(celery_app.Task):
     """
     Base task class with common error handling and logging.
+
+    Automatically propagates correlation_id from task headers into the
+    logger ContextVar so every log line emitted during the task includes
+    the originating request's correlation ID (Requirement 21.4).
     """
     
     autoretry_for = (Exception,)
@@ -101,7 +106,29 @@ class BaseTask(celery_app.Task):
     retry_backoff = settings.CELERY_RETRY_BACKOFF  # Exponential backoff
     retry_backoff_max = 60  # Max 60 seconds between retries
     retry_jitter = True  # Add random jitter to prevent thundering herd
-    
+
+    def _get_correlation_id(self) -> str | None:
+        """Extract correlation_id from task headers or kwargs."""
+        # Prefer headers (set via apply_async(headers={...}))
+        headers = getattr(self.request, "headers", None) or {}
+        correlation_id = headers.get("correlation_id")
+        # Fall back to kwargs (set as a task argument)
+        if not correlation_id:
+            kwargs = getattr(self.request, "kwargs", None) or {}
+            correlation_id = kwargs.get("correlation_id")
+        return correlation_id
+
+    def __call__(self, *args, **kwargs):
+        """Execute the task, setting correlation_id in logger context."""
+        correlation_id = self._get_correlation_id()
+        if correlation_id:
+            set_correlation_id(correlation_id)
+        try:
+            return super().__call__(*args, **kwargs)
+        finally:
+            if correlation_id:
+                clear_correlation_id()
+
     def on_failure(self, exc, task_id, args, kwargs, einfo):
         """
         Called when task fails after all retries.
@@ -113,9 +140,10 @@ class BaseTask(celery_app.Task):
             kwargs: Task keyword arguments
             einfo: Exception info
         """
+        correlation_id = self._get_correlation_id()
         logger.error(
             f"[Celery] Task {self.name} failed after all retries: "
-            f"task_id={task_id}, error={exc}",
+            f"task_id={task_id}, correlation_id={correlation_id}, error={exc}",
             exc_info=einfo
         )
         
@@ -133,9 +161,11 @@ class BaseTask(celery_app.Task):
             kwargs: Task keyword arguments
             einfo: Exception info
         """
+        correlation_id = self._get_correlation_id()
         logger.warning(
             f"[Celery] Task {self.name} retrying: "
-            f"task_id={task_id}, retry={self.request.retries}, error={exc}"
+            f"task_id={task_id}, retry={self.request.retries}, "
+            f"correlation_id={correlation_id}, error={exc}"
         )
     
     def on_success(self, retval, task_id, args, kwargs):
@@ -148,9 +178,10 @@ class BaseTask(celery_app.Task):
             args: Task positional arguments
             kwargs: Task keyword arguments
         """
+        correlation_id = self._get_correlation_id()
         logger.info(
             f"[Celery] Task {self.name} completed successfully: "
-            f"task_id={task_id}"
+            f"task_id={task_id}, correlation_id={correlation_id}"
         )
 
 

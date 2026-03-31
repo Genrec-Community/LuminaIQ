@@ -14,6 +14,7 @@ from contextlib import contextmanager
 from opentelemetry import trace, metrics
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.sdk.trace.sampling import Sampler, SamplingResult, ParentBased, ALWAYS_ON, TraceIdRatioBased, Decision
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.sdk.resources import Resource, SERVICE_NAME, SERVICE_VERSION
@@ -551,47 +552,55 @@ class TelemetryService:
             logger.error(f"Failed to flush telemetry: {e}")
 
 
-class AdaptiveSampler:
+class AdaptiveSampler(Sampler):
     """
     Adaptive sampler that samples 100% of errors and 10% of successful requests.
-    
-    This ensures all errors are captured while reducing telemetry volume for
-    successful requests.
+
+    Implements the OpenTelemetry Sampler interface so it can be passed directly
+    to TracerProvider.  Errors (HTTP status >= 400) are always sampled; all
+    other spans use a 10% TraceIdRatioBased sampler wrapped in ParentBased so
+    that child spans honour the parent's sampling decision.
     """
-    
+
     def __init__(self):
-        from opentelemetry.sdk.trace.sampling import (
-            ParentBasedTraceIdRatioBased,
-            ALWAYS_ON,
-            TraceIdRatioBased
-        )
-        
-        # Use parent-based sampling with 10% ratio for root spans
-        self.success_sampler = ParentBasedTraceIdRatioBased(
-            root=TraceIdRatioBased(0.1)  # 10% sampling
-        )
-        self.error_sampler = ALWAYS_ON  # 100% sampling for errors
-    
-    def should_sample(self, *args, **kwargs):
+        self.success_sampler = ParentBased(root=TraceIdRatioBased(0.1))
+        self.error_sampler = ALWAYS_ON
+
+    def should_sample(  # type: ignore[override]
+        self,
+        parent_context: Optional[Any],
+        trace_id: int,
+        name: str,
+        kind: Optional[Any] = None,
+        attributes: Optional[Any] = None,
+        links: Optional[Any] = None,
+        trace_state: Optional[Any] = None,
+    ) -> SamplingResult:
         """
         Determine if a span should be sampled.
-        
-        Always samples errors (status code >= 400), samples 10% of successful requests.
+
+        Always samples spans that carry an HTTP status >= 400; samples 10% of
+        everything else.
         """
-        # Check if this is an error span by looking at attributes
-        if len(args) > 4:
-            attributes = args[4] if len(args) > 4 else kwargs.get('attributes', {})
-            if attributes:
-                status_code = attributes.get(SpanAttributes.HTTP_STATUS_CODE)
-                if status_code and int(status_code) >= 400:
-                    # Sample all errors
-                    return self.error_sampler.should_sample(*args, **kwargs)
-        
-        # Sample 10% of successful requests
-        return self.success_sampler.should_sample(*args, **kwargs)
-    
-    def get_description(self):
-        """Get sampler description."""
+        if attributes:
+            status_code = attributes.get("http.status_code") or attributes.get("http.response.status_code")
+            if status_code:
+                try:
+                    if int(status_code) >= 400:
+                        return self.error_sampler.should_sample(
+                            parent_context, trace_id, name, kind=kind,
+                            attributes=attributes, links=links, trace_state=trace_state
+                        )
+                except (ValueError, TypeError):
+                    pass
+
+        return self.success_sampler.should_sample(
+            parent_context, trace_id, name, kind=kind,
+            attributes=attributes, links=links, trace_state=trace_state
+        )
+
+    def get_description(self) -> str:
+        """Return a human-readable description of this sampler."""
         return "AdaptiveSampler(success=10%, errors=100%)"
 
 

@@ -9,8 +9,15 @@ import time
 import logging
 from typing import Any, Callable, Optional
 from functools import wraps
+from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def _null_ctx():
+    """No-op context manager used when telemetry is unavailable."""
+    yield None
 
 
 def track_db_operation(operation_name: str, table_name: Optional[str] = None):
@@ -32,78 +39,112 @@ def track_db_operation(operation_name: str, table_name: Optional[str] = None):
             start_time = time.time()
             success = False
             error_msg = None
-            
+
             try:
-                result = await func(*args, **kwargs)
-                success = True
-                return result
-            except Exception as e:
-                error_msg = str(e)
-                raise
-            finally:
-                duration_ms = (time.time() - start_time) * 1000
-                
-                # Track telemetry
+                from core.telemetry import get_telemetry_service
+                telemetry = get_telemetry_service()
+            except Exception:
+                telemetry = None
+
+            span_name = f"db.{operation_name}"
+            span_props = {"operation": operation_name}
+            if table_name:
+                span_props["table"] = table_name
+
+            with (telemetry.start_span(span_name, properties=span_props) if telemetry else _null_ctx()) as span:
                 try:
-                    from core.telemetry import get_telemetry_service
-                    telemetry = get_telemetry_service()
-                    
-                    properties = {
-                        "operation": operation_name,
-                    }
-                    if table_name:
-                        properties["table"] = table_name
-                    if error_msg:
-                        properties["error"] = error_msg
-                    
-                    telemetry.track_dependency(
-                        name=f"Supabase {operation_name}",
-                        dependency_type="supabase",
-                        duration=duration_ms,
-                        success=success,
-                        properties=properties
-                    )
-                except Exception as telemetry_err:
-                    logger.debug(f"Failed to track telemetry: {telemetry_err}")
+                    result = await func(*args, **kwargs)
+                    success = True
+                    return result
+                except Exception as e:
+                    error_msg = str(e)
+                    if span:
+                        try:
+                            from opentelemetry.trace import Status, StatusCode
+                            span.set_status(Status(StatusCode.ERROR, error_msg))
+                            span.record_exception(e)
+                        except Exception:
+                            pass
+                    raise
+                finally:
+                    duration_ms = (time.time() - start_time) * 1000
+
+                    # Track telemetry
+                    try:
+                        if telemetry:
+                            properties = {
+                                "operation": operation_name,
+                            }
+                            if table_name:
+                                properties["table"] = table_name
+                            if error_msg:
+                                properties["error"] = error_msg
+
+                            telemetry.track_dependency(
+                                name=f"Supabase {operation_name}",
+                                dependency_type="supabase",
+                                duration=duration_ms,
+                                success=success,
+                                properties=properties
+                            )
+                    except Exception as telemetry_err:
+                        logger.debug(f"Failed to track telemetry: {telemetry_err}")
         
         @wraps(func)
         def sync_wrapper(*args, **kwargs):
             start_time = time.time()
             success = False
             error_msg = None
-            
+
             try:
-                result = func(*args, **kwargs)
-                success = True
-                return result
-            except Exception as e:
-                error_msg = str(e)
-                raise
-            finally:
-                duration_ms = (time.time() - start_time) * 1000
-                
-                # Track telemetry
+                from core.telemetry import get_telemetry_service
+                telemetry = get_telemetry_service()
+            except Exception:
+                telemetry = None
+
+            span_name = f"db.{operation_name}"
+            span_props = {"operation": operation_name}
+            if table_name:
+                span_props["table"] = table_name
+
+            with (telemetry.start_span(span_name, properties=span_props) if telemetry else _null_ctx()) as span:
                 try:
-                    from core.telemetry import get_telemetry_service
-                    telemetry = get_telemetry_service()
-                    
-                    properties = {
-                        "operation": operation_name,
-                    }
-                    if table_name:
-                        properties["table"] = table_name
-                    if error_msg:
-                        properties["error"] = error_msg
-                    
-                    telemetry.track_dependency(
-                        name=f"Supabase {operation_name}",
-                        dependency_type="supabase",
-                        duration=duration_ms,
-                        success=success,
-                        properties=properties
-                    )
-                except Exception as telemetry_err:
-                    logger.debug(f"Failed to track telemetry: {telemetry_err}")
+                    result = func(*args, **kwargs)
+                    success = True
+                    return result
+                except Exception as e:
+                    error_msg = str(e)
+                    if span:
+                        try:
+                            from opentelemetry.trace import Status, StatusCode
+                            span.set_status(Status(StatusCode.ERROR, error_msg))
+                            span.record_exception(e)
+                        except Exception:
+                            pass
+                    raise
+                finally:
+                    duration_ms = (time.time() - start_time) * 1000
+
+                    # Track telemetry
+                    try:
+                        if telemetry:
+                            properties = {
+                                "operation": operation_name,
+                            }
+                            if table_name:
+                                properties["table"] = table_name
+                            if error_msg:
+                                properties["error"] = error_msg
+
+                            telemetry.track_dependency(
+                                name=f"Supabase {operation_name}",
+                                dependency_type="supabase",
+                                duration=duration_ms,
+                                success=success,
+                                properties=properties
+                            )
+                    except Exception as telemetry_err:
+                        logger.debug(f"Failed to track telemetry: {telemetry_err}")
         
         # Return appropriate wrapper based on function type
         import asyncio
@@ -137,36 +178,53 @@ async def track_supabase_query(operation_name: str, query_func: Callable, table_
     start_time = time.time()
     success = False
     error_msg = None
-    
+
     try:
-        result = query_func()
-        success = True
-        return result
-    except Exception as e:
-        error_msg = str(e)
-        raise
-    finally:
-        duration_ms = (time.time() - start_time) * 1000
-        
-        # Track telemetry
+        from core.telemetry import get_telemetry_service
+        telemetry = get_telemetry_service()
+    except Exception:
+        telemetry = None
+
+    span_name = f"db.{operation_name}"
+    span_props = {"operation": operation_name}
+    if table_name:
+        span_props["table"] = table_name
+
+    with (telemetry.start_span(span_name, properties=span_props) if telemetry else _null_ctx()) as span:
         try:
-            from core.telemetry import get_telemetry_service
-            telemetry = get_telemetry_service()
-            
-            properties = {
-                "operation": operation_name,
-            }
-            if table_name:
-                properties["table"] = table_name
-            if error_msg:
-                properties["error"] = error_msg
-            
-            telemetry.track_dependency(
-                name=f"Supabase {operation_name}",
-                dependency_type="supabase",
-                duration=duration_ms,
-                success=success,
-                properties=properties
-            )
-        except Exception as telemetry_err:
-            logger.debug(f"Failed to track telemetry: {telemetry_err}")
+            result = query_func()
+            success = True
+            return result
+        except Exception as e:
+            error_msg = str(e)
+            if span:
+                try:
+                    from opentelemetry.trace import Status, StatusCode
+                    span.set_status(Status(StatusCode.ERROR, error_msg))
+                    span.record_exception(e)
+                except Exception:
+                    pass
+            raise
+        finally:
+            duration_ms = (time.time() - start_time) * 1000
+
+            # Track telemetry
+            try:
+                if telemetry:
+                    properties = {
+                        "operation": operation_name,
+                    }
+                    if table_name:
+                        properties["table"] = table_name
+                    if error_msg:
+                        properties["error"] = error_msg
+
+                    telemetry.track_dependency(
+                        name=f"Supabase {operation_name}",
+                        dependency_type="supabase",
+                        duration=duration_ms,
+                        success=success,
+                        properties=properties
+                    )
+            except Exception as telemetry_err:
+                logger.debug(f"Failed to track telemetry: {telemetry_err}")

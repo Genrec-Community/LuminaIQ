@@ -17,12 +17,23 @@ from typing import Generator
 # These stubs allow Settings to load; unit tests mock the actual services.
 # ---------------------------------------------------------------------------
 _STUB_ENV = {
-    # Required fields missing from local .env
+    # Azure OpenAI (required by Settings)
     "AZURE_OPENAI_API_KEY": "stub-azure-key-for-tests",
     "AZURE_OPENAI_ENDPOINT": "https://stub.openai.azure.com/",
     "AZURE_OPENAI_DEPLOYMENT": "stub-deployment",
-    # Extra keys in .env that Settings now forbids — remove them so pydantic
-    # doesn't raise "Extra inputs are not permitted".
+    # Supabase (required by Settings)
+    "SUPABASE_URL": "https://stub.supabase.co",
+    "SUPABASE_KEY": "stub-supabase-anon-key",
+    "SUPABASE_SERVICE_KEY": "stub-supabase-service-key",
+    # Webhook (required by Settings)
+    "MAIN_API_WEBHOOK_SECRET": "stub-webhook-secret",
+    "MAIN_API_WEBHOOK_URL": "https://stub.webhook.url",
+    # Embedding (required by Settings)
+    "EMBEDDING_API_KEY": "stub-embedding-key",
+    "EMBEDDING_BASE_URL": "https://stub.embedding.url",
+    "EMBEDDING_MODEL": "stub-embedding-model",
+    # App secret (required by Settings)
+    "SECRET_KEY": "stub-secret-key-for-tests",
 }
 for _k, _v in _STUB_ENV.items():
     os.environ.setdefault(_k, _v)

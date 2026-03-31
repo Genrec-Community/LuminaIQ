@@ -1,6 +1,6 @@
 """Document processing background tasks.
 
-**Validates: Requirements 18.1, 18.2**
+**Validates: Requirements 18.1, 18.2, 21.4**
 
 This module contains Celery tasks for document processing operations
 such as reprocessing with batch embedding generation (50 chunks/call)
@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional
 from core.celery_app import celery_app
 from core.job_manager import BackgroundJobManager, JobStatusEnum
 from core.redis_manager import get_redis_manager
+from utils.logger import set_correlation_id, clear_correlation_id
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +66,10 @@ def process_document(
     """
     logger.info(f"[DocumentTask] Processing document {document_id} for project {project_id}")
 
+    # Propagate correlation_id into the logger ContextVar for this task (Requirement 21.4)
+    if correlation_id:
+        set_correlation_id(correlation_id)
+
     # Placeholder — full pipeline is handled by DocumentService.process_document
     return {
         "document_id": document_id,
@@ -102,6 +107,10 @@ def reprocess_document(
     """
     log_prefix = f"[ReprocessTask job={job_id} doc={document_id}]"
     logger.info(f"{log_prefix} Starting document reprocessing")
+
+    # Propagate correlation_id into the logger ContextVar for this task (Requirement 21.4)
+    if correlation_id:
+        set_correlation_id(correlation_id)
 
     async def _reprocess():
         redis_manager = get_redis_manager()
@@ -317,3 +326,6 @@ def reprocess_document(
     except Exception as exc:
         logger.error(f"[ReprocessTask job={job_id}] Retrying due to: {exc}")
         raise self.retry(exc=exc, countdown=2 ** self.request.retries)
+    finally:
+        if correlation_id:
+            clear_correlation_id()

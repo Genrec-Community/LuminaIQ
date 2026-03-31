@@ -1,6 +1,6 @@
 """Knowledge graph generation background tasks.
 
-**Validates: Requirements 8.1, 8.2, 8.3, 8.4, 8.5**
+**Validates: Requirements 8.1, 8.2, 8.3, 8.4, 8.5, 21.4**
 
 This module contains Celery tasks for building and updating knowledge graphs
 from extracted topics, with progress tracking and distributed locking.
@@ -14,6 +14,7 @@ from core.celery_app import celery_app
 from core.job_manager import BackgroundJobManager, JobStatusEnum
 from core.redis_manager import get_redis_manager
 from core.lock_manager import DistributedLockManager
+from utils.logger import set_correlation_id, clear_correlation_id
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +75,10 @@ def build_knowledge_graph(
     """
     log_prefix = f"[KGTask job={job_id} project={project_id}]"
     logger.info(f"{log_prefix} Starting knowledge graph build, topics={len(topics)}, force_rebuild={force_rebuild}")
+
+    # Propagate correlation_id into the logger ContextVar for this task (Requirement 21.4)
+    if correlation_id:
+        set_correlation_id(correlation_id)
 
     async def _build():
         redis_manager = get_redis_manager()
@@ -180,3 +185,6 @@ def build_knowledge_graph(
     except Exception as exc:
         logger.error(f"{log_prefix} Retrying due to: {exc}")
         raise self.retry(exc=exc, countdown=2 ** self.request.retries)
+    finally:
+        if correlation_id:
+            clear_correlation_id()

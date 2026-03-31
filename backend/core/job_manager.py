@@ -148,7 +148,8 @@ class BackgroundJobManager:
         payload: Dict[str, Any],
         project_id: str,
         user_id: Optional[str] = None,
-        priority: int = 0
+        priority: int = 0,
+        correlation_id: Optional[str] = None,
     ) -> str:
         """
         Enqueue a background job.
@@ -159,6 +160,7 @@ class BackgroundJobManager:
             project_id: Associated project ID
             user_id: User who initiated the job
             priority: Job priority (higher = more important)
+            correlation_id: Request correlation ID for tracing (Requirement 21.4)
             
         Returns:
             Job ID
@@ -175,7 +177,7 @@ class BackgroundJobManager:
             project_id=project_id,
             user_id=user_id,
             created_at=now,
-            metadata={"payload": payload, "priority": priority}
+            metadata={"payload": payload, "priority": priority, "correlation_id": correlation_id}
         )
         
         # Store job in Redis
@@ -199,18 +201,59 @@ class BackgroundJobManager:
         
         logger.info(
             f"[BackgroundJobManager] Enqueued job {job_id} of type {job_type.value} "
-            f"for project={project_id}"
+            f"for project={project_id}, correlation_id={correlation_id}"
         )
         
         # Update queue length and track telemetry
         self._queue_length += 1
         self._track_job_queue_length()
         
-        # TODO: Actually enqueue to Celery
-        # celery_app.send_task(task_name, args=[payload], task_id=job_id)
-        
         return job_id
     
+    def dispatch_celery_task(
+        self,
+        task_name: str,
+        args: list,
+        kwargs: dict,
+        job_id: str,
+        correlation_id: Optional[str] = None,
+    ) -> None:
+        """
+        Dispatch a Celery task with correlation_id propagated in task headers.
+
+        The correlation_id is passed in two ways so that BaseTask.__call__ can
+        pick it up regardless of how the worker reads it (Requirement 21.4):
+          1. Via ``apply_async(headers={"correlation_id": ...})`` — read by
+             ``BaseTask._get_correlation_id`` from ``self.request.headers``.
+          2. As a ``correlation_id`` kwarg — read as a fallback from
+             ``self.request.kwargs``.
+
+        Args:
+            task_name: Fully-qualified Celery task name.
+            args: Positional arguments for the task.
+            kwargs: Keyword arguments for the task.
+            job_id: Job ID used as the Celery task ID for correlation.
+            correlation_id: Request correlation ID to propagate.
+        """
+        from core.celery_app import celery_app  # local import to avoid circular dep
+
+        # Always include correlation_id in kwargs as a fallback
+        if correlation_id:
+            kwargs.setdefault("correlation_id", correlation_id)
+
+        celery_app.send_task(
+            task_name,
+            args=args,
+            kwargs=kwargs,
+            task_id=job_id,
+            headers={"correlation_id": correlation_id} if correlation_id else {},
+        )
+
+        logger.info(
+            f"[BackgroundJobManager] Dispatched Celery task {task_name} "
+            f"job_id={job_id}, correlation_id={correlation_id}"
+        )
+
     async def get_job_status(self, job_id: str) -> Optional[JobStatus]:
         """
         Get job status.
