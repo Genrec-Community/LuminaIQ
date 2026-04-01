@@ -160,22 +160,22 @@ This implementation plan transforms the LuminaIQ backend into a production-grade
     - Test job persistence
     - _Requirements: 7.1, 7.2, 10.1_
 
-- [ ] 8. Implement background job tasks
-  - [ ] 8.1 Create knowledge graph build background task
+- [x] 8. Implement background job tasks
+  - [x] 8.1 Create knowledge graph build background task
     - Create backend/tasks/knowledge_graph_tasks.py with build_knowledge_graph Celery task
     - Implement progress tracking (update Redis every 10%)
     - Add distributed lock acquisition for project_id
     - Return job_id immediately to client
     - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
 
-  - [ ] 8.2 Create batch notes generation background task
+  - [x] 8.2 Create batch notes generation background task
     - Create backend/tasks/notes_tasks.py with generate_batch_notes Celery task
     - Implement concurrency limit of 2 LLM calls
     - Track progress (current/total * 100)
     - Store completed notes in Supabase
     - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5_
 
-  - [ ] 8.3 Create document reprocessing background task
+  - [x] 8.3 Create document reprocessing background task
     - Create backend/tasks/document_tasks.py with reprocess_document Celery task
     - Implement batch embedding generation (50 chunks per API call)
     - Implement batch vector upsert (100 vectors per operation)
@@ -292,20 +292,20 @@ This implementation plan transforms the LuminaIQ backend into a production-grade
     - Test custom metrics tracking
     - _Requirements: 20.1, 20.2, 20.3_
 
-- [ ] 14. Implement structured logging with correlation IDs
+- [x] 14. Implement structured logging with correlation IDs
   - [x] 14.1 Create structured logger with correlation ID support
     - Modify backend/utils/logger.py to support JSON structured logging
     - Add correlation_id field to all log entries
     - Include timestamp, level, message, context fields
     - _Requirements: 21.2, 21.3_
 
-  - [ ] 14.2 Add correlation ID middleware
+  - [x] 14.2 Add correlation ID middleware
     - Create middleware to generate unique correlation_id for each request
     - Store correlation_id in request.state
     - Add X-Correlation-ID response header
     - _Requirements: 21.1, 21.5_
 
-  - [ ] 14.3 Propagate correlation IDs to background jobs
+  - [x] 14.3 Propagate correlation IDs to background jobs
     - Pass correlation_id to Celery tasks in task metadata
     - Include correlation_id in all job-related logs
     - _Requirements: 21.4_
@@ -316,15 +316,15 @@ This implementation plan transforms the LuminaIQ backend into a production-grade
     - Test correlation ID propagation
     - _Requirements: 21.1, 21.2, 21.3_
 
-- [ ] 15. Implement distributed tracing
-  - [ ] 15.1 Add OpenTelemetry tracing spans
+- [x] 15. Implement distributed tracing
+  - [x] 15.1 Add OpenTelemetry tracing spans
     - Create trace spans for embedding generation
     - Create trace spans for vector search operations
     - Create trace spans for LLM API calls
     - Create trace spans for database queries
     - _Requirements: 22.1, 22.3_
 
-  - [ ] 15.2 Configure trace context propagation
+  - [x] 15.2 Configure trace context propagation
     - Link child spans to parent spans
     - Send trace data to Application Insights
     - _Requirements: 22.2, 22.4_
@@ -334,17 +334,17 @@ This implementation plan transforms the LuminaIQ backend into a production-grade
     - Test trace context propagation
     - _Requirements: 22.1, 22.4_
 
-- [ ] 16. Checkpoint - Verify observability infrastructure
+- [x] 16. Checkpoint - Verify observability infrastructure
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 17. Implement database connection pooling
-  - [ ] 17.1 Configure Supabase connection pool
+- [x] 17. Implement database connection pooling
+  - [x] 17.1 Configure Supabase connection pool
     - Modify backend/db/client.py to use connection pooling
     - Set min_size=5, max_size=20, timeout=10 seconds
     - Monitor connection pool metrics (active, idle, waiting)
     - _Requirements: 15.1, 15.2, 15.3_
 
-  - [ ] 17.2 Add connection pool monitoring
+  - [x] 17.2 Add connection pool monitoring
     - Log warning when pool utilization > 80%
     - Track connection pool metrics in telemetry
     - _Requirements: 15.4, 15.5_

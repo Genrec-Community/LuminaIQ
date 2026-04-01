@@ -11,7 +11,7 @@ Tables managed:
   8. study_streaks
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from datetime import date, datetime, timedelta
 from db.client import get_supabase_client
 from utils.logger import logger

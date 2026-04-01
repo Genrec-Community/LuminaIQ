@@ -1,8 +1,6 @@
 """Unit tests for RedisCacheManager."""
 
 import pytest
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from core.redis_manager import RedisCacheManager
 

@@ -5,6 +5,13 @@ from utils.logger import logger
 import os
 import hashlib
 import json
+from contextlib import contextmanager
+
+
+@contextmanager
+def _null_ctx():
+    """No-op context manager used when telemetry is unavailable."""
+    yield None
 
 class EmbeddingService:
     """
@@ -149,48 +156,64 @@ class EmbeddingService:
 
             import time
             start_time = time.time()
-            
-            embeddings = []
-            texts_to_generate = []
-            text_indices = []
-            
-            # Check cache for each text
-            for i, text in enumerate(texts):
-                prefixed_text = self._add_passage_prefix([text])[0]
-                cached_embedding = await self._get_cached_embedding(prefixed_text)
-                
-                if cached_embedding:
-                    embeddings.append(cached_embedding)
-                    self._track_cache_hit()
-                else:
-                    embeddings.append(None)  # Placeholder
-                    texts_to_generate.append(text)
-                    text_indices.append(i)
-                    self._track_cache_miss()
-            
-            # Generate embeddings for cache misses
-            if texts_to_generate:
-                prefixed_texts = self._add_passage_prefix(texts_to_generate)
-                generated_embeddings = await self.embeddings.aembed_documents(prefixed_texts)
-                
-                # Store in cache and update results
-                for idx, embedding in zip(text_indices, generated_embeddings):
-                    embeddings[idx] = embedding
-                    prefixed_text = self._add_passage_prefix([texts[idx]])[0]
-                    await self._cache_embedding(prefixed_text, embedding)
-            
-            # Track embedding throughput
-            duration = time.time() - start_time
-            if duration > 0:
-                embeddings_per_second = len(texts) / duration
-                self._track_embedding_throughput(
-                    embeddings_per_second=embeddings_per_second,
-                    batch_size=len(texts),
-                    cache_hits=len(texts) - len(texts_to_generate),
-                    cache_misses=len(texts_to_generate)
-                )
-            
-            return embeddings
+
+            telemetry = self._get_telemetry()
+            span_props = {
+                "operation": "generate_embeddings",
+                "batch_size": len(texts),
+                "model": settings.EMBEDDING_MODEL,
+            }
+
+            with (telemetry.start_span("embedding.generate_batch", properties=span_props) if telemetry else _null_ctx()) as span:
+                embeddings = []
+                texts_to_generate = []
+                text_indices = []
+
+                # Check cache for each text
+                for i, text in enumerate(texts):
+                    prefixed_text = self._add_passage_prefix([text])[0]
+                    cached_embedding = await self._get_cached_embedding(prefixed_text)
+
+                    if cached_embedding:
+                        embeddings.append(cached_embedding)
+                        self._track_cache_hit()
+                    else:
+                        embeddings.append(None)  # Placeholder
+                        texts_to_generate.append(text)
+                        text_indices.append(i)
+                        self._track_cache_miss()
+
+                # Generate embeddings for cache misses
+                if texts_to_generate:
+                    prefixed_texts = self._add_passage_prefix(texts_to_generate)
+                    generated_embeddings = await self.embeddings.aembed_documents(prefixed_texts)
+
+                    # Store in cache and update results
+                    for idx, embedding in zip(text_indices, generated_embeddings):
+                        embeddings[idx] = embedding
+                        prefixed_text = self._add_passage_prefix([texts[idx]])[0]
+                        await self._cache_embedding(prefixed_text, embedding)
+
+                # Track embedding throughput
+                duration = time.time() - start_time
+                cache_hits = len(texts) - len(texts_to_generate)
+                cache_misses = len(texts_to_generate)
+
+                if span:
+                    span.set_attribute("cache_hits", cache_hits)
+                    span.set_attribute("cache_misses", cache_misses)
+                    span.set_attribute("api_calls_made", len(texts_to_generate))
+
+                if duration > 0:
+                    embeddings_per_second = len(texts) / duration
+                    self._track_embedding_throughput(
+                        embeddings_per_second=embeddings_per_second,
+                        batch_size=len(texts),
+                        cache_hits=cache_hits,
+                        cache_misses=cache_misses,
+                    )
+
+                return embeddings
 
         except Exception as e:
             logger.error(f"Error generating embeddings: {str(e)}")
@@ -204,22 +227,34 @@ class EmbeddingService:
         """
         try:
             prefixed_text = self._add_query_prefix(text)
-            
-            # Check cache first
-            cached_embedding = await self._get_cached_embedding(prefixed_text)
-            if cached_embedding:
-                self._track_cache_hit()
-                return cached_embedding
-            
-            # Cache miss - generate embedding
-            self._track_cache_miss()
-            embedding = await self.embeddings.aembed_query(prefixed_text)
-            
-            # Store in cache
-            await self._cache_embedding(prefixed_text, embedding)
-            
-            return embedding
-            
+
+            telemetry = self._get_telemetry()
+            span_props = {
+                "operation": "generate_embedding",
+                "model": settings.EMBEDDING_MODEL,
+                "text_length": len(text),
+            }
+
+            with (telemetry.start_span("embedding.generate_query", properties=span_props) if telemetry else _null_ctx()) as span:
+                # Check cache first
+                cached_embedding = await self._get_cached_embedding(prefixed_text)
+                if cached_embedding:
+                    self._track_cache_hit()
+                    if span:
+                        span.set_attribute("cache_hit", True)
+                    return cached_embedding
+
+                # Cache miss - generate embedding
+                self._track_cache_miss()
+                if span:
+                    span.set_attribute("cache_hit", False)
+                embedding = await self.embeddings.aembed_query(prefixed_text)
+
+                # Store in cache
+                await self._cache_embedding(prefixed_text, embedding)
+
+                return embedding
+
         except Exception as e:
             logger.error(f"Error generating embedding: {str(e)}")
             raise

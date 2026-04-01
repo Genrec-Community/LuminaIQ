@@ -5,6 +5,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from api.v1.api import api_router
 from config.settings import settings
 from utils.logger import setup_uvicorn_log_filter, logger
+from middleware.correlation_id import CorrelationIDMiddleware
 from middleware.rate_limit import RateLimitMiddleware
 from middleware.telemetry import TelemetryMiddleware
 import asyncio
@@ -101,11 +102,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Telemetry middleware (should be early in the chain to track all requests)
+# Telemetry middleware (tracks all requests; reads correlation_id set by CorrelationIDMiddleware)
 app.add_middleware(TelemetryMiddleware)
 
 # Rate limiting middleware
 app.add_middleware(RateLimitMiddleware)
+
+# Correlation ID middleware — added last so it runs FIRST (Starlette reverses order).
+# Generates/propagates X-Correlation-ID, stores in request.state, wires the logger ContextVar.
+app.add_middleware(CorrelationIDMiddleware)
 
 
 @app.on_event("startup")

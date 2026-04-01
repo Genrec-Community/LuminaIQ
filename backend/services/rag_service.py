@@ -2,7 +2,6 @@ from typing import List, Dict, Any, Optional
 import asyncio
 from services.embedding_service import embedding_service
 from services.qdrant_service import qdrant_service
-from services.llm_service import llm_service
 from db.client import get_supabase_client
 from config.settings import settings
 from utils.logger import logger
@@ -11,13 +10,11 @@ from core.redis_manager import get_redis_manager
 from core.semantic_cache import SemanticCacheService
 
 # LangChain Imports
-from langchain_qdrant import QdrantVectorStore
 from langchain_openai import AzureChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.messages import HumanMessage, AIMessage
-from langchain_core.runnables import RunnableConfig
 
 
 # Retry decorator for handling 503 and transient errors
@@ -488,7 +485,7 @@ Context:
                         return
                     except Exception as fallback_err:
                         logger.error(f"Fallback also failed: {fallback_err}")
-                        yield f"Error: Service temporarily unavailable. Please try again in a moment."
+                        yield "Error: Service temporarily unavailable. Please try again in a moment."
                         return
 
                 logger.error(f"Error in RAG stream: {str(e)}")

@@ -14,7 +14,6 @@ from fastapi.responses import StreamingResponse
 from jose import jwt, JWTError
 from config.settings import settings
 from utils.progress_manager import get_progress_manager
-from utils.logger import logger
 
 router = APIRouter()
 

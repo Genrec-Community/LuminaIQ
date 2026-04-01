@@ -7,7 +7,6 @@ and other frequently accessed data into Redis on application startup.
 """
 
 import asyncio
-import logging
 from typing import List
 from datetime import datetime, timedelta
 

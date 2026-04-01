@@ -7,7 +7,6 @@ from qdrant_client.models import (
     Filter,
     FieldCondition,
     MatchValue,
-    Range,
     PayloadSchemaType,
 )
 from config.settings import settings
@@ -15,8 +14,15 @@ from typing import List, Dict, Any, Optional
 from uuid import uuid4
 from utils.logger import logger
 from services.embedding_service import embedding_service
+from contextlib import contextmanager
 import asyncio
 import time
+
+
+@contextmanager
+def _null_ctx():
+    """No-op context manager used when telemetry is unavailable."""
+    yield None
 
 
 class QdrantService:
@@ -156,79 +162,89 @@ class QdrantService:
             )
             points.append(point)
 
-        # Retry logic with exponential backoff
-        last_error = None
-        for attempt in range(self.MAX_RETRIES):
-            try:
-                await self.async_client.upsert(collection_name=collection_name, points=points)
-                logger.info(f"Upserted {len(points)} chunks to {collection_name}")
-                success = True
-                
-                # Track successful dependency
-                duration_ms = (time.time() - start_time) * 1000
-                telemetry = self._get_telemetry()
-                if telemetry:
-                    telemetry.track_dependency(
-                        name=f"Qdrant upsert",
-                        dependency_type="qdrant",
-                        duration=duration_ms,
-                        success=True,
-                        properties={
-                            "operation": "upsert",
-                            "collection": collection_name,
-                            "points_count": len(points)
-                        }
-                    )
-                
-                return
-            except Exception as e:
-                last_error = e
-                error_str = str(e).lower()
+        telemetry = self._get_telemetry()
+        span_props = {
+            "operation": "upsert_chunks",
+            "collection": collection_name,
+            "points_count": len(points),
+        }
 
-                is_retryable = any(
-                    x in error_str
-                    for x in [
-                        "timeout",
-                        "timed out",
-                        "connection",
-                        "temporary",
-                        "unavailable",
-                        "reset",
-                        "broken pipe",
-                    ]
-                )
+        with (telemetry.start_span("qdrant.upsert_chunks", properties=span_props) if telemetry else _null_ctx()) as span:
+            # Retry logic with exponential backoff
+            last_error = None
+            for attempt in range(self.MAX_RETRIES):
+                try:
+                    await self.async_client.upsert(collection_name=collection_name, points=points)
+                    logger.info(f"Upserted {len(points)} chunks to {collection_name}")
+                    success = True
 
-                if is_retryable and attempt < self.MAX_RETRIES - 1:
-                    delay = self.RETRY_BASE_DELAY * (2 ** attempt)
-                    logger.warning(
-                        f"Qdrant upsert failed (attempt {attempt + 1}/{self.MAX_RETRIES}), "
-                        f"retrying in {delay:.1f}s: {e}"
-                    )
-                    await asyncio.sleep(delay)
-                else:
-                    logger.error(f"Error upserting chunks: {str(e)}")
-                    
-                    # Track failed dependency
+                    # Track successful dependency
                     duration_ms = (time.time() - start_time) * 1000
-                    telemetry = self._get_telemetry()
                     if telemetry:
                         telemetry.track_dependency(
-                            name=f"Qdrant upsert",
+                            name="Qdrant upsert",
                             dependency_type="qdrant",
                             duration=duration_ms,
-                            success=False,
+                            success=True,
                             properties={
                                 "operation": "upsert",
                                 "collection": collection_name,
-                                "points_count": len(points),
-                                "error": str(e)
+                                "points_count": len(points)
                             }
                         )
-                    
-                    raise
 
-        if last_error:
-            raise last_error
+                    return
+                except Exception as e:
+                    last_error = e
+                    error_str = str(e).lower()
+
+                    is_retryable = any(
+                        x in error_str
+                        for x in [
+                            "timeout",
+                            "timed out",
+                            "connection",
+                            "temporary",
+                            "unavailable",
+                            "reset",
+                            "broken pipe",
+                        ]
+                    )
+
+                    if is_retryable and attempt < self.MAX_RETRIES - 1:
+                        delay = self.RETRY_BASE_DELAY * (2 ** attempt)
+                        logger.warning(
+                            f"Qdrant upsert failed (attempt {attempt + 1}/{self.MAX_RETRIES}), "
+                            f"retrying in {delay:.1f}s: {e}"
+                        )
+                        await asyncio.sleep(delay)
+                    else:
+                        logger.error(f"Error upserting chunks: {str(e)}")
+
+                        # Track failed dependency
+                        duration_ms = (time.time() - start_time) * 1000
+                        if telemetry:
+                            telemetry.track_dependency(
+                                name="Qdrant upsert",
+                                dependency_type="qdrant",
+                                duration=duration_ms,
+                                success=False,
+                                properties={
+                                    "operation": "upsert",
+                                    "collection": collection_name,
+                                    "points_count": len(points),
+                                    "error": str(e)
+                                }
+                            )
+                        if span:
+                            from opentelemetry.trace import Status, StatusCode
+                            span.set_status(Status(StatusCode.ERROR, str(e)))
+                            span.record_exception(e)
+
+                        raise
+
+            if last_error:
+                raise last_error
 
     def get_vector_store(self, collection_name: str):
         """Get LangChain VectorStore instance (uses sync client for LangChain compat)"""
@@ -250,87 +266,69 @@ class QdrantService:
         """Search for similar vectors (fully async — non-blocking)"""
         start_time = time.time()
         success = False
-        
-        try:
-            from qdrant_client.models import Filter, FieldCondition, MatchValue
 
-            query_filter = None
-            if filter_conditions and "document_ids" in filter_conditions:
-                should_conditions = [
-                    FieldCondition(key="document_id", match=MatchValue(value=doc_id))
-                    for doc_id in filter_conditions["document_ids"]
-                ]
-                if should_conditions:
-                    query_filter = Filter(should=should_conditions)
+        telemetry = self._get_telemetry()
+        span_props = {
+            "operation": "search",
+            "collection": collection_name,
+            "limit": limit,
+        }
 
+        with (telemetry.start_span("qdrant.search", properties=span_props) if telemetry else _null_ctx()) as span:
             try:
-                results = (await self.async_client.query_points(
-                    collection_name=collection_name,
-                    query=query_vector,
-                    limit=limit,
-                    query_filter=query_filter,
-                )).points
-            except Exception as search_err:
-                if "Index required" in str(search_err):
-                    logger.warning(
-                        f"Index missing for {collection_name}, attempting to fix..."
-                    )
-                    await self._ensure_indexes(collection_name)
+                from qdrant_client.models import Filter, FieldCondition, MatchValue
+
+                query_filter = None
+                if filter_conditions and "document_ids" in filter_conditions:
+                    should_conditions = [
+                        FieldCondition(key="document_id", match=MatchValue(value=doc_id))
+                        for doc_id in filter_conditions["document_ids"]
+                    ]
+                    if should_conditions:
+                        query_filter = Filter(should=should_conditions)
+
+                try:
                     results = (await self.async_client.query_points(
                         collection_name=collection_name,
                         query=query_vector,
                         limit=limit,
                         query_filter=query_filter,
                     )).points
-                else:
-                    raise search_err
+                except Exception as search_err:
+                    if "Index required" in str(search_err):
+                        logger.warning(
+                            f"Index missing for {collection_name}, attempting to fix..."
+                        )
+                        await self._ensure_indexes(collection_name)
+                        results = (await self.async_client.query_points(
+                            collection_name=collection_name,
+                            query=query_vector,
+                            limit=limit,
+                            query_filter=query_filter,
+                        )).points
+                    else:
+                        raise search_err
 
-            hits = []
-            for result in results:
-                hits.append(
-                    {
-                        "id": result.id,
-                        "score": result.score,
-                        "text": result.payload.get("text", ""),
-                        "document_id": result.payload.get("document_id"),
-                        "chunk_id": result.payload.get("chunk_id"),
-                    }
-                )
+                hits = []
+                for result in results:
+                    hits.append(
+                        {
+                            "id": result.id,
+                            "score": result.score,
+                            "text": result.payload.get("text", ""),
+                            "document_id": result.payload.get("document_id"),
+                            "chunk_id": result.payload.get("chunk_id"),
+                        }
+                    )
 
-            logger.info(f"Found {len(hits)} results in {collection_name}")
-            success = True
-            
-            # Track successful dependency
-            duration_ms = (time.time() - start_time) * 1000
-            telemetry = self._get_telemetry()
-            if telemetry:
-                telemetry.track_dependency(
-                    name=f"Qdrant search",
-                    dependency_type="qdrant",
-                    duration=duration_ms,
-                    success=True,
-                    properties={
-                        "operation": "search",
-                        "collection": collection_name,
-                        "limit": limit,
-                        "results_count": len(hits)
-                    }
-                )
-            
-            return hits
+                logger.info(f"Found {len(hits)} results in {collection_name}")
+                success = True
 
-        except Exception as e:
-            if "Not found: Collection" in str(e) or "doesn't exist" in str(e):
-                logger.warning(
-                    f"Collection {collection_name} not found during search. Returning empty."
-                )
-                
-                # Track as successful (expected behavior)
+                # Track successful dependency
                 duration_ms = (time.time() - start_time) * 1000
-                telemetry = self._get_telemetry()
                 if telemetry:
                     telemetry.track_dependency(
-                        name=f"Qdrant search",
+                        name="Qdrant search",
                         dependency_type="qdrant",
                         duration=duration_ms,
                         success=True,
@@ -338,33 +336,62 @@ class QdrantService:
                             "operation": "search",
                             "collection": collection_name,
                             "limit": limit,
-                            "results_count": 0,
-                            "note": "collection_not_found"
+                            "results_count": len(hits)
                         }
                     )
-                
-                return []
-            
-            logger.error(f"Error searching: {str(e)}")
-            
-            # Track failed dependency
-            duration_ms = (time.time() - start_time) * 1000
-            telemetry = self._get_telemetry()
-            if telemetry:
-                telemetry.track_dependency(
-                    name=f"Qdrant search",
-                    dependency_type="qdrant",
-                    duration=duration_ms,
-                    success=False,
-                    properties={
-                        "operation": "search",
-                        "collection": collection_name,
-                        "limit": limit,
-                        "error": str(e)
-                    }
-                )
-            
-            raise
+                if span:
+                    span.set_attribute("results_count", len(hits))
+
+                return hits
+
+            except Exception as e:
+                if "Not found: Collection" in str(e) or "doesn't exist" in str(e):
+                    logger.warning(
+                        f"Collection {collection_name} not found during search. Returning empty."
+                    )
+
+                    # Track as successful (expected behavior)
+                    duration_ms = (time.time() - start_time) * 1000
+                    if telemetry:
+                        telemetry.track_dependency(
+                            name="Qdrant search",
+                            dependency_type="qdrant",
+                            duration=duration_ms,
+                            success=True,
+                            properties={
+                                "operation": "search",
+                                "collection": collection_name,
+                                "limit": limit,
+                                "results_count": 0,
+                                "note": "collection_not_found"
+                            }
+                        )
+
+                    return []
+
+                logger.error(f"Error searching: {str(e)}")
+
+                # Track failed dependency
+                duration_ms = (time.time() - start_time) * 1000
+                if telemetry:
+                    telemetry.track_dependency(
+                        name="Qdrant search",
+                        dependency_type="qdrant",
+                        duration=duration_ms,
+                        success=False,
+                        properties={
+                            "operation": "search",
+                            "collection": collection_name,
+                            "limit": limit,
+                            "error": str(e)
+                        }
+                    )
+                if span:
+                    from opentelemetry.trace import Status, StatusCode
+                    span.set_status(Status(StatusCode.ERROR, str(e)))
+                    span.record_exception(e)
+
+                raise
 
     async def get_initial_chunks(
         self, collection_name: str, document_id: str, limit: int = 10

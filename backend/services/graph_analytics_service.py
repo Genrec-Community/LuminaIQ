@@ -8,7 +8,7 @@ Features:
 4. Session-based analytics for learning patterns
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from datetime import datetime, timedelta
 from collections import Counter, defaultdict
 from db.client import get_supabase_client
@@ -18,7 +18,6 @@ from services.qdrant_service import qdrant_service
 from utils.logger import logger
 from utils.performance import PerformanceTracker
 from uuid import uuid4
-import json
 
 
 class GraphAnalyticsService:

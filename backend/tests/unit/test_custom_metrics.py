@@ -10,7 +10,7 @@ Tests the custom metrics tracking functionality for:
 """
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 from core.telemetry import TelemetryService
 
 

@@ -17,11 +17,9 @@ DSA Used:
 - Priority Queue for weighted path finding
 """
 
-import heapq
 from collections import defaultdict, deque
-from typing import List, Dict, Any, Optional, Set, Tuple
+from typing import List, Dict, Any, Optional
 from db.client import get_supabase_client, async_db
-from services.llm_service import llm_service
 from utils.logger import logger
 from uuid import uuid4
 import json

@@ -6,8 +6,7 @@ Integration tests for custom metrics tracking.
 Tests the end-to-end custom metrics tracking functionality.
 """
 
-import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 
 class TestCustomMetricsIntegration:

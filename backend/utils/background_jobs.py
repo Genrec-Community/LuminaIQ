@@ -14,7 +14,6 @@ Heavy endpoints (/heavy/*) return a job_id and process in background
 
 import asyncio
 import uuid
-import time
 from typing import Dict, Any, Optional, Callable
 from datetime import datetime, timedelta
 from enum import Enum

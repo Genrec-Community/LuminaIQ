@@ -6,7 +6,7 @@ from models.schemas import (
     MCQSubmitRequest,
     MCQSubmitResponse,
 )
-from typing import Any, List, Dict
+from typing import Any, Dict
 from api.deps import get_current_user
 
 router = APIRouter()

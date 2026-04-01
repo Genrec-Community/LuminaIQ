@@ -4,8 +4,7 @@ from loguru import logger
 import os
 import json
 from contextvars import ContextVar
-from typing import Optional, Dict, Any
-from datetime import datetime
+from typing import Optional, Any
 
 # Create logs directory if it doesn't exist
 os.makedirs("logs", exist_ok=True)

@@ -16,11 +16,9 @@ DSA Used:
 import heapq
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Tuple
-from collections import defaultdict
 from db.client import get_supabase_client
 from utils.logger import logger
 from uuid import uuid4
-import math
 
 
 class PerformanceTracker:
