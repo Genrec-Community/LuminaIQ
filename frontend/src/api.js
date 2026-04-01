@@ -9,7 +9,7 @@ export const api = axios.create({
     headers: {
         'Content-Type': 'application/json',
     },
-    timeout: 15000, // 15s — fail fast on cold-start backends
+    timeout: 60000, // 60s — handles cloud cold starts (Azure App Service can take 30-50s to wake)
 });
 
 // Inject auth token on every request from localStorage.
@@ -118,8 +118,14 @@ export const uploadDocument = async (projectId, file, onProgress, bookOptions = 
     return response.data;
 };
 export const getDocuments = async (projectId) => {
-    const response = await api.get(`/documents/${projectId}`, { params: { _: Date.now() } });
+    const response = await api.get(`/documents/${projectId}`);
     return response.data;
+};
+
+// Returns a streamable/signed URL for viewing a document in the PDF viewer
+export const getDocumentUrl = async (projectId, documentId) => {
+    const response = await api.get(`/documents/${projectId}/${documentId}/url`);
+    return response.data; // { url: string }
 };
 
 // ============== Book Store API ==============

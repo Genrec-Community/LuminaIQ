@@ -44,6 +44,7 @@ import {
 import {
     uploadDocument,
     getDocuments,
+    getDocumentUrl,
     getChatHistory, // Imported
     chatMessage,
     chatMessageStream, // Imported
@@ -97,6 +98,7 @@ import AddDocumentModal from '../components/AddDocumentModal';
 
 // Chat Agentic Components
 import { CommandPicker, CommandParamForm } from '../components/chat/ChatCommands';
+import { ToolLoadingCard, ToolResultCard, ToolErrorCard } from '../components/chat/ToolResultCard';
 import PDFViewer from '../components/chat/PDFViewer';
 import ErrorBoundary from '../components/ErrorBoundary';
 
@@ -190,6 +192,10 @@ const ProjectView = () => {
     const [preGeneratedQA, setPreGeneratedQA] = useState(null);
     const [preGeneratedQuiz, setPreGeneratedQuiz] = useState(null);
 
+    // Auto-generate flags — set by LearningPath when user clicks "Generate Notes" / "Start Q&A"
+    const [notesAutoGenerate, setNotesAutoGenerate] = useState(false);
+    const [qaAutoGenerate, setQAAutoGenerate] = useState(false);
+
     // Mindmap & Flashcards State (shown inline, only from learning path)
     const [mindmapTopic, setMindmapTopic] = useState(null);
     const [mindmapDocs, setMindmapDocs] = useState([]);
@@ -236,6 +242,7 @@ const ProjectView = () => {
     // Add loading state for ProjectView
     const [projectViewLoading, setProjectViewLoading] = useState(true);
     const [fetchError, setFetchError] = useState(false);
+    const [isSlowLoad, setIsSlowLoad] = useState(false);
 
     // Ref to ensure fetchTopics is only called once per mount, not on every tab change
     const topicsFetchedRef = useRef(false);
@@ -265,20 +272,26 @@ const ProjectView = () => {
         };
 
         const initialLoad = async () => {
-            // 10s hard timeout — skeleton must never hang forever
-            const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('timeout')), 10000)
-            );
+            // Show 'waking up' banner if load takes more than 3s
+            const slowTimer = setTimeout(() => {
+                setIsSlowLoad(true);
+            }, 3000);
 
             let docData = null;
             try {
-                docData = await Promise.race([fetchDocuments(), timeoutPromise]);
+                // No local race-timeout — rely on the axios 60s timeout so Azure
+                // cold starts (30-50s) don't prematurely trigger the error screen.
+                docData = await fetchDocuments();
             } catch (err) {
-                console.warn('Initial document load failed or timed out:', err.message);
+                console.warn('Initial document load failed:', err.message);
                 setFetchError(true);
                 setProjectViewLoading(false);
                 clearInterval(rotationInterval);
+                clearTimeout(slowTimer);
                 return;
+            } finally {
+                clearTimeout(slowTimer);
+                setIsSlowLoad(false);
             }
 
             // Restore chat messages from session cache, or start fresh
@@ -846,7 +859,17 @@ const ProjectView = () => {
     };
 
     if (projectViewLoading && documents.length === 0) {
-        return <ProjectViewSkeleton />;
+        return (
+            <div className="relative">
+                <ProjectViewSkeleton />
+                {isSlowLoad && (
+                    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-[#4A3B32] text-white px-5 py-3 rounded-2xl shadow-xl text-sm">
+                        <WifiOff className="h-4 w-4 shrink-0 text-[#C8A288]" />
+                        <span>Taking longer than expected… backend may be waking up</span>
+                    </div>
+                )}
+            </div>
+        );
     }
 
     // Error fallback — initial load timed out and no docs

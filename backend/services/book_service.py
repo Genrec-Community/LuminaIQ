@@ -4,9 +4,21 @@ Book Store Service
 Handles all operations for the Book Store:
 - Listing public books (with search + tag filtering)
 - Reading a user's own books
-- Importing a public book into a project (copies txt, re-embeds)
+- Importing a public book into a project
 - Updating book metadata / visibility
 - Deleting a book (owner only)
+
+## Book Import Strategy (Fast Path)
+
+When a user imports from the store, the book is already embedded in Qdrant
+under the original uploader's project collection. We clone those vectors
+directly into the importer's project collection and copy the topics from
+the source document — no re-embedding, no LLM calls.
+
+Import time: ~2-5 seconds instead of 2-5 minutes.
+
+Fallback: If source vectors are not found (edge case — source doc deleted),
+we fall back to the old re-embedding pipeline so imports never silently fail.
 """
 
 import asyncio
@@ -56,7 +68,6 @@ class BookService:
             )
 
             if search:
-                # Use ilike for case-insensitive partial match across key fields
                 q = q.or_(
                     f"title.ilike.%{search}%,"
                     f"author.ilike.%{search}%,"
@@ -64,7 +75,6 @@ class BookService:
                 )
 
             if tags:
-                # Filter books that contain ALL the requested tags (Postgres array overlap)
                 q = q.contains("tags", tags)
 
             return q.execute()
@@ -121,7 +131,6 @@ class BookService:
             if not result.data:
                 return None
             book = result.data[0]
-            # Check access: public books are visible to all; private only to owner
             if not book["is_public"] and book["user_id"] != user_id:
                 return None
             return book
@@ -133,8 +142,11 @@ class BookService:
         self, book_id: str, project_id: str, user_id: str
     ) -> Optional[Dict]:
         """
-        Check if a book has already been imported into a project.
-        Returns the import record or None.
+        Check if a book has already been imported into a project AND that the
+        resulting document still exists.
+
+        If the user deleted the document after importing, the book_imports row
+        becomes stale. We clean it up so the user can re-import freely.
         """
         def _query():
             return (
@@ -150,13 +162,52 @@ class BookService:
 
         try:
             result = await async_db(_query)
-            return result.data if result else None
+            import_record = result.data if result else None
+
+            if not import_record:
+                return None
+
+            # Verify the linked document still exists
+            document_id = import_record.get("document_id")
+            if document_id:
+                def _check_doc():
+                    return (
+                        get_supabase_client()
+                        .table("documents")
+                        .select("id")
+                        .eq("id", document_id)
+                        .maybe_single()
+                        .execute()
+                    )
+
+                doc_result = await async_db(_check_doc)
+                if not doc_result or not doc_result.data:
+                    # Document was deleted — clean up the stale import record
+                    logger.info(
+                        f"[BookImport] Stale import record found for book {book_id} "
+                        f"(document {document_id} no longer exists). Cleaning up."
+                    )
+                    def _delete_stale():
+                        return (
+                            get_supabase_client()
+                            .table("book_imports")
+                            .delete()
+                            .eq("book_id", book_id)
+                            .eq("project_id", project_id)
+                            .eq("user_id", user_id)
+                            .execute()
+                        )
+                    await async_db(_delete_stale)
+                    return None  # Allow re-import
+
+            return import_record
+
         except Exception as e:
             logger.error(f"Failed to check import status: {e}")
             return None
 
     # ──────────────────────────────────────────────────────────────────────────
-    # WRITE
+    # WRITE — Import (fast vector-clone path)
     # ──────────────────────────────────────────────────────────────────────────
 
     async def import_book(
@@ -165,31 +216,27 @@ class BookService:
         """
         Import a public book into a user's project.
 
-        Flow:
-        1. Validate book exists and is public
-        2. Check for duplicate import
-        3. Read the extracted .txt from Supabase texts/ bucket
-        4. Create a new document record in the target project
-        5. Save the txt to the target project's path in texts/ bucket
-        6. Trigger background embedding pipeline
-        7. Record the import in book_imports
-        8. Increment import_count on books table
+        The HTTP response returns in ~1 second — only lightweight DB work
+        is done synchronously:
+          1. Validate book + duplicate check
+          2. Create document record (status: pending)
+          3. Record import + increment counter
+          4. Return the document to the frontend immediately
 
-        Returns the new document record.
+        All heavy I/O (text copy, vector clone, topic copy) is fired into a
+        background task so the "Added!" tick appears instantly in the UI.
         """
-        # 1. Validate book
+        # ── Synchronous: validate ──────────────────────────────────────────
         book = await self.get_book(book_id, user_id)
         if not book:
             raise ValueError("Book not found or not accessible")
         if not book["is_public"]:
             raise PermissionError("This book is not publicly available")
 
-        # 2. Check duplicate
         existing = await self.check_import_status(book_id, project_id, user_id)
         if existing:
             raise ValueError("This book has already been imported into this project")
 
-        # 3. Read extracted text from texts/ bucket
         source_text_path = book.get("text_path")
         if not source_text_path:
             raise ValueError(
@@ -197,25 +244,12 @@ class BookService:
                 "Please ask the owner to re-process it."
             )
 
-        def _read_text():
-            supabase = get_supabase_client()
-            return supabase.storage.from_(settings.BOOK_IMPORT_TEXTS_BUCKET).download(
-                source_text_path
-            )
-
-        try:
-            text_bytes = await async_db(_read_text)
-            text_content = text_bytes.decode("utf-8")
-        except Exception as e:
-            logger.error(f"Failed to download text for book {book_id}: {e}")
-            raise ValueError("Failed to read book content from storage")
-
-        # 4. Create a new document record in the target project
+        # ── Synchronous: create document record ────────────────────────────
         doc_data = {
             "project_id": project_id,
             "filename": f"{book['title']}.txt",
             "file_type": "text/plain",
-            "file_size": len(text_bytes),
+            "file_size": 0,  # will be updated by background task
             "upload_status": "pending",
             "user_id": user_id,
         }
@@ -235,45 +269,7 @@ class BookService:
         document = doc_result.data[0]
         document_id = document["id"]
 
-        # 5. Save text to target project path in texts/ bucket
-        target_text_path = f"{project_id}/{document_id}.txt"
-        try:
-            def _upload_text():
-                get_supabase_client().storage.from_(
-                    settings.BOOK_IMPORT_TEXTS_BUCKET
-                ).upload(
-                    file=text_bytes,
-                    path=target_text_path,
-                    file_options={"content-type": "text/plain"},
-                )
-
-            await async_db(_upload_text)
-
-            # Update document with text_storage_path
-            def _update_path():
-                return (
-                    get_supabase_client()
-                    .table("documents")
-                    .update({"text_storage_path": target_text_path})
-                    .eq("id", document_id)
-                    .execute()
-                )
-            await async_db(_update_path)
-        except Exception as e:
-            logger.warning(f"Failed to copy text to target path: {e}")
-            # Non-fatal — we'll still embed from in-memory text
-
-        # 6. Trigger embedding pipeline (non-blocking background task)
-        asyncio.create_task(
-            self._embed_imported_text(
-                document_id=document_id,
-                project_id=project_id,
-                filename=doc_data["filename"],
-                text_content=text_content,
-            )
-        )
-
-        # 7. Record the import
+        # ── Synchronous: record the import + increment counter ─────────────
         def _record_import():
             return (
                 get_supabase_client()
@@ -289,34 +285,265 @@ class BookService:
 
         await async_db(_record_import)
 
-        # 8. Increment import_count (best-effort)
         try:
             def _increment():
-                supabase = get_supabase_client()
-                current = (
-                    supabase.table("books")
-                    .select("import_count")
-                    .eq("id", book_id)
+                return (
+                    get_supabase_client()
+                    .rpc("increment_book_import_count", {"book_id_input": book_id})
+                    .execute()
+                )
+            await async_db(_increment)
+        except Exception:
+            try:
+                def _increment_fallback():
+                    supabase = get_supabase_client()
+                    current = (
+                        supabase.table("books")
+                        .select("import_count")
+                        .eq("id", book_id)
+                        .single()
+                        .execute()
+                    )
+                    count = (current.data or {}).get("import_count", 0) + 1
+                    return (
+                        supabase.table("books")
+                        .update({"import_count": count})
+                        .eq("id", book_id)
+                        .execute()
+                    )
+                await async_db(_increment_fallback)
+            except Exception as e:
+                logger.warning(f"Failed to increment import_count: {e}")
+
+        logger.info(
+            f"[BookImport] '{book['title']}' registered for project {project_id} "
+            f"as document {document_id}  — background clone starting"
+        )
+
+        # ── Background: text copy + vector clone + topics ──────────────────
+        asyncio.create_task(
+            self._background_clone(
+                book=book,
+                document_id=document_id,
+                project_id=project_id,
+                doc_filename=doc_data["filename"],
+                source_text_path=source_text_path,
+            )
+        )
+
+        return document
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Background clone — runs after the HTTP response is already sent
+    # ──────────────────────────────────────────────────────────────────────────
+
+    async def _background_clone(
+        self,
+        book: Dict,
+        document_id: str,
+        project_id: str,
+        doc_filename: str,
+        source_text_path: str,
+    ):
+        """
+        Runs in asyncio.create_task after the import endpoint has already
+        returned 200 to the frontend.
+
+        Steps:
+          1. Download source text from storage
+          2. Copy text to target project path
+          3. Resolve source document_id / project_id
+          4. Clone Qdrant vectors (fast path)
+          5. Copy topics + mark completed
+
+        If vector clone fails or finds 0 vectors → falls back to full
+        re-embedding pipeline (which also runs in background).
+        """
+        try:
+            # 1. Download source text
+            def _read_text():
+                return get_supabase_client().storage.from_(
+                    settings.BOOK_IMPORT_TEXTS_BUCKET
+                ).download(source_text_path)
+
+            text_bytes = await async_db(_read_text)
+            text_content = text_bytes.decode("utf-8")
+
+            # Update file_size now that we have the bytes
+            def _update_size():
+                return (
+                    get_supabase_client()
+                    .table("documents")
+                    .update({"file_size": len(text_bytes)})
+                    .eq("id", document_id)
+                    .execute()
+                )
+            await async_db(_update_size)
+
+            # 2. Copy text to target project path
+            target_text_path = f"{project_id}/{document_id}.txt"
+            try:
+                def _upload_text():
+                    get_supabase_client().storage.from_(
+                        settings.BOOK_IMPORT_TEXTS_BUCKET
+                    ).upload(
+                        file=text_bytes,
+                        path=target_text_path,
+                        file_options={"content-type": "text/plain"},
+                    )
+                await async_db(_upload_text)
+
+                def _update_path():
+                    return (
+                        get_supabase_client()
+                        .table("documents")
+                        .update({"text_storage_path": target_text_path})
+                        .eq("id", document_id)
+                        .execute()
+                    )
+                await async_db(_update_path)
+            except Exception as e:
+                logger.warning(f"[BackgroundClone] Text copy failed: {e}")
+
+            # 3. Resolve source document_id and source project_id
+            source_document_id = book.get("document_id")
+            source_project_id = None
+
+            if source_document_id:
+                try:
+                    def _get_source_doc():
+                        return (
+                            get_supabase_client()
+                            .table("documents")
+                            .select("project_id")
+                            .eq("id", source_document_id)
+                            .single()
+                            .execute()
+                        )
+                    src_doc = await async_db(_get_source_doc)
+                    if src_doc.data:
+                        source_project_id = src_doc.data.get("project_id")
+                except Exception as e:
+                    logger.warning(f"[BackgroundClone] Could not resolve source project: {e}")
+
+            # 4. Clone Qdrant vectors
+            vectors_cloned = 0
+            if source_document_id and source_project_id:
+                try:
+                    from services.qdrant_service import qdrant_service
+
+                    source_collection = f"project_{source_project_id}"
+                    target_collection = f"project_{project_id}"
+
+                    await qdrant_service.create_collection(target_collection)
+
+                    vectors_cloned = await qdrant_service.clone_document_vectors(
+                        source_collection=source_collection,
+                        target_collection=target_collection,
+                        source_document_id=source_document_id,
+                        target_document_id=document_id,
+                        target_document_name=doc_filename,
+                    )
+
+                    logger.info(
+                        f"[BackgroundClone] Cloned {vectors_cloned} vectors for "
+                        f"'{book['title']}' into project {project_id}"
+                    )
+                except Exception as e:
+                    logger.error(f"[BackgroundClone] Vector clone failed: {e}")
+
+            # 5. Finalize
+            if vectors_cloned > 0:
+                await self._copy_topics_and_complete(
+                    source_document_id=source_document_id,
+                    target_document_id=document_id,
+                )
+                logger.info(
+                    f"[BackgroundClone] '{book['title']}' completed (cloned {vectors_cloned} vectors)"
+                )
+            else:
+                logger.warning(
+                    f"[BackgroundClone] No vectors to clone for '{book['title']}' — "
+                    "falling back to full embedding pipeline"
+                )
+                await self._embed_imported_text(
+                    document_id=document_id,
+                    project_id=project_id,
+                    filename=doc_filename,
+                    text_content=text_content,
+                )
+
+        except Exception as e:
+            logger.error(f"[BackgroundClone] Fatal error for {document_id}: {e}")
+            await self._update_doc_status(document_id, "failed", str(e))
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Fast path helpers
+    # ──────────────────────────────────────────────────────────────────────────
+
+    async def _copy_topics_and_complete(
+        self,
+        source_document_id: str,
+        target_document_id: str,
+    ):
+        """
+        Copy topics from source document to target document and mark as completed.
+        Called immediately after a successful vector clone — no LLM needed.
+        """
+        try:
+            # Fetch source topics
+            def _get_topics():
+                return (
+                    get_supabase_client()
+                    .table("documents")
+                    .select("topics")
+                    .eq("id", source_document_id)
                     .single()
                     .execute()
                 )
-                count = (current.data or {}).get("import_count", 0) + 1
+
+            src = await async_db(_get_topics)
+            topics = (src.data or {}).get("topics") or []
+
+            # Update target with topics + completed status
+            def _complete():
                 return (
-                    supabase.table("books")
-                    .update({"import_count": count})
-                    .eq("id", book_id)
+                    get_supabase_client()
+                    .table("documents")
+                    .update({
+                        "upload_status": "completed",
+                        "topics": topics,
+                        "error_message": None,
+                    })
+                    .eq("id", target_document_id)
                     .execute()
                 )
 
-            await async_db(_increment)
-        except Exception as e:
-            logger.warning(f"Failed to increment import_count: {e}")
+            await async_db(_complete)
+            logger.info(
+                f"[BookImport] Document {target_document_id} marked completed "
+                f"with {len(topics)} topics (copied from {source_document_id})"
+            )
 
-        logger.info(
-            f"Book '{book['title']}' imported into project {project_id} "
-            f"as document {document_id}"
-        )
-        return document
+        except Exception as e:
+            logger.error(
+                f"[BookImport] Failed to copy topics/complete for {target_document_id}: {e}"
+            )
+            # Still mark as completed even without topics
+            try:
+                await async_db(
+                    lambda: get_supabase_client()
+                    .table("documents")
+                    .update({"upload_status": "completed", "error_message": None})
+                    .eq("id", target_document_id)
+                    .execute()
+                )
+            except Exception:
+                pass
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Fallback — full re-embed (only used if vector clone fails)
+    # ──────────────────────────────────────────────────────────────────────────
 
     async def _embed_imported_text(
         self,
@@ -326,8 +553,8 @@ class BookService:
         text_content: str,
     ):
         """
-        Background task: chunk and embed the imported book's text content.
-        Uses the same pipeline as regular document processing.
+        Fallback: full embedding pipeline for imported book text.
+        Only triggered when source Qdrant vectors are missing.
         """
         from utils.progress_manager import get_progress_manager
         from utils.text_chunker import TextChunker
@@ -357,15 +584,10 @@ class BookService:
                     await self._update_doc_status(document_id, "failed", "No content chunks")
                     return
 
-                await progress.emit(
-                    document_id, "chunking", 100,
-                    f"Generated {len(chunks)} chunks"
-                )
+                await progress.emit(document_id, "chunking", 100, f"Generated {len(chunks)} chunks")
 
-                # Embed
                 collection_name = f"project_{project_id}"
                 await qdrant_service.create_collection(collection_name)
-
                 await progress.emit(document_id, "embedding", 0, f"Embedding {len(chunks)} chunks...")
 
                 from services.document_service import document_service
@@ -373,7 +595,6 @@ class BookService:
                     chunks, document_id, filename, collection_name
                 )
 
-                # Topics
                 await progress.emit(document_id, "topics", 0, "Generating topics...")
                 llm_semaphore = EmbeddingQueue.get_llm_semaphore()
                 try:
@@ -387,7 +608,7 @@ class BookService:
 
                 await self._update_doc_status(document_id, "completed")
                 await progress.emit(document_id, "completed", 100, "Book import complete")
-                logger.info(f"Imported book {filename} embedded successfully")
+                logger.info(f"Imported book {filename} embedded successfully (fallback path)")
 
         except Exception as e:
             logger.error(f"Failed to embed imported book {document_id}: {e}")
@@ -408,18 +629,20 @@ class BookService:
         except Exception as e:
             logger.warning(f"Failed to update doc status: {e}")
 
+    # ──────────────────────────────────────────────────────────────────────────
+    # Book metadata management
+    # ──────────────────────────────────────────────────────────────────────────
+
     async def update_book(
         self, book_id: str, user_id: str, updates: Dict[str, Any]
     ) -> Dict:
         """Update book metadata / visibility. Only owner can update."""
-        # Ensure user is the owner
         book = await self.get_book(book_id, user_id)
         if not book:
             raise ValueError("Book not found")
         if book["user_id"] != user_id:
             raise PermissionError("Only the book owner can edit this book")
 
-        # Whitelist updatable fields
         allowed = {"title", "author", "description", "cover_url", "tags", "is_public"}
         safe_updates = {k: v for k, v in updates.items() if k in allowed}
 
@@ -455,7 +678,6 @@ class BookService:
         if book["user_id"] != user_id:
             raise PermissionError("Only the book owner can delete this book")
 
-        # Delete text from storage (non-fatal)
         if book.get("text_path"):
             try:
                 def _delete_text():
@@ -467,7 +689,6 @@ class BookService:
             except Exception as e:
                 logger.warning(f"Could not delete text file for book {book_id}: {e}")
 
-        # Delete book record (cascade deletes book_imports)
         def _delete_book():
             return (
                 get_supabase_client()

@@ -72,7 +72,7 @@ const BookStoreStep = ({ projectId, onImported, onBack }) => {
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [total, setTotal] = useState(0);
-    const [importingId, setImportingId] = useState(null);
+    const [importingIds, setImportingIds] = useState(new Set());
     const [importedIds, setImportedIds] = useState(new Set());
     const toast = useToast();
 
@@ -99,8 +99,8 @@ const BookStoreStep = ({ projectId, onImported, onBack }) => {
     };
 
     const handleImport = async (book) => {
-        if (importingId || importedIds.has(book.id)) return;
-        setImportingId(book.id);
+        if (importingIds.has(book.id) || importedIds.has(book.id)) return;
+        setImportingIds(s => new Set([...s, book.id]));
         try {
             const result = await importBook(book.id, projectId);
             setImportedIds(s => new Set([...s, book.id]));
@@ -114,7 +114,7 @@ const BookStoreStep = ({ projectId, onImported, onBack }) => {
                 toast.error(err.response?.data?.detail || 'Import failed');
             }
         } finally {
-            setImportingId(null);
+            setImportingIds(s => { const n = new Set(s); n.delete(book.id); return n; });
         }
     };
 
@@ -189,7 +189,7 @@ const BookStoreStep = ({ projectId, onImported, onBack }) => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {books.map(book => {
                             const isImported = importedIds.has(book.id);
-                            const isImporting = importingId === book.id;
+                            const isImporting = importingIds.has(book.id);
                             return (
                                 <div key={book.id} className="flex flex-col p-4 bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl hover:border-[#C8A288] hover:shadow-md hover:shadow-[#C8A288]/10 transition-all">
                                     <div className="flex items-start gap-3 mb-2">
@@ -223,7 +223,7 @@ const BookStoreStep = ({ projectId, onImported, onBack }) => {
                                         </span>
                                         <button
                                             onClick={() => handleImport(book)}
-                                            disabled={isImporting || isImported}
+                                            disabled={isImporting || isImported || importingIds.size > 0}
                                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                                                 isImported
                                                     ? 'bg-emerald-50 text-emerald-600 border border-emerald-200 cursor-default'
@@ -329,7 +329,7 @@ const UploadStep = ({ onUpload, uploading, onBack }) => {
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 min-h-0">
                 {/* Drop Zone */}
                 <div
                     onDrop={handleDrop}
@@ -569,7 +569,7 @@ const AddDocumentModal = ({ projectId, uploading, onUpload, onImported, onClose 
                 </div>
 
                 {/* Step content */}
-                <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+                <div className="flex-1 overflow-auto flex flex-col min-h-0">
                     {step === 'pick' && (
                         <SourcePicker onChoose={setStep} />
                     )}

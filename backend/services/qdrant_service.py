@@ -27,6 +27,7 @@ class QdrantService:
     - Sync client retained only for LangChain VectorStore compatibility
     - Automatic retry with exponential backoff for transient failures
     - Longer timeout for large batch operations
+    - clone_document_vectors() for instant book imports (no re-embedding)
     """
 
     MAX_RETRIES = 3
@@ -321,6 +322,100 @@ class QdrantService:
 
         except Exception as e:
             logger.error(f"Error deleting vectors: {str(e)}")
+
+    async def clone_document_vectors(
+        self,
+        source_collection: str,
+        target_collection: str,
+        source_document_id: str,
+        target_document_id: str,
+        target_document_name: str,
+        batch_size: int = 100,
+    ) -> int:
+        """
+        Clone all Qdrant vectors for a document from one collection to another.
+
+        Used by book imports to skip re-embedding: vectors are copied from the
+        original uploader's project collection into the importer's project collection,
+        with document_id / document_name payload rewritten to the new document's IDs.
+
+        This reduces book import time from ~2-5 minutes to ~2-5 seconds.
+
+        Returns:
+            Number of vectors cloned (0 if source collection/document is missing).
+        """
+        scroll_filter = Filter(
+            must=[
+                FieldCondition(
+                    key="document_id", match=MatchValue(value=source_document_id)
+                )
+            ]
+        )
+
+        total_cloned = 0
+        offset = None  # Qdrant scroll pagination token
+
+        while True:
+            try:
+                points, next_offset = await self.async_client.scroll(
+                    collection_name=source_collection,
+                    scroll_filter=scroll_filter,
+                    limit=batch_size,
+                    offset=offset,
+                    with_payload=True,
+                    with_vectors=True,
+                )
+            except Exception as e:
+                if "Not found: Collection" in str(e) or "doesn't exist" in str(e):
+                    logger.warning(
+                        f"[VectorClone] Source collection {source_collection} not found "
+                        f"— falling back to re-embedding"
+                    )
+                    return 0
+                raise
+
+            if not points:
+                break
+
+            cloned_points = []
+            for p in points:
+                new_payload = dict(p.payload)
+                new_payload["document_id"] = target_document_id
+                new_payload["document_name"] = target_document_name
+                # Also rewrite nested metadata dict if present
+                if "metadata" in new_payload and isinstance(new_payload["metadata"], dict):
+                    new_payload["metadata"] = dict(new_payload["metadata"])
+                    new_payload["metadata"]["document_id"] = target_document_id
+                    new_payload["metadata"]["document_name"] = target_document_name
+
+                cloned_points.append(
+                    PointStruct(
+                        id=str(uuid4()),   # New UUID — avoids ID collisions across projects
+                        vector=p.vector,
+                        payload=new_payload,
+                    )
+                )
+
+            await self.async_client.upsert(
+                collection_name=target_collection,
+                points=cloned_points,
+            )
+            total_cloned += len(cloned_points)
+            logger.info(
+                f"[VectorClone] {total_cloned} vectors cloned "
+                f"({source_collection}/{source_document_id} -> "
+                f"{target_collection}/{target_document_id})"
+            )
+
+            if next_offset is None:
+                break
+            offset = next_offset
+
+        logger.info(
+            f"[VectorClone] Complete: {total_cloned} vectors in "
+            f"{target_collection}/{target_document_id}"
+        )
+        return total_cloned
 
 
 qdrant_service = QdrantService()

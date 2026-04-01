@@ -214,6 +214,73 @@ async def list_documents(
         raise HTTPException(500, str(e))
 
 
+@router.get("/{project_id}/{document_id}/url")
+async def get_document_url(
+    project_id: str,
+    document_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Generate a short-lived signed URL for viewing a document in the PDF viewer.
+    Tries common storage path patterns and returns the first that works.
+    """
+    supabase = get_supabase_client()
+    BUCKET = "documents"
+    EXPIRY = 3600 * 24  # 24 hours
+
+    # Try common storage path conventions
+    extensions = ["pdf", "txt", "docx", "doc", "pptx", "ppt", "xlsx", "xls", "png", "jpg", "jpeg"]
+    candidate_paths = [f"{project_id}/{document_id}.{ext}" for ext in extensions]
+    candidate_paths.insert(0, f"{project_id}/{document_id}")  # no extension
+
+    def _try_signed():
+        for path in candidate_paths:
+            try:
+                result = supabase.storage.from_(BUCKET).create_signed_url(path, EXPIRY)
+                if isinstance(result, dict) and result.get("signedURL"):
+                    return result["signedURL"]
+                if isinstance(result, dict) and result.get("signed_url"):
+                    return result["signed_url"]
+            except Exception:
+                continue
+        return None
+
+    url = await async_db(_try_signed)
+    if not url:
+        # Final fallback — try fetching the doc record to find file type hint
+        try:
+            def _get_doc():
+                return (
+                    get_supabase_client()
+                    .table("documents")
+                    .select("filename, file_type")
+                    .eq("id", document_id)
+                    .single()
+                    .execute()
+                )
+            doc_res = await async_db(_get_doc)
+            if doc_res.data:
+                filename = doc_res.data.get("filename", "")
+                ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+                if ext:
+                    def _try_ext():
+                        path = f"{project_id}/{document_id}.{ext}"
+                        try:
+                            result = supabase.storage.from_(BUCKET).create_signed_url(path, EXPIRY)
+                            if isinstance(result, dict):
+                                return result.get("signedURL") or result.get("signed_url")
+                        except Exception:
+                            return None
+                    url = await async_db(_try_ext)
+        except Exception:
+            pass
+
+    if not url:
+        raise HTTPException(404, "Document file not found in storage. It may have been uploaded as text-only.")
+
+    return {"url": url}
+
+
 @router.delete("/{document_id}")
 async def delete_document(
     document_id: str, project_id: str, current_user: dict = Depends(get_current_user)

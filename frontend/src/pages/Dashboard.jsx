@@ -79,19 +79,16 @@ const Dashboard = () => {
         setFetchError(false);
         setIsLoadingProjects(true);
 
-        // If no cache, start a 5s slow-load warning timer
+        // If no cache, show a 'waking up' banner after 3s
         const hasCached = (getCachedProjects() || []).length > 0;
         if (!hasCached) {
-            slowLoadTimerRef.current = setTimeout(() => setIsSlowLoad(true), 5000);
+            slowLoadTimerRef.current = setTimeout(() => setIsSlowLoad(true), 3000);
         }
 
-        // Hard 8s timeout — never show skeleton forever
-        const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('timeout')), 8000)
-        );
-
         try {
-            const data = await Promise.race([getProjects(), timeoutPromise]);
+            // No local race-timeout — rely on the axios 60s timeout so Azure
+            // cold starts (30-50s) don't prematurely trigger the error screen.
+            const data = await getProjects();
             setProjects(data);
             setCachedProjects(data);
             setFetchError(false);
