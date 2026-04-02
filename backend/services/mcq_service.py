@@ -62,7 +62,7 @@ Return ONLY a valid JSON array of topic strings:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"CONTENT:\n{text[:14000]}"}
             ]
-            response = await llm_service.chat_completion(messages, temperature=0.3, max_tokens=2000)
+            response = await llm_service.chat_completion(messages, temperature=0.3, max_tokens=4000)
             
             # DIAGNOSTIC: Log raw LLM output
             print("\n====== RAW LLM OUTPUT ======\n")
@@ -281,7 +281,7 @@ Respond ONLY with the valid JSON array. Do not add any markdown formatting (like
 
             messages = [{"role": "user", "content": prompt}]
             response = await llm_service.chat_completion(
-                messages, temperature=0.7, max_tokens=3000
+                messages, temperature=0.7, max_tokens=6000
             )
 
             # 3. Parse response
@@ -316,68 +316,46 @@ Respond ONLY with the valid JSON array. Do not add any markdown formatting (like
         num_chunks: int = 15,
         selected_documents: List[str] = None,
     ) -> str:
-        """Retrieve relevant content using Query Expansion (Multi-Query)"""
+        """Retrieve relevant content — parallel multi-query retrieval (no LLM expansion)."""
         try:
             collection_name = f"project_{project_id}"
+            filter_conds = {"document_ids": selected_documents} if selected_documents else None
 
-            # 1. Generate variations of the query (Query Expansion)
-            # If a topic is provided, we ask the LLM to generate sub-topics or related questions to broaden search.
-            queries = (
-                [topic]
-                if topic
-                else ["important concepts", "summary", "key definitions"]
-            )
-
+            # Build query variants without LLM (saves 2-3s per call)
             if topic:
-                expansion_prompt = f"""You are an AI assistant helping to search a vector database. 
-Generate 3 alternative search queries or related sub-topics for the topic: "{topic}" 
-to ensure we find all relevant information in an educational textbook.
-Return only the 3 queries separated by newlines."""
+                queries = [
+                    topic,
+                    f"definition and explanation of {topic}",
+                    f"examples and applications of {topic}",
+                    f"key concepts in {topic}",
+                ]
+            else:
+                queries = ["important concepts", "key definitions", "main topics", "summary"]
 
-                try:
-                    expansion_response = await llm_service.chat_completion(
-                        [{"role": "user", "content": expansion_prompt}], temperature=0.7
-                    )
-                    queries.extend(
-                        [q.strip() for q in expansion_response.split("\n") if q.strip()]
-                    )
-                except Exception as e:
-                    logger.warning(f"Query expansion failed: {e}")
-
-            logger.info(f"Generated {len(queries)} search queries: {queries}")
-
-            # 2. Perform Search for each query
-            all_hits = []
-            seen_texts = set()
-
-            # Distribute the chunk limit across queries, but ensure at least 3 per query
             limit_per_query = max(3, num_chunks // len(queries))
 
-            for query_text in queries:
-                query_embedding = await embedding_service.generate_embedding(query_text)
-
-                results = await qdrant_service.search(
+            # Run ALL embedding + qdrant searches in parallel
+            async def _search_one(q: str):
+                emb = await embedding_service.generate_embedding(q)
+                return await qdrant_service.search(
                     collection_name=collection_name,
-                    query_vector=query_embedding,
+                    query_vector=emb,
                     limit=limit_per_query,
-                    filter_conditions={"document_ids": selected_documents}
-                    if selected_documents
-                    else None,
+                    filter_conditions=filter_conds,
                 )
 
+            results_list = await asyncio.gather(*[_search_one(q) for q in queries])
+
+            all_hits = []
+            seen_texts = set()
+            for results in results_list:
                 for hit in results:
                     if hit["text"] not in seen_texts:
                         all_hits.append(hit)
                         seen_texts.add(hit["text"])
 
-            # 3. Sort and Deduplicate (Implicitly done by set, but maybe we want to re-rank?
-            # For now, simple concatenation is sufficient for context window)
-
-            # Limit total content size roughly
             final_chunks = [hit["text"] for hit in all_hits][:num_chunks]
-
-            content = "\n\n".join(final_chunks)
-            return content
+            return "\n\n".join(final_chunks)
 
         except Exception as e:
             logger.error(f"Error retrieving context content: {str(e)}")
@@ -469,30 +447,20 @@ Return only the 3 queries separated by newlines."""
     async def get_saved_tests(self, project_id: str) -> List[Dict[str, Any]]:
         """Get all saved MCQ tests for a project"""
         try:
-            response = await async_db(lambda: 
+            # Fetch everything in ONE query (no N+1)
+            response = await async_db(lambda:
                 self.client.table("mcq_tests")
-                .select("id, project_id, chapter_name, created_at")
+                .select("id, project_id, chapter_name, created_at, questions")
                 .eq("project_id", project_id)
                 .order("created_at", desc=True)
                 .execute()
             )
             tests = response.data or []
-            # Add question count from stored JSON
             for test in tests:
-                # Fetch question count separately to keep listing lightweight
-                q_response = await async_db(lambda: 
-                    self.client.table("mcq_tests")
-                    .select("questions")
-                    .eq("id", test["id"])
-                    .execute()
-                )
-                if q_response.data and q_response.data[0].get("questions"):
-                    try:
-                        questions = json.loads(q_response.data[0]["questions"])
-                        test["question_count"] = len(questions)
-                    except (json.JSONDecodeError, TypeError):
-                        test["question_count"] = 0
-                else:
+                try:
+                    qs = test.pop("questions", None)
+                    test["question_count"] = len(json.loads(qs)) if qs else 0
+                except (json.JSONDecodeError, TypeError):
                     test["question_count"] = 0
             return tests
         except Exception as e:

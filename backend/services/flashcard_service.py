@@ -221,7 +221,7 @@ Generate exactly {num_cards} high-quality flashcards. Return ONLY the JSON array
             response = await llm_service.chat_completion(
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.7,
-                max_tokens=3000
+                max_tokens=6000
             )
             
             # Parse the response to extract flashcards

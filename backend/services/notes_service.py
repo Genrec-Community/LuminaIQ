@@ -1,3 +1,4 @@
+import asyncio
 from typing import Dict, Any, List
 from db.client import get_supabase_client
 from utils.logger import logger
@@ -123,7 +124,7 @@ You MUST follow ALL of these formatting and content rules:
 - Write in a clear, educational tone suitable for university students.
 
 Respond ONLY with the Markdown notes content. Do not include meta-commentary."""
-            max_tokens = 4500
+            max_tokens = 8000
             temperature = 0.5
 
         # ── Bullet Point Key Facts ─────────────────────────────────────
@@ -166,7 +167,7 @@ You MUST follow ALL of these rules:
 - Use **bold** for terms, *italic* for emphasis, and `code` for formulas or technical notation.
 
 Respond ONLY with the Markdown bullet-point notes. Do not include meta-commentary."""
-            max_tokens = 3500
+            max_tokens = 6000
             temperature = 0.4
 
         # ── Glossary of Terms ──────────────────────────────────────────
@@ -214,7 +215,7 @@ You MUST follow ALL of these rules:
 - Use **bold** for the term when it first appears, *italic* for related terms referenced within definitions.
 
 Respond ONLY with the Markdown glossary content. Do not include meta-commentary."""
-            max_tokens = 3500
+            max_tokens = 6000
             temperature = 0.3
 
         # ── Exam Cheat Sheet ───────────────────────────────────────────
@@ -299,7 +300,7 @@ Requirements:
 - Aim for at least 600-800 words.
 
 Respond ONLY with the Markdown content."""
-            max_tokens = 3000
+            max_tokens = 5000
             temperature = 0.5
 
         return {
@@ -401,19 +402,24 @@ Respond ONLY with the Markdown content."""
             # 1. Get type-specific configuration
             config = self._get_note_config(note_type, topic)
 
-            # 2. Retrieve content with type-specific queries
+            # 2. Retrieve content in PARALLEL — all queries run concurrently
             collection_name = f"project_{project_id}"
+            filter_conds = {"document_ids": selected_documents} if selected_documents else None
+
+            async def _search_one(q: str):
+                emb = await embedding_service.generate_embedding(q)
+                return await qdrant_service.search(
+                    collection_name=collection_name,
+                    query_vector=emb,
+                    limit=10,
+                    filter_conditions=filter_conds,
+                )
+
+            results_list = await asyncio.gather(*[_search_one(q) for q in config["queries"]])
+
             all_hits = []
             seen_texts = set()
-
-            for q in config["queries"]:
-                embedding = await embedding_service.generate_embedding(q)
-                results = await qdrant_service.search(
-                    collection_name=collection_name,
-                    query_vector=embedding,
-                    limit=12,
-                    filter_conditions={"document_ids": selected_documents} if selected_documents else None
-                )
+            for results in results_list:
                 for hit in results:
                     if hit["text"] not in seen_texts:
                         all_hits.append(hit)

@@ -5,6 +5,7 @@ from services.llm_service import llm_service
 from db.client import get_supabase_client
 from utils.logger import logger
 from uuid import uuid4
+import asyncio
 import json
 import re
 from models.schemas import SubjectiveQuestion, SubjectiveEvaluationResult
@@ -183,29 +184,33 @@ Respond ONLY with the valid JSON array."""
             total_score = 0
             max_score = 0
 
-            # 2. Evaluate each answer
-            for q_id_str, user_answer in answers.items():
+            # 2. Evaluate ALL answers in parallel (concurrent LLM calls)
+            async def _eval_one(q_id_str, user_answer):
                 q_id = int(q_id_str)
                 question_obj = questions_map.get(q_id)
-
                 if not question_obj:
-                    continue
-
+                    return None
                 question_text = question_obj["question"]
-                # Support both 'answer' and 'model_answer' keys
-                model_answer = question_obj.get(
-                    "answer", question_obj.get("model_answer", "")
-                )
-
-                # AI Evaluation
+                model_answer = question_obj.get("answer", question_obj.get("model_answer", ""))
                 eval_result = await self._evaluate_single_answer_internal(
                     question_text, user_answer, model_answer
                 )
+                return (q_id, question_text, user_answer, model_answer, eval_result)
 
+            eval_results = await asyncio.gather(
+                *[_eval_one(qid, ans) for qid, ans in answers.items()]
+            )
+
+            evaluations = []
+            total_score = 0
+            max_score = 0
+            for res in eval_results:
+                if res is None:
+                    continue
+                q_id, question_text, user_answer, model_answer, eval_result = res
                 score = eval_result.get("score", 0)
                 total_score += score
-                max_score += 10  # Assuming 10 points per question
-
+                max_score += 10
                 evaluations.append(
                     SubjectiveEvaluationResult(
                         question_id=q_id,
@@ -214,7 +219,7 @@ Respond ONLY with the valid JSON array."""
                         score=score,
                         feedback=eval_result.get("feedback", "No feedback provided"),
                         suggestions=eval_result.get("suggestions", []),
-                        model_answer=model_answer,  # Optional to show back
+                        model_answer=model_answer,
                     )
                 )
 
@@ -351,59 +356,41 @@ Be constructive and specific in your feedback. Respond ONLY with the JSON object
         num_chunks: int = 5,
         selected_documents: List[str] = None,
     ) -> str:
-        """Retrieve relevant context for evaluation using Query Expansion"""
+        """Retrieve relevant context — parallel multi-query, no LLM expansion."""
         try:
             collection_name = f"project_{project_id}"
+            filter_conds = {"document_ids": selected_documents} if selected_documents else None
 
-            # Simple Query Expansion for now
-            queries = [query_text]
+            # Rule-based query variants (saves one full LLM round-trip)
+            queries = [
+                query_text,
+                f"explanation of {query_text}",
+                f"key concepts related to {query_text}",
+            ]
+            limit_per_query = max(2, num_chunks // len(queries))
 
-            # If query is very short, expand it?
-            # For evaluation, the query IS the question, which is usually specific enough.
-            # But let's add a variation to be safe.
-            expansion_prompt = f"""Generate 2 distinct search queries to find information relevant to answering this question: "{query_text}"
-            Return only the queries separated by newlines."""
-
-            try:
-                expansion_response = await llm_service.chat_completion(
-                    [{"role": "user", "content": expansion_prompt}], temperature=0.5
+            async def _search_one(q: str):
+                emb = await embedding_service.generate_embedding(q)
+                return await qdrant_service.search(
+                    collection_name=collection_name,
+                    query_vector=emb,
+                    limit=limit_per_query,
+                    filter_conditions=filter_conds,
                 )
-                queries.extend(
-                    [q.strip() for q in expansion_response.split("\n") if q.strip()]
-                )
-            except:
-                pass
+
+            results_list = await asyncio.gather(*[_search_one(q) for q in queries])
 
             all_hits = []
             seen_texts = set()
-
-            limit_per_query = max(2, num_chunks // len(queries))
-
-            for q in queries:
-                # Generate embedding for question/topic
-                query_embedding = await embedding_service.generate_embedding(q)
-
-                # Search in Qdrant
-                results = await qdrant_service.search(
-                    collection_name=collection_name,
-                    query_vector=query_embedding,
-                    limit=limit_per_query,
-                    filter_conditions={"document_ids": selected_documents}
-                    if selected_documents
-                    else None,
-                )
-
+            for results in results_list:
                 for hit in results:
                     if hit["text"] not in seen_texts:
                         all_hits.append(hit)
                         seen_texts.add(hit["text"])
 
-            # Combine chunks
             if not all_hits:
                 return ""
-
-            context = "\n\n".join([hit["text"] for hit in all_hits[:num_chunks]])
-            return context
+            return "\n\n".join([hit["text"] for hit in all_hits[:num_chunks]])
 
         except Exception as e:
             logger.error(f"Error retrieving context: {str(e)}")

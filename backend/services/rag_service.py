@@ -57,13 +57,8 @@ class RAGService:
             settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY
         )
 
-        # Initialize LLM
-        self.llm = ChatOpenAI(
-            model=settings.LLM_MODEL,
-            openai_api_key=settings.LLM_API_KEY,
-            openai_api_base=settings.LLM_BASE_URL,
-            temperature=0.1,  # Lower temperature for strict factuality and less hallucination
-        )
+        # Initialize LLM via centralized llm_service
+        self.llm = llm_service._get_client(temperature=0.1)
 
     def _get_retrieval_chain(
         self, collection_name: str, selected_documents: Optional[List[str]] = None

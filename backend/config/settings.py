@@ -43,12 +43,12 @@ class Settings(BaseSettings):
     MAIN_API_WEBHOOK_URL: str = Field(default="http://localhost:8000/api/v1/webhook/document-ready")
 
     # ─────────────────────────────────────────────────────────
-    # Embeddings — Together AI (multilingual-e5-large)
+    # Embeddings — Azure OpenAI (text-embedding-3-small)
     # ─────────────────────────────────────────────────────────
     EMBEDDING_API_KEY: str
     EMBEDDING_BASE_URL: str
     EMBEDDING_MODEL: str
-    EMBEDDING_DIMENSION: int = 1024
+    EMBEDDING_DIMENSION: int = 1536
 
     # ─────────────────────────────────────────────────────────
     # Qdrant Vector Store

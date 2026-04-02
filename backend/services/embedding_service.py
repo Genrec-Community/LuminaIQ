@@ -39,13 +39,7 @@ class EmbeddingService:
         )
         logger.info(f"[EmbeddingService] Initialized with {self.MAX_WORKERS_BATCH} batch workers and {self.MAX_WORKERS_SEARCH} search workers")
     
-    def _add_passage_prefix(self, texts: List[str]) -> List[str]:
-        """Add 'passage: ' prefix for E5 instruct models (document/passage embedding)."""
-        return [f"passage: {t}" for t in texts]
 
-    def _add_query_prefix(self, text: str) -> str:
-        """Add 'query: ' prefix for E5 instruct models (search query embedding)."""
-        return f"query: {text}"
 
     async def generate_embeddings(self, texts: List[str]) -> List[List[float]]:
         """
@@ -60,12 +54,10 @@ class EmbeddingService:
 
             loop = asyncio.get_running_loop()
 
-            # Add E5 instruction prefix for passages
-            prefixed_texts = self._add_passage_prefix(texts)
             embeddings = await loop.run_in_executor(
                 self._batch_executor,  # Use dedicated batch pool
                 self.embeddings.embed_documents,
-                prefixed_texts,
+                texts,
             )
             return embeddings
 
@@ -80,11 +72,10 @@ class EmbeddingService:
         """
         try:
             loop = asyncio.get_running_loop()
-            prefixed_text = self._add_query_prefix(text)
             return await loop.run_in_executor(
                 self._search_executor,  # Use dedicated search pool
                 self.embeddings.embed_query,
-                prefixed_text,
+                text,
             )
         except Exception as e:
             logger.error(f"Error generating embedding: {str(e)}")
