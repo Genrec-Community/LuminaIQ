@@ -184,7 +184,7 @@ class BookService:
                 if not doc_result or not doc_result.data:
                     # Document was deleted — clean up the stale import record
                     logger.info(
-                        f"[BookImport] Stale import record found for book {book_id} "
+                        f"Stale import record found for book {book_id} "
                         f"(document {document_id} no longer exists). Cleaning up."
                     )
                     def _delete_stale():
@@ -316,7 +316,7 @@ class BookService:
                 logger.warning(f"Failed to increment import_count: {e}")
 
         logger.info(
-            f"[BookImport] '{book['title']}' registered for project {project_id} "
+            f"Import for '{book['title']}' registered in project {project_id} "
             f"as document {document_id}  — background clone starting"
         )
 
@@ -403,7 +403,7 @@ class BookService:
                     )
                 await async_db(_update_path)
             except Exception as e:
-                logger.warning(f"[BackgroundClone] Text copy failed: {e}")
+                logger.warning(f"Background clone text copy failed: {e}")
 
             # 3. Resolve source document_id and source project_id
             source_document_id = book.get("document_id")
@@ -424,7 +424,7 @@ class BookService:
                     if src_doc.data:
                         source_project_id = src_doc.data.get("project_id")
                 except Exception as e:
-                    logger.warning(f"[BackgroundClone] Could not resolve source project: {e}")
+                    logger.warning(f"Background clone could not resolve source project: {e}")
 
             # 4. Clone Qdrant vectors
             vectors_cloned = 0
@@ -446,11 +446,11 @@ class BookService:
                     )
 
                     logger.info(
-                        f"[BackgroundClone] Cloned {vectors_cloned} vectors for "
+                        f"Background clone completed {vectors_cloned} vectors for "
                         f"'{book['title']}' into project {project_id}"
                     )
                 except Exception as e:
-                    logger.error(f"[BackgroundClone] Vector clone failed: {e}")
+                    logger.error(f"Background vector clone failed: {e}")
 
             # 5. Finalize
             if vectors_cloned > 0:
@@ -459,11 +459,11 @@ class BookService:
                     target_document_id=document_id,
                 )
                 logger.info(
-                    f"[BackgroundClone] '{book['title']}' completed (cloned {vectors_cloned} vectors)"
+                    f"Background clone for '{book['title']}' completed ({vectors_cloned} vectors)"
                 )
             else:
                 logger.warning(
-                    f"[BackgroundClone] No vectors to clone for '{book['title']}' — "
+                    f"Background clone found no vectors for '{book['title']}' — "
                     "falling back to full embedding pipeline"
                 )
                 await self._embed_imported_text(
@@ -474,7 +474,7 @@ class BookService:
                 )
 
         except Exception as e:
-            logger.error(f"[BackgroundClone] Fatal error for {document_id}: {e}")
+            logger.error(f"Fatal background clone error for record {document_id}: {e}")
             await self._update_doc_status(document_id, "failed", str(e))
 
     # ──────────────────────────────────────────────────────────────────────────
@@ -521,13 +521,13 @@ class BookService:
 
             await async_db(_complete)
             logger.info(
-                f"[BookImport] Document {target_document_id} marked completed "
+                f"Imported document {target_document_id} marked completed "
                 f"with {len(topics)} topics (copied from {source_document_id})"
             )
 
         except Exception as e:
             logger.error(
-                f"[BookImport] Failed to copy topics/complete for {target_document_id}: {e}"
+                f"Failed to copy topics/complete during import for {target_document_id}: {e}"
             )
             # Still mark as completed even without topics
             try:

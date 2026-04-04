@@ -37,7 +37,7 @@ class EmbeddingService:
         self._search_executor = ThreadPoolExecutor(
             max_workers=self.MAX_WORKERS_SEARCH, thread_name_prefix="embed_search"
         )
-        logger.info(f"[EmbeddingService] Initialized with {self.MAX_WORKERS_BATCH} batch workers and {self.MAX_WORKERS_SEARCH} search workers")
+        logger.info(f"Initialized embedding thread pools (batch_workers={self.MAX_WORKERS_BATCH}, search_workers={self.MAX_WORKERS_SEARCH})")
     
 
 
@@ -87,7 +87,7 @@ class EmbeddingService:
             self._batch_executor.shutdown(wait=False)
         if hasattr(self, '_search_executor') and self._search_executor:
             self._search_executor.shutdown(wait=False)
-        logger.info("[EmbeddingService] Thread pools shut down")
+        logger.info("Embedding thread pools successfully shut down")
 
 
 embedding_service = EmbeddingService()

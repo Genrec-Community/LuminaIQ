@@ -85,7 +85,7 @@ class ProgressManager:
                 self._subscribers[document_id] = []
             self._subscribers[document_id].append(queue)
 
-        logger.info(f"[ProgressManager] Subscriber added for document {document_id}")
+        logger.info(f"Subscriber added for document {document_id}")
 
         try:
             while True:
@@ -111,7 +111,7 @@ class ProgressManager:
                 if not queues and document_id in self._subscribers:
                     del self._subscribers[document_id]
 
-            logger.info(f"[ProgressManager] Subscriber removed for document {document_id}")
+            logger.info(f"Subscriber removed for document {document_id}")
 
     def _cleanup_sync(self, document_id: str):
         """Synchronous cleanup callback (called from call_later)"""

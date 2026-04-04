@@ -65,7 +65,7 @@ class AzureOCRService:
 
             file_size_mb = len(file_bytes) / (1024 * 1024)
             logger.info(
-                f"[AzureOCR] Submitting {file_size_mb:.2f} MB to Azure CV Read API "
+                f"Submitting {file_size_mb:.2f} MB to Azure CV Read API "
                 f"({self.analyze_url})"
             )
 
@@ -78,15 +78,15 @@ class AzureOCRService:
             return await self._poll_result(operation_location)
 
         except FileNotFoundError:
-            logger.error(f"[AzureOCR] File not found: {file_path}")
+            logger.error(f"File not found: {file_path}")
             return None
         except PermissionError:
-            logger.error(f"[AzureOCR] Permission denied reading: {file_path}")
+            logger.error(f"Permission denied reading: {file_path}")
             return None
         except Exception as e:
-            logger.error(f"[AzureOCR] Unexpected error for {file_path}: {e}")
+            logger.error(f"Unexpected error for {file_path}: {e}")
             import traceback
-            logger.error(f"[AzureOCR] {traceback.format_exc()}")
+            logger.error(f"{traceback.format_exc()}")
             return None
 
     # ──────────────────────────────────────────────────────────────────────────
@@ -117,30 +117,30 @@ class AzureOCRService:
                         op_location = resp.headers.get("Operation-Location", "")
                         if op_location:
                             logger.info(
-                                f"[AzureOCR] Job accepted. Operation: {op_location}"
+                                f"Job accepted, operation: {op_location}"
                             )
                             return op_location
                         logger.error(
-                            "[AzureOCR] 202 received but Operation-Location header is missing"
+                            "202 received but Operation-Location header is missing"
                         )
                         return None
 
                     # Non-202 response
                     body = await resp.text()
                     logger.error(
-                        f"[AzureOCR] Submit failed [{resp.status}]: {body[:500]}"
+                        f"Submit failed [{resp.status}]: {body[:500]}"
                     )
                     return None
 
         except aiohttp.ClientResponseError as e:
-            logger.error(f"[AzureOCR] HTTP error during submit: {e.status} {e.message}")
+            logger.error(f"HTTP error during submit: {e.status} {e.message}")
             return None
         except aiohttp.ClientConnectionError as e:
-            logger.error(f"[AzureOCR] Connection error during submit: {e}")
+            logger.error(f"Connection error during submit: {e}")
             return None
         except asyncio.TimeoutError:
             logger.error(
-                f"[AzureOCR] Submit timed out after {self.SUBMIT_TIMEOUT_S}s"
+                f"Submit timed out after {self.SUBMIT_TIMEOUT_S}s"
             )
             return None
 
@@ -159,7 +159,7 @@ class AzureOCRService:
         elapsed = 0.0
 
         logger.info(
-            f"[AzureOCR] Polling (max {self.MAX_POLL_TIME_S:.0f}s, every {self.POLL_INTERVAL_S:.0f}s)..."
+            f"Polling for result (max {self.MAX_POLL_TIME_S:.0f}s, every {self.POLL_INTERVAL_S:.0f}s)"
         )
 
         async with aiohttp.ClientSession() as session:
@@ -175,7 +175,7 @@ class AzureOCRService:
                     ) as resp:
                         if resp.status != 200:
                             logger.warning(
-                                f"[AzureOCR] Poll returned [{resp.status}] — retrying"
+                                f"Poll returned [{resp.status}] — retrying"
                             )
                             continue
 
@@ -184,7 +184,7 @@ class AzureOCRService:
 
                         if status == "succeeded":
                             logger.info(
-                                f"[AzureOCR] Job succeeded after ~{elapsed:.0f}s"
+                                f"Job succeeded after ~{elapsed:.0f}s"
                             )
                             return self._parse_result(data)
 
@@ -193,28 +193,28 @@ class AzureOCRService:
                                 data.get("analyzeResult", {})
                                 .get("errors", [])
                             )
-                            logger.error(f"[AzureOCR] Job failed: {errors}")
+                            logger.error(f"Job failed: {errors}")
                             return None
 
                         elif status in ("running", "notStarted"):
                             logger.debug(
-                                f"[AzureOCR] Status={status} ({elapsed:.0f}s elapsed)"
+                                f"Status={status} ({elapsed:.0f}s elapsed)"
                             )
 
                         else:
-                            logger.warning(f"[AzureOCR] Unknown status: {status!r}")
+                            logger.warning(f"Unknown status: {status!r}")
 
                 except asyncio.TimeoutError:
                     logger.warning(
-                        f"[AzureOCR] Poll request timed out at {elapsed:.0f}s — retrying"
+                        f"Poll request timed out at {elapsed:.0f}s — retrying"
                     )
                     continue
                 except aiohttp.ClientError as e:
-                    logger.warning(f"[AzureOCR] Poll connection error: {e} — retrying")
+                    logger.warning(f"Poll connection error: {e} — retrying")
                     continue
 
         logger.error(
-            f"[AzureOCR] Timed out waiting for result after {self.MAX_POLL_TIME_S:.0f}s"
+            f"Timed out waiting for result after {self.MAX_POLL_TIME_S:.0f}s"
         )
         return None
 
@@ -240,7 +240,7 @@ class AzureOCRService:
             read_results = analyze_result.get("readResults", [])
 
             if not read_results:
-                logger.warning("[AzureOCR] No readResults in API response")
+                logger.warning("No readResults in API response")
                 return None
 
             pages_text = []
@@ -259,24 +259,24 @@ class AzureOCRService:
                     pages_text.append("\n".join(page_lines))
                     total_lines += len(page_lines)
                     logger.debug(
-                        f"[AzureOCR] Page {page_idx + 1}: {len(page_lines)} lines"
+                        f"Page {page_idx + 1}: {len(page_lines)} lines"
                     )
 
             if not pages_text:
-                logger.warning("[AzureOCR] Parsed result but found zero text lines")
+                logger.warning("Parsed result but found zero text lines")
                 return None
 
             full_text = "\n\n".join(pages_text)
             logger.info(
-                f"[AzureOCR] Parsed {total_lines} lines across "
+                f"Parsed {total_lines} lines across "
                 f"{len(pages_text)} page(s) → {len(full_text)} chars"
             )
             return full_text
 
         except Exception as e:
-            logger.error(f"[AzureOCR] Failed to parse API result: {e}")
+            logger.error(f"Failed to parse API result: {e}")
             import traceback
-            logger.error(f"[AzureOCR] {traceback.format_exc()}")
+            logger.error(f"{traceback.format_exc()}")
             return None
 
 
@@ -298,9 +298,9 @@ def get_azure_ocr_service() -> Optional[AzureOCRService]:
                 key=settings.AZURE_CV_KEY,
             )
         logger.debug(
-            "[AzureOCR] AZURE_CV_ENDPOINT or AZURE_CV_KEY not configured — Azure OCR disabled"
+            "AZURE_CV_ENDPOINT or AZURE_CV_KEY not configured — Azure OCR disabled"
         )
         return None
     except Exception as e:
-        logger.error(f"[AzureOCR] Failed to initialise service: {e}")
+        logger.error(f"Failed to initialise service: {e}")
         return None

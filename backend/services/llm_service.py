@@ -26,8 +26,7 @@ def _build_client(temperature: float = 0.7, max_tokens: int = 4000):
         # behaves like a standard OpenAI proxy (GitHub Models / Azure Global)
         from langchain_openai import ChatOpenAI
         logger.debug(
-            f"[LLMService] Using Azure/GitHub Proxy ChatOpenAI — "
-            f"deployment={settings.AZURE_OPENAI_DEPLOYMENT}"
+            f"Using Azure/GitHub Proxy ChatOpenAI provider (deployment={settings.AZURE_OPENAI_DEPLOYMENT})"
         )
         return ChatOpenAI(
             model=settings.AZURE_OPENAI_DEPLOYMENT,
@@ -39,7 +38,7 @@ def _build_client(temperature: float = 0.7, max_tokens: int = 4000):
 
     # Fallback: legacy OpenAI-compatible (Groq etc.)
     from langchain_openai import ChatOpenAI
-    logger.warning("[LLMService] Azure vars not set — falling back to ChatOpenAI")
+    logger.warning("Azure credentials missing, falling back to basic ChatOpenAI client")
     return ChatOpenAI(
         model=settings.LLM_MODEL or "gpt-3.5-turbo",
         openai_api_key=settings.LLM_API_KEY,
@@ -77,11 +76,10 @@ class LLMService:
         using_azure = bool(settings.AZURE_OPENAI_ENDPOINT and settings.AZURE_OPENAI_API_KEY)
         if using_azure:
             logger.info(
-                f"[LLMService] Initialized with Azure OpenAI — "
-                f"deployment={settings.AZURE_OPENAI_DEPLOYMENT}"
+                f"Initialized Azure OpenAI service (deployment={settings.AZURE_OPENAI_DEPLOYMENT})"
             )
         else:
-            logger.warning("[LLMService] Azure OpenAI not configured — using fallback LLM.")
+            logger.warning("Azure OpenAI not configured, utilizing fallback LLM.")
 
     def _get_client(self, temperature: float = 0.7, max_tokens: int = 4000):
         return _build_client(temperature=temperature, max_tokens=max_tokens)
@@ -104,7 +102,7 @@ class LLMService:
             client = self._get_client(temperature=temperature, max_tokens=max_tokens)
             lc_messages = _convert_messages(messages)
             logger.info(
-                f"[LLMService] Sending {len(lc_messages)} messages "
+                f"Sending {len(lc_messages)} messages "
                 f"(temp={temperature}, max_tokens={max_tokens})"
             )
             response = await client.ainvoke(lc_messages)
@@ -121,7 +119,7 @@ class LLMService:
 
             if not answer or len(answer) < self.EMPTY_RESPONSE_MIN_CHARS:
                 logger.warning(
-                    f"[LLMService] Empty/short response — finish_reason={finish_reason!r}, "
+                    f"Empty/short response detected: finish_reason={finish_reason!r}, "
                     f"reasoning_tokens={reasoning_tokens}. "
                     f"Metadata: {metadata}"
                 )
@@ -131,23 +129,23 @@ class LLMService:
                     # Cap retry max_tokens to prevent "Request too large" 413 error (e.g. Groq 8000 TPM)
                     retry_tokens = min(max_tokens * self.RETRY_TOKEN_MULTIPLIER, 6000)
                     logger.warning(
-                        f"[LLMService] Retrying with {retry_tokens} tokens "
-                        f"(token starvation detected — reasoning used {reasoning_tokens} tokens)"
+                        f"Retrying completion with {retry_tokens} tokens "
+                        f"(token starvation detected, reasoning used {reasoning_tokens} tokens)"
                     )
                     retry_client = self._get_client(temperature=temperature, max_tokens=retry_tokens)
                     retry_response = await retry_client.ainvoke(lc_messages)
                     answer = retry_response.content if getattr(retry_response, "content", None) else ""
-                    logger.info(f"[LLMService] Retry completion: {len(answer)} chars")
+                    logger.info(f"Retry completion successful: {len(answer)} chars generated")
 
             if not answer:
-                logger.error(f"[LLMService] Still empty after retry. Metadata: {metadata}")
+                logger.error(f"Response remains empty after retry. Metadata: {metadata}")
             else:
-                logger.info(f"[LLMService] Completion: {len(answer)} chars")
+                logger.info(f"Completion generated {len(answer)} chars")
             return answer
         except Exception as e:
-            logger.error(f"[LLMService] chat_completion error: {e}")
+            logger.error(f"Chat completion error occurred: {e}")
             import traceback
-            logger.error(traceback.format_exc())
+            logger.error(f"Traceback: {traceback.format_exc()}")
             raise
 
     async def chat_completion_stream(
@@ -165,7 +163,7 @@ class LLMService:
                 if chunk.content:
                     yield chunk.content
         except Exception as e:
-            logger.error(f"[LLMService] streaming error: {e}")
+            logger.error(f"Streaming completion error occurred: {e}")
             raise
 
 

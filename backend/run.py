@@ -40,7 +40,7 @@ def run_gunicorn():
     workers = int(os.environ.get("WEB_CONCURRENCY", settings.GUNICORN_WORKERS))
     port = int(os.environ.get("PORT", 8000))
 
-    logger.info(f"[run.py] Starting Gunicorn with {workers} workers on port {port}")
+    logger.info(f"Starting Gunicorn with {workers} workers on port {port}")
 
     # Import Gunicorn's BaseApplication to run programmatically
     try:
@@ -82,7 +82,7 @@ def run_gunicorn():
         StandaloneApp(fastapi_app, options).run()
 
     except ImportError:
-        logger.warning("[run.py] Gunicorn not installed — falling back to Uvicorn")
+        logger.warning("Gunicorn not installed — falling back to Uvicorn")
         run_uvicorn()
 
 

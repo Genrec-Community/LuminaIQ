@@ -56,9 +56,8 @@ class AdaptiveFairShareLimiter:
             )
 
             logger.info(
-                f"[RateLimiter] Registered {job_id} | "
-                f"Active jobs: {len(self._active_jobs)} | "
-                f"Rate: UNLIMITED (no rate limiting)"
+                f"Registered job {job_id} — "
+                f"active jobs: {len(self._active_jobs)}, rate: unlimited"
             )
 
             return job_id
@@ -73,10 +72,9 @@ class AdaptiveFairShareLimiter:
                 duration = time.monotonic() - job.start_time
 
                 logger.info(
-                    f"[RateLimiter] Completed {job_id} | "
-                    f"Duration: {duration:.1f}s | "
-                    f"Batches: {job.completed_batches}/{job.total_batches} | "
-                    f"Remaining jobs: {len(self._active_jobs)}"
+                    f"Completed job {job_id} in {duration:.1f}s — "
+                    f"batches: {job.completed_batches}/{job.total_batches}, "
+                    f"remaining jobs: {len(self._active_jobs)}"
                 )
 
     async def acquire(self, job_id: Optional[str] = None, tokens: int = 1) -> float:

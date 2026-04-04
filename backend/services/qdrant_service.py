@@ -59,8 +59,7 @@ class QdrantService:
             grpc_options=self.GRPC_OPTIONS,
         )
         logger.info(
-            f"[QdrantService] Initialized with AsyncQdrantClient | "
-            f"async_timeout={self.ASYNC_TIMEOUT}s, sync_timeout={self.SYNC_TIMEOUT}s"
+            f"Initialized Qdrant connections (async_timeout={self.ASYNC_TIMEOUT}s, sync_timeout={self.SYNC_TIMEOUT}s)"
         )
 
     async def create_collection(self, collection_name: str, vector_size: int = settings.EMBEDDING_DIMENSION):
@@ -368,8 +367,8 @@ class QdrantService:
             except Exception as e:
                 if "Not found: Collection" in str(e) or "doesn't exist" in str(e):
                     logger.warning(
-                        f"[VectorClone] Source collection {source_collection} not found "
-                        f"— falling back to re-embedding"
+                        f"Source collection {source_collection} not found "
+                        f"- falling back to document re-embedding"
                     )
                     return 0
                 raise
@@ -402,9 +401,8 @@ class QdrantService:
             )
             total_cloned += len(cloned_points)
             logger.info(
-                f"[VectorClone] {total_cloned} vectors cloned "
-                f"({source_collection}/{source_document_id} -> "
-                f"{target_collection}/{target_document_id})"
+                f"Cloned {total_cloned} vectors "
+                f"({source_collection}/{source_document_id} -> {target_collection}/{target_document_id})"
             )
 
             if next_offset is None:
@@ -412,8 +410,7 @@ class QdrantService:
             offset = next_offset
 
         logger.info(
-            f"[VectorClone] Complete: {total_cloned} vectors in "
-            f"{target_collection}/{target_document_id}"
+            f"Vector cloning complete: stored {total_cloned} vectors in {target_collection}/{target_document_id}"
         )
         return total_cloned
 

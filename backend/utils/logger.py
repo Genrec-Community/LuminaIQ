@@ -86,7 +86,21 @@ def setup_logging():
         enqueue=True,
     )
 
-    # 3. Intercept standard logging from noisy third-party frameworks
+    # 3. File Handler (Human-readable text format for local debugging)
+    text_log_file_path = f"{settings.LOG_DIR}/lumina_backend_readable.log"
+    logger.add(
+        text_log_file_path,
+        level=settings.LOG_LEVEL,
+        format=log_format,
+        colorize=False,
+        filter=log_filter,
+        rotation=settings.LOG_ROTATION,
+        retention=settings.LOG_RETENTION,
+        compression="zip",
+        enqueue=True,
+    )
+
+    # 4. Intercept standard logging from noisy third-party frameworks
     loggers_to_intercept = [
         "uvicorn",
         "uvicorn.access",
