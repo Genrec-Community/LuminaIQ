@@ -152,6 +152,13 @@ const QuizView = ({
             const isActive = mcqLoading || evalLoading || mcqTest !== null || evalTest !== null;
             onQuizActiveChange(isActive);
         }
+        
+        // Cleanup: reset to false when component unmounts
+        return () => {
+            if (onQuizActiveChange) {
+                onQuizActiveChange(false);
+            }
+        };
     }, [mcqLoading, evalLoading, mcqTest, evalTest, onQuizActiveChange]);
     
     // Handle pre-selected topic from Learning Path

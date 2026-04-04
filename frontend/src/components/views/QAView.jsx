@@ -69,6 +69,13 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
             const isActive = qaLoading || qaTest !== null;
             onQAActiveChange(isActive);
         }
+        
+        // Cleanup: reset to false when component unmounts
+        return () => {
+            if (onQAActiveChange) {
+                onQAActiveChange(false);
+            }
+        };
     }, [qaLoading, qaTest, onQAActiveChange]);
 
     const fetchSavedTests = async () => {

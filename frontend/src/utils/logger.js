@@ -13,9 +13,19 @@
  *   [LuminaIQ:MyComponent] 2026-04-04T13:39:26.123Z INFO — User logged in {userId: '123'}
  *
  * Log levels (ascending severity): DEBUG < INFO < WARN < ERROR
- * In development: all levels are emitted.
+ * In development: all levels are emitted and saved to file.
  * In production: only WARN and ERROR are emitted.
+ *
+ * File-based logging (development only):
+ *   In development mode, logs are automatically saved to localStorage and can be downloaded.
+ *   Use window.LuminaLogger in the browser console to access logging utilities:
+ *   - window.LuminaLogger.download() - Download logs as JSON
+ *   - window.LuminaLogger.downloadText() - Download logs as text
+ *   - window.LuminaLogger.clear() - Clear all logs
+ *   - window.LuminaLogger.stats() - View log statistics
  */
+
+import { createFileLogger } from './fileLogger.js';
 
 /**
  * Numeric values for log level comparison.
@@ -55,6 +65,8 @@ const formatPrefix = (moduleName, level) => {
  * messages can be easily filtered in the browser DevTools console
  * (e.g., filter by "LuminaIQ:AuthContext").
  *
+ * In development mode, logs are also saved to file for debugging.
+ *
  * @param {string} moduleName - A short, descriptive name identifying the
  *   module, component, or context that owns the logger. Convention:
  *   PascalCase matching the source file name (e.g., 'AuthContext', 'API').
@@ -65,6 +77,12 @@ export const createLogger = (moduleName) => {
         throw new Error('createLogger requires a non-empty string moduleName');
     }
 
+    // Use file logger in development mode
+    if (import.meta.env.MODE === 'development') {
+        return createFileLogger(moduleName);
+    }
+
+    // Use console-only logger in production
     return {
         /**
          * Log detailed diagnostic information.

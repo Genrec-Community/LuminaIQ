@@ -142,6 +142,14 @@ const ProjectView = () => {
         setMindmapDocs([]);
         setFlashcardTopic(null);
         setFlashcardDocs([]);
+        
+        // Reset quiz/QA active states when switching away from those tabs
+        if (activeTab !== 'quiz') {
+            setIsQuizActive(false);
+        }
+        if (activeTab !== 'qa') {
+            setIsQAActive(false);
+        }
     }, [activeTab, projectId]);
 
     // Persist chat messages to sessionStorage
@@ -232,6 +240,16 @@ const ProjectView = () => {
 
     // Combined sidebar hidden state
     const isSidebarHidden = isQuizActive || isQAActive || zenMode;
+
+    // Debug: Log sidebar state changes
+    useEffect(() => {
+        logger.debug('Sidebar visibility state', {
+            isSidebarHidden,
+            isQuizActive,
+            isQAActive,
+            zenMode
+        });
+    }, [isSidebarHidden, isQuizActive, isQAActive, zenMode]);
 
     // File Upload Ref
     const fileInputRef = useRef(null);
