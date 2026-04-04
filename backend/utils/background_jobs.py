@@ -18,10 +18,9 @@ import time
 from typing import Dict, Any, Optional, Callable
 from datetime import datetime, timedelta
 from enum import Enum
-import logging
 from dataclasses import dataclass, field
 
-logger = logging.getLogger(__name__)
+from utils.logger import logger
 
 
 class JobStatus(str, Enum):

@@ -170,7 +170,7 @@ async def chat_stream(
                     ).execute()
                 )
             except Exception as save_err:
-                print(f"Failed to save assistant message: {save_err}")
+                logger.error(f"Failed to save assistant message: {save_err}")
 
         return StreamingResponse(stream_and_save(), media_type="text/event-stream")
     except Exception as e:

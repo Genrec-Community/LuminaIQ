@@ -16,11 +16,10 @@ import json
 from typing import Any, Optional, Dict, Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-import logging
 import asyncio
 from functools import wraps
 
-logger = logging.getLogger(__name__)
+from utils.logger import logger
 
 
 @dataclass

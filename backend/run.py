@@ -10,6 +10,7 @@ The number of workers is controlled by settings.GUNICORN_WORKERS.
 
 import os
 import sys
+from utils.logger import logger
 
 
 def run_uvicorn():
@@ -39,7 +40,7 @@ def run_gunicorn():
     workers = int(os.environ.get("WEB_CONCURRENCY", settings.GUNICORN_WORKERS))
     port = int(os.environ.get("PORT", 8000))
 
-    print(f"[run.py] Starting Gunicorn with {workers} workers on port {port}")
+    logger.info(f"[run.py] Starting Gunicorn with {workers} workers on port {port}")
 
     # Import Gunicorn's BaseApplication to run programmatically
     try:
@@ -81,7 +82,7 @@ def run_gunicorn():
         StandaloneApp(fastapi_app, options).run()
 
     except ImportError:
-        print("[run.py] Gunicorn not installed — falling back to Uvicorn")
+        logger.warning("[run.py] Gunicorn not installed — falling back to Uvicorn")
         run_uvicorn()
 
 
