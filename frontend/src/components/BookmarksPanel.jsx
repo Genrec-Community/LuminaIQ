@@ -5,6 +5,9 @@ import {
     Star, Highlighter, Quote, Copy, Palette
 } from 'lucide-react';
 import { getBookmarks, addBookmark as addBookmarkApi, updateBookmark as updateBookmarkApi, deleteBookmark as deleteBookmarkApi } from '../api';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('BookmarksPanel');
 
 const HIGHLIGHT_COLORS = [
     { name: 'Yellow', value: 'yellow', bg: 'bg-yellow-100', border: 'border-yellow-300', text: 'text-yellow-800', accent: 'bg-yellow-400' },
@@ -43,7 +46,7 @@ const BookmarksPanel = ({
                 const data = await getBookmarks(projectId);
                 setBookmarks(data.bookmarks || []);
             } catch (err) {
-                console.error('Failed to load bookmarks:', err);
+                logger.error('Failed to load bookmarks', err);
             }
         };
         load();
@@ -72,7 +75,7 @@ const BookmarksPanel = ({
             setNewBookmark({ title: '', note: '', documentId: '', type: 'topic' });
             setShowAddForm(false);
         } catch (err) {
-            console.error('Failed to add bookmark:', err);
+            logger.error('Failed to add bookmark', err);
         }
     };
 
@@ -97,7 +100,7 @@ const BookmarksPanel = ({
             setNewHighlight({ title: '', highlightText: '', note: '', documentId: '', color: 'yellow' });
             setShowAddForm(false);
         } catch (err) {
-            console.error('Failed to add highlight:', err);
+            logger.error('Failed to add highlight', err);
         }
     };
 
@@ -106,7 +109,7 @@ const BookmarksPanel = ({
             await deleteBookmarkApi(id);
             setBookmarks(bookmarks.filter(b => b.id !== id));
         } catch (err) {
-            console.error('Failed to delete bookmark:', err);
+            logger.error('Failed to delete bookmark', err);
         }
     };
 
@@ -125,7 +128,7 @@ const BookmarksPanel = ({
             setEditingId(null);
             setEditNote('');
         } catch (err) {
-            console.error('Failed to update bookmark:', err);
+            logger.error('Failed to update bookmark', err);
         }
     };
 

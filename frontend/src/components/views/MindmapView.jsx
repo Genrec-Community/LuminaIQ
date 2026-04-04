@@ -2,6 +2,9 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Zap, Plus, Trash2, Eye, Loader2, Download, X, ZoomIn, ZoomOut, Maximize2, RefreshCw } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 import { getMindmaps, generateMindmap as generateMindmapAPI, deleteMindmap as deleteMindmapAPI } from '../../api';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('MindmapView');
 
 // ======================== Mindmap Tree Renderer ========================
 
@@ -269,7 +272,7 @@ const MindmapView = ({ projectId, availableTopics, selectedDocuments }) => {
             const data = await getMindmaps(projectId);
             setMindmaps(data);
         } catch (error) {
-            console.error('Failed to fetch mindmaps:', error);
+            logger.error('Failed to fetch mindmaps', { error: error.message });
             toast.error('Failed to load mindmaps');
         } finally {
             setLoading(false);
@@ -306,7 +309,7 @@ const MindmapView = ({ projectId, availableTopics, selectedDocuments }) => {
                 setSelectedMindmap(result);
             }
         } catch (error) {
-            console.error('Failed to generate mindmap:', error);
+            logger.error('Failed to generate mindmap', { error: error.message });
             toast.error('Failed to generate mindmap');
         } finally {
             setGenerating(false);
@@ -327,7 +330,7 @@ const MindmapView = ({ projectId, availableTopics, selectedDocuments }) => {
             }
             fetchMindmaps();
         } catch (error) {
-            console.error('Failed to delete mindmap:', error);
+            logger.error('Failed to delete mindmap', { error: error.message });
             toast.error('Failed to delete mindmap');
         }
     };

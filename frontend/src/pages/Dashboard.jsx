@@ -1,4 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('Dashboard');
 import { useNavigate } from 'react-router-dom';
 import {
     Plus, Search, BookOpen, Calendar, ArrowRight, LogOut, Upload, FileText,
@@ -93,7 +96,7 @@ const Dashboard = () => {
             setCachedProjects(data);
             setFetchError(false);
         } catch (error) {
-            console.error("Failed to fetch projects:", error);
+            logger.error('Failed to fetch projects', { error: error.message });
             // Show cached data if available, otherwise show error
             const cached = getCachedProjects();
             if (cached && cached.length > 0) {
@@ -157,7 +160,7 @@ const Dashboard = () => {
             setProjects(prev => prev.filter(p => p.id !== deleteTargetId));
             setDeleteTargetId(null);
         } catch (error) {
-            console.error("Failed to delete project:", error);
+            logger.error('Failed to delete project', { error: error.message });
             toast.error('Failed to delete project');
         } finally {
             setIsDeleting(false);

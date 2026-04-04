@@ -15,6 +15,9 @@ import {
 import { useToast } from '../../context/ToastContext';
 import { recordActivity } from '../../utils/studyActivity';
 import { getRotatingLoadingMessage } from '../../utils/LoadingMessages';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('LearningPathView');
 
 const humorReasons = [
     "Weak topic detected. You skipped leg day on this one.",
@@ -138,7 +141,7 @@ const LearningPathView = ({
                 performance: perfMap
             }));
         } catch (error) {
-            console.error('Failed to load learning path:', error);
+            logger.error('Failed to load learning path', { error: error.message });
         } finally {
             setLoading(false);
         }
@@ -165,7 +168,7 @@ const LearningPathView = ({
             await loadData();
             recordActivity(projectId, 'path', { action: 'build_graph', topicCount: topicsToUse.length });
         } catch (error) {
-            console.error('Failed to build graph:', error);
+            logger.error('Failed to build graph', { error: error.message });
             toast.error('Failed to build learning path. Please try again.');
         } finally {
             setBuilding(false);

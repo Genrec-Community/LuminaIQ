@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { X, ZoomIn, ZoomOut, Maximize2, Minimize2, ChevronLeft, ChevronRight, AlertCircle, FileText } from 'lucide-react';
+import { createLogger } from '../../utils/logger';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
+
+const logger = createLogger('PDFViewer');
 
 // Initialize the worker to use the same version as the API to avoid version mismatch errors
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -50,14 +53,14 @@ const PDFViewer = ({ url, highlightText, onClose, title = "PDF Viewer", initialP
                     return { pageIndex: i - 1 };
                 }
             } catch (e) {
-                console.warn("Error extracting text for search on page", i, e);
+                logger.warn('Error extracting text for search on page', { page: i, error: e });
             }
         }
         return null;
     };
 
     const onDocumentLoadError = (err) => {
-        console.error("Failed to load PDF:", err);
+        logger.error('Failed to load PDF', err);
         setError("Failed to load the document. It might not be available or may be corrupted.");
     };
 
@@ -67,7 +70,7 @@ const PDFViewer = ({ url, highlightText, onClose, title = "PDF Viewer", initialP
     const toggleFullscreen = () => {
         if (!document.fullscreenElement) {
             containerRef.current.requestFullscreen().catch(err => {
-                console.error(`Error attempting to enable fullscreen: ${err.message}`);
+                logger.error('Failed to enable fullscreen', { error: err.message });
             });
         } else {
             document.exitFullscreen();

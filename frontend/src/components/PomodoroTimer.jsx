@@ -7,6 +7,9 @@ import {
 import { recordActivity } from '../utils/studyActivity';
 import { useSettings } from '../context/SettingsContext';
 import { getPomodoro, savePomodoro } from '../api';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('PomodoroTimer');
 
 const PomodoroTimer = ({ 
     projectId = null,
@@ -42,7 +45,7 @@ const PomodoroTimer = ({
                 setSessionsCompleted(data.sessions || 0);
                 setTotalFocusTime((data.focusTime || 0) * 60); // API stores minutes, timer uses seconds
             } catch (err) {
-                console.warn('Failed to load pomodoro data:', err);
+                logger.warn('Failed to load pomodoro data', err);
             }
         };
         load();
@@ -55,7 +58,7 @@ const PomodoroTimer = ({
             Math.round(totalFocusTime / 60), // convert seconds to minutes
             projectId,
             documentId
-        ).catch(err => console.warn('Failed to save pomodoro:', err));
+        ).catch(err => logger.warn('Failed to save pomodoro', err));
     }, [documentId, projectId, sessionsCompleted, totalFocusTime]);
 
     // Timer logic
@@ -149,7 +152,7 @@ const PomodoroTimer = ({
                 oscillator.start(audioContext.currentTime);
                 oscillator.stop(audioContext.currentTime + 0.5);
             } catch (e) {
-                console.log('Audio not supported');
+                logger.debug('Audio playback not supported');
             }
         }
     };

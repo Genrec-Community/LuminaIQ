@@ -5,6 +5,9 @@ import {
     Sparkles, Filter
 } from 'lucide-react';
 import { searchDocuments, getRecentSearches, saveRecentSearch as saveRecentSearchApi, clearRecentSearches as clearRecentSearchesApi } from '../api';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('GlobalSearch');
 
 // Simple debounce helper (no lodash dependency)
 const debounce = (fn, ms) => {
@@ -47,7 +50,7 @@ const GlobalSearch = ({
                 const data = await getRecentSearches(projectId);
                 setRecentSearches(data.searches || []);
             } catch (err) {
-                console.warn('Failed to load recent searches:', err);
+                logger.warn('Failed to load recent searches', err);
             }
         };
         load();
@@ -87,7 +90,7 @@ const GlobalSearch = ({
                 const data = await searchDocuments(projectId, searchQuery, null, 5);
                 semanticResults = data.results || [];
             } catch (error) {
-                console.error('Semantic search failed:', error);
+                logger.error('Semantic search failed', error);
             }
 
             setResults({
@@ -109,7 +112,7 @@ const GlobalSearch = ({
         const updated = [searchQuery, ...recentSearches.filter(s => s !== searchQuery)].slice(0, 5);
         setRecentSearches(updated);
         saveRecentSearchApi(projectId, searchQuery).catch(err =>
-            console.warn('Failed to save recent search:', err)
+            logger.warn('Failed to save recent search', err)
         );
     };
 
@@ -129,7 +132,7 @@ const GlobalSearch = ({
     const clearRecentSearches = () => {
         setRecentSearches([]);
         clearRecentSearchesApi(projectId).catch(err =>
-            console.warn('Failed to clear recent searches:', err)
+            logger.warn('Failed to clear recent searches', err)
         );
     };
 

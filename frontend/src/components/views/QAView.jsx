@@ -5,6 +5,9 @@ import remarkGfm from 'remark-gfm';
 import { generateSubjectiveTest, getSavedQATests, getSavedQATest, deleteSavedQATest } from '../../api';
 import { useToast } from '../../context/ToastContext';
 import { recordActivity } from '../../utils/studyActivity';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('QAView');
 
 const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopic = null, preGeneratedData = null, onConsumePreGenerated = null, onQAActiveChange = null, onBack = null, autoGenerate = false }) => {
     const toast = useToast();
@@ -74,7 +77,7 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
             const data = await getSavedQATests(projectId);
             setSavedTests(data || []);
         } catch (error) {
-            console.error('Failed to fetch saved Q&A tests:', error);
+            logger.error('Failed to fetch saved Q&A tests', { error: error.message });
         } finally {
             setSavedLoading(false);
         }
@@ -93,7 +96,7 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
             setQaTopic(data.topic || '');
             setQaRevealed({});
         } catch (error) {
-            console.error('Failed to load saved test:', error);
+            logger.error('Failed to load saved test', { error: error.message });
             toast.error('Failed to load saved Q&A session');
             setViewMode('list');
         } finally {
@@ -112,7 +115,7 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
                 setViewMode('list');
             }
         } catch (error) {
-            console.error('Failed to delete test:', error);
+            logger.error('Failed to delete test', { error: error.message });
             toast.error('Failed to delete Q&A session');
         }
     };
@@ -159,7 +162,7 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
             // Refresh saved list since new test was created
             fetchSavedTests();
         } catch (error) {
-            console.error("QA gen error", error);
+            logger.error('Q&A generation failed', { error: error.message });
             toast.error('Failed to generate Q&A');
             setViewMode('form');
         } finally {

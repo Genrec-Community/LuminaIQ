@@ -2,6 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Layers, Plus, Trash2, Edit2, Save, X, ChevronDown, Loader2, BookOpen, Sparkles, Shuffle, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 import { getFlashcardSets, createFlashcardSet, deleteFlashcardSet, generateFlashcardsWithAI } from '../../api';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('FlashcardsView');
 
 const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
     const toast = useToast();
@@ -43,7 +46,7 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
             const data = await getFlashcardSets(projectId);
             setFlashcardSets(data);
         } catch (error) {
-            console.error('Failed to fetch flashcard sets:', error);
+            logger.error('Failed to fetch flashcard sets', { error: error.message });
             toast.error('Failed to load flashcard sets');
         } finally {
             setLoading(false);
@@ -75,7 +78,7 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
             setFormData({ title: '', topic: '', cards: [{ front: '', back: '' }] });
             fetchFlashcardSets();
         } catch (error) {
-            console.error('Failed to create flashcard set:', error);
+            logger.error('Failed to create flashcard set', { error: error.message });
             toast.error('Failed to create flashcard set');
         }
     };
@@ -110,7 +113,7 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
                 startStudying(result);
             }
         } catch (error) {
-            console.error('Failed to generate flashcards:', error);
+            logger.error('Failed to generate flashcards', { error: error.message });
             toast.error('Failed to generate flashcards');
         } finally {
             setAiGenerating(false);
@@ -127,7 +130,7 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
             }
             fetchFlashcardSets();
         } catch (error) {
-            console.error('Failed to delete flashcard set:', error);
+            logger.error('Failed to delete flashcard set', { error: error.message });
             toast.error('Failed to delete flashcard set');
         }
     };

@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('QuizView');
 import { HelpCircle, FileText, LogOut, CheckSquare, X, ChevronDown, Loader2, BookMarked, Brain, Zap, Sparkles, ArrowLeft, Target, Trophy, AlertTriangle, Clock, Trash2, Eye, Plus } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -132,7 +135,7 @@ const QuizView = ({
             setAdaptiveComputed({ difficulty: computedDifficulty, avgScore: Math.round(avgScore), quizCount });
             setMcqDifficulty(computedDifficulty);
         } catch (error) {
-            console.log('Adaptive difficulty: no performance data, using medium', error);
+            logger.debug('Adaptive difficulty: no performance data, using fallback', { error: error.message });
             // Fallback to self-assessed level
             const levelMap = { beginner: 'easy', intermediate: 'medium', advanced: 'hard' };
             const fallback = levelMap[settings.selfLevel] || 'medium';
@@ -208,7 +211,7 @@ const QuizView = ({
             const data = await getSuggestedTopic(projectId);
             setSuggestedTopic(data);
         } catch (error) {
-            console.log('No suggestion available:', error);
+            logger.debug('No suggestion available', { error: error.message });
         } finally {
             setLoadingSuggestion(false);
         }
@@ -220,7 +223,7 @@ const QuizView = ({
             const data = await getSavedQuizzes(projectId);
             setSavedQuizzes(data || []);
         } catch (error) {
-            console.error('Failed to fetch saved quizzes:', error);
+            logger.error('Failed to fetch saved quizzes', { error: error.message });
         } finally {
             setSavedLoading(false);
         }
@@ -246,7 +249,7 @@ const QuizView = ({
             setPerformanceSaved(false);
             setCardsCreated(null);
         } catch (error) {
-            console.error('Failed to load saved quiz:', error);
+            logger.error('Failed to load saved quiz', { error: error.message });
             toast.error('Failed to load saved quiz');
             setShowSavedList(true);
         } finally {
@@ -261,7 +264,7 @@ const QuizView = ({
             toast.success('Quiz deleted');
             setSavedQuizzes(prev => prev.filter(t => t.id !== testId));
         } catch (error) {
-            console.error('Failed to delete quiz:', error);
+            logger.error('Failed to delete quiz', { error: error.message });
             toast.error('Failed to delete quiz');
         }
     };
@@ -298,7 +301,7 @@ const QuizView = ({
             const data = await generateMCQ(projectId, mcqTopic, numQ, selectedDocuments, mcqDifficulty);
             setMcqTest(data);
         } catch (error) {
-            console.error("MCQ gen error", error);
+            logger.error('MCQ generation failed', { error: error.message });
             toast.error("Failed to generate quiz. Please try again.");
         } finally {
             setMcqLoading(false);
@@ -365,7 +368,7 @@ const QuizView = ({
                 onQuizComplete(topic, percentage, passed);
             }
         } catch (error) {
-            console.error('Failed to save performance:', error);
+            logger.error('Failed to save performance', { error: error.message });
         } finally {
             setSavingPerformance(false);
         }
@@ -387,7 +390,7 @@ const QuizView = ({
             const result = await createCardsFromQuiz(projectId, topic, mcqScore.feedback, true);
             setCardsCreated(result.cards_created);
         } catch (error) {
-            console.error('Failed to create review cards:', error);
+            logger.error('Failed to create review cards', { error: error.message });
             toast.error('Failed to create review cards');
         } finally {
             setCreatingCards(false);
@@ -457,7 +460,7 @@ const QuizView = ({
             const data = await generateSubjectiveTest(projectId, evalTopic, numQ, selectedDocuments);
             setEvalTest(data);
         } catch (error) {
-            console.error("Subjective test gen error", error);
+            logger.error('Subjective test generation failed', { error: error.message });
             toast.error('Failed to generate subjective test');
         } finally {
             setEvalLoading(false);
@@ -474,7 +477,7 @@ const QuizView = ({
             setEvalUserAnswers({});
             setEvalResult(null);
         } catch (error) {
-            console.error("Subjective test gen error", error);
+            logger.error('Subjective test generation failed', { error: error.message });
             toast.error('Failed to generate subjective questions');
         } finally {
             setEvalLoading(false);
@@ -520,11 +523,11 @@ const QuizView = ({
                         onQuizComplete(topic, subjectivePercent, passed);
                     }
                 } catch (error) {
-                    console.error('Failed to save performance:', error);
+                    logger.error('Failed to save performance', { error: error.message });
                 }
             }
         } catch (error) {
-            console.error("Submit subjective error", error);
+            logger.error('Submit subjective failed', { error: error.message });
             toast.error('Failed to submit answers');
         } finally {
             setEvalLoading(false);
@@ -556,7 +559,9 @@ const QuizView = ({
         const totalCorrect = mcqScoreData.score + Math.round((subjectiveResult.total_score / subjectiveResult.max_score) * 2);
         const totalWrong = (mcqScoreData.total - mcqScoreData.score) + Math.round(((subjectiveResult.max_score - subjectiveResult.total_score) / subjectiveResult.max_score) * 2);
         
-        recordPerformance(projectId, topic, totalCorrect, totalWrong).catch(console.error);
+        recordPerformance(projectId, topic, totalCorrect, totalWrong).catch(err => {
+            logger.error('Failed to record performance', { error: err.message });
+        });
         
         // Track combined quiz activity for heatmap
         recordActivity(projectId, 'quiz', { score: Math.round(combined), num_questions: (mcqScoreData?.total || 5) + (subjectiveResult?.questions?.length || 2) });

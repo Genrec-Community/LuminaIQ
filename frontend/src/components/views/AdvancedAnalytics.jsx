@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('AdvancedAnalytics');
 import {
     BarChart3, TrendingUp, Clock, Target, Brain,
     BookOpen, Calendar, Award, Flame, ChevronDown,
@@ -65,7 +68,7 @@ const AdvancedAnalytics = ({ projectId, documents = [], bookIsolation = true }) 
                 bookPerformance,
             });
         } catch (error) {
-            console.error('Failed to load analytics:', error);
+            logger.error('Failed to load analytics', { error: error.message });
         } finally {
             setLoading(false);
         }
@@ -380,7 +383,7 @@ const StudyActivityHeatmap = ({ projectId }) => {
                 const data = await fetchActivity(projectId, 90);
                 setActivityData(data);
             } catch (err) {
-                console.warn('Failed to load activity data:', err);
+                logger.warn('Failed to load activity data', { error: err.message });
             }
         };
         load();

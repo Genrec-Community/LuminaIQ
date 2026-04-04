@@ -13,6 +13,9 @@
  */
 
 import { recordStudyActivity, getStudyActivity } from '../api';
+import { createLogger } from './logger';
+
+const logger = createLogger('StudyActivity');
 
 // ============================
 // Gamification XP Bridge
@@ -71,7 +74,7 @@ export const recordActivity = (projectId, activityType, meta = {}) => {
 
     // Fire-and-forget — callers never await this
     recordStudyActivity(projectId, activityType, meta).catch(err =>
-        console.warn('Failed to record study activity:', err)
+        logger.warn('Failed to record study activity', err)
     );
 
     // Award XP via gamification bridge (also fire-and-forget)
@@ -79,7 +82,7 @@ export const recordActivity = (projectId, activityType, meta = {}) => {
         try {
             _xpCallback(activityType, meta);
         } catch (err) {
-            console.warn('Failed to award XP:', err);
+            logger.warn('Failed to award XP via bridge', err);
         }
     }
 };
@@ -95,7 +98,7 @@ export const fetchActivity = async (projectId, days = 90) => {
         const data = await getStudyActivity(projectId, days);
         return data.activity || {};
     } catch (err) {
-        console.warn('Failed to fetch study activity:', err);
+        logger.warn('Failed to fetch study activity', err);
         return {};
     }
 };

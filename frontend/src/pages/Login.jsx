@@ -1,4 +1,7 @@
 import React, { useState } from 'react';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('Login');
 import { useNavigate } from 'react-router-dom';
 import { BookOpen, Loader2, ArrowRight, Mail, Lock, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -46,7 +49,7 @@ const Login = () => {
                 });
             }
         } catch (err) {
-            console.error("Auth error:", err);
+            logger.error('Auth error', { error: err.message });
             // Extract meaningful message
             let errorMsg = err.response?.data?.detail || 'An error occurred. Please try again.';
             const status = err.response?.status;

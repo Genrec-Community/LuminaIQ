@@ -1,6 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api, login as apiLogin, signup as apiSignup, loginWithGoogle as apiLoginGoogle } from '../api';
 import { supabase } from '../supabaseClient';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('AuthContext');
 
 const AuthContext = createContext(null);
 
@@ -26,7 +29,7 @@ export const AuthProvider = ({ children }) => {
             const { data: { session } } = await supabase.auth.getSession();
             
             if (session && !tokenExchanged.current) {
-                console.log("Supabase session found, exchanging token...");
+                logger.info('Supabase session found, exchanging token');
                 const currentToken = localStorage.getItem('token');
                 
                 // If we don't have our app token yet, exchange the Supabase one
@@ -41,7 +44,7 @@ export const AuthProvider = ({ children }) => {
                             setUser(data.user);
                         }
                     } catch (e) {
-                        console.error("Google Token Exchange Failed:", e);
+                        logger.error('Google token exchange failed', e);
                         tokenExchanged.current = false; // Reset on failure
                     }
                 }
@@ -54,13 +57,13 @@ export const AuthProvider = ({ children }) => {
 
         // Listen for Supabase auth changes (including OAuth callbacks)
         const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-            console.log("Auth event:", event, session ? "with session" : "no session");
+            logger.info('Auth state changed', { event, hasSession: Boolean(session) });
             
             if (event === 'SIGNED_IN' && session && !tokenExchanged.current) {
                 // Mark as exchanged immediately to prevent multiple exchanges
                 tokenExchanged.current = true;
                 
-                console.log("Supabase Signed In via OAuth, exchanging token...");
+                logger.info('Supabase signed in via OAuth, exchanging token');
                 const currentToken = localStorage.getItem('token');
 
                 // If we don't have our app token yet, exchange the Supabase one
@@ -79,7 +82,7 @@ export const AuthProvider = ({ children }) => {
                             window.location.href = '/dashboard';
                         }
                     } catch (e) {
-                        console.error("Google Token Exchange Failed:", e);
+                        logger.error('Google token exchange failed', e);
                         tokenExchanged.current = false; // Reset on failure to allow retry
                         await supabase.auth.signOut(); // Clear invalid supabase session
                     }
@@ -109,7 +112,7 @@ export const AuthProvider = ({ children }) => {
             }
             return false;
         } catch (error) {
-            console.error("Login failed", error);
+            logger.error('Login failed', error);
             throw error;
         }
     };
@@ -119,7 +122,7 @@ export const AuthProvider = ({ children }) => {
             await apiSignup(email, password, fullName);
             return true;
         } catch (error) {
-            console.error("Signup failed", error);
+            logger.error('Signup failed', error);
             throw error;
         }
     };
@@ -134,7 +137,7 @@ export const AuthProvider = ({ children }) => {
             });
             if (error) throw error;
         } catch (error) {
-            console.error("Google login init failed", error);
+            logger.error('Google login init failed', error);
             throw error;
         }
     };

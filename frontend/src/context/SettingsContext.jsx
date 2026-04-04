@@ -1,6 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { getUserSettings, saveUserSettings } from '../api';
 import { useAuth } from './AuthContext';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('SettingsContext');
 
 const SettingsContext = createContext();
 
@@ -55,7 +58,7 @@ export const SettingsProvider = ({ children }) => {
                     setSettings(prev => ({ ...prev, ...data.settings }));
                 }
             } catch (err) {
-                console.warn('Failed to load settings from API, using defaults', err);
+                logger.warn('Failed to load settings from API, using defaults', err);
             } finally {
                 setLoaded(true);
             }
@@ -86,7 +89,7 @@ export const SettingsProvider = ({ children }) => {
             const next = { ...prev, [key]: value };
             // Fire-and-forget save to API
             saveUserSettings(next).catch(err =>
-                console.warn('Failed to save settings:', err)
+                logger.warn('Failed to save settings', err)
             );
             return next;
         });

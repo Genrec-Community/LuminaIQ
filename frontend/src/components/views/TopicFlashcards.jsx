@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('TopicFlashcards');
 import {
     Layers, RefreshCw, ArrowLeft, ArrowRight,
     RotateCcw, Check, X, Shuffle, Eye, EyeOff
@@ -99,7 +102,7 @@ const TopicFlashcards = ({ projectId, topic, selectedDocuments = [], onClose }) 
                 setError('Failed to generate flashcards');
             }
         } catch (err) {
-            console.error('Flashcard generation failed:', err);
+            logger.error('Flashcard generation failed', { error: err.message });
             setError(err.response?.data?.detail || 'Failed to generate flashcards. Please try again.');
         } finally {
             setLoading(false);
