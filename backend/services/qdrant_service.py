@@ -73,7 +73,7 @@ class QdrantService:
                 await self.async_client.create_collection(
                     collection_name=collection_name,
                     vectors_config=VectorParams(
-                        size=vector_size, distance=Distance.COSINE
+                        size=vector_size, distance=Distance.DOT
                     ),
                 )
                 logger.info(f"Created collection: {collection_name}")
@@ -178,7 +178,7 @@ class QdrantService:
             raise last_error
 
     def get_vector_store(self, collection_name: str):
-        """Get LangChain VectorStore instance (uses sync client for LangChain compat)"""
+        """Get LangChain VectorStore instance (uses both sync and async clients for max speed)"""
         return QdrantVectorStore(
             client=self._sync_client,
             collection_name=collection_name,
@@ -196,16 +196,17 @@ class QdrantService:
     ) -> List[Dict[str, Any]]:
         """Search for similar vectors (fully async — non-blocking)"""
         try:
-            from qdrant_client.models import Filter, FieldCondition, MatchValue
+            from qdrant_client.models import Filter, FieldCondition, MatchAny
 
             query_filter = None
             if filter_conditions and "document_ids" in filter_conditions:
-                should_conditions = [
-                    FieldCondition(key="document_id", match=MatchValue(value=doc_id))
-                    for doc_id in filter_conditions["document_ids"]
-                ]
-                if should_conditions:
-                    query_filter = Filter(should=should_conditions)
+                doc_ids = filter_conditions["document_ids"]
+                if doc_ids:
+                    query_filter = Filter(
+                        must=[
+                            FieldCondition(key="document_id", match=MatchAny(any=doc_ids))
+                        ]
+                    )
 
             try:
                 results = (await self.async_client.query_points(
