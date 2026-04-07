@@ -81,7 +81,7 @@ class KnowledgeGraph:
         project_lock = await self._get_project_lock(project_id)
         if project_lock.locked():
             logger.info(
-                f"[KnowledgeGraph] Build already in progress for {project_id}, skipping."
+                f"Graph build already in progress for project {project_id}, skipping"
             )
             return {"edges_created": 0, "message": "Build already in progress"}
 

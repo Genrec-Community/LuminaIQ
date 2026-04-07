@@ -40,7 +40,7 @@ class FileParser:
 
         Supported: pdf, docx, txt, html, md, jpg, jpeg, png, bmp, tiff, tif, gif, webp
         """
-        logger.info(f"[FileParser] Extracting from: {file_path}")
+        logger.info(f"Extracting from: {file_path}")
 
         try:
             _, ext = os.path.splitext(file_path)
@@ -59,15 +59,15 @@ class FileParser:
             elif ext in [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif", ".gif", ".webp"]:
                 return FileParser._extract_image(file_path)
             else:
-                logger.error(f"[FileParser] Unsupported file type: {ext}")
+                logger.error(f"Unsupported file type: {ext}")
                 return None
 
         except ValueError:
             raise  # Re-raise so document_service marks the doc as failed
         except Exception as e:
-            logger.error(f"[FileParser] Error extracting from {file_path}: {e}")
+            logger.error(f"Error extracting from {file_path}: {e}")
             import traceback
-            logger.error(f"[FileParser] Traceback: {traceback.format_exc()}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return None
 
     # ──────────────────────────────────────────────────────────────────────────
@@ -93,17 +93,16 @@ class FileParser:
 
         if text and len(text.strip()) >= FileParser.MIN_TEXT_CHARS:
             logger.info(
-                f"[FileParser] Digital PDF: primary extraction succeeded "
-                f"({len(text)} chars). Azure OCR not needed."
+                f"Digital PDF: primary extraction succeeded "
+                f"({len(text)} chars), Azure OCR not needed"
             )
             return text
 
         # Stage 1 yielded nothing or too little — this is a scanned PDF
         char_count = len(text.strip()) if text else 0
         logger.warning(
-            f"[FileParser] Primary extraction yielded only {char_count} chars "
-            f"(< {FileParser.MIN_TEXT_CHARS}). PDF appears to be scanned. "
-            f"Escalating to OCR..."
+            f"Primary extraction yielded only {char_count} chars "
+            f"(< {FileParser.MIN_TEXT_CHARS}), PDF appears scanned — escalating to OCR"
         )
 
         # ── Stage 2a: Azure Computer Vision OCR ───────────────────────────────
@@ -114,7 +113,7 @@ class FileParser:
         if azure_text is not None:
             # Azure ran but returned too little — log and continue to Tesseract
             logger.warning(
-                f"[FileParser] Azure OCR returned only {len(azure_text.strip())} chars "
+                f"Azure OCR returned only {len(azure_text.strip())} chars "
                 f"— trying Tesseract fallback"
             )
 
@@ -149,7 +148,7 @@ class FileParser:
         """
         _, ext = os.path.splitext(file_path)
         logger.info(
-            f"[FileParser] Image file detected ({ext.lower()}) — routing to OCR"
+            f"Image file detected ({ext.lower()}) — routing to OCR"
         )
 
         # ── Primary: Azure Computer Vision ────────────────────────────────────
@@ -159,7 +158,7 @@ class FileParser:
 
         if azure_text is not None:
             logger.warning(
-                f"[FileParser] Azure OCR returned only {len(azure_text.strip())} chars "
+                f"Azure OCR returned only {len(azure_text.strip())} chars "
                 f"on image — trying Tesseract fallback"
             )
 
@@ -207,21 +206,21 @@ class FileParser:
             if service is None:
                 # Azure not configured — caller will try Tesseract instead
                 logger.debug(
-                    "[FileParser] Azure CV not configured — skipping Azure OCR"
+                    "Azure CV not configured — skipping Azure OCR"
                 )
                 return None
 
-            logger.info(f"[FileParser] Calling Azure CV Read API for: {file_path}")
+            logger.info(f"Calling Azure CV Read API for: {file_path}")
             # asyncio.run() creates a fresh event loop in this executor thread
             result = asyncio.run(service.extract_text(file_path))
             return result
 
         except RuntimeError as e:
             # asyncio.run() failed — should not happen in executor thread
-            logger.error(f"[FileParser] Azure OCR asyncio error: {e}")
+            logger.error(f"Azure OCR asyncio error: {e}")
             return None
         except Exception as e:
-            logger.error(f"[FileParser] Azure OCR call failed: {e}")
+            logger.error(f"Azure OCR call failed: {e}")
             return None
 
     @staticmethod
@@ -238,7 +237,7 @@ class FileParser:
             from pdf2image import convert_from_path
             import pytesseract
 
-            logger.info("[FileParser] Trying Tesseract OCR (pdf2image + pytesseract)...")
+            logger.info("Trying Tesseract OCR (pdf2image + pytesseract)...")
             images = convert_from_path(file_path)
             pages_text = [pytesseract.image_to_string(img) for img in images]
             text = "\n\n".join(t for t in pages_text if t.strip())
@@ -251,20 +250,20 @@ class FileParser:
                 )
 
             logger.info(
-                f"[FileParser] Tesseract succeeded: {len(text)} chars "
+                f"Tesseract succeeded: {len(text)} chars "
                 f"from {len(images)} pages"
             )
             return text.strip()
 
         except (ImportError, FileNotFoundError) as e:
             logger.warning(
-                f"[FileParser] Tesseract/Poppler not installed — local OCR unavailable: {e}"
+                f"Tesseract/Poppler not installed — local OCR unavailable: {e}"
             )
             return None
         except ValueError:
             raise  # Re-raise explicit "insufficient text" error
         except Exception as e:
-            logger.error(f"[FileParser] Tesseract OCR failed: {e}")
+            logger.error(f"Tesseract OCR failed: {e}")
             return None
 
     @staticmethod
@@ -279,24 +278,24 @@ class FileParser:
             import pytesseract
             from PIL import Image
 
-            logger.info(f"[FileParser] Trying Tesseract image OCR for: {file_path}")
+            logger.info(f"Trying Tesseract image OCR for: {file_path}")
             img = Image.open(file_path)
             text = pytesseract.image_to_string(img)
 
             if text and text.strip():
                 logger.info(
-                    f"[FileParser] Tesseract image OCR: {len(text)} chars extracted"
+                    f"Tesseract image OCR: {len(text)} chars extracted"
                 )
                 return text.strip()
 
-            logger.warning("[FileParser] Tesseract image OCR returned empty text")
+            logger.warning("Tesseract image OCR returned empty text")
             return None
 
         except ImportError as e:
-            logger.warning(f"[FileParser] Tesseract/PIL not installed: {e}")
+            logger.warning(f"Tesseract/PIL not installed: {e}")
             return None
         except Exception as e:
-            logger.error(f"[FileParser] Tesseract image OCR failed: {e}")
+            logger.error(f"Tesseract image OCR failed: {e}")
             return None
 
     # ──────────────────────────────────────────────────────────────────────────
@@ -316,19 +315,19 @@ class FileParser:
         # Method 1: PyMuPDF4LLM
         try:
             import pymupdf4llm
-            logger.info("[FileParser] Trying PyMuPDF4LLM...")
+            logger.info("Trying PyMuPDF4LLM...")
             text = pymupdf4llm.to_markdown(file_path)
             if text and text.strip():
-                logger.info(f"[FileParser] PyMuPDF4LLM: {len(text)} chars")
+                logger.info(f"PyMuPDF4LLM: {len(text)} chars")
                 return text.strip()
-            logger.warning("[FileParser] PyMuPDF4LLM returned empty text")
+            logger.warning("PyMuPDF4LLM returned empty text")
         except Exception as e:
-            logger.warning(f"[FileParser] PyMuPDF4LLM failed: {e}")
+            logger.warning(f"PyMuPDF4LLM failed: {e}")
 
         # Method 2: PyPDF2
         try:
             from PyPDF2 import PdfReader
-            logger.info("[FileParser] Trying PyPDF2...")
+            logger.info("Trying PyPDF2...")
             reader = PdfReader(file_path)
             pages_text = []
             for i, page in enumerate(reader.pages):
@@ -337,23 +336,23 @@ class FileParser:
                     if page_text:
                         pages_text.append(page_text)
                 except Exception as page_err:
-                    logger.warning(f"[FileParser] PyPDF2 page {i} failed: {page_err}")
+                    logger.warning(f"PyPDF2 page {i} failed: {page_err}")
             if pages_text:
                 text = "\n\n".join(pages_text)
                 logger.info(
-                    f"[FileParser] PyPDF2: {len(text)} chars from {len(pages_text)} pages"
+                    f"PyPDF2: {len(text)} chars from {len(pages_text)} pages"
                 )
                 return text.strip()
-            logger.warning("[FileParser] PyPDF2 extracted no text")
+            logger.warning("PyPDF2 extracted no text")
         except ImportError:
-            logger.warning("[FileParser] PyPDF2 not installed")
+            logger.warning("PyPDF2 not installed")
         except Exception as e:
-            logger.warning(f"[FileParser] PyPDF2 failed: {e}")
+            logger.warning(f"PyPDF2 failed: {e}")
 
         # Method 3: Raw PyMuPDF/fitz
         try:
             import fitz
-            logger.info("[FileParser] Trying raw PyMuPDF...")
+            logger.info("Trying raw PyMuPDF...")
             doc = fitz.open(file_path)
             pages_text = []
             for i, page in enumerate(doc):
@@ -362,17 +361,17 @@ class FileParser:
                     if page_text:
                         pages_text.append(page_text)
                 except Exception as page_err:
-                    logger.warning(f"[FileParser] PyMuPDF page {i} failed: {page_err}")
+                    logger.warning(f"PyMuPDF page {i} failed: {page_err}")
             doc.close()
             if pages_text:
                 text = "\n\n".join(pages_text)
                 logger.info(
-                    f"[FileParser] Raw PyMuPDF: {len(text)} chars from {len(pages_text)} pages"
+                    f"Raw PyMuPDF: {len(text)} chars from {len(pages_text)} pages"
                 )
                 return text.strip()
-            logger.warning("[FileParser] Raw PyMuPDF extracted no text")
+            logger.warning("Raw PyMuPDF extracted no text")
         except Exception as e:
-            logger.warning(f"[FileParser] Raw PyMuPDF failed: {e}")
+            logger.warning(f"Raw PyMuPDF failed: {e}")
 
         return None
 
@@ -387,10 +386,10 @@ class FileParser:
             from docx import Document
             doc = Document(file_path)
             text = "\n".join([p.text for p in doc.paragraphs])
-            logger.info(f"[FileParser] DOCX extracted: {len(text)} chars")
+            logger.info(f"DOCX extracted: {len(text)} chars")
             return text.strip() if text.strip() else None
         except Exception as e:
-            logger.error(f"[FileParser] DOCX extraction failed: {e}")
+            logger.error(f"DOCX extraction failed: {e}")
             return None
 
     @staticmethod
@@ -403,15 +402,15 @@ class FileParser:
                     text = f.read().strip()
                     if text:
                         logger.info(
-                            f"[FileParser] TXT extracted ({encoding}): {len(text)} chars"
+                            f"TXT extracted ({encoding}): {len(text)} chars"
                         )
                         return text
             except UnicodeDecodeError:
                 continue
             except Exception as e:
-                logger.error(f"[FileParser] TXT extraction failed: {e}")
+                logger.error(f"TXT extraction failed: {e}")
                 return None
-        logger.error("[FileParser] TXT extraction failed — all encodings tried")
+        logger.error("TXT extraction failed — all encodings tried")
         return None
 
     @staticmethod
@@ -422,10 +421,10 @@ class FileParser:
             with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                 soup = BeautifulSoup(f.read(), "html.parser")
                 text = soup.get_text().strip()
-                logger.info(f"[FileParser] HTML extracted: {len(text)} chars")
+                logger.info(f"HTML extracted: {len(text)} chars")
                 return text if text else None
         except Exception as e:
-            logger.error(f"[FileParser] HTML extraction failed: {e}")
+            logger.error(f"HTML extraction failed: {e}")
             return None
 
     @staticmethod
@@ -439,8 +438,8 @@ class FileParser:
                 html = markdown.markdown(md_text)
                 soup = BeautifulSoup(html, "html.parser")
                 text = soup.get_text().strip()
-                logger.info(f"[FileParser] Markdown extracted: {len(text)} chars")
+                logger.info(f"Markdown extracted: {len(text)} chars")
                 return text if text else None
         except Exception as e:
-            logger.error(f"[FileParser] Markdown extraction failed: {e}")
+            logger.error(f"Markdown extraction failed: {e}")
             return None

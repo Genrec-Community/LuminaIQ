@@ -127,6 +127,14 @@ class Settings(BaseSettings):
     BOOK_STORE_MAX_DESCRIPTION: int = 2000
     BOOK_IMPORT_TEXTS_BUCKET: str = "texts"   # Supabase bucket for extracted .txt files
 
+    # ─────────────────────────────────────────────────────────
+    # Logging
+    # ─────────────────────────────────────────────────────────
+    LOG_LEVEL: str = "INFO"
+    LOG_DIR: str = "logs"
+    LOG_ROTATION: str = "10 MB"
+    LOG_RETENTION: str = "10 days"
+
     class Config:
         env_file = ".env"
         case_sensitive = True

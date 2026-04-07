@@ -31,6 +31,9 @@ import {
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { recordActivity } from '../../utils/studyActivity';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('KnowledgeGraphView');
 
 const KnowledgeGraphView = ({ projectId }) => {
     // Graph State
@@ -83,7 +86,7 @@ const KnowledgeGraphView = ({ projectId }) => {
         // Safety check: container must have dimensions
         const rect = containerRef.current.getBoundingClientRect();
         if (rect.width === 0 || rect.height === 0) {
-            console.warn('KnowledgeGraph: container has zero dimensions, retrying...');
+            logger.warn('Container has zero dimensions, retrying');
             setTimeout(() => initCytoscape(data), 100);
             return;
         }
@@ -391,7 +394,7 @@ const KnowledgeGraphView = ({ projectId }) => {
             try {
                 data = await getKnowledgeGraphVisualization(projectId);
             } catch (vizErr) {
-                console.warn('Knowledge graph visualization endpoint failed, falling back:', vizErr);
+                logger.warn('Visualization endpoint failed, falling back', { error: vizErr.message });
                 // Fallback: use the learning API endpoint
                 try {
                     const kgData = await getKnowledgeGraph(projectId);
@@ -434,7 +437,7 @@ const KnowledgeGraphView = ({ projectId }) => {
                     
                     data = { project_name: 'Knowledge Graph', nodes, edges, stats: kgData?.stats || {} };
                 } catch (fallbackErr) {
-                    console.error('Fallback also failed:', fallbackErr);
+                    logger.error('Fallback also failed', { error: fallbackErr.message });
                     throw vizErr;
                 }
             }
@@ -451,12 +454,12 @@ const KnowledgeGraphView = ({ projectId }) => {
                 setSessionStartTime(Date.now());
                 recordActivity(projectId, 'knowledge_graph', { action: 'start_session' });
             }).catch(sessionErr => {
-                console.warn('Session tracking unavailable:', sessionErr.message);
+                logger.warn('Session tracking unavailable', { error: sessionErr.message });
                 setSessionStartTime(Date.now());
             });
             
         } catch (err) {
-            console.error('Error fetching graph:', err);
+            logger.error('Error fetching graph', { error: err.message });
             setError(err.message || 'Failed to load knowledge graph');
             setLoading(false);
         }
@@ -469,7 +472,7 @@ const KnowledgeGraphView = ({ projectId }) => {
             const data = await getTopicSummary(projectId, topic, forceRegenerate);
             setTopicSummary(data);
         } catch (err) {
-            console.error('Error fetching summary:', err);
+            logger.error('Error fetching summary', { topic, error: err.message });
             setTopicSummary({
                 topic,
                 summary: 'Failed to load summary. Please try again.',
@@ -488,7 +491,7 @@ const KnowledgeGraphView = ({ projectId }) => {
             setSuggestions(data);
             setAnalytics(data.analytics);
         } catch (err) {
-            console.warn('Suggestions unavailable:', err.message);
+            logger.warn('Suggestions unavailable', { error: err.message });
         }
     };
 

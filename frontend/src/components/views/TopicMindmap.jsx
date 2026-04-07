@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('TopicMindmap');
 import {
     GitBranch, X, RefreshCw, ZoomIn, ZoomOut,
     ChevronRight, ChevronDown, Circle, ArrowLeft
@@ -128,7 +131,7 @@ const TopicMindmap = ({ projectId, topic, selectedDocuments = [], onClose }) => 
                 setError('Failed to generate mindmap');
             }
         } catch (err) {
-            console.error('Mindmap generation failed:', err);
+            logger.error('Mindmap generation failed', { error: err.message });
             setError(err.response?.data?.detail || 'Failed to generate mindmap. Please try again.');
         } finally {
             setLoading(false);

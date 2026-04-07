@@ -1,4 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('ProjectView');
 import { useNavigate, useParams } from 'react-router-dom';
 import {
     MessageSquare,
@@ -139,6 +142,14 @@ const ProjectView = () => {
         setMindmapDocs([]);
         setFlashcardTopic(null);
         setFlashcardDocs([]);
+        
+        // Reset quiz/QA active states when switching away from those tabs
+        if (activeTab !== 'quiz') {
+            setIsQuizActive(false);
+        }
+        if (activeTab !== 'qa') {
+            setIsQAActive(false);
+        }
     }, [activeTab, projectId]);
 
     // Persist chat messages to sessionStorage
@@ -214,7 +225,7 @@ const ProjectView = () => {
                     setLearningProgress(new Set(data.completed_topics));
                 }
             } catch (err) {
-                console.warn('Failed to load learning progress:', err);
+                logger.warn('Failed to load learning progress', { error: err.message });
             }
         };
         loadProgress();
@@ -229,6 +240,16 @@ const ProjectView = () => {
 
     // Combined sidebar hidden state
     const isSidebarHidden = isQuizActive || isQAActive || zenMode;
+
+    // Debug: Log sidebar state changes
+    useEffect(() => {
+        logger.debug('Sidebar visibility state', {
+            isSidebarHidden,
+            isQuizActive,
+            isQAActive,
+            zenMode
+        });
+    }, [isSidebarHidden, isQuizActive, isQAActive, zenMode]);
 
     // File Upload Ref
     const fileInputRef = useRef(null);
@@ -283,7 +304,7 @@ const ProjectView = () => {
                 // cold starts (30-50s) don't prematurely trigger the error screen.
                 docData = await fetchDocuments();
             } catch (err) {
-                console.warn('Initial document load failed:', err.message);
+                logger.warn('Initial document load failed', { error: err.message });
                 setFetchError(true);
                 setProjectViewLoading(false);
                 clearInterval(rotationInterval);
@@ -362,7 +383,7 @@ const ProjectView = () => {
                     },
                     (err) => {
                         // SSE failed (network drop etc.) — fall back to one-time poll
-                        console.warn(`SSE connection lost for doc ${doc.id}, falling back to poll`);
+                        logger.warn('SSE connection lost, falling back to poll', { docId: doc.id, error: err.message });
                         setTimeout(() => fetchDocuments(), 5000);
                     }
                 );
@@ -388,7 +409,7 @@ const ProjectView = () => {
             setDocuments(data.documents || []);
             return data;
         } catch (error) {
-            console.error("Failed to fetch documents", error);
+            logger.error('Failed to fetch documents', { error: error.message });
             return null;
         }
     };
@@ -404,7 +425,7 @@ const ProjectView = () => {
                 setAllProjectTopics(data);
             }
         } catch (error) {
-            console.error('Failed to fetch topics', error);
+            logger.error('Failed to fetch topics', { error: error.message });
         }
     };
 
@@ -523,7 +544,7 @@ const ProjectView = () => {
             const response = await getProjectSummary(projectId, selectedDocuments);
             setSummaryContent(response.answer);
         } catch (error) {
-            console.error("Summary error", error);
+            logger.error('Summary generation failed', { error: error.message });
             setSummaryContent("Could not retrieve summary. Please try again.");
         } finally {
             setSummaryLoading(false);
@@ -637,7 +658,7 @@ const ProjectView = () => {
 
             recordActivity(projectId, toolType === 'notes' ? 'notes' : toolType === 'qa' ? 'qa' : 'chat');
         } catch (error) {
-            console.error(`Tool ${toolType} error:`, error);
+            logger.error('Tool execution failed', { toolType, error: error.message });
             // Replace loading card with error card
             setMessages(prev => {
                 const updated = [...prev];
@@ -756,7 +777,7 @@ const ProjectView = () => {
                 }
             );
         } catch (error) {
-            console.error("Chat error", error);
+            logger.error('Chat message failed', { error: error.message });
             setMessages(prev => {
                 const updated = [...prev];
                 const lastMsg = updated[updated.length - 1];
@@ -778,7 +799,7 @@ const ProjectView = () => {
             await fetchDocuments();
             setShowUploadModal(false);
         } catch (error) {
-            console.error("Upload error", error);
+            logger.error('Upload failed', { error: error.message });
             toast.error('Failed to upload document(s)');
         } finally {
             setUploading(false);
@@ -804,7 +825,7 @@ const ProjectView = () => {
             setSelectedDocuments(prev => prev.filter(id => id !== docId));
             fetchDocuments();
         } catch (error) {
-            console.error("Delete failed", error);
+            logger.error('Delete document failed', { error: error.message });
             toast.error('Failed to delete document');
             fetchDocuments();
             // Remove from deleting set on error so user can retry
@@ -853,7 +874,7 @@ const ProjectView = () => {
                 initialPage: source.page || 1
             });
         } catch (error) {
-            console.error("Failed to generate or fetch document URL", error);
+            logger.error('Failed to generate or fetch document URL', { error: error.message });
             toast.error("Could not load the document. It may have been deleted or there is an issue with the server.");
         }
     };
@@ -1492,7 +1513,7 @@ const ProjectView = () => {
                                     newProgress.add(topic);
                                     setLearningProgress(newProgress);
                                     saveLearningProgress(projectId, [...newProgress]).catch(err =>
-                                        console.warn('Failed to save progress:', err)
+                                        logger.warn('Failed to save progress', { error: err.message })
                                     );
                                 }
                                 // Clear pre-selection after quiz complete
@@ -1591,7 +1612,7 @@ const ProjectView = () => {
                                 newProgress.add(topic);
                                 setLearningProgress(newProgress);
                                 saveLearningProgress(projectId, [...newProgress]).catch(err =>
-                                    console.warn('Failed to save progress:', err)
+                                    logger.warn('Failed to save progress', { error: err.message })
                                 );
                             }}
                             onGenerateNotes={(topic, docsToSelect) => {

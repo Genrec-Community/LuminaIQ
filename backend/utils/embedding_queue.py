@@ -134,7 +134,7 @@ class EmbeddingQueue:
             )
 
         logger.info(
-            f"[EmbeddingQueue] Limits: "
+            f"Concurrency limits: "
             f"{limits['MAX_CONCURRENT_DOCUMENTS']} docs, "
             f"{limits['MAX_GLOBAL_DB_OPERATIONS']} DB ops, "
             f"{limits['MAX_GLOBAL_EMBEDDINGS']} embed, "
@@ -194,7 +194,7 @@ class EmbeddingQueue:
             except asyncio.CancelledError:
                 pass
         self._active_tasks.clear()
-        logger.info("[EmbeddingQueue] All tasks stopped")
+        logger.info("All tasks stopped")
 
     async def enqueue(
         self,
@@ -231,9 +231,9 @@ class EmbeddingQueue:
 
             active_count = len(self._active_tasks)
             logger.info(
-                f"[EmbeddingQueue] Starting {filename} | "
-                f"Chunks: {len(chunks)} | Job: {job_id} | "
-                f"Active: {active_count + 1}"
+                f"Starting {filename} — "
+                f"chunks: {len(chunks)}, job: {job_id}, "
+                f"active: {active_count + 1}"
             )
 
             # Start processing immediately in a new task
@@ -254,8 +254,8 @@ class EmbeddingQueue:
                 job.position = 0
 
                 logger.info(
-                    f"[EmbeddingQueue] Processing {job.filename} | "
-                    f"Chunks: {len(job.chunks)}"
+                    f"Processing {job.filename} — "
+                    f"chunks: {len(job.chunks)}"
                 )
 
                 # Execute the callback (which uses global semaphores for batch ops)
@@ -268,17 +268,17 @@ class EmbeddingQueue:
                 duration = (job.completed_at - job.started_at).total_seconds()
                 chunks_per_sec = len(job.chunks) / max(0.1, duration)
                 logger.info(
-                    f"[EmbeddingQueue] Completed {job.filename} | "
-                    f"Duration: {duration:.1f}s | Speed: {chunks_per_sec:.1f} chunks/s"
+                    f"Completed {job.filename} in {duration:.1f}s "
+                    f"({chunks_per_sec:.1f} chunks/s)"
                 )
 
         except Exception as e:
             job.status = JobStatus.FAILED
             job.error_message = str(e)
             job.completed_at = datetime.now()
-            logger.error(f"[EmbeddingQueue] Failed {job.filename}: {e}")
+            logger.error(f"Failed {job.filename}: {e}")
             import traceback
-            logger.error(f"[EmbeddingQueue] Traceback: {traceback.format_exc()}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
 
         finally:
             self._active_tasks.pop(job.job_id, None)
@@ -362,7 +362,7 @@ class EmbeddingQueue:
             del self._jobs[job_id]
 
         if to_remove:
-            logger.info(f"[EmbeddingQueue] Cleaned up {len(to_remove)} old jobs")
+            logger.info(f"Cleaned up {len(to_remove)} old jobs")
 
 
 # Singleton instance

@@ -2,6 +2,9 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { getGamification, awardXP } from '../api';
 import { setXPCallback } from '../utils/studyActivity';
 import { useAuth } from './AuthContext';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('GamificationContext');
 
 const GamificationContext = createContext(null);
 
@@ -42,7 +45,7 @@ export const GamificationProvider = ({ children }) => {
                 const result = await getGamification();
                 if (result) setData(result);
             } catch (err) {
-                console.warn('Failed to load gamification data:', err);
+                logger.warn('Failed to load gamification data', err);
             } finally {
                 setLoaded(true);
             }
@@ -117,10 +120,10 @@ export const GamificationProvider = ({ children }) => {
 
                 return result;
             } else if (result && result.error) {
-                console.warn('XP award failed on server:', result.error);
+                logger.warn('XP award rejected by server', { error: result.error });
             }
         } catch (err) {
-            console.warn('Failed to award XP:', err);
+            logger.warn('Failed to award XP', err);
         }
         return null;
     }, []);
@@ -143,7 +146,7 @@ export const GamificationProvider = ({ children }) => {
             const result = await getGamification();
             if (result) setData(result);
         } catch (err) {
-            console.warn('Failed to refresh gamification:', err);
+            logger.warn('Failed to refresh gamification data', err);
         }
     }, []);
 

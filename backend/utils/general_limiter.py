@@ -47,7 +47,7 @@ def get_general_semaphore() -> asyncio.Semaphore:
             limit = 40  # safe fallback
 
         _general_semaphore = asyncio.Semaphore(limit)
-        logger.info(f"[GeneralLimiter] Initialized with limit={limit}")
+        logger.info(f"Initialized with limit={limit}")
 
     return _general_semaphore
 

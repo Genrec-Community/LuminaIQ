@@ -32,12 +32,8 @@ class MCQService:
 
             text = "\n".join(chunks)
 
-            # DIAGNOSTIC: Log text sample before sending to LLM
-            print("\n====== EXTRACTED TEXT SAMPLE ======\n")
-            print(text[:1000] if text else "EMPTY TEXT")
-            print("\n====================================\n")
-            print(f"TEXT LENGTH: {len(text)} chars")
-            print(f"CHUNK COUNT: {len(chunks)} chunks\n")
+            # Log text sample size before sending to LLM
+            logger.debug(f"Extracted {len(text)} chars across {len(chunks)} chunks for MCQ processing")
 
             system_prompt = """You are an expert curriculum analyst. Analyze this educational content and extract ALL learning topics.
 
@@ -64,10 +60,8 @@ Return ONLY a valid JSON array of topic strings:
             ]
             response = await llm_service.chat_completion(messages, temperature=0.3, max_tokens=4000)
             
-            # DIAGNOSTIC: Log raw LLM output
-            print("\n====== RAW LLM OUTPUT ======\n")
-            print(response)
-            print("\n===========================\n")
+            # Log raw LLM output characteristics
+            logger.debug(f"Received generated output from LLM ({len(response) if response else 0} chars)")
             if not response:
                 logger.error("LLM returned empty response for topic generation")
                 return []
@@ -90,7 +84,6 @@ Return ONLY a valid JSON array of topic strings:
                 except json.JSONDecodeError as e:
                     logger.error(f"Failed to parse topics JSON: {e}")
                     # FALLBACK: Try to extract topics from raw response text
-                    print("FALLBACK: Trying to extract topics from raw text...")
                     import re
                     # Look for quoted strings in the response
                     matches = re.findall(r'"([^"]+)"', response)
@@ -99,8 +92,7 @@ Return ONLY a valid JSON array of topic strings:
                         if clean and len(clean) > 3 and clean.lower() not in seen:
                             topics.append(clean)
                             seen.add(clean.lower())
-                    if topics:
-                        print(f"FALLBACK: Extracted {len(topics)} topics from raw text")
+                    logger.info(f"JSON parsing failed. Extracted {len(topics)} topics from raw text fallback")
 
             # Save to document
             if topics:

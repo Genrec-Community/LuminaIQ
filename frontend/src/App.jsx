@@ -5,6 +5,7 @@ import { SettingsProvider } from './context/SettingsContext';
 import { GamificationProvider } from './context/GamificationContext';
 import PrivateRoute from './components/PrivateRoute';
 import XPToast from './components/XPToast';
+import DevLogViewer from './components/DevLogViewer';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import ProjectView from './pages/ProjectView';
@@ -34,6 +35,7 @@ function App() {
                             </Routes>
                         </Router>
                         <XPToast />
+                        <DevLogViewer />
                     </ToastProvider>
                 </GamificationProvider>
             </SettingsProvider>

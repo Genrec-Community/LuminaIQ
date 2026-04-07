@@ -1,103 +1,128 @@
 import logging
 import sys
-from datetime import datetime
+from loguru import logger
+from config.settings import settings
 
 
-class EndpointFilter(logging.Filter):
+class InterceptHandler(logging.Handler):
+    """
+    Default handler from logging to intercept standard logging messages 
+    and route them to loguru.
+    """
+    def emit(self, record: logging.LogRecord):
+        # Get corresponding Loguru level if it exists
+        try:
+            level = logger.level(record.levelname).name
+        except ValueError:
+            level = str(record.levelno)
+
+        # Find caller from where originated the logged message
+        frame, depth = logging.currentframe(), 2
+        while frame and frame.f_code.co_filename == logging.__file__:
+            frame = frame.f_back
+            depth += 1
+
+        logger.opt(depth=depth, exception=record.exc_info).log(
+            level, record.getMessage()
+        )
+
+
+def log_filter(record):
     """
     Filter to reduce noisy HTTP logs.
-
-    Filters out:
-    - OPTIONS requests (CORS preflight)
-    - Polling GET requests (document status checks)
-    - Health check endpoints
     """
-
-    # Patterns to filter (case-insensitive partial match)
     FILTER_PATTERNS = [
         "OPTIONS",  # CORS preflight requests
         "GET /api/v1/documents/",  # Document polling
         "GET /health",  # Health checks
         "GET / HTTP",  # Root endpoint
     ]
-
-    def filter(self, record: logging.LogRecord) -> bool:
-        message = record.getMessage()
-
-        # Filter out noisy patterns
-        for pattern in self.FILTER_PATTERNS:
-            if pattern in message:
-                return False
-
-        return True
+    message = record["message"]
+    
+    # Filter out noisy patterns
+    for pattern in FILTER_PATTERNS:
+        if pattern in message:
+            return False
+            
+    return True
 
 
-class ColoredFormatter(logging.Formatter):
+def setup_logging():
     """
-    Colored log formatter for better readability.
-
-    Colors:
-    - DEBUG: Cyan
-    - INFO: Green
-    - WARNING: Yellow
-    - ERROR: Red
-    - CRITICAL: Bold Red
+    Configure loguru logging with console and file handlers, 
+    and intercept standard python logging.
     """
+    # Remove default loguru handler
+    logger.remove()
 
-    COLORS = {
-        "DEBUG": "\033[36m",  # Cyan
-        "INFO": "\033[32m",  # Green
-        "WARNING": "\033[33m",  # Yellow
-        "ERROR": "\033[31m",  # Red
-        "CRITICAL": "\033[1;31m",  # Bold Red
-    }
-    RESET = "\033[0m"
+    # Define common human-readable format
+    log_format = (
+        "<green>{time:YYYY-MM-DD HH:mm:ss}</green> │ "
+        "<level>{level: <8}</level> │ "
+        "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
+    )
 
-    def format(self, record: logging.LogRecord) -> str:
-        # Add color to level name
-        color = self.COLORS.get(record.levelname, "")
-        record.levelname = f"{color}{record.levelname}{self.RESET}"
+    # 1. Console Handler (Human Readable)
+    logger.add(
+        sys.stdout,
+        level=settings.LOG_LEVEL,
+        format=log_format,
+        filter=log_filter,
+        colorize=True,
+        enqueue=True,
+    )
 
-        return super().format(record)
+    # 2. File Handler (JSON format for Production Observation)
+    log_file_path = f"{settings.LOG_DIR}/lumina_backend.log"
+    logger.add(
+        log_file_path,
+        level=settings.LOG_LEVEL,
+        # serialize output to JSON. Built-in loguru serialization provides time, level, message, name, etc.
+        serialize=True,
+        filter=log_filter,
+        rotation=settings.LOG_ROTATION,
+        retention=settings.LOG_RETENTION,
+        compression="zip",
+        enqueue=True,
+    )
 
+    # 3. File Handler (Human-readable text format for local debugging)
+    text_log_file_path = f"{settings.LOG_DIR}/lumina_backend_readable.log"
+    logger.add(
+        text_log_file_path,
+        level=settings.LOG_LEVEL,
+        format=log_format,
+        colorize=False,
+        filter=log_filter,
+        rotation=settings.LOG_ROTATION,
+        retention=settings.LOG_RETENTION,
+        compression="zip",
+        enqueue=True,
+    )
 
-def setup_logger(name: str = "lumina") -> logging.Logger:
-    """
-    Setup application logger with filtering and coloring.
-    """
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
-
-    if not logger.handlers:
-        handler = logging.StreamHandler(sys.stdout)
-
-        # Use colored formatter
-        formatter = ColoredFormatter(
-            "%(asctime)s │ %(levelname)-8s │ %(message)s", datefmt="%H:%M:%S"
-        )
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
+    # 4. Intercept standard logging from noisy third-party frameworks
+    loggers_to_intercept = [
+        "uvicorn",
+        "uvicorn.access",
+        "uvicorn.error",
+        "fastapi",
+        "httpx",
+        "httpcore"
+    ]
+    
+    # Intercept root
+    logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
+    
+    # Force specific loggers to use interceptor and not propagate to root
+    for logger_name in loggers_to_intercept:
+        std_logger = logging.getLogger(logger_name)
+        std_logger.handlers = [InterceptHandler()]
+        std_logger.propagate = False
+        
+        if logger_name in ["httpx", "httpcore"]:
+            std_logger.setLevel(logging.WARNING)
 
     return logger
 
-
-def setup_uvicorn_log_filter():
-    """
-    Apply filter to uvicorn access logs to reduce noise.
-    Call this in main.py after app initialization.
-    """
-    # Filter uvicorn access logs
-    uvicorn_access = logging.getLogger("uvicorn.access")
-    uvicorn_access.addFilter(EndpointFilter())
-
-    # Also filter httpx if present
-    httpx_logger = logging.getLogger("httpx")
-    httpx_logger.setLevel(logging.WARNING)
-
-    # Filter httpcore
-    httpcore_logger = logging.getLogger("httpcore")
-    httpcore_logger.setLevel(logging.WARNING)
-
-
-# Create default logger instance
-logger = setup_logger()
+# Initialize logging configuration immediately upon import
+logger = setup_logging()

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { createLogger } from '../utils/logger';
 import {
     Brain, Send, Loader2, Lightbulb, HelpCircle,
     BookOpen, Sparkles, RefreshCw, ThumbsUp, ThumbsDown,
@@ -9,6 +10,8 @@ import remarkGfm from 'remark-gfm';
 import { recordActivity } from '../utils/studyActivity';
 import { useSettings } from '../context/SettingsContext';
 import { API_URL } from '../api';
+
+const logger = createLogger('AITutorChat');
 
 const AITutorChat = ({
     projectId,
@@ -254,7 +257,7 @@ Guidelines:
             // Track chat activity for heatmap
             recordActivity(projectId, 'chat');
         } catch (error) {
-            console.error('Tutor error:', error);
+            logger.error('Tutor streaming error', error);
             setMessages(prev => [...prev, {
                 role: 'assistant',
                 content: 'I apologize, but I encountered an error. Please try again.',

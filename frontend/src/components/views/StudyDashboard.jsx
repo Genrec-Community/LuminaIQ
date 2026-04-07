@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('StudyDashboard');
 import { 
     Brain, BookOpen, Clock, CheckCircle, AlertTriangle, 
     Loader2, RefreshCw, Star, TrendingUp, Calendar,
@@ -41,7 +44,7 @@ const StudyDashboard = ({ projectId, availableTopics }) => {
             const data = await getLearningDashboard(projectId);
             setDashboard(data);
         } catch (err) {
-            console.error('Failed to load dashboard:', err);
+            logger.error('Failed to load dashboard', { error: err.message });
             setError(err.response?.data?.detail || err.message || 'Failed to load dashboard');
         } finally {
             setLoading(false);
@@ -61,7 +64,7 @@ const StudyDashboard = ({ projectId, availableTopics }) => {
                 toast.info('No cards due for review!');
             }
         } catch (error) {
-            console.error('Failed to load review cards:', error);
+            logger.error('Failed to load review cards', { error: error.message });
         }
     };
 
@@ -87,7 +90,7 @@ const StudyDashboard = ({ projectId, availableTopics }) => {
                 loadDashboard(); // Refresh stats
             }
         } catch (error) {
-            console.error('Failed to record review:', error);
+            logger.error('Failed to record review', { error: error.message });
         } finally {
             setSubmittingReview(false);
         }

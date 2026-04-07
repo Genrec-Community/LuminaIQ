@@ -1,4 +1,7 @@
 import axios from 'axios';
+import { createLogger } from './utils/logger';
+
+const logger = createLogger('API');
 
 // Fallback to localhost so a missing VITE_MAIN_API_URL env var doesn't silently
 // send every request to '/undefined/...' on deployed builds.
@@ -48,7 +51,7 @@ api.interceptors.response.use(
         if (isRetryable) {
             config._retryCount = (config._retryCount || 0) + 1;
             const delay = Math.min(1000 * Math.pow(2, config._retryCount - 1), 10000);
-            console.log(`Retrying request (attempt ${config._retryCount}/3) in ${delay}ms...`);
+            logger.info(`Retrying request (attempt ${config._retryCount}/3)`, { delay, url: config.url, status });
 
             await new Promise(resolve => setTimeout(resolve, delay));
             return api(config);
@@ -207,7 +210,7 @@ export const chatMessageStream = async (projectId, message, history = [], select
             // Check for retryable HTTP errors
             if (response.status === 503 || response.status === 429 || response.status === 502) {
                 const delay = Math.min(1500 * Math.pow(2, attempt), 10000);
-                console.log(`Service unavailable (${response.status}), retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})...`);
+                logger.info(`Service unavailable, retrying`, { status: response.status, attempt: attempt + 1, maxRetries, delay });
                 await new Promise(resolve => setTimeout(resolve, delay));
                 continue;
             }
@@ -245,13 +248,13 @@ export const chatMessageStream = async (projectId, message, history = [], select
                         // Clean and parse sources
                         const cleanSourcesJson = sourcesJson.trim();
                         sources = JSON.parse(cleanSourcesJson);
-                        console.log('Sources parsed successfully:', sources);
+                        logger.debug('Chat stream sources parsed successfully', { count: sources.length });
 
                         // Update with clean text
                         onChunk(textPart);
                         fullText = textPart; // Reset to just text without marker
                     } catch (e) {
-                        console.warn('JSON parse incomplete, continuing...', e.message);
+                        logger.debug('JSON parse incomplete, continuing to read', { reason: e.message });
                         // Continue reading, JSON might be split across chunks
                     }
                 } else {
@@ -261,7 +264,7 @@ export const chatMessageStream = async (projectId, message, history = [], select
             }
 
             // Stream complete - use parsed sources
-            console.log('Stream finished. Sources:', sources);
+            logger.debug('Chat stream finished', { sourceCount: sources.length });
             onComplete({ answer: fullText, sources: sources });
             return; // Success, exit retry loop
 
@@ -273,19 +276,19 @@ export const chatMessageStream = async (projectId, message, history = [], select
 
             if (isRetryable && attempt < maxRetries - 1) {
                 const delay = Math.min(1500 * Math.pow(2, attempt), 10000);
-                console.log(`Retryable error: ${error.message}. Retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})...`);
+                logger.info(`Retryable streaming error, retrying`, { error: error.message, attempt: attempt + 1, maxRetries, delay });
                 await new Promise(resolve => setTimeout(resolve, delay));
                 continue;
             }
 
-            console.error("Streaming error:", error);
+            logger.error('Chat streaming error', error);
             onComplete({ answer: `Error: ${error.message}. Please try again.`, sources: [] });
             return;
         }
     }
 
     // All retries exhausted
-    console.error("All retries exhausted:", lastError);
+    logger.error('All chat stream retries exhausted', lastError);
     onComplete({ answer: "Service temporarily unavailable. Please try again in a moment.", sources: [] });
 };
 
@@ -889,12 +892,12 @@ export const subscribeDocumentProgress = (documentId, onEvent, onError = null) =
                 eventSource.close();
             }
         } catch (e) {
-            console.warn('Failed to parse SSE event:', e);
+            logger.warn('Failed to parse SSE event', e);
         }
     };
 
     eventSource.onerror = (err) => {
-        console.error('SSE connection error:', err);
+        logger.error('SSE connection error', { documentId, error: err });
         if (onError) onError(err);
         eventSource.close();
     };

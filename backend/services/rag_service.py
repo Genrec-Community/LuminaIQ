@@ -227,11 +227,7 @@ Context:
             sources = []
             if "context" in response:
                 # DIAGNOSTIC: Log retrieved chunks
-                print("\n====== RETRIEVED CHUNKS ======")
-                for i, doc in enumerate(response["context"]):
-                    print(f"\n--- Chunk {i+1} ---")
-                    print(doc.page_content[:300])
-                print("\n===========================\n")
+                logger.debug(f"Retrieved {len(response['context'])} semantic chunks from context payload")
                 
                 for i, doc in enumerate(response["context"]):
                     # Resolve filename from doc.metadata if available

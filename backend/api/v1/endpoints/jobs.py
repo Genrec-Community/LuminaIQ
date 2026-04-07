@@ -18,9 +18,7 @@ import asyncio
 from api.deps import get_current_user
 from utils.background_jobs import job_manager, JobStatus
 from utils.cache import content_cache
-import logging
-
-logger = logging.getLogger(__name__)
+from utils.logger import logger
 
 router = APIRouter()
 

@@ -5,6 +5,9 @@ import remarkGfm from 'remark-gfm';
 import { generateNotes, getSavedNotes, getSavedNote, deleteSavedNote } from '../../api';
 import { useToast } from '../../context/ToastContext';
 import { recordActivity } from '../../utils/studyActivity';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('NotesView');
 
 const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopic = null, preGeneratedData = null, onConsumePreGenerated = null, autoGenerate = false }) => {
     const toast = useToast();
@@ -74,7 +77,7 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
             const data = await getSavedNotes(projectId);
             setSavedNotes(data || []);
         } catch (error) {
-            console.error('Failed to fetch saved notes:', error);
+            logger.error('Failed to fetch saved notes', { error: error.message });
         } finally {
             setSavedLoading(false);
         }
@@ -91,7 +94,7 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
             setNotesTopicSelection(data.topic || '');
             setNotesTitle(data.title || data.note_type || 'Notes');
         } catch (error) {
-            console.error('Failed to load saved note:', error);
+            logger.error('Failed to load saved note', { error: error.message });
             toast.error('Failed to load saved note');
             setViewMode('list');
         } finally {
@@ -106,7 +109,7 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
             toast.success('Note deleted');
             setSavedNotes(prev => prev.filter(n => n.id !== noteId));
         } catch (error) {
-            console.error('Failed to delete note:', error);
+            logger.error('Failed to delete note', { error: error.message });
             toast.error('Failed to delete note');
         }
     };
@@ -140,7 +143,7 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
             // Refresh saved list since new note was auto-saved
             fetchSavedNotes();
         } catch (error) {
-            console.error("Notes gen error", error);
+            logger.error('Notes generation failed', { error: error.message });
             toast.error('Failed to generate notes');
             setViewMode('form');
         } finally {
@@ -305,7 +308,7 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
             await html2pdf().set(opt).from(container).save();
             toast.success('PDF downloaded successfully!');
         } catch (error) {
-            console.error('PDF generation error:', error);
+            logger.error('PDF generation failed', { error: error.message });
             toast.error('Failed to generate PDF. Please try again.');
         } finally {
             setPdfLoading(false);

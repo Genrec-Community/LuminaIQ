@@ -76,7 +76,7 @@ class DocumentService:
                 await self._update_document_status(
                     document_id, "queued", "Waiting for processing slot..."
                 )
-                logger.info(f"[{filename}] Queued — waiting for doc_semaphore slot")
+                logger.info(f"Document '{filename}' queued — waiting for doc_semaphore slot")
 
             async with doc_semaphore:
                 await self._run_pipeline(
@@ -377,7 +377,7 @@ class DocumentService:
         db_semaphore = EmbeddingQueue.get_db_semaphore()
 
         logger.info(
-            f"[{filename}] Starting embedding: {len(chunks)} chunks, "
+            f"Starting embedding for '{filename}': {len(chunks)} chunks, "
             f"{total_batches} batches (global limits)"
         )
 
@@ -420,7 +420,7 @@ class DocumentService:
 
                     if completed[0] % 5 == 0 or completed[0] == total_batches:
                         logger.info(
-                            f"[{filename}] Progress: {completed[0]}/{total_batches} batches"
+                            f"Progress for '{filename}': {completed[0]}/{total_batches} batches"
                         )
                     return
 
@@ -437,13 +437,13 @@ class DocumentService:
                     if is_retryable and attempt < retries - 1:
                         wait_time = (2 ** attempt) + (0.1 * (batch_idx % 5))
                         logger.warning(
-                            f"[{filename}] Batch {batch_idx + 1} retry {attempt + 1}/{retries} "
+                            f"Batch {batch_idx + 1} for '{filename}' retry {attempt + 1}/{retries} "
                             f"in {wait_time:.1f}s: {e}"
                         )
                         await asyncio.sleep(wait_time)
                         continue
 
-                    logger.error(f"[{filename}] Batch {batch_idx + 1} failed: {e}")
+                    logger.error(f"Batch {batch_idx + 1} for '{filename}' failed: {e}")
                     if attempt == retries - 1:
                         failed_batches.append(batch_idx)
                         return  # Let other batches complete
@@ -456,10 +456,10 @@ class DocumentService:
 
         if failed_batches:
             logger.warning(
-                f"[{filename}] Completed with {len(failed_batches)} failed batches: {failed_batches}"
+                f"Document '{filename}' completed with {len(failed_batches)} failed batches: {failed_batches}"
             )
         else:
-            logger.info(f"[{filename}] Embedding completed: {total_batches} batches")
+            logger.info(f"Embedding completed for '{filename}': {total_batches} batches")
 
     # ──────────────────────────────────────────────────────────────────────────
     # Database helpers
