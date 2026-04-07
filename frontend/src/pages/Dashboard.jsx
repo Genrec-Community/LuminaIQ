@@ -75,6 +75,22 @@ const Dashboard = () => {
         };
     }, []);
 
+    const fetchBsBooks = useCallback(async (page = bsPage, search = bsSearch) => {
+        setBsLoading(true);
+        try {
+            const data = await getPublicBooks(page, search);
+            setBsBooks(data.books || []);
+            setBsTotalPages(data.total_pages || 1);
+            setBsTotal(data.total || 0);
+        } catch { /* silent */ } finally {
+            setBsLoading(false);
+        }
+    }, [bsPage, bsSearch]);
+
+    useEffect(() => {
+        if (modalStep === 'store') fetchBsBooks(bsPage, bsSearch);
+    }, [modalStep, bsPage, bsSearch]);
+
     const fetchProjects = async () => {
         setFetchError(false);
         setIsLoadingProjects(true);
@@ -202,21 +218,7 @@ const Dashboard = () => {
         }
     };
 
-    const fetchBsBooks = useCallback(async (page = bsPage, search = bsSearch) => {
-        setBsLoading(true);
-        try {
-            const data = await getPublicBooks(page, search);
-            setBsBooks(data.books || []);
-            setBsTotalPages(data.total_pages || 1);
-            setBsTotal(data.total || 0);
-        } catch { /* silent */ } finally {
-            setBsLoading(false);
-        }
-    }, [bsPage, bsSearch]);
 
-    useEffect(() => {
-        if (modalStep === 'store') fetchBsBooks(bsPage, bsSearch);
-    }, [modalStep, bsPage, bsSearch]);
 
     const handleBsSearch = (e) => {
         e.preventDefault();
