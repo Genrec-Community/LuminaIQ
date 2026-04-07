@@ -78,6 +78,24 @@ const Dashboard = () => {
         };
     }, []);
 
+    // ── ALL HOOKS MUST BE DECLARED BEFORE ANY CONDITIONAL RETURNS ──
+    
+    const fetchBsBooks = useCallback(async (page = bsPage, search = bsSearch) => {
+        setBsLoading(true);
+        try {
+            const data = await getPublicBooks(page, search);
+            setBsBooks(data.books || []);
+            setBsTotalPages(data.total_pages || 1);
+            setBsTotal(data.total || 0);
+        } catch { /* silent */ } finally {
+            setBsLoading(false);
+        }
+    }, [bsPage, bsSearch]);
+
+    useEffect(() => {
+        if (modalStep === 'store') fetchBsBooks(bsPage, bsSearch);
+    }, [modalStep, bsPage, bsSearch, fetchBsBooks]);
+
     const fetchProjects = async () => {
         setFetchError(false);
         setIsLoadingProjects(true);
@@ -111,7 +129,7 @@ const Dashboard = () => {
         }
     };
 
-    // ... handlers ...
+    // ── CONDITIONAL RETURNS COME AFTER ALL HOOKS ──
 
     // Show skeleton only when there's no cached data to display
     if (isLoadingProjects && projects.length === 0 && !fetchError) {
@@ -204,22 +222,6 @@ const Dashboard = () => {
             setTimeout(() => navigate(`/project/${bsCreatedProjectId}`), 300);
         }
     };
-
-    const fetchBsBooks = useCallback(async (page = bsPage, search = bsSearch) => {
-        setBsLoading(true);
-        try {
-            const data = await getPublicBooks(page, search);
-            setBsBooks(data.books || []);
-            setBsTotalPages(data.total_pages || 1);
-            setBsTotal(data.total || 0);
-        } catch { /* silent */ } finally {
-            setBsLoading(false);
-        }
-    }, [bsPage, bsSearch]);
-
-    useEffect(() => {
-        if (modalStep === 'store') fetchBsBooks(bsPage, bsSearch);
-    }, [modalStep, bsPage, bsSearch]);
 
     const handleBsSearch = (e) => {
         e.preventDefault();
