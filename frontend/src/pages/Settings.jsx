@@ -135,26 +135,53 @@ const Settings = () => {
         </div>
     );
 
-    const TextInput = ({ value, onChange, label, description, icon: Icon, placeholder }) => (
-        <div className="p-4 bg-white rounded-2xl border border-[#E6D5CC]/80">
-            <div className="flex items-center gap-3.5 mb-3">
-                <div className="h-10 w-10 bg-[#FDF6F0] rounded-xl flex items-center justify-center shrink-0">
-                    <Icon className="h-5 w-5 text-[#C8A288]" />
+    const TextInput = ({ value, onChange, label, description, icon: Icon, placeholder }) => {
+        // Use local state to avoid cursor-jumping from parent re-renders
+        const [localValue, setLocalValue] = React.useState(value || '');
+        const timerRef = React.useRef(null);
+
+        // Sync from parent when the actual saved value changes (e.g. reset)
+        React.useEffect(() => {
+            setLocalValue(value || '');
+        }, [value]);
+
+        const handleChange = (e) => {
+            const v = e.target.value;
+            setLocalValue(v);
+            // Debounce: save after 500ms idle
+            clearTimeout(timerRef.current);
+            timerRef.current = setTimeout(() => onChange(v), 500);
+        };
+
+        const handleBlur = () => {
+            clearTimeout(timerRef.current);
+            if (localValue !== (value || '')) {
+                onChange(localValue);
+            }
+        };
+
+        return (
+            <div className="p-4 bg-white rounded-2xl border border-[#E6D5CC]/80">
+                <div className="flex items-center gap-3.5 mb-3">
+                    <div className="h-10 w-10 bg-[#FDF6F0] rounded-xl flex items-center justify-center shrink-0">
+                        <Icon className="h-5 w-5 text-[#C8A288]" />
+                    </div>
+                    <div className="min-w-0">
+                        <p className="font-semibold text-[#4A3B32] text-sm">{label}</p>
+                        <p className="text-xs text-[#8a6a5c] mt-0.5">{description}</p>
+                    </div>
                 </div>
-                <div>
-                    <p className="font-semibold text-[#4A3B32] text-sm">{label}</p>
-                    <p className="text-xs text-[#8a6a5c] mt-0.5">{description}</p>
-                </div>
+                <input
+                    type="text"
+                    value={localValue}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    placeholder={placeholder}
+                    className="w-full px-4 py-2.5 bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl focus:ring-2 focus:ring-[#C8A288] focus:border-transparent outline-none text-[#4A3B32] font-medium text-sm placeholder-[#8a6a5c]/40"
+                />
             </div>
-            <input
-                type="text"
-                value={value || ''}
-                onChange={(e) => onChange(e.target.value)}
-                placeholder={placeholder}
-                className="w-full px-4 py-2.5 bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl focus:ring-2 focus:ring-[#C8A288] focus:border-transparent outline-none text-[#4A3B32] font-medium text-sm placeholder-[#8a6a5c]/40"
-            />
-        </div>
-    );
+        );
+    };
 
     const SectionHeader = ({ icon: Icon, title, subtitle }) => (
         <div className="flex items-center gap-3 mb-5">

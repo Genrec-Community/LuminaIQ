@@ -79,30 +79,69 @@ const MindmapRenderer = ({ data }) => {
         });
     };
 
-    // Pan/zoom handlers
-    const handleMouseDown = (e) => {
+    // Pan/zoom handlers — supports both mouse and touch
+    const handlePointerDown = (e) => {
         if (e.target.closest('.mindmap-node')) return;
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
         setIsDragging(true);
-        setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+        setDragStart({ x: clientX - pan.x, y: clientY - pan.y });
     };
 
-    const handleMouseMove = useCallback((e) => {
+    const handlePointerMove = useCallback((e) => {
         if (!isDragging) return;
-        setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        setPan({ x: clientX - dragStart.x, y: clientY - dragStart.y });
     }, [isDragging, dragStart]);
 
-    const handleMouseUp = () => setIsDragging(false);
+    const handlePointerUp = () => setIsDragging(false);
+
+    // Track pinch-to-zoom distance
+    const lastPinchDist = useRef(0);
+    const handleTouchStart = (e) => {
+        if (e.touches.length === 2) {
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            lastPinchDist.current = Math.hypot(dx, dy);
+        } else {
+            handlePointerDown(e);
+        }
+    };
+    const handleTouchMove = (e) => {
+        if (e.touches.length === 2) {
+            e.preventDefault();
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            const dist = Math.hypot(dx, dy);
+            if (lastPinchDist.current > 0) {
+                const scale = dist / lastPinchDist.current;
+                setZoom(prev => Math.max(0.3, Math.min(2, prev * scale)));
+            }
+            lastPinchDist.current = dist;
+        } else {
+            handlePointerMove(e);
+        }
+    };
+    const handleTouchEnd = () => {
+        lastPinchDist.current = 0;
+        handlePointerUp();
+    };
 
     useEffect(() => {
         if (isDragging) {
-            window.addEventListener('mousemove', handleMouseMove);
-            window.addEventListener('mouseup', handleMouseUp);
+            window.addEventListener('mousemove', handlePointerMove);
+            window.addEventListener('mouseup', handlePointerUp);
+            window.addEventListener('touchmove', handlePointerMove, { passive: false });
+            window.addEventListener('touchend', handlePointerUp);
             return () => {
-                window.removeEventListener('mousemove', handleMouseMove);
-                window.removeEventListener('mouseup', handleMouseUp);
+                window.removeEventListener('mousemove', handlePointerMove);
+                window.removeEventListener('mouseup', handlePointerUp);
+                window.removeEventListener('touchmove', handlePointerMove);
+                window.removeEventListener('touchend', handlePointerUp);
             };
         }
-    }, [isDragging, handleMouseMove]);
+    }, [isDragging, handlePointerMove]);
 
     const handleWheel = (e) => {
         e.preventDefault();
@@ -111,7 +150,7 @@ const MindmapRenderer = ({ data }) => {
     };
 
     const resetView = () => {
-        setZoom(1);
+        setZoom(0.7);
         setPan({ x: 0, y: 0 });
     };
 
@@ -127,15 +166,15 @@ const MindmapRenderer = ({ data }) => {
             <div key={node.id} className="flex flex-col items-center">
                 {/* Node */}
                 <div
-                    className="mindmap-node relative cursor-pointer select-none transition-all duration-200 hover:scale-105"
+                    className="mindmap-node relative cursor-pointer select-none transition-all duration-200 active:scale-95 md:hover:scale-105"
                     onClick={() => hasChildren && toggleNode(node.id)}
                 >
                     <div
-                        className={`px-4 py-2.5 rounded-xl border-2 shadow-sm transition-all duration-200 max-w-[200px] text-center ${
+                        className={`px-3 py-2 md:px-4 md:py-2.5 rounded-xl border-2 shadow-sm transition-all duration-200 max-w-[150px] md:max-w-[200px] text-center ${
                             isRoot
-                                ? 'bg-gradient-to-br from-[#C8A288] to-[#A08072] border-[#8B7060] text-white font-bold text-base px-6 py-3.5 shadow-lg shadow-[#C8A288]/30'
+                                ? 'bg-gradient-to-br from-[#C8A288] to-[#A08072] border-[#8B7060] text-white font-bold text-sm md:text-base px-4 py-2.5 md:px-6 md:py-3.5 shadow-lg shadow-[#C8A288]/30'
                                 : depth === 1
-                                    ? `font-semibold text-sm`
+                                    ? `font-semibold text-xs md:text-sm`
                                     : 'bg-white text-xs font-medium'
                         }`}
                         style={!isRoot ? {
@@ -162,7 +201,7 @@ const MindmapRenderer = ({ data }) => {
                             style={{ backgroundColor: isRoot ? '#C8A288' : color.border }}
                         />
                         
-                        <div className="flex gap-4 items-start relative">
+                        <div className="flex gap-2 md:gap-4 items-start relative">
                             {/* Horizontal connector line */}
                             {node.children.length > 1 && (
                                 <div
@@ -221,11 +260,14 @@ const MindmapRenderer = ({ data }) => {
                 {Math.round(zoom * 100)}%
             </div>
 
-            {/* Canvas */}
+            {/* Canvas — supports mouse + touch */}
             <div
                 ref={containerRef}
-                className="h-full w-full cursor-grab active:cursor-grabbing"
-                onMouseDown={handleMouseDown}
+                className="h-full w-full cursor-grab active:cursor-grabbing touch-none"
+                onMouseDown={handlePointerDown}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
                 onWheel={handleWheel}
             >
                 <div
@@ -344,9 +386,9 @@ const MindmapView = ({ projectId, availableTopics, selectedDocuments }) => {
     if (selectedMindmap) {
         return (
             <div className="h-full flex flex-col">
-                <div className="flex items-center justify-between px-4 md:px-6 py-3 border-b border-[#E6D5CC]/50 bg-white/50 shrink-0">
+                <div className="flex items-center justify-between px-3 md:px-6 py-2 md:py-3 border-b border-[#E6D5CC]/50 bg-white/50 shrink-0">
                     <div className="min-w-0">
-                        <h2 className="text-lg font-bold text-[#4A3B32] truncate">{selectedMindmap.title}</h2>
+                        <h2 className="text-base md:text-lg font-bold text-[#4A3B32] truncate">{selectedMindmap.title}</h2>
                         <p className="text-xs text-[#8a6a5c]">
                             {selectedMindmap.topic} · {selectedMindmap.data?.nodes?.length || 0} nodes
                         </p>
@@ -371,16 +413,16 @@ const MindmapView = ({ projectId, availableTopics, selectedDocuments }) => {
 
     // List View
     return (
-        <div className="h-full overflow-y-auto custom-scrollbar p-4 md:p-8">
+        <div className="h-full overflow-y-auto custom-scrollbar p-3 md:p-8">
             <div className="max-w-6xl mx-auto">
-                <div className="flex items-center justify-between mb-8">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 md:mb-8">
                     <div>
-                        <h2 className="text-2xl font-bold text-[#4A3B32]">Mindmaps</h2>
-                        <p className="text-[#8a6a5c]">Generate visual mindmaps from your documents</p>
+                        <h2 className="text-xl md:text-2xl font-bold text-[#4A3B32]">Mindmaps</h2>
+                        <p className="text-sm md:text-base text-[#8a6a5c]">Generate visual mindmaps from your documents</p>
                     </div>
                     <button
                         onClick={() => setShowCreateModal(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-[#C8A288] text-white rounded-lg hover:bg-[#B08B72] transition-colors"
+                        className="flex items-center justify-center gap-2 px-4 py-2 bg-[#C8A288] text-white rounded-lg hover:bg-[#B08B72] transition-colors shrink-0 text-sm md:text-base"
                     >
                         <Plus className="h-5 w-5" />
                         Generate Mindmap
