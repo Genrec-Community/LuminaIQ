@@ -162,7 +162,7 @@ async def upload_document(
                 "user_id": current_user.get("id"),
             }
 
-        asyncio.create_task(
+        task = asyncio.create_task(
             document_service.process_document(
                 document_id=document_id,
                 project_id=project_id,
@@ -172,6 +172,17 @@ async def upload_document(
                 book_meta=book_meta,
             )
         )
+
+        # Ensure background task errors are always logged (not silently swallowed)
+        def _log_task_exception(t):
+            if t.cancelled():
+                logger.warning(f"Background processing cancelled for {file.filename}")
+            elif t.exception():
+                logger.error(
+                    f"Background processing FAILED for {file.filename}: {t.exception()}"
+                )
+
+        task.add_done_callback(_log_task_exception)
 
         logger.info(
             f"Document {file.filename} upload started, processing in background "

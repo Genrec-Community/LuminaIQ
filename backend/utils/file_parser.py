@@ -77,16 +77,15 @@ class FileParser:
     @staticmethod
     def _extract_pdf(file_path: str) -> Optional[str]:
         """
-        2-stage PDF extraction pipeline:
+        2-stage PDF extraction:
 
-        Stage 1 — Standard extraction (PyMuPDF4LLM → PyPDF2 → raw PyMuPDF).
+        Stage 1 — Standard text extraction (PyMuPDF4LLM → PyPDF2 → raw PyMuPDF).
                    Fast path for digital/text-layer PDFs.
 
-        Stage 2 — OCR, triggered when Stage 1 yields < MIN_TEXT_CHARS:
-            2a — Azure Computer Vision Read API  (preferred, cloud-based)
-            2b — Tesseract + pdf2image           (local fallback)
+        Stage 2 — Azure Document Intelligence OCR (for scanned PDFs).
+                   Triggered when Stage 1 yields < MIN_TEXT_CHARS.
 
-        Raises ValueError if all stages fail — never silently returns garbage.
+        Raises ValueError if all stages fail.
         """
         # ── Stage 1: Standard text extraction ─────────────────────────────────
         text = FileParser._try_primary_extraction(file_path)
@@ -94,209 +93,97 @@ class FileParser:
         if text and len(text.strip()) >= FileParser.MIN_TEXT_CHARS:
             logger.info(
                 f"[FileParser] Digital PDF: primary extraction succeeded "
-                f"({len(text)} chars). Azure OCR not needed."
+                f"({len(text)} chars). OCR not needed."
             )
             return text
 
-        # Stage 1 yielded nothing or too little — this is a scanned PDF
+        # Stage 1 yielded nothing or too little — scanned PDF
         char_count = len(text.strip()) if text else 0
         logger.warning(
             f"[FileParser] Primary extraction yielded only {char_count} chars "
-            f"(< {FileParser.MIN_TEXT_CHARS}). PDF appears to be scanned. "
-            f"Escalating to OCR..."
+            f"(< {FileParser.MIN_TEXT_CHARS}). PDF appears scanned → Azure OCR..."
         )
 
-        # ── Stage 2a: Azure Computer Vision OCR ───────────────────────────────
+        # ── Stage 2: Azure Document Intelligence OCR ──────────────────────────
         azure_text = FileParser._try_azure_ocr_sync(file_path)
         if azure_text and len(azure_text.strip()) >= FileParser.MIN_TEXT_CHARS:
             return azure_text
 
-        if azure_text is not None:
-            # Azure ran but returned too little — log and continue to Tesseract
-            logger.warning(
-                f"[FileParser] Azure OCR returned only {len(azure_text.strip())} chars "
-                f"— trying Tesseract fallback"
-            )
-
-        # ── Stage 2b: Tesseract local OCR fallback ─────────────────────────────
-        ocr_text = FileParser._try_tesseract_ocr(file_path)
-        if ocr_text and len(ocr_text.strip()) >= FileParser.MIN_TEXT_CHARS:
-            return ocr_text
-
-        # ── All stages exhausted ───────────────────────────────────────────────
-        best_text = azure_text or ocr_text or text
+        # ── All stages exhausted ──────────────────────────────────────────────
+        best_text = azure_text or text
         final_count = len(best_text.strip()) if best_text else 0
         raise ValueError(
-            f"Complete PDF extraction failure: all methods (PyMuPDF, PyPDF2, "
-            f"Azure OCR, Tesseract) yielded only {final_count} chars. "
-            "The file may be encrypted, corrupt, or a scanned image with no "
-            "readable text."
+            f"PDF extraction failed: all methods yielded only {final_count} chars. "
+            "The file may be encrypted, corrupt, or contain no readable text."
         )
 
     # ──────────────────────────────────────────────────────────────────────────
-    # Image extraction — always OCR
+    # Image extraction — Azure OCR only
     # ──────────────────────────────────────────────────────────────────────────
 
     @staticmethod
     def _extract_image(file_path: str) -> Optional[str]:
         """
-        Extract text from image files using OCR.
-
-        Primary:  Azure Computer Vision Read API
-        Fallback: Tesseract via PIL (if Azure not configured)
+        Extract text from image files using Azure Document Intelligence OCR.
 
         Supported: jpg, jpeg, png, bmp, tiff, tif, gif, webp
         """
         _, ext = os.path.splitext(file_path)
         logger.info(
-            f"[FileParser] Image file detected ({ext.lower()}) — routing to OCR"
+            f"[FileParser] Image file ({ext.lower()}) → Azure Document Intelligence OCR"
         )
 
-        # ── Primary: Azure Computer Vision ────────────────────────────────────
         azure_text = FileParser._try_azure_ocr_sync(file_path)
         if azure_text and len(azure_text.strip()) >= FileParser.MIN_IMAGE_CHARS:
             return azure_text
 
-        if azure_text is not None:
-            logger.warning(
-                f"[FileParser] Azure OCR returned only {len(azure_text.strip())} chars "
-                f"on image — trying Tesseract fallback"
-            )
-
-        # ── Fallback: Tesseract via PIL ────────────────────────────────────────
-        tesseract_text = FileParser._try_tesseract_image(file_path)
-        if tesseract_text and len(tesseract_text.strip()) >= FileParser.MIN_IMAGE_CHARS:
-            return tesseract_text
-
-        # ── Both failed ────────────────────────────────────────────────────────
-        best = azure_text or tesseract_text
-        char_count = len(best.strip()) if best else 0
-
-        if azure_text is None and tesseract_text is None:
-            # Azure not configured and Tesseract not available
+        if azure_text is None:
             raise ValueError(
-                f"Image OCR unavailable: neither Azure CV (AZURE_CV_KEY not set) "
-                "nor Tesseract is configured. Cannot extract text from image files."
+                "Azure Document Intelligence OCR is not configured "
+                "(AZURE_CV_ENDPOINT/AZURE_CV_KEY missing in .env). "
+                "Cannot extract text from image files."
             )
 
+        char_count = len(azure_text.strip()) if azure_text else 0
         raise ValueError(
             f"Image OCR produced insufficient text ({char_count} chars). "
-            "The image may contain no readable text, or text may be too small/blurry."
+            "The image may contain no readable text, or text is too small/blurry."
         )
 
     # ──────────────────────────────────────────────────────────────────────────
-    # OCR engines
+    # Azure Document Intelligence OCR
     # ──────────────────────────────────────────────────────────────────────────
 
     @staticmethod
     def _try_azure_ocr_sync(file_path: str) -> Optional[str]:
         """
-        Synchronous wrapper for Azure Computer Vision OCR.
+        Call Azure Document Intelligence (prebuilt-read) for OCR.
 
-        Calls the async AzureOCRService via asyncio.run(), which is safe here
-        because this method is always called from a run_in_executor thread
-        (i.e., not the main asyncio event loop thread — no loop conflict).
+        Uses synchronous HTTP (requests library) — safe for executor threads.
 
         Returns:
-            Extracted text string, or None if Azure is not configured / any failure.
+            Extracted text, or None if Azure is not configured or fails.
         """
         try:
             from utils.azure_ocr_service import get_azure_ocr_service
 
             service = get_azure_ocr_service()
             if service is None:
-                # Azure not configured — caller will try Tesseract instead
-                logger.debug(
-                    "[FileParser] Azure CV not configured — skipping Azure OCR"
-                )
+                logger.info("[FileParser] Azure OCR not configured — skipping")
                 return None
 
-            logger.info(f"[FileParser] Calling Azure CV Read API for: {file_path}")
-            # asyncio.run() creates a fresh event loop in this executor thread
-            result = asyncio.run(service.extract_text(file_path))
+            logger.info(f"[FileParser] Azure Document Intelligence OCR → {file_path}")
+            result = service.extract_text_sync(file_path)
+            if result:
+                logger.info(f"[FileParser] Azure OCR → {len(result)} chars extracted")
+            else:
+                logger.warning("[FileParser] Azure OCR returned no text")
             return result
 
-        except RuntimeError as e:
-            # asyncio.run() failed — should not happen in executor thread
-            logger.error(f"[FileParser] Azure OCR asyncio error: {e}")
-            return None
         except Exception as e:
-            logger.error(f"[FileParser] Azure OCR call failed: {e}")
-            return None
-
-    @staticmethod
-    def _try_tesseract_ocr(file_path: str) -> Optional[str]:
-        """
-        OCR fallback for PDFs using pdf2image + pytesseract (local Tesseract).
-
-        Requires: poppler-utils (OS) + pytesseract + tesseract (OS)
-        Returns extracted text or None if dependencies are missing.
-
-        Raises ValueError if Tesseract runs but yields < 200 chars (explicit failure).
-        """
-        try:
-            from pdf2image import convert_from_path
-            import pytesseract
-
-            logger.info("[FileParser] Trying Tesseract OCR (pdf2image + pytesseract)...")
-            images = convert_from_path(file_path)
-            pages_text = [pytesseract.image_to_string(img) for img in images]
-            text = "\n\n".join(t for t in pages_text if t.strip())
-
-            if not text or len(text.strip()) < FileParser.MIN_TEXT_CHARS:
-                char_count = len(text.strip()) if text else 0
-                raise ValueError(
-                    f"Tesseract OCR produced insufficient text ({char_count} chars). "
-                    "The file may be a low-quality scan or an image with no readable text."
-                )
-
-            logger.info(
-                f"[FileParser] Tesseract succeeded: {len(text)} chars "
-                f"from {len(images)} pages"
-            )
-            return text.strip()
-
-        except (ImportError, FileNotFoundError) as e:
-            logger.warning(
-                f"[FileParser] Tesseract/Poppler not installed — local OCR unavailable: {e}"
-            )
-            return None
-        except ValueError:
-            raise  # Re-raise explicit "insufficient text" error
-        except Exception as e:
-            logger.error(f"[FileParser] Tesseract OCR failed: {e}")
-            return None
-
-    @staticmethod
-    def _try_tesseract_image(file_path: str) -> Optional[str]:
-        """
-        Direct image OCR using Tesseract + PIL (no pdf2image needed).
-        Used for .jpg, .png, .bmp, .tiff, .gif, .webp files.
-
-        Returns extracted text or None if Tesseract is not available.
-        """
-        try:
-            import pytesseract
-            from PIL import Image
-
-            logger.info(f"[FileParser] Trying Tesseract image OCR for: {file_path}")
-            img = Image.open(file_path)
-            text = pytesseract.image_to_string(img)
-
-            if text and text.strip():
-                logger.info(
-                    f"[FileParser] Tesseract image OCR: {len(text)} chars extracted"
-                )
-                return text.strip()
-
-            logger.warning("[FileParser] Tesseract image OCR returned empty text")
-            return None
-
-        except ImportError as e:
-            logger.warning(f"[FileParser] Tesseract/PIL not installed: {e}")
-            return None
-        except Exception as e:
-            logger.error(f"[FileParser] Tesseract image OCR failed: {e}")
+            logger.error(f"[FileParser] Azure OCR failed: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return None
 
     # ──────────────────────────────────────────────────────────────────────────
