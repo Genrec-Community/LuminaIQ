@@ -121,7 +121,36 @@ DEFAULT_STATS = {
     "exams_taken": 0,
     "graphs_explored": 0,
     "qa_completed": 0,
+    "streak_days": 0,
+    "last_active_date": "",   # ISO date string YYYY-MM-DD
 }
+
+
+def _compute_streak(stats: dict) -> dict:
+    """Update streak_days based on last_active_date vs today. Returns mutated stats."""
+    today = datetime.utcnow().date().isoformat()
+    last = stats.get("last_active_date", "")
+
+    if last == today:
+        # Already counted today — no change
+        pass
+    elif last == "":
+        # First ever activity
+        stats["streak_days"] = 1
+        stats["last_active_date"] = today
+    else:
+        from datetime import date, timedelta
+        last_date = date.fromisoformat(last)
+        today_date = date.fromisoformat(today)
+        delta = (today_date - last_date).days
+        if delta == 1:
+            stats["streak_days"] = stats.get("streak_days", 0) + 1
+        elif delta > 1:
+            stats["streak_days"] = 1  # streak broken
+        stats["last_active_date"] = today
+
+    return stats
+
 
 
 class GamificationService:
@@ -232,6 +261,7 @@ class GamificationService:
                         "next_level": level_info["next_level"],
                         "badges": row.get("badges", []),
                         "stats": row.get("stats", {}),
+                        "streak_days": (row.get("stats") or {}).get("streak_days", 0),
                         "all_levels": LEVELS,
                         "all_badges": BADGE_DEFINITIONS,
                     }
@@ -353,6 +383,9 @@ class GamificationService:
                 if score >= 90:
                     stats["high_scores"] = stats.get("high_scores", 0) + 1
 
+            # Update streak (must run after all stat updates, once per real activity)
+            stats = _compute_streak(stats)
+
             # New XP and level
             new_xp = old_xp + total_earned
             new_level_info = self._calculate_level(new_xp)
@@ -393,6 +426,7 @@ class GamificationService:
                 "old_level": old_level,
                 "new_badges": new_badges,
                 "stats": stats,
+                "streak_days": stats.get("streak_days", 0),
             }
 
         except Exception as e:

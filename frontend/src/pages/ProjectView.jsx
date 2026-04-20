@@ -107,6 +107,7 @@ const ProjectView = () => {
     const navigate = useNavigate();
     const toast = useToast();
     const { settings } = useSettings();
+    const isDark = settings?.darkMode ?? false;
     const { data: gamificationData } = useGamification();
     const [showGamification, setShowGamification] = useState(false);
     const [activeTab, setActiveTab] = useState(() => {
@@ -397,11 +398,15 @@ const ProjectView = () => {
         try {
             const data = await getTopics(projectId);
             if (data.all && data.by_doc) {
-                setAllProjectTopics(data.all);
+                // Deduplicate topics and sort for a stable ordering
+                const uniqueAll = [...new Set(data.all)].sort();
+                setAllProjectTopics(uniqueAll);
+                setAvailableTopics(uniqueAll);
                 setDocumentTopics(data.by_doc);
             } else if (Array.isArray(data)) {
-                setAvailableTopics(data);
-                setAllProjectTopics(data);
+                const unique = [...new Set(data)].sort();
+                setAvailableTopics(unique);
+                setAllProjectTopics(unique);
             }
         } catch (error) {
             console.error('Failed to fetch topics', error);
@@ -722,6 +727,17 @@ const ProjectView = () => {
                     content: m.content || ''
                 }));
 
+            // Inject student profile as a system context prefix (only if any profile data exists)
+            const { studentName, learningGoal, selfLevel, tutorStyle } = settings;
+            const contextParts = [];
+            if (studentName) contextParts.push(`The student's name is ${studentName}.`);
+            if (learningGoal) contextParts.push(`Their learning goal is: ${learningGoal}.`);
+            if (selfLevel) contextParts.push(`Self-assessed level: ${selfLevel}.`);
+            if (tutorStyle && tutorStyle !== 'balanced') contextParts.push(`Preferred tutor style: ${tutorStyle}.`);
+            if (contextParts.length > 0) {
+                history.unshift({ role: 'system', content: contextParts.join(' ') });
+            }
+
             await chatMessageStream(
                 projectId,
                 userMsg,
@@ -825,12 +841,20 @@ const ProjectView = () => {
                 setActiveTab(id);
                 setIsMobileMenuOpen(false);
             }}
-            className={`w-full flex items-center ${leftCollapsed ? 'justify-center px-3 py-4' : 'gap-4 px-5 py-4'} rounded-xl transition-colors ${activeTab === id
-                ? 'bg-[#C8A288] text-white font-semibold shadow-md shadow-[#C8A288]/20'
-                : 'text-[#4A3B32] hover:bg-[#E6D5CC] hover:shadow-sm'
+            className={`w-full flex items-center ${leftCollapsed ? 'justify-center px-3 py-4' : 'gap-4 px-5 py-4'} rounded-xl transition-all duration-200 relative overflow-hidden ${activeTab === id
+                ? isDark
+                    ? 'bg-gradient-to-r from-[#C8A288] to-[#a8824a] text-white font-semibold shadow-lg shadow-[#C8A288]/30 ring-1 ring-[#C8A288]/40'
+                    : 'bg-[#C8A288] text-white font-semibold shadow-md shadow-[#C8A288]/20'
+                : isDark
+                    ? 'text-[#c4a882] hover:bg-[#2e2318]/80 hover:text-[#e8c898]'
+                    : 'text-[#4A3B32] hover:bg-[#E6D5CC] hover:shadow-sm'
                 }`}
             title={leftCollapsed ? label : undefined}
         >
+            {/* Active indicator bar */}
+            {activeTab === id && !leftCollapsed && (
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full bg-white/60" />
+            )}
             <Icon className="h-6 w-6 shrink-0" />
             {!leftCollapsed && <span className="text-base">{label}</span>}
         </button>
@@ -902,7 +926,11 @@ const ProjectView = () => {
     }
 
     return (
-        <div className="h-[100dvh] flex bg-[#FDF6F0] overflow-hidden font-sans text-[#4A3B32]">
+        <div className="h-[100dvh] flex overflow-hidden font-sans transition-colors duration-300"
+            style={isDark ? {
+                background: 'radial-gradient(ellipse at 20% 0%, #2a1e12 0%, #1c1814 45%, #181410 100%)',
+                color: '#e8e2dc'
+            } : { background: '#FDF6F0', color: '#4A3B32' }}>
 
             {/* Mobile Sidebar Overlay */}
             {isMobileMenuOpen && (
@@ -915,9 +943,13 @@ const ProjectView = () => {
             {/* Sidebar - Desktop & Mobile - Hidden when quiz/qa is active */}
             {!isSidebarHidden && (
                 <div className={`
-                fixed inset-y-0 left-0 z-50 ${leftCollapsed ? 'w-20' : 'w-80'} bg-[#FDF6F0]/95 backdrop-blur-xl border-r border-white/20 flex flex-col transition-all duration-300 ease-in-out md:translate-x-0 md:static md:shrink-0 shadow-2xl md:shadow-none
-                ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
-            `}>
+                fixed inset-y-0 left-0 z-50 ${leftCollapsed ? 'w-20' : 'w-80'} backdrop-blur-xl border-r flex flex-col transition-all duration-300 ease-in-out md:translate-x-0 md:static md:shrink-0 shadow-2xl md:shadow-none
+                ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}
+                style={isDark ? {
+                    background: 'linear-gradient(180deg, #251d14 0%, #1e1710 60%, #1a1410 100%)',
+                    borderColor: 'rgba(90,60,30,0.35)'
+                } : { background: 'rgba(253,246,240,0.95)', borderColor: 'rgba(255,255,255,0.20)'
+                }}>
                     <div className={`flex-1 flex flex-col min-h-0 ${leftCollapsed ? 'p-3' : 'p-6'}`}>
                         <div className={`flex items-center ${leftCollapsed ? 'justify-center' : 'justify-between'} mb-8`}>
                             {!leftCollapsed && (
@@ -952,6 +984,8 @@ const ProjectView = () => {
                             <NavItem id="chat" icon={MessageSquare} label="Chat" />
                             <NavItem id="path" icon={Target} label="Learning Path" />
 
+                            <NavItem id="knowledge" icon={Network} label="Knowledge Graph" />
+
                             {/* General Section - Expandable */}
                             <div className={leftCollapsed ? '' : ''}>
                                 <button
@@ -973,13 +1007,13 @@ const ProjectView = () => {
 
                                 {/* General Sub-items */}
                                 {!leftCollapsed && (activeTab === 'general' || activeTab === 'qa' || activeTab === 'quiz' || activeTab === 'notes' || activeTab === 'flashcards' || activeTab === 'mindmap') && (
-                                    <div className="ml-6 mt-2 space-y-2 border-l-2 border-[#E6D5CC] pl-4">
+                                    <div className={`ml-6 mt-2 space-y-2 border-l-2 pl-4 ${isDark ? 'border-[#5a3a20]' : 'border-[#E6D5CC]'}`}>
                                         <button
                                             onClick={() => {
                                                 setActiveTab('qa');
                                                 setIsMobileMenuOpen(false);
                                             }}
-                                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-base transition-colors ${activeTab === 'qa' ? 'text-[#C8A288] font-semibold bg-[#FDF6F0]' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/50'
+                                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-base transition-colors ${activeTab === 'qa' ? isDark ? 'text-[#e8b870] font-semibold bg-[#2e2010]/80' : 'text-[#C8A288] font-semibold bg-[#FDF6F0]' : isDark ? 'text-[#a08060] hover:text-[#e8c898] hover:bg-[#2e2318]/60' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/50'
                                                 }`}
                                         >
                                             <HelpCircle className="h-5 w-5" />
@@ -990,7 +1024,7 @@ const ProjectView = () => {
                                                 setActiveTab('quiz');
                                                 setIsMobileMenuOpen(false);
                                             }}
-                                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-base transition-colors ${activeTab === 'quiz' ? 'text-[#C8A288] font-semibold bg-[#FDF6F0]' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/50'
+                                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-base transition-colors ${activeTab === 'quiz' ? isDark ? 'text-[#e8b870] font-semibold bg-[#2e2010]/80' : 'text-[#C8A288] font-semibold bg-[#FDF6F0]' : isDark ? 'text-[#a08060] hover:text-[#e8c898] hover:bg-[#2e2318]/60' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/50'
                                                 }`}
                                         >
                                             <CheckSquare className="h-5 w-5" />
@@ -1001,7 +1035,7 @@ const ProjectView = () => {
                                                 setActiveTab('notes');
                                                 setIsMobileMenuOpen(false);
                                             }}
-                                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-base transition-colors ${activeTab === 'notes' ? 'text-[#C8A288] font-semibold bg-[#FDF6F0]' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/50'
+                                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-base transition-colors ${activeTab === 'notes' ? isDark ? 'text-[#e8b870] font-semibold bg-[#2e2010]/80' : 'text-[#C8A288] font-semibold bg-[#FDF6F0]' : isDark ? 'text-[#a08060] hover:text-[#e8c898] hover:bg-[#2e2318]/60' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/50'
                                                 }`}
                                         >
                                             <FileText className="h-5 w-5" />
@@ -1012,7 +1046,7 @@ const ProjectView = () => {
                                                 setActiveTab('flashcards');
                                                 setIsMobileMenuOpen(false);
                                             }}
-                                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-base transition-colors ${activeTab === 'flashcards' ? 'text-[#C8A288] font-semibold bg-[#FDF6F0]' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/50'
+                                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-base transition-colors ${activeTab === 'flashcards' ? isDark ? 'text-[#e8b870] font-semibold bg-[#2e2010]/80' : 'text-[#C8A288] font-semibold bg-[#FDF6F0]' : isDark ? 'text-[#a08060] hover:text-[#e8c898] hover:bg-[#2e2318]/60' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/50'
                                                 }`}
                                         >
                                             <Layers className="h-5 w-5" />
@@ -1023,7 +1057,7 @@ const ProjectView = () => {
                                                 setActiveTab('mindmap');
                                                 setIsMobileMenuOpen(false);
                                             }}
-                                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-base transition-colors ${activeTab === 'mindmap' ? 'text-[#C8A288] font-semibold bg-[#FDF6F0]' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/50'
+                                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-base transition-colors ${activeTab === 'mindmap' ? isDark ? 'text-[#e8b870] font-semibold bg-[#2e2010]/80' : 'text-[#C8A288] font-semibold bg-[#FDF6F0]' : isDark ? 'text-[#a08060] hover:text-[#e8c898] hover:bg-[#2e2318]/60' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/50'
                                                 }`}
                                         >
                                             <Zap className="h-5 w-5" />
@@ -1033,45 +1067,62 @@ const ProjectView = () => {
                                 )}
                             </div>
 
-                            <NavItem id="knowledge" icon={Network} label="Knowledge Graph" />
-
 
                         </nav>
 
                         {/* Profile Section - Fixed at Bottom of Sidebar */}
-                        <div className={`shrink-0 ${leftCollapsed ? 'p-3' : 'p-4'} border-t border-[#E6D5CC]/50 bg-[#FDF6F0]/95 backdrop-blur-sm`}>
-                            <button
-                                onClick={() => setShowProfileMenu(!showProfileMenu)}
-                                className={`profile-dropdown w-full flex items-center ${leftCollapsed ? 'justify-center px-3 py-3' : 'gap-3 px-4 py-3'} rounded-xl transition-all hover:bg-[#E6D5CC] hover:shadow-sm group`}
-                                title={leftCollapsed ? 'Profile' : undefined}
-                            >
-                                <div className="h-10 w-10 bg-gradient-to-br from-[#C8A288] to-[#A08072] rounded-full flex items-center justify-center text-white shadow-md group-hover:shadow-lg transition-shadow shrink-0">
-                                    <User className="h-5 w-5" />
-                                </div>
-                                {!leftCollapsed && (
-                                    <div className="flex-1 text-left">
-                                        <p className="text-sm font-bold text-[#4A3B32]">Profile</p>
-                                        <p className="text-xs text-[#8a6a5c]">Settings & More</p>
+                        <div className={`shrink-0 ${leftCollapsed ? 'p-3' : 'p-4'} border-t backdrop-blur-sm`}
+                            style={isDark ? { borderColor: 'rgba(90,60,30,0.35)', background: 'linear-gradient(to top, #1a1208 0%, rgba(26,18,8,0.85) 100%)' } : { borderColor: 'rgba(230,213,204,0.5)', background: 'rgba(253,246,240,0.95)' }}>
+                            <div className={`w-full flex items-center ${leftCollapsed ? 'justify-center' : 'gap-1'}`}>
+                                <button
+                                    onClick={() => setShowProfileMenu(!showProfileMenu)}
+                                    className={`profile-dropdown flex-1 flex items-center ${leftCollapsed ? 'justify-center p-3' : 'gap-3 px-3 py-3'} rounded-xl transition-all group ${isDark ? 'hover:bg-[#2e2318]/80' : 'hover:bg-[#E6D5CC] hover:shadow-sm'}`}
+                                    title={leftCollapsed ? 'Profile' : undefined}
+                                >
+                                    <div className="h-10 w-10 bg-gradient-to-br from-[#C8A288] to-[#A08072] rounded-full flex items-center justify-center text-white shadow-md group-hover:shadow-lg transition-shadow shrink-0">
+                                        <User className="h-5 w-5" />
                                     </div>
-                                )}
+                                    {!leftCollapsed && (
+                                        <div className="flex-1 text-left min-w-0">
+                                            <p className={`text-sm font-bold truncate ${isDark ? 'text-[#e8d8c0]' : 'text-[#4A3B32]'}`}>
+                                                {settings?.studentName || 'Profile'}
+                                            </p>
+                                            <p className={`text-xs ${isDark ? 'text-[#9a7858]' : 'text-[#8a6a5c]'}`}>Menu</p>
+                                        </div>
+                                    )}
+                                </button>
                                 {!leftCollapsed && (
-                                    <Settings className="h-5 w-5 text-[#8a6a5c] group-hover:text-[#C8A288] transition-colors" />
+                                    <button 
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            navigate('/settings');
+                                        }}
+                                        className={`shrink-0 p-3 rounded-xl transition-all group ${isDark ? 'hover:bg-[#2e2318]/80' : 'hover:bg-[#E6D5CC] hover:shadow-sm'}`}
+                                        title="Settings"
+                                    >
+                                        <Settings className="h-5 w-5 text-[#8a6a5c] group-hover:text-[#C8A288] transition-colors" />
+                                    </button>
                                 )}
-                            </button>
+                            </div>
                         </div>
                     </div>
                 </div>
             )}
 
             {/* Main Content Area */}
-            <div className={`flex-1 flex flex-col min-w-0 overflow-hidden backdrop-blur-sm ${zenMode
-                ? 'bg-white m-0 rounded-none border-0 shadow-none'
-                : 'bg-white/50 md:bg-white md:m-4 md:rounded-3xl shadow-sm border-x md:border-y border-[#E6D5CC]/50 md:border-[#E6D5CC]'
-                }`}>
+            <div className={`flex-1 flex flex-col min-w-0 overflow-hidden backdrop-blur-sm transition-colors duration-300`}
+                style={zenMode
+                    ? { background: isDark ? '#1c1814' : '#fff' }
+                    : isDark
+                        ? { background: 'rgba(28,20,14,0.85)', margin: '1rem', borderRadius: '1.5rem', border: '1px solid rgba(90,58,28,0.30)', boxShadow: '0 0 0 1px rgba(90,58,28,0.10), inset 0 1px 0 rgba(200,162,136,0.06)' }
+                        : { background: 'rgba(255,255,255,0.5)' }
+                }
+            >
 
                 {/* Header (Context) - Hidden in Zen Mode */}
                 {!zenMode && (
-                    <div className="px-3 md:px-5 py-2.5 border-b border-[#E6D5CC]/50 bg-white/50 backdrop-blur-md sticky top-0 z-30">
+                    <div className="px-3 md:px-5 py-2.5 border-b backdrop-blur-md sticky top-0 z-30"
+                        style={isDark ? { borderColor: 'rgba(90,58,28,0.30)', background: 'rgba(26,18,10,0.80)' } : { borderColor: 'rgba(230,213,204,0.5)', background: 'rgba(255,255,255,0.5)' }}>
                         {/* Single-row header with proper spacing */}
                         <div className="flex items-center gap-2 h-11">
                             {/* Mobile Menu Button */}
@@ -1084,7 +1135,7 @@ const ProjectView = () => {
 
                             {/* Left: Tab name + Summary */}
                             <div className="flex items-center gap-2 min-w-0 shrink-0">
-                                <h2 className="text-base font-bold text-[#4A3B32] whitespace-nowrap">
+                                <h2 className={`text-base font-bold whitespace-nowrap ${isDark ? 'text-[#e8d8c0]' : 'text-[#4A3B32]'}`}>
                                     {activeTab === 'chat' && 'Chat'}
                                     {activeTab === 'qa' && 'Q&A'}
                                     {activeTab === 'quiz' && 'Quiz'}
@@ -1329,7 +1380,7 @@ const ProjectView = () => {
                                                 : 'bg-[#FDF6F0] text-[#4A3B32] rounded-bl-none'
                                                 }`}>
                                                 {msg.content ? (
-                                                    <div className={`text-sm leading-relaxed ${msg.role === 'assistant' ? 'prose prose-sm max-w-none overflow-x-auto prose-p:my-2 prose-headings:text-[#4A3B32] prose-a:text-[#C8A288]' : ''}`}>
+                                                    <div className={`chat-text leading-relaxed ${msg.role === 'assistant' ? 'prose prose-sm max-w-none overflow-x-auto prose-p:my-2 prose-headings:text-[#4A3B32] prose-a:text-[#C8A288]' : ''}`}>
                                                         <ReactMarkdown 
                                                             remarkPlugins={[remarkGfm]}
                                                             components={{
@@ -1386,16 +1437,21 @@ const ProjectView = () => {
                                     </div>
                                 ))}
                                 <div ref={messagesEndRef} />
-                                {isProcessingDocs && (
+                                {isProcessingDocs && selectedDocuments.some(id => {
+                                    const doc = documents.find(d => d.id === id);
+                                    return doc && (doc.upload_status === 'pending' || doc.upload_status === 'processing' || doc.upload_status === 'embedding' || doc.upload_status === 'queued');
+                                }) && (
                                     <div className="flex justify-center my-4 animate-in fade-in slide-in-from-bottom-2">
-                                        <div className="bg-gradient-to-r from-amber-50 to-orange-50 text-amber-700 px-5 py-4 rounded-xl text-sm flex items-start gap-3 border border-amber-200 shadow-md max-w-lg w-full">
+                                        <div className="bg-gradient-to-r from-[#FDF6F0] to-[#f7ede3] text-[#6b4c38] px-5 py-4 rounded-xl text-sm flex items-start gap-3 border border-[#E6D5CC] shadow-md max-w-lg w-full">
                                             <div className="relative shrink-0 mt-0.5">
-                                                <div className="h-8 w-8 border-2 border-amber-300 rounded-full"></div>
-                                                <div className="absolute inset-0 h-8 w-8 border-2 border-amber-500 rounded-full border-t-transparent animate-spin"></div>
+                                                <div className="h-8 w-8 border-2 border-[#E6D5CC] rounded-full"></div>
+                                                <div className="absolute inset-0 h-8 w-8 border-2 border-[#C8A288] rounded-full border-t-transparent animate-spin"></div>
                                             </div>
-                                            <div className="flex-1">
-                                                <p className="font-bold text-amber-800 tracking-wide text-xs uppercase mb-1.5">Processing Documents</p>
-                                                <div className="text-[11px] leading-relaxed italic text-amber-700/90 whitespace-pre-line transition-opacity duration-300 font-medium">
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-bold text-[#4A3B32] tracking-wide text-xs uppercase mb-1.5">
+                                                    {getRotatingLoadingMessage(loadingMsgIdx + 17)}
+                                                </p>
+                                                <div className="text-[11px] leading-relaxed italic text-[#8a6a5c] whitespace-pre-line transition-opacity duration-300 font-medium">
                                                     {getRotatingLoadingMessage(loadingMsgIdx)}
                                                 </div>
                                             </div>
@@ -1529,12 +1585,13 @@ const ProjectView = () => {
                     {activeTab === 'notes' && (
                         <NotesView
                             projectId={projectId}
-                            availableTopics={availableTopics}
+                            availableTopics={allProjectTopics}
                             selectedDocuments={selectedDocuments}
                             preSelectedTopic={preSelectedTopic}
                             preGeneratedData={preGeneratedNotes}
                             onConsumePreGenerated={() => setPreGeneratedNotes(null)}
                             autoGenerate={notesAutoGenerate}
+                            onAutoGenerateConsumed={() => setNotesAutoGenerate(false)}
                         />
                     )}
 
@@ -1646,7 +1703,7 @@ const ProjectView = () => {
 
                     {/* Knowledge Graph View */}
                     {activeTab === 'knowledge' && (
-                        <KnowledgeGraphView projectId={projectId} />
+                        <KnowledgeGraphView projectId={projectId} zenMode={zenMode} />
                     )}
 
                     {/* Mindmap Overlay (only from Learning Path) */}
@@ -1993,7 +2050,7 @@ const ProjectView = () => {
                                             <User className="h-6 w-6 md:h-5 md:w-5" />
                                         </div>
                                         <div>
-                                            <p className="font-bold text-base md:text-sm">User</p>
+                                            <p className="font-bold text-base md:text-sm">{settings?.studentName || 'User'}</p>
                                             <p className="text-xs opacity-80">Free Plan</p>
                                         </div>
                                     </div>

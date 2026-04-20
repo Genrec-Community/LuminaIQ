@@ -18,8 +18,24 @@ export const AuthProvider = ({ children }) => {
             const storedUser = localStorage.getItem('user');
 
             if (token && storedUser) {
-                setUser(JSON.parse(storedUser));
-                api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+                // Check if the JWT is expired before using it
+                try {
+                    const payload = JSON.parse(atob(token.split('.')[1]));
+                    const nowSec = Math.floor(Date.now() / 1000);
+                    if (payload.exp && payload.exp < nowSec) {
+                        // Token is expired — clear it; Supabase session below will refresh
+                        console.log('Stored token expired, clearing...');
+                        localStorage.removeItem('token');
+                        localStorage.removeItem('user');
+                    } else {
+                        setUser(JSON.parse(storedUser));
+                        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+                    }
+                } catch {
+                    // Malformed token — clear it
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                }
             }
 
             // Wait for Supabase session to initialize (handles OAuth callback)

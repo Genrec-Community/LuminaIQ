@@ -15,7 +15,7 @@ export const api = axios.create({
 // Inject auth token on every request from localStorage.
 // This avoids a race condition where SettingsContext fires API calls
 // before AuthContext.useEffect has set api.defaults.headers.
-api.interceptors.request.use((config) => {
+api.interceptors.request.use(async (config) => {
     const token = localStorage.getItem('token');
     if (token) {
         config.headers = config.headers || {};
@@ -24,32 +24,96 @@ api.interceptors.request.use((config) => {
     return config;
 });
 
-// Retry interceptor for 503 and transient errors
+// Flag to prevent multiple simultaneous refresh attempts
+let isRefreshing = false;
+let refreshQueue = []; // pending requests waiting on the refresh
+
+const processQueue = (error, token = null) => {
+    refreshQueue.forEach(({ resolve, reject }) => {
+        if (error) reject(error);
+        else resolve(token);
+    });
+    refreshQueue = [];
+};
+
+// Retry interceptor — handles 503/429 retries AND 401 token refresh
 api.interceptors.response.use(
     (response) => response,
     async (error) => {
         const config = error.config;
+        const status = error.response?.status;
 
-        // Don't retry if no config or already retried 3 times
-        if (!config || config._retryCount >= 3) {
-            return Promise.reject(error);
+        // ── 401 Unauthorized: try to refresh the app JWT via Supabase ──
+        if (status === 401 && config && !config._retried) {
+            config._retried = true; // mark so we don't loop
+
+            if (isRefreshing) {
+                // Another refresh is in flight — queue this request
+                return new Promise((resolve, reject) => {
+                    refreshQueue.push({ resolve, reject });
+                }).then((newToken) => {
+                    config.headers['Authorization'] = `Bearer ${newToken}`;
+                    return api(config);
+                });
+            }
+
+            isRefreshing = true;
+
+            try {
+                // Dynamically import supabase to avoid circular dep issues
+                const { supabase } = await import('./supabaseClient');
+                const { data: { session } } = await supabase.auth.getSession();
+
+                if (session?.access_token) {
+                    // Exchange the fresh Supabase token for a new app JWT
+                    const resp = await api.post('/auth/google', {
+                        access_token: session.access_token
+                    });
+                    const newToken = resp.data?.access_token;
+
+                    if (newToken) {
+                        localStorage.setItem('token', newToken);
+                        api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+                        processQueue(null, newToken);
+                        config.headers['Authorization'] = `Bearer ${newToken}`;
+                        return api(config); // retry original request
+                    }
+                }
+
+                // No valid session — clear stale token and force login
+                throw new Error('No active session');
+            } catch (refreshError) {
+                processQueue(refreshError, null);
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                delete api.defaults.headers.common['Authorization'];
+                // Redirect to login without a hard reload loop
+                const isAlreadyOnAuth = ['/login', '/signup', '/'].includes(window.location.pathname);
+                if (!isAlreadyOnAuth) {
+                    window.location.href = '/login';
+                }
+                return Promise.reject(refreshError);
+            } finally {
+                isRefreshing = false;
+            }
         }
 
-        // Don't retry auth endpoints — surface errors immediately to the user
-        const url = config.url || '';
+        // ── Skip retry for auth endpoints to surface errors immediately ──
+        const url = config?.url || '';
         if (url.includes('/auth/')) {
             return Promise.reject(error);
         }
 
-        // Check if error is retryable (503, 429, network errors)
-        const status = error.response?.status;
-        const isRetryable = status === 503 || status === 429 || status === 502 || !error.response;
+        // ── Retry for transient server errors (503, 429, 502, network) ──
+        if (!config || config._retryCount >= 3) {
+            return Promise.reject(error);
+        }
 
+        const isRetryable = status === 503 || status === 429 || status === 502 || !error.response;
         if (isRetryable) {
             config._retryCount = (config._retryCount || 0) + 1;
             const delay = Math.min(1000 * Math.pow(2, config._retryCount - 1), 10000);
             console.log(`Retrying request (attempt ${config._retryCount}/3) in ${delay}ms...`);
-
             await new Promise(resolve => setTimeout(resolve, delay));
             return api(config);
         }

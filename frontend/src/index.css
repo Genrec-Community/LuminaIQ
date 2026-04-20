@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 @theme {
   --color-primary-50: #fdf8f6;
@@ -17,12 +18,20 @@
   --color-accent: #C8A288;
   --color-accent-hover: #B08B72;
 
+  --color-dark-bg: #1c1814;
+  --color-dark-paper: #252018;
+  --color-dark-text: #e8e2dc;
+
   --font-sans: "Outfit", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer base {
   body {
     @apply bg-[#FDF6F0] text-[#4A3B32] font-sans antialiased;
+  }
+
+  .dark body {
+    @apply bg-[--color-dark-bg] text-[--color-dark-text];
   }
 
   /* Global markdown table styles — ensures tables are visible everywhere */
@@ -51,9 +60,20 @@
     color: #4A3B32;
   }
 
+  .dark .prose tbody td,
+  .dark .markdown-content tbody td {
+    border-color: #3d3835;
+    color: #e5e0dc;
+  }
+
   .prose tbody tr:nth-child(even) td,
   .markdown-content tbody tr:nth-child(even) td {
     background: #FDF6F0;
+  }
+
+  .dark .prose tbody tr:nth-child(even) td,
+  .dark .markdown-content tbody tr:nth-child(even) td {
+    background: #262220;
   }
 
   .prose tbody tr:hover td,
@@ -61,11 +81,142 @@
     background: #f3ebe4;
   }
 
+  .dark .prose tbody tr:hover td,
+  .dark .markdown-content tbody tr:hover td {
+    background: #332e2b;
+  }
+
   /* Scrollable table wrapper — prevents overflow on narrow containers */
   .prose-table-wrap {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
+}
+
+/* ============================================================
+   DARK MODE — Claude-style near-black warm theme
+   ============================================================ */
+
+html.dark {
+  --dm-bg: #1c1814;
+  --dm-sidebar: #221e18;
+  --dm-surface: #2b2620;
+  --dm-surface-hover: #342e26;
+  --dm-surface-elevated: #312b24;
+  --dm-border: rgba(255,255,255,0.07);
+  --dm-border-strong: rgba(255,255,255,0.12);
+  --dm-text-primary: #f0ece6;
+  --dm-text-secondary: #a8997a;  /* nudged warmer & lighter for WCAG AA */
+  --dm-text-muted: #6b5d4a;
+  --dm-accent: #d4aa82;          /* slightly lighter in dark for contrast */
+  --dm-accent-hover: #debb96;
+  --dm-accent-bg: rgba(200, 162, 136, 0.18);
+}
+
+html.dark body {
+  background-color: var(--dm-bg) !important;
+  color: var(--dm-text-primary) !important;
+}
+
+/* Page-level backgrounds */
+html.dark .min-h-screen,
+html.dark .h-\[100dvh\] {
+  background-color: var(--dm-bg) !important;
+}
+
+/* Sidebar and surface backgrounds */
+html.dark .bg-\[\#FDF6F0\],
+html.dark .bg-\[\#FDF6F0\]\/95,
+html.dark .bg-\[\#FDF6F0\]\/98 {
+  background-color: var(--dm-sidebar) !important;
+}
+
+html.dark .bg-white,
+html.dark .bg-white\/50,
+html.dark .bg-white\/80,
+html.dark .bg-white\/95 {
+  background-color: var(--dm-surface) !important;
+}
+
+/* Cards */
+html.dark .rounded-2xl.border,
+html.dark .rounded-xl.border,
+html.dark .rounded-3xl {
+  background-color: var(--dm-surface);
+}
+
+/* Borders */
+html.dark .border-\[\#E6D5CC\],
+html.dark .border-\[\#E6D5CC\]\/50,
+html.dark .border-\[\#E6D5CC\]\/60,
+html.dark .border-\[\#E6D5CC\]\/80 {
+  border-color: var(--dm-border) !important;
+}
+
+html.dark .border-white\/20 {
+  border-color: var(--dm-border) !important;
+}
+
+/* Text colors */
+html.dark .text-\[\#4A3B32\] { color: var(--dm-text-primary) !important; }
+html.dark .text-\[\#8a6a5c\] { color: var(--dm-text-secondary) !important; }
+html.dark .text-\[\#5a4a42\] { color: var(--dm-text-secondary) !important; }
+
+/* Hover backgrounds */
+html.dark .hover\:bg-\[\#E6D5CC\]:hover,
+html.dark .hover\:bg-\[\#E6D5CC\]\/30:hover,
+html.dark .hover\:bg-\[\#E6D5CC\]\/40:hover,
+html.dark .hover\:bg-\[\#E6D5CC\]\/50:hover { background-color: var(--dm-surface-hover) !important; }
+html.dark .hover\:bg-\[\#FDF6F0\]:hover { background-color: var(--dm-surface-hover) !important; }
+html.dark .hover\:bg-\[\#FDF6F0\]\/80:hover { background-color: var(--dm-surface-hover) !important; }
+
+/* Inputs and selects */
+html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+html.dark textarea,
+html.dark select {
+  background-color: var(--dm-surface-elevated) !important;
+  color: var(--dm-text-primary) !important;
+  border-color: var(--dm-border-strong) !important;
+}
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: var(--dm-text-muted) !important;
+}
+
+/* Active nav items — keep accent brand colors */
+html.dark .bg-\[\#C8A288\] { background-color: var(--dm-accent) !important; }
+
+/* Chat message bubbles */
+html.dark .bg-\[\#C8A288\].rounded-2xl { background-color: var(--dm-accent) !important; }
+html.dark .bg-\[\#FDF6F0\].rounded-2xl {
+  background-color: var(--dm-surface-elevated) !important;
+  color: var(--dm-text-primary) !important;
+}
+
+/* Prose dark */
+html.dark .prose { color: var(--dm-text-primary) !important; }
+html.dark .prose h1, html.dark .prose h2, html.dark .prose h3,
+html.dark .prose h4, html.dark .prose h5, html.dark .prose h6,
+html.dark .prose strong { color: var(--dm-text-primary) !important; }
+html.dark .prose code {
+  background-color: var(--dm-surface-hover) !important;
+  color: #d4b39b !important;
+}
+html.dark .prose pre {
+  background-color: #111110 !important;
+}
+
+/* Dark scrollbar */
+html.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #3a3733 !important;
+}
+html.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--dm-accent) !important;
+}
+
+/* Gradient card header in dark */
+html.dark .bg-gradient-to-br.from-\[\#FDF6F0\] {
+  background: linear-gradient(to bottom right, var(--dm-sidebar), var(--dm-surface)) !important;
 }
 
 @layer utilities {
@@ -114,4 +265,22 @@
   .compact .text-lg { font-size: 0.975rem; }
   .compact .rounded-2xl { border-radius: 0.75rem; }
   .compact .rounded-3xl { border-radius: 1rem; }
+
+  /* ── Global Font Size Scale (applied to html element) ── */
+  .app-font-sm  { font-size: 13px; }
+  .app-font-md  { font-size: 15px; }
+  .app-font-lg  { font-size: 17px; }
+  .app-font-xl  { font-size: 19px; }
+
+  /* ── Chat message text: bumped +2 sizes from Tailwind sm (14px) → base (16px) ── */
+  .chat-text {
+    font-size: 1rem !important;
+    line-height: 1.65 !important;
+  }
+  .chat-text p,
+  .chat-text li,
+  .chat-text td,
+  .chat-text span {
+    font-size: 1rem !important;
+  }
 }

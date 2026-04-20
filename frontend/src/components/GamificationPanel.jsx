@@ -175,8 +175,28 @@ const GamificationPanel = ({ onClose }) => {
 // ===================== Tab Renderers =====================
 
 function renderOverview(stats, data, earnedBadgeIds, allBadges) {
+    const streakDays = data.streak_days ?? 0;
     return (
         <div className="space-y-4">
+            {/* Streak Banner */}
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
+                style={{ background: 'linear-gradient(135deg, #3a2208 0%, #5a3210 100%)', border: '1px solid rgba(200,162,136,0.25)' }}>
+                <span className="text-2xl" role="img" aria-label="flame">🔥</span>
+                <div className="flex-1">
+                    <p className="text-white font-black text-lg leading-none">{streakDays} Day{streakDays !== 1 ? 's' : ''}</p>
+                    <p className="text-[#C8A288] text-[11px] font-medium mt-0.5">
+                        {streakDays === 0 ? 'Start your streak by studying today!' :
+                         streakDays === 1 ? 'Day 1 — keep it going tomorrow!' :
+                         streakDays < 7 ? 'Building momentum — keep it up!' :
+                         streakDays < 30 ? `${streakDays}-day warrior! Don't break the chain.` :
+                         `Legendary ${streakDays}-day streak! 🏆`}
+                    </p>
+                </div>
+                <div className="text-right">
+                    <p className="text-[10px] text-[#C8A288]/60 font-medium uppercase tracking-wider">Current Streak</p>
+                </div>
+            </div>
+
             {/* Quick Stats Grid */}
             <div>
                 <h4 className="text-[10px] font-bold text-[#8a6a5c] uppercase tracking-wider mb-2">Activity Stats</h4>

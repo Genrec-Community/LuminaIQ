@@ -24,6 +24,7 @@ const defaultSettings = {
     // Learning Mode
     bookIsolation: true,
     darkMode: false,
+    fontSize: 'md', // 'sm' | 'md' | 'lg' | 'xl'
     pomodoroWork: 25,
     pomodoroBreak: 5,
     pomodoroLongBreak: 15,
@@ -53,6 +54,12 @@ export const SettingsProvider = ({ children }) => {
                 const data = await getUserSettings();
                 if (data?.settings) {
                     setSettings(prev => ({ ...prev, ...data.settings }));
+                    // Keep localStorage in sync with server value so the
+                    // FOUC-prevention script (index.html) always has fresh data
+                    localStorage.setItem(
+                        'lumina_dark_mode',
+                        data.settings.darkMode ? '1' : '0'
+                    );
                 }
             } catch (err) {
                 console.warn('Failed to load settings from API, using defaults', err);
@@ -63,14 +70,27 @@ export const SettingsProvider = ({ children }) => {
         load();
     }, [user]);
 
-    // Apply dark mode whenever settings change
+    // Apply dark mode — toggle html.dark for CSS cascade.
+    // Also persist to localStorage so index.html blocking script can read it
+    // before React mounts and prevent the flash of light mode on reload.
     useEffect(() => {
         if (settings.darkMode) {
             document.documentElement.classList.add('dark');
+            localStorage.setItem('lumina_dark_mode', '1');
         } else {
             document.documentElement.classList.remove('dark');
+            localStorage.setItem('lumina_dark_mode', '0');
         }
     }, [settings.darkMode]);
+
+    // Apply font size class to html element
+    useEffect(() => {
+        const el = document.documentElement;
+        el.classList.remove('app-font-sm', 'app-font-md', 'app-font-lg', 'app-font-xl');
+        if (settings.fontSize && settings.fontSize !== 'md') {
+            el.classList.add(`app-font-${settings.fontSize}`);
+        }
+    }, [settings.fontSize]);
 
     // Apply compact mode whenever settings change
     useEffect(() => {

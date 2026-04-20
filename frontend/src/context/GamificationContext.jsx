@@ -15,10 +15,45 @@ export const useGamification = () => {
 
 // Per-activity cooldowns (ms) to prevent XP spam
 const ACTIVITY_COOLDOWNS = {
-    chat: 15000,           // 15s between chat XP awards
-    review: 3000,          // 3s between review awards
-    knowledge_graph: 10000, // 10s between graph explore awards
-    path: 8000,            // 8s between path awards
+    chat: 15000,            // 15s between chat XP awards
+    review: 3000,           // 3s between review awards
+    knowledge_graph: 30000, // 30s min between graph XP awards (only on real exploration)
+    path: 60000,            // 60s — only on genuine path interaction
+    notes: 20000,
+    qa: 15000,
+    quiz: 0,                // No cooldown for quiz — score-based, awarded once per attempt
+    exam: 0,
+    pomodoro: 300000,       // 5 min cooldown for pomodoro
+};
+
+/**
+ * Actions that represent REAL learning — only these trigger XP.
+ * Passive events like 'start_session', 'open', 'view' do NOT award XP.
+ */
+const XP_WORTHY_ACTIONS = new Set([
+    // knowledge_graph: only when a topic node is actively explored
+    'explore_topic',
+    // Generic learn actions (no meta.action = also worthy for non-KG activities)
+    undefined,
+    null,
+]);
+
+/**
+ * Check if the meta object represents a real, XP-worthy learning action.
+ * Returns false for passive events (start_session, open, view, etc.)
+ */
+const isXPWorthy = (activityType, meta = {}) => {
+    const action = meta?.action;
+
+    // Activities that always require an explicit worthy action
+    if (activityType === 'knowledge_graph') {
+        return action === 'explore_topic';
+    }
+
+    // All other legit activity types are worthy unless they carry
+    // an explicit non-earning action tag
+    const passiveActions = new Set(['start_session', 'open', 'view', 'mount', 'close', 'session_end']);
+    return !passiveActions.has(action);
 };
 
 export const GamificationProvider = ({ children }) => {
@@ -52,7 +87,12 @@ export const GamificationProvider = ({ children }) => {
 
     // Award XP and trigger animations
     const earnXP = useCallback(async (activityType, meta = {}) => {
-        // Cooldown check — skip if we awarded this activity type too recently
+        // Gate 1: only award XP for real learning actions
+        if (!isXPWorthy(activityType, meta)) {
+            return null;
+        }
+
+        // Gate 2: cooldown check — skip if we awarded this activity type too recently
         const cooldownMs = ACTIVITY_COOLDOWNS[activityType];
         if (cooldownMs) {
             const lastAward = cooldownsRef.current[activityType] || 0;

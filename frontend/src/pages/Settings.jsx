@@ -26,16 +26,94 @@ import {
     Flame,
     Eye,
     Zap,
-    Trophy
+    Trophy,
+    Type
 } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
 import { useGamification } from '../context/GamificationContext';
+
+/**
+ * TextInput — MUST be defined at module level (outside Settings component).
+ * If defined inside, React creates a new component type on every parent render,
+ * which unmounts+remounts the input and destroys focus mid-typing.
+ */
+const TextInput = ({ value, onChange, label, description, icon: Icon, placeholder }) => {
+    const [localValue, setLocalValue] = React.useState(value || '');
+    const timerRef = React.useRef(null);
+    const isFocused = React.useRef(false);
+    const pendingValue = React.useRef(value || '');
+
+    // Only sync from parent when NOT actively typing
+    React.useEffect(() => {
+        if (!isFocused.current) {
+            setLocalValue(value || '');
+            pendingValue.current = value || '';
+        }
+    }, [value]);
+
+    // Cleanup timer on unmount
+    React.useEffect(() => () => clearTimeout(timerRef.current), []);
+
+    const handleChange = (e) => {
+        const v = e.target.value;
+        setLocalValue(v);
+        pendingValue.current = v;
+        clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => onChange(pendingValue.current), 1200);
+    };
+
+    const handleFocus = () => { isFocused.current = true; };
+
+    const handleBlur = () => {
+        isFocused.current = false;
+        clearTimeout(timerRef.current);
+        if (pendingValue.current !== (value || '')) {
+            onChange(pendingValue.current);
+        }
+    };
+
+    return (
+        <div className="p-4 bg-white rounded-2xl border border-[#E6D5CC]/80">
+            <div className="flex items-center gap-3.5 mb-3">
+                <div className="h-10 w-10 bg-[#FDF6F0] rounded-xl flex items-center justify-center shrink-0">
+                    <Icon className="h-5 w-5 text-[#C8A288]" />
+                </div>
+                <div className="min-w-0">
+                    <p className="font-semibold text-[#4A3B32] text-sm">{label}</p>
+                    <p className="text-xs text-[#8a6a5c] mt-0.5">{description}</p>
+                </div>
+            </div>
+            <input
+                type="text"
+                value={localValue}
+                onChange={handleChange}
+                onFocus={handleFocus}
+                onBlur={handleBlur}
+                placeholder={placeholder}
+                autoComplete="off"
+                spellCheck={false}
+                className="w-full px-4 py-2.5 bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl focus:ring-2 focus:ring-[#C8A288] focus:border-transparent outline-none text-[#4A3B32] font-medium text-sm placeholder-[#8a6a5c]/40 transition-shadow"
+            />
+        </div>
+    );
+};
 
 const Settings = () => {
     const navigate = useNavigate();
     const { settings, updateSetting, resetSettings } = useSettings();
     const { data: gamificationData } = useGamification();
     const [activeSection, setActiveSection] = useState('profile');
+
+    const isDark = settings?.darkMode ?? false;
+
+    // Shorthand theme tokens used throughout this page
+    const bg     = isDark ? '#1c1814' : '#FDF6F0';
+    const paper  = isDark ? '#252018' : '#FFFFFF';
+    const border  = isDark ? '#3d3028' : '#E6D5CC';
+    const muted   = isDark ? '#8a7060' : '#8a6a5c';
+    const heading = isDark ? '#e8e2dc' : '#4A3B32';
+    const inputBg = isDark ? '#1e1a16' : '#FDF6F0';
+
 
     const sections = [
         { id: 'profile', label: 'Profile', icon: User },
@@ -49,19 +127,21 @@ const Settings = () => {
     // --- Reusable Components ---
 
     const ToggleSwitch = ({ enabled, onChange, label, description, icon: Icon, comingSoon = false }) => (
-        <div className={`flex items-center justify-between p-4 bg-white rounded-2xl border border-[#E6D5CC]/80 hover:border-[#C8A288]/50 transition-all group ${comingSoon ? 'opacity-70' : ''}`}>
+        <div className={`flex items-center justify-between p-4 rounded-2xl border hover:border-[#C8A288]/50 transition-all group ${comingSoon ? 'opacity-70' : ''}`}
+            style={{ background: paper, borderColor: border }}>
             <div className="flex items-center gap-3.5 min-w-0">
-                <div className="h-10 w-10 bg-[#FDF6F0] rounded-xl flex items-center justify-center shrink-0 group-hover:bg-[#C8A288]/10 transition-colors">
+                <div className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0 group-hover:bg-[#C8A288]/10 transition-colors"
+                    style={{ background: inputBg }}>
                     <Icon className="h-5 w-5 text-[#C8A288]" />
                 </div>
                 <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                        <p className="font-semibold text-[#4A3B32] text-sm">{label}</p>
+                        <p className="font-semibold text-sm" style={{ color: heading }}>{label}</p>
                         {comingSoon && (
                             <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[9px] font-bold rounded-full uppercase tracking-wider">Soon</span>
                         )}
                     </div>
-                    <p className="text-xs text-[#8a6a5c] mt-0.5 leading-relaxed">{description}</p>
+                    <p className="text-xs mt-0.5 leading-relaxed" style={{ color: muted }}>{description}</p>
                 </div>
             </div>
             <button
@@ -81,21 +161,23 @@ const Settings = () => {
         </div>
     );
 
+
     const SelectOption = ({ value, onChange, label, description, icon: Icon, options }) => (
-        <div className="p-4 bg-white rounded-2xl border border-[#E6D5CC]/80">
+        <div className="p-4 rounded-2xl border" style={{ background: paper, borderColor: border }}>
             <div className="flex items-center gap-3.5 mb-3">
-                <div className="h-10 w-10 bg-[#FDF6F0] rounded-xl flex items-center justify-center shrink-0">
+                <div className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: inputBg }}>
                     <Icon className="h-5 w-5 text-[#C8A288]" />
                 </div>
                 <div>
-                    <p className="font-semibold text-[#4A3B32] text-sm">{label}</p>
-                    <p className="text-xs text-[#8a6a5c] mt-0.5">{description}</p>
+                    <p className="font-semibold text-sm" style={{ color: heading }}>{label}</p>
+                    <p className="text-xs mt-0.5" style={{ color: muted }}>{description}</p>
                 </div>
             </div>
             <select
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
-                className="w-full px-4 py-2.5 bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl focus:ring-2 focus:ring-[#C8A288] focus:border-transparent outline-none text-[#4A3B32] font-medium text-sm cursor-pointer"
+                className="w-full px-4 py-2.5 rounded-xl focus:ring-2 focus:ring-[#C8A288] focus:border-transparent outline-none font-medium text-sm cursor-pointer border"
+                style={{ background: inputBg, color: heading, borderColor: border }}
             >
                 {options.map(opt => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -104,84 +186,38 @@ const Settings = () => {
         </div>
     );
 
+
     const NumberInput = ({ value, onChange, label, description, icon: Icon, min, max, suffix }) => (
-        <div className="p-4 bg-white rounded-2xl border border-[#E6D5CC]/80">
+        <div className="p-4 rounded-2xl border" style={{ background: paper, borderColor: border }}>
             <div className="flex items-center gap-3.5">
-                <div className="h-10 w-10 bg-[#FDF6F0] rounded-xl flex items-center justify-center shrink-0">
+                <div className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: inputBg }}>
                     <Icon className="h-5 w-5 text-[#C8A288]" />
                 </div>
                 <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-[#4A3B32] text-sm">{label}</p>
-                    <p className="text-xs text-[#8a6a5c] mt-0.5">{description}</p>
+                    <p className="font-semibold text-sm" style={{ color: heading }}>{label}</p>
+                    <p className="text-xs mt-0.5" style={{ color: muted }}>{description}</p>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                     <button
                         onClick={() => onChange(Math.max(min, value - 5))}
-                        className="h-8 w-8 bg-[#FDF6F0] rounded-lg flex items-center justify-center text-[#4A3B32] hover:bg-[#E6D5CC] transition-colors font-bold text-lg"
-                    >
-                        -
-                    </button>
-                    <span className="w-14 text-center font-bold text-[#4A3B32] text-sm tabular-nums">
+                        className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-[#E6D5CC] transition-colors font-bold text-lg"
+                        style={{ background: inputBg, color: heading }}
+                    >-</button>
+                    <span className="w-14 text-center font-bold text-sm tabular-nums" style={{ color: heading }}>
                         {value}{suffix}
                     </span>
                     <button
                         onClick={() => onChange(Math.min(max, value + 5))}
-                        className="h-8 w-8 bg-[#FDF6F0] rounded-lg flex items-center justify-center text-[#4A3B32] hover:bg-[#E6D5CC] transition-colors font-bold text-lg"
-                    >
-                        +
-                    </button>
+                        className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-[#E6D5CC] transition-colors font-bold text-lg"
+                        style={{ background: inputBg, color: heading }}
+                    >+</button>
                 </div>
             </div>
         </div>
     );
 
-    const TextInput = ({ value, onChange, label, description, icon: Icon, placeholder }) => {
-        // Use local state to avoid cursor-jumping from parent re-renders
-        const [localValue, setLocalValue] = React.useState(value || '');
-        const timerRef = React.useRef(null);
 
-        // Sync from parent when the actual saved value changes (e.g. reset)
-        React.useEffect(() => {
-            setLocalValue(value || '');
-        }, [value]);
-
-        const handleChange = (e) => {
-            const v = e.target.value;
-            setLocalValue(v);
-            // Debounce: save after 500ms idle
-            clearTimeout(timerRef.current);
-            timerRef.current = setTimeout(() => onChange(v), 500);
-        };
-
-        const handleBlur = () => {
-            clearTimeout(timerRef.current);
-            if (localValue !== (value || '')) {
-                onChange(localValue);
-            }
-        };
-
-        return (
-            <div className="p-4 bg-white rounded-2xl border border-[#E6D5CC]/80">
-                <div className="flex items-center gap-3.5 mb-3">
-                    <div className="h-10 w-10 bg-[#FDF6F0] rounded-xl flex items-center justify-center shrink-0">
-                        <Icon className="h-5 w-5 text-[#C8A288]" />
-                    </div>
-                    <div className="min-w-0">
-                        <p className="font-semibold text-[#4A3B32] text-sm">{label}</p>
-                        <p className="text-xs text-[#8a6a5c] mt-0.5">{description}</p>
-                    </div>
-                </div>
-                <input
-                    type="text"
-                    value={localValue}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    placeholder={placeholder}
-                    className="w-full px-4 py-2.5 bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl focus:ring-2 focus:ring-[#C8A288] focus:border-transparent outline-none text-[#4A3B32] font-medium text-sm placeholder-[#8a6a5c]/40"
-                />
-            </div>
-        );
-    };
+    // TextInput is defined at module level — see above the Settings component
 
     const SectionHeader = ({ icon: Icon, title, subtitle }) => (
         <div className="flex items-center gap-3 mb-5">
@@ -189,11 +225,12 @@ const Settings = () => {
                 <Icon className="h-4.5 w-4.5 text-white" />
             </div>
             <div>
-                <h2 className="text-base font-bold text-[#4A3B32]">{title}</h2>
-                {subtitle && <p className="text-xs text-[#8a6a5c] mt-0.5">{subtitle}</p>}
+                <h2 className="text-base font-bold" style={{ color: heading }}>{title}</h2>
+                {subtitle && <p className="text-xs mt-0.5" style={{ color: muted }}>{subtitle}</p>}
             </div>
         </div>
     );
+
 
     // --- Section Renderers ---
 
@@ -563,14 +600,61 @@ const Settings = () => {
         <div className="space-y-5">
             <SectionHeader icon={Sun} title="Appearance" subtitle="Customize the look and feel" />
             <div className="space-y-3">
-                <ToggleSwitch
-                    enabled={settings.darkMode}
-                    onChange={(v) => updateSetting('darkMode', v)}
-                    label="Dark Mode"
-                    description="Reduce eye strain in low light"
-                    icon={Moon}
-                    comingSoon
+                {/* Dark Mode — fully functional */}
+                <div className={`p-5 rounded-2xl border-2 transition-all ${
+                    settings.darkMode
+                        ? 'bg-[#2a2927] border-[#C8A288]/60'
+                        : 'bg-white border-[#E6D5CC]'
+                }`}>
+                    <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3.5">
+                            <div className={`h-11 w-11 rounded-xl flex items-center justify-center shrink-0 ${
+                                settings.darkMode ? 'bg-[#4A3B32]' : 'bg-[#FDF6F0]'
+                            }`}>
+                                {settings.darkMode
+                                    ? <Moon className="h-5 w-5 text-[#C8A288]" />
+                                    : <Sun className="h-5 w-5 text-[#C8A288]" />}
+                            </div>
+                            <div>
+                                <p className="font-bold text-[#4A3B32]">
+                                    {settings.darkMode ? 'Dark Mode — On' : 'Dark Mode — Off'}
+                                </p>
+                                <p className="text-xs text-[#8a6a5c] mt-0.5">
+                                    {settings.darkMode ? 'Warm near-black theme, easy on the eyes' : 'Switch to a rich dark theme'}
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => updateSetting('darkMode', !settings.darkMode)}
+                            className={`relative w-12 h-7 rounded-full transition-all shrink-0 ${
+                                settings.darkMode ? 'bg-[#C8A288]' : 'bg-[#E6D5CC]'
+                            }`}
+                        >
+                            <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-transform ${
+                                settings.darkMode ? 'translate-x-[22px]' : 'translate-x-0.5'
+                            }`}>
+                                {settings.darkMode && <Check className="h-3.5 w-3.5 text-[#C8A288] m-[5px]" />}
+                            </div>
+                        </button>
+                    </div>
+                </div>
+
+                {/* Font Size */}
+                <SelectOption
+                    value={settings.fontSize || 'md'}
+                    onChange={(v) => updateSetting('fontSize', v)}
+                    label="Font Size"
+                    description="Adjust the overall text size across the app"
+                    icon={Type}
+                    options={[
+                        { value: 'sm', label: 'Small — Compact text' },
+                        { value: 'md', label: 'Medium — Default' },
+                        { value: 'lg', label: 'Large — Easier to read' },
+                        { value: 'xl', label: 'Extra Large — Maximum readability' },
+                    ]}
                 />
+
+                {/* Compact Mode */}
                 <ToggleSwitch
                     enabled={settings.compactMode}
                     onChange={(v) => updateSetting('compactMode', v)}
@@ -581,6 +665,7 @@ const Settings = () => {
             </div>
         </div>
     );
+
 
     const renderNotifications = () => (
         <div className="space-y-5">
@@ -613,19 +698,20 @@ const Settings = () => {
             </div>
 
             {/* Coming soon info */}
-            <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200/60">
+            <div className="p-4 rounded-2xl border" style={{ background: isDark ? '#2a1e10' : '#fffbf2', borderColor: isDark ? '#5a3a20' : '#fde68a' }}>
                 <div className="flex items-start gap-3">
-                    <div className="h-8 w-8 bg-amber-100 rounded-lg flex items-center justify-center shrink-0 mt-0.5">
-                        <Sparkles className="h-4 w-4 text-amber-600" />
+                    <div className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5" style={{ background: isDark ? '#3a2810' : '#fef3c7' }}>
+                        <Sparkles className="h-4 w-4 text-amber-500" />
                     </div>
                     <div>
-                        <p className="font-semibold text-amber-900 text-sm">Features in Development</p>
-                        <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
-                            Study reminders, sound effects, streaks, and dark mode are being built. Settings marked with "Soon" will be enabled in a future update.
+                        <p className="font-semibold text-sm" style={{ color: isDark ? '#d4a060' : '#78350f' }}>Features in Development</p>
+                        <p className="text-xs mt-0.5 leading-relaxed" style={{ color: isDark ? '#a07840' : '#92400e' }}>
+                            Study reminders, sound effects, and streaks are being built. Settings marked with "Soon" will be enabled in a future update.
                         </p>
                     </div>
                 </div>
             </div>
+
         </div>
     );
 
@@ -642,21 +728,25 @@ const Settings = () => {
     };
 
     return (
-        <div className="min-h-screen bg-[#FDF6F0] font-sans text-[#4A3B32]">
+        <div className="min-h-screen font-sans transition-colors duration-300" style={{ background: bg, color: heading }}>
             {/* Header */}
-            <div className="bg-white/80 backdrop-blur-md border-b border-[#E6D5CC] sticky top-0 z-10">
+            <div className="backdrop-blur-md border-b sticky top-0 z-10 transition-colors duration-300"
+                style={{ background: isDark ? 'rgba(28,24,20,0.95)' : 'rgba(255,255,255,0.80)', borderColor: border }}>
                 <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
                     <button
                         onClick={() => navigate(-1)}
-                        className="p-2 hover:bg-[#FDF6F0] rounded-xl transition-colors shrink-0"
+                        className="p-2 rounded-xl transition-colors shrink-0"
+                        style={{ background: 'transparent' }}
+                        onMouseEnter={e => e.currentTarget.style.background = inputBg}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                     >
-                        <ChevronLeft className="h-5 w-5 text-[#4A3B32]" />
+                        <ChevronLeft className="h-5 w-5" style={{ color: heading }} />
                     </button>
                     <div className="flex items-center gap-2.5">
                         <div className="h-9 w-9 bg-gradient-to-br from-[#C8A288] to-[#A08072] rounded-xl flex items-center justify-center shadow-sm">
                             <SettingsIcon className="h-4.5 w-4.5 text-white" />
                         </div>
-                        <h1 className="text-lg font-bold text-[#4A3B32]">Settings</h1>
+                        <h1 className="text-lg font-bold" style={{ color: heading }}>Settings</h1>
                     </div>
                 </div>
             </div>
@@ -674,11 +764,13 @@ const Settings = () => {
                                     <button
                                         key={sec.id}
                                         onClick={() => setActiveSection(sec.id)}
-                                        className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                                            isActive
-                                                ? 'bg-[#C8A288] text-white shadow-sm'
-                                                : 'text-[#8a6a5c] hover:bg-[#E6D5CC]/40 hover:text-[#4A3B32]'
-                                        }`}
+                                        className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all"
+                                        style={isActive
+                                            ? { background: '#C8A288', color: '#fff' }
+                                            : { color: muted, background: 'transparent' }
+                                        }
+                                        onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = isDark ? '#2e2620' : 'rgba(230,213,204,0.4)'; }}
+                                        onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
                                     >
                                         <Icon className="h-4 w-4 shrink-0" />
                                         {sec.label}
@@ -688,7 +780,7 @@ const Settings = () => {
                         </div>
 
                         {/* Reset button */}
-                        <div className="mt-6 pt-4 border-t border-[#E6D5CC]/50">
+                        <div className="mt-6 pt-4 border-t" style={{ borderColor: border }}>
                             <button
                                 onClick={() => {
                                     if (confirm('Reset all settings to defaults?')) {
@@ -703,7 +795,8 @@ const Settings = () => {
                     </nav>
 
                     {/* Mobile Tab Bar */}
-                    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-[#E6D5CC] z-20 px-2 py-1.5 flex justify-around">
+                    <div className="md:hidden fixed bottom-0 left-0 right-0 backdrop-blur-md border-t z-20 px-2 py-1.5 flex justify-around"
+                        style={{ background: isDark ? 'rgba(28,24,20,0.97)' : 'rgba(255,255,255,0.95)', borderColor: border }}>
                         {sections.map(sec => {
                             const Icon = sec.icon;
                             const isActive = activeSection === sec.id;
@@ -711,19 +804,18 @@ const Settings = () => {
                                 <button
                                     key={sec.id}
                                     onClick={() => setActiveSection(sec.id)}
-                                    className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg text-[10px] font-medium transition-colors ${
-                                        isActive ? 'text-[#C8A288]' : 'text-[#8a6a5c]'
-                                    }`}
+                                    className="flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg text-[10px] font-medium transition-colors"
+                                    style={{ color: isActive ? '#C8A288' : muted }}
                                 >
-                                    <Icon className={`h-4.5 w-4.5 ${isActive ? 'text-[#C8A288]' : ''}`} />
-                                    {sec.label}
+                                    <Icon className="h-4.5 w-4.5" />
+                                    <span>{sec.label}</span>
                                 </button>
                             );
                         })}
                     </div>
 
                     {/* Main Content */}
-                    <div className="flex-1 min-w-0 pb-24 md:pb-8">
+                    <div className="flex-1 min-w-0 mb-20 md:mb-0">
                         {renderSection()}
                     </div>
                 </div>
@@ -733,3 +825,5 @@ const Settings = () => {
 };
 
 export default Settings;
+
+

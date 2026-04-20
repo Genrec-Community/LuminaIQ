@@ -596,22 +596,32 @@ OUTPUT FORMAT - Return ONLY valid JSON, no markdown:
 
                 return []
 
-            # Build graph and in-degree count
+            # Build graph adjacency list + in-degree counts from edges
             graph = defaultdict(list)
             in_degree = defaultdict(int)
-            all_topics = set()
 
             for edge in edges:
                 from_topic = edge["from_topic"]
                 to_topic = edge["to_topic"]
-
                 graph[from_topic].append(to_topic)
                 in_degree[to_topic] += 1
-                all_topics.add(from_topic)
-                all_topics.add(to_topic)
-
                 if from_topic not in in_degree:
                     in_degree[from_topic] = 0
+
+            # ── Seed all_topics from documents (source of truth) ─────────────
+            # Every topic from every completed document MUST appear in the path,
+            # even if the LLM created no edges for it during graph build.
+            all_topics = set(topic_doc_map.keys())
+
+            # Defensive: include any edge-endpoint topics not in doc map
+            for edge in edges:
+                all_topics.add(edge["from_topic"])
+                all_topics.add(edge["to_topic"])
+
+            # Ensure every topic has an in_degree entry (default 0 = queue-ready)
+            for t in all_topics:
+                if t not in in_degree:
+                    in_degree[t] = 0
 
             # Filter if target_topics provided
             if target_topics:

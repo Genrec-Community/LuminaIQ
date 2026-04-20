@@ -2,6 +2,19 @@
 <html lang="en">
 
 <head>
+  <!-- FOUC Prevention: apply dark mode BEFORE paint so there's no white flash.
+       This script is intentionally synchronous (no defer/async) so it blocks
+       rendering until the class is set. Must be the first child of <head>. -->
+  <script>
+    (function() {
+      try {
+        if (localStorage.getItem('lumina_dark_mode') === '1') {
+          document.documentElement.classList.add('dark');
+        }
+      } catch (e) {}
+    })();
+  </script>
+
   <meta charset="UTF-8" />
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />

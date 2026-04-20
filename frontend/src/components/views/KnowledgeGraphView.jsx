@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import cytoscape from 'cytoscape';
-import { 
-    Book, 
-    Network, 
-    Lightbulb, 
-    Clock, 
-    TrendingUp, 
+import {
+    Book,
+    Network,
+    Lightbulb,
+    Clock,
+    TrendingUp,
     ChevronRight,
     X,
     RefreshCw,
@@ -18,11 +18,11 @@ import {
     Target,
     BarChart3
 } from 'lucide-react';
-import { 
-    getKnowledgeGraphVisualization, 
+import {
+    getKnowledgeGraphVisualization,
     getKnowledgeGraph,
     getTopics,
-    getTopicSummary, 
+    getTopicSummary,
     recordGraphInteraction,
     getLearningSuggestions,
     startLearningSession,
@@ -31,36 +31,80 @@ import {
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { recordActivity } from '../../utils/studyActivity';
+import { useSettings } from '../../context/SettingsContext';
 
-const KnowledgeGraphView = ({ projectId }) => {
+// ─── Palette definitions ──────────────────────────────────────────────────────
+const LIGHT = {
+    canvas: '#FFF5ED',
+    toolbarBg: 'rgba(0,0,0,0.6)',   // gradient overlay
+    orbFill: '#FFFFFF',
+    orbGradient: '#FFFFFF #FFF8DC #FFD700',
+    orbBorder: '#D4A373',
+    orbLabel: '#4A3728',
+    edgeContains: '#BC9A71',
+    edgePrereq: '#BC9A71',
+    edgeRelated: '#BC9A71',
+    legendBg: 'rgba(62,47,40,0.95)',
+    legendBorder: 'rgba(188,154,113,0.30)',
+    glowColor: 'rgba(200,162,136,0.18)',
+};
+
+const DARK = {
+    canvas: '#221810',
+    toolbarBg: '#2e1f12',           // solid, per spec
+    orbFill: '#3a2c1e',
+    orbGradient: '#3a2c1e #4a3520 #5a4028',
+    orbBorder: '#7a5c3a',
+    orbLabel: '#a08060',
+    edgeContains: '#7a5030',
+    edgePrereq: '#7a5030',
+    edgeRelated: '#7a5030',
+    legendBg: '#2e1f12',
+    legendBorder: '#5a3a20',
+    glowColor: 'rgba(122,80,48,0.22)',
+};
+
+const KnowledgeGraphView = ({ projectId, zenMode }) => {
+    const { settings } = useSettings();
+    const isDark = settings?.darkMode ?? false;
+    const P = isDark ? DARK : LIGHT;
+
     // Graph State
     const [graphData, setGraphData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    
+
     // Selected Topic & Summary
     const [selectedTopic, setSelectedTopic] = useState(null);
     const [topicSummary, setTopicSummary] = useState(null);
     const [summaryLoading, setSummaryLoading] = useState(false);
-    
+
     // Suggestions & Analytics
     const [suggestions, setSuggestions] = useState(null);
     const [analytics, setAnalytics] = useState(null);
-    
+
+    // Hover State for Glassmorphism Panel
+    const [hoveredNodeData, setHoveredNodeData] = useState(null);
+
     // Session Tracking
     const [sessionId, setSessionId] = useState(null);
     const [sessionStartTime, setSessionStartTime] = useState(null);
     const [topicsVisited, setTopicsVisited] = useState(new Set());
     const [topicStartTime, setTopicStartTime] = useState(null);
-    
-    // Cytoscape Ref
+
+    // Refs
     const cyRef = useRef(null);
-    const containerRef = useRef(null);
-    
+    const containerRef = useRef(null);  // Cytoscape mount target
+    const wrapRef = useRef(null);  // outer wrapper (for glow canvas sizing)
+    const glowCanvasRef = useRef(null); // ambient glow overlay
+    const glowRafRef = useRef(null);
+    const mouseRef = useRef({ x: -9999, y: -9999 });
+    const glowRef = useRef({ x: -9999, y: -9999 }); // lerped position
+
     // Pan mode
     const [isPanMode, setIsPanMode] = useState(false);
 
-    // Refs to avoid stale closures in Cytoscape event handlers & cleanup
+    // Refs to avoid stale closures
     const selectedTopicRef = useRef(null);
     const topicStartTimeRef = useRef(null);
     const sessionIdRef = useRef(null);
@@ -68,7 +112,6 @@ const KnowledgeGraphView = ({ projectId }) => {
     const topicsVisitedRef = useRef(new Set());
     const isPanModeRef = useRef(false);
 
-    // Sync refs with state
     useEffect(() => { selectedTopicRef.current = selectedTopic; }, [selectedTopic]);
     useEffect(() => { topicStartTimeRef.current = topicStartTime; }, [topicStartTime]);
     useEffect(() => { sessionIdRef.current = sessionId; }, [sessionId]);
@@ -76,35 +119,263 @@ const KnowledgeGraphView = ({ projectId }) => {
     useEffect(() => { topicsVisitedRef.current = topicsVisited; }, [topicsVisited]);
     useEffect(() => { isPanModeRef.current = isPanMode; }, [isPanMode]);
 
-    // Initialize Cytoscape
+    // ── Ambient glow canvas (cursor-reactive) ─────────────────────────────────
+    const startGlowLoop = useCallback(() => {
+        const canvas = glowCanvasRef.current;
+        if (!canvas) return;
+
+        const resize = () => {
+            const wrap = wrapRef.current;
+            if (!wrap) return;
+            canvas.width = wrap.clientWidth;
+            canvas.height = wrap.clientHeight;
+        };
+        resize();
+
+        const ro = new ResizeObserver(resize);
+        if (wrapRef.current) ro.observe(wrapRef.current);
+
+        const tick = () => {
+            const ctx = canvas.getContext('2d');
+            if (!ctx) { glowRafRef.current = requestAnimationFrame(tick); return; }
+
+            // Lerp glow towards mouse (spring feel)
+            glowRef.current.x += (mouseRef.current.x - glowRef.current.x) * 0.06;
+            glowRef.current.y += (mouseRef.current.y - glowRef.current.y) * 0.06;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (mouseRef.current.x > 0) {
+                const radius = Math.max(canvas.width, canvas.height) * 0.45;
+                const grd = ctx.createRadialGradient(
+                    glowRef.current.x, glowRef.current.y, 0,
+                    glowRef.current.x, glowRef.current.y, radius
+                );
+                grd.addColorStop(0, isDark ? 'rgba(122,80,48,0.20)' : 'rgba(200,162,136,0.15)');
+                grd.addColorStop(0.4, isDark ? 'rgba(90,58,32,0.08)' : 'rgba(200,162,136,0.06)');
+                grd.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = grd;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+
+            glowRafRef.current = requestAnimationFrame(tick);
+        };
+
+        glowRafRef.current = requestAnimationFrame(tick);
+        return () => {
+            cancelAnimationFrame(glowRafRef.current);
+            ro.disconnect();
+        };
+    }, [isDark]);
+
+    // Mouse tracking on the wrapper
+    const handleMouseMove = useCallback((e) => {
+        const wrap = wrapRef.current;
+        if (!wrap) return;
+        const rect = wrap.getBoundingClientRect();
+        mouseRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    }, []);
+
+    const handleMouseLeave = useCallback(() => {
+        mouseRef.current = { x: -9999, y: -9999 };
+    }, []);
+
+    // Start/restart glow loop when dark mode changes or data loads
+    useEffect(() => {
+        if (!graphData || loading) return;
+        const cleanup = startGlowLoop();
+        return cleanup;
+    }, [graphData, loading, startGlowLoop]);
+
+    // ── Cytoscape palette (re-styles existing instance when dark mode changes) ─
+    const buildCyStyle = useCallback((p) => [
+        // Book nodes — Central Red Giant Sun (unchanged)
+        {
+            selector: 'node[type="book"]',
+            style: {
+                'background-color': '#FFFFFF',
+                'background-fill': 'radial-gradient',
+                'background-gradient-stop-colors': '#FFFFFF #FFA500 #8B0000',
+                'background-gradient-stop-positions': '0% 40% 100%',
+                'border-width': 0,
+                'label': 'data(label)',
+                'text-valign': 'bottom',
+                'text-halign': 'center',
+                'text-margin-y': 12,
+                'font-size': '12px',
+                'font-weight': 'bold',
+                'color': p.orbLabel,
+                'text-outline-width': 0,
+                'width': 80,
+                'height': 80,
+                'shape': 'ellipse',
+                'shadow-blur': 40,
+                'shadow-color': '#FF0000',
+                'shadow-opacity': 0.9,
+                'shadow-offset-x': 0,
+                'shadow-offset-y': 0,
+                'text-wrap': 'wrap',
+                'text-max-width': '150px',
+                'z-index': 10
+            }
+        },
+        // Topic nodes — Warm Orbs
+        {
+            selector: 'node[type="topic"]',
+            style: {
+                'background-color': p.orbFill,
+                'background-fill': 'radial-gradient',
+                'background-gradient-stop-colors': p.orbGradient,
+                'background-gradient-stop-positions': '0% 50% 100%',
+                'shape': 'ellipse',
+                'width': 24,
+                'height': 24,
+                'border-width': 1.5,
+                'border-color': p.orbBorder,
+                'label': 'data(label)',
+                'text-valign': 'bottom',
+                'text-halign': 'center',
+                'text-margin-y': 8,
+                'font-size': '10px',
+                'font-family': 'sans-serif',
+                'color': p.orbLabel,
+                'text-outline-width': 0,
+                'text-wrap': 'wrap',
+                'text-max-width': '130px',
+                'z-index': 5
+            }
+        },
+        // High-connectivity nodes (4+) — Larger Orb
+        {
+            selector: 'node[type="topic"][degree >= 4]',
+            style: {
+                'width': 34,
+                'height': 34,
+                'font-size': '11px',
+                'font-weight': 'bold',
+                'text-max-width': '150px'
+            }
+        },
+        // Selected
+        {
+            selector: 'node:selected',
+            style: {
+                'background-color': '#C8A288',
+                'border-color': '#7B5B4E',
+                'border-width': 3,
+                'color': p.orbLabel,
+                'text-outline-width': 0,
+                'z-index': 20
+            }
+        },
+        // Hovered
+        {
+            selector: 'node.hover',
+            style: {
+                'background-color': isDark ? '#4a3828' : '#E6D5CC',
+                'border-color': isDark ? '#9a7050' : '#C8A288',
+                'border-width': 2.5,
+                'z-index': 15
+            }
+        },
+        // Neighbor highlight
+        {
+            selector: 'node.neighbor',
+            style: {
+                'background-color': isDark ? '#3e3020' : '#F0E4DA',
+                'border-color': isDark ? '#8a6040' : '#C8A288',
+                'border-width': 2.5,
+                'z-index': 12
+            }
+        },
+        // Dimmed
+        {
+            selector: 'node.dimmed',
+            style: { 'opacity': 0.25 }
+        },
+        // Contains edges
+        {
+            selector: 'edge[type="contains"]',
+            style: {
+                'line-color': p.edgeContains,
+                'width': 1.5,
+                'curve-style': 'bezier',
+                'opacity': 0.5,
+                'line-style': 'solid'
+            }
+        },
+        // Prerequisite edges
+        {
+            selector: 'edge[type="prerequisite"]',
+            style: {
+                'line-color': p.edgePrereq,
+                'width': 2.5,
+                'target-arrow-shape': 'triangle',
+                'target-arrow-color': p.edgePrereq,
+                'arrow-scale': 1.2,
+                'curve-style': 'bezier',
+                'opacity': 0.75
+            }
+        },
+        // Related edges
+        {
+            selector: 'edge[type="related"]',
+            style: {
+                'line-color': p.edgeRelated,
+                'width': 1.5,
+                'line-style': 'dashed',
+                'curve-style': 'bezier',
+                'opacity': 0.3
+            }
+        },
+        // Highlighted edges
+        {
+            selector: 'edge.highlighted',
+            style: {
+                'opacity': 1,
+                'width': 3,
+                'z-index': 15
+            }
+        },
+        // Dimmed edges
+        {
+            selector: 'edge.dimmed',
+            style: { 'opacity': 0.08 }
+        }
+    ], [isDark]);
+
+    // Re-style when dark mode flips (without reiniting the whole graph)
+    useEffect(() => {
+        if (cyRef.current) {
+            cyRef.current.style(buildCyStyle(P));
+            // Also update canvas bg
+            if (containerRef.current) {
+                containerRef.current.style.background = P.canvas;
+            }
+        }
+    }, [isDark]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // ── Cytoscape init ────────────────────────────────────────────────────────
     const initCytoscape = useCallback((data) => {
         if (!containerRef.current || !data) return;
-        
-        // Safety check: container must have dimensions
+
         const rect = containerRef.current.getBoundingClientRect();
         if (rect.width === 0 || rect.height === 0) {
-            console.warn('KnowledgeGraph: container has zero dimensions, retrying...');
             setTimeout(() => initCytoscape(data), 100);
             return;
         }
-        
-        // Destroy existing instance
-        if (cyRef.current) {
-            cyRef.current.destroy();
-        }
-        
-        // Prepare elements
+
+        if (cyRef.current) cyRef.current.destroy();
+
+        // Degree map for size scaling
         const elements = [];
-        
-        // Count connections per node for size scaling
         const degreeMap = {};
         data.nodes.forEach(node => { degreeMap[node.id] = 0; });
         data.edges.forEach(edge => {
             degreeMap[edge.source] = (degreeMap[edge.source] || 0) + 1;
             degreeMap[edge.target] = (degreeMap[edge.target] || 0) + 1;
         });
-        
-        // Add nodes
+
         data.nodes.forEach(node => {
             elements.push({
                 data: {
@@ -116,8 +387,7 @@ const KnowledgeGraphView = ({ projectId }) => {
                 }
             });
         });
-        
-        // Add edges (use index for unique IDs to avoid collisions with hyphenated names)
+
         data.edges.forEach((edge, idx) => {
             elements.push({
                 data: {
@@ -129,171 +399,20 @@ const KnowledgeGraphView = ({ projectId }) => {
                 }
             });
         });
-        
-        // Create Cytoscape instance
+
+        const p = isDark ? DARK : LIGHT;
+
         cyRef.current = cytoscape({
             container: containerRef.current,
             elements,
-            style: [
-                // Book nodes (documents) — large, prominent anchor nodes
-                {
-                    selector: 'node[type="book"]',
-                    style: {
-                        'background-color': '#A08072',
-                        'background-opacity': 0.95,
-                        'border-color': '#7B5B4E',
-                        'border-width': 3,
-                        'label': 'data(label)',
-                        'text-valign': 'bottom',
-                        'text-halign': 'center',
-                        'text-margin-y': 10,
-                        'font-size': '11px',
-                        'font-weight': 'bold',
-                        'color': '#4A3B32',
-                        'text-outline-color': '#FDF6F0',
-                        'text-outline-width': 2,
-                        'width': 55,
-                        'height': 55,
-                        'shape': 'round-rectangle',
-                        'text-wrap': 'wrap',
-                        'text-max-width': '120px',
-                        'z-index': 10
-                    }
-                },
-                // Topic nodes — sized by degree (connectivity)
-                {
-                    selector: 'node[type="topic"]',
-                    style: {
-                        'background-color': '#FDF6F0',
-                        'background-opacity': 0.95,
-                        'border-color': '#D4BFB4',
-                        'border-width': 2,
-                        'label': 'data(label)',
-                        'text-valign': 'center',
-                        'text-halign': 'center',
-                        'font-size': '10px',
-                        'color': '#4A3B32',
-                        'width': 'label',
-                        'height': 'label',
-                        'padding': '14px',
-                        'shape': 'round-rectangle',
-                        'text-wrap': 'wrap',
-                        'text-max-width': '130px',
-                        'z-index': 5
-                    }
-                },
-                // High-connectivity topic nodes (4+ connections)
-                {
-                    selector: 'node[type="topic"][degree >= 4]',
-                    style: {
-                        'background-color': '#F0E4DA',
-                        'border-color': '#C8A288',
-                        'border-width': 2.5,
-                        'font-size': '11px',
-                        'font-weight': 'bold',
-                        'padding': '16px',
-                        'text-max-width': '150px'
-                    }
-                },
-                // Selected node
-                {
-                    selector: 'node:selected',
-                    style: {
-                        'background-color': '#C8A288',
-                        'border-color': '#7B5B4E',
-                        'border-width': 3,
-                        'color': '#FFFFFF',
-                        'text-outline-color': '#7B5B4E',
-                        'text-outline-width': 1,
-                        'z-index': 20
-                    }
-                },
-                // Hovered node
-                {
-                    selector: 'node.hover',
-                    style: {
-                        'background-color': '#E6D5CC',
-                        'border-color': '#C8A288',
-                        'border-width': 2.5,
-                        'z-index': 15
-                    }
-                },
-                // Neighbor highlight when a node is selected
-                {
-                    selector: 'node.neighbor',
-                    style: {
-                        'background-color': '#F0E4DA',
-                        'border-color': '#C8A288',
-                        'border-width': 2.5,
-                        'z-index': 12
-                    }
-                },
-                // Dimmed nodes (when a selection is active)
-                {
-                    selector: 'node.dimmed',
-                    style: {
-                        'opacity': 0.3
-                    }
-                },
-                // Edges - contains (book to topic) — subtle connectors
-                {
-                    selector: 'edge[type="contains"]',
-                    style: {
-                        'line-color': '#D4BFB4',
-                        'width': 1.5,
-                        'curve-style': 'bezier',
-                        'opacity': 0.4,
-                        'line-style': 'dotted'
-                    }
-                },
-                // Edges - prerequisite — prominent with arrows
-                {
-                    selector: 'edge[type="prerequisite"]',
-                    style: {
-                        'line-color': '#A08072',
-                        'width': 2.5,
-                        'target-arrow-shape': 'triangle',
-                        'target-arrow-color': '#A08072',
-                        'arrow-scale': 1.2,
-                        'curve-style': 'bezier',
-                        'opacity': 0.75
-                    }
-                },
-                // Edges - related — dashed connectors
-                {
-                    selector: 'edge[type="related"]',
-                    style: {
-                        'line-color': '#E6D5CC',
-                        'width': 1.5,
-                        'line-style': 'dashed',
-                        'curve-style': 'bezier',
-                        'opacity': 0.45
-                    }
-                },
-                // Highlighted edges (connected to selected node)
-                {
-                    selector: 'edge.highlighted',
-                    style: {
-                        'opacity': 1,
-                        'width': 3,
-                        'z-index': 15
-                    }
-                },
-                // Dimmed edges
-                {
-                    selector: 'edge.dimmed',
-                    style: {
-                        'opacity': 0.1
-                    }
-                }
-            ],
+            style: buildCyStyle(p),
             layout: {
                 name: 'cose',
                 animate: true,
                 animationDuration: 800,
-                nodeRepulsion: function() { return 12000; },
-                idealEdgeLength: function() { return 150; },
-                edgeElasticity: function() { return 80; },
+                nodeRepulsion: () => 12000,
+                idealEdgeLength: () => 150,
+                edgeElasticity: () => 80,
                 nestingFactor: 1.2,
                 gravity: 0.15,
                 numIter: 1500,
@@ -304,148 +423,182 @@ const KnowledgeGraphView = ({ projectId }) => {
             },
             minZoom: 0.2,
             maxZoom: 4,
-            wheelSensitivity: 0.15,
+            wheelSensitivity: 0.21,
             boxSelectionEnabled: false,
             selectionType: 'single'
         });
-        
-        // Event handlers
+
+        // Set canvas bg via DOM (Cytoscape doesn't expose it)
+        containerRef.current.style.background = p.canvas;
+
+        // ── Event handlers ────────────────────────────────────────────────────
+
         cyRef.current.on('tap', 'node[type="topic"]', async (evt) => {
             const node = evt.target;
             const topicLabel = node.data('label');
-            
-            // Record click interaction (non-blocking)
+
             if (topicStartTimeRef.current && selectedTopicRef.current) {
                 const duration = Date.now() - topicStartTimeRef.current;
-                recordGraphInteraction(projectId, selectedTopicRef.current, 'click', duration).catch(() => {});
+                recordGraphInteraction(projectId, selectedTopicRef.current, 'click', duration).catch(() => { });
             }
-            
-            // Highlight neighborhood: dim everything, then highlight selected + neighbors
+
             cyRef.current.elements().removeClass('neighbor highlighted dimmed');
             cyRef.current.elements().addClass('dimmed');
-            
+
             const neighborhood = node.neighborhood().add(node);
             neighborhood.nodes().removeClass('dimmed').addClass('neighbor');
             neighborhood.edges().removeClass('dimmed').addClass('highlighted');
-            node.removeClass('neighbor dimmed'); // selected state handles this node
-            
+            node.removeClass('neighbor dimmed');
+
             setSelectedTopic(topicLabel);
             setTopicStartTime(Date.now());
             setTopicsVisited(prev => new Set([...prev, topicLabel]));
-            
-            // Record activity for unified tracking
+
             recordActivity(projectId, 'knowledge_graph', { action: 'explore_topic', topic: topicLabel });
-            
-            // Fetch summary
             await fetchTopicSummary(topicLabel);
-            
-            // Fetch suggestions (non-blocking)
             fetchSuggestions(topicLabel);
         });
-        
-        // Click on book nodes to highlight their topics
+
         cyRef.current.on('tap', 'node[type="book"]', (evt) => {
             const node = evt.target;
             cyRef.current.elements().removeClass('neighbor highlighted dimmed');
             cyRef.current.elements().addClass('dimmed');
-            
             const neighborhood = node.neighborhood().add(node);
             neighborhood.nodes().removeClass('dimmed').addClass('neighbor');
             neighborhood.edges().removeClass('dimmed').addClass('highlighted');
             node.removeClass('neighbor dimmed');
         });
-        
-        // Click on background to clear highlight
+
         cyRef.current.on('tap', (evt) => {
             if (evt.target === cyRef.current) {
                 cyRef.current.elements().removeClass('neighbor highlighted dimmed');
             }
         });
-        
+
         cyRef.current.on('mouseover', 'node', (evt) => {
-            evt.target.addClass('hover');
+            const node = evt.target;
+            node.addClass('hover');
             containerRef.current.style.cursor = 'pointer';
+            setHoveredNodeData(node.data());
+
+            if (node.data('type') === 'book') {
+                node.stop();
+                node.animate({
+                    style: {
+                        'width': 95, 'height': 95,
+                        'shadow-blur': 80,
+                        'shadow-color': '#FFA500',
+                        'background-gradient-stop-colors': '#FFFFFF #FFD700 #FF0000'
+                    },
+                    duration: 300,
+                    easing: 'ease-out'
+                });
+            } else {
+                node.stop();
+                node.animate({
+                    style: {
+                        'width': node.data('degree') >= 4 ? 38 : 28,
+                        'height': node.data('degree') >= 4 ? 38 : 28
+                    },
+                    duration: 150,
+                    easing: 'ease-out'
+                });
+            }
         });
-        
+
+        const pulseSun = (node, scaleUp = true) => {
+            if (node.removed() || node.hasClass('hover')) return;
+            node.animate({
+                style: {
+                    'width': scaleUp ? 85 : 80,
+                    'height': scaleUp ? 85 : 80,
+                    'shadow-blur': scaleUp ? 60 : 40,
+                },
+                duration: 2000,
+                easing: 'ease-in-out-sine',
+                complete: () => pulseSun(node, !scaleUp)
+            });
+        };
+
         cyRef.current.on('mouseout', 'node', (evt) => {
-            evt.target.removeClass('hover');
+            const node = evt.target;
+            node.removeClass('hover');
             containerRef.current.style.cursor = isPanModeRef.current ? 'grab' : 'default';
+            setHoveredNodeData(null);
+
+            if (node.data('type') === 'book') {
+                node.stop();
+                node.style({
+                    'shadow-color': '#FF0000',
+                    'background-gradient-stop-colors': '#FFFFFF #FFA500 #8B0000'
+                });
+                pulseSun(node);
+            } else {
+                node.stop();
+                node.animate({
+                    style: {
+                        'width': node.data('degree') >= 4 ? 34 : 24,
+                        'height': node.data('degree') >= 4 ? 34 : 24
+                    },
+                    duration: 300,
+                    easing: 'ease-in-out'
+                });
+            }
         });
-        
-        // Fit graph to container AFTER layout completes (not immediately,
-        // since the cose layout animates over 500ms and the container may
-        // not have dimensions yet if it just appeared in the DOM)
+
         cyRef.current.on('layoutstop', () => {
             cyRef.current.fit(undefined, 50);
+            cyRef.current.nodes('[type="book"]').forEach(n => pulseSun(n));
         });
-        
-    }, [projectId]);
 
-    // Fetch graph data
+    }, [projectId, isDark, buildCyStyle]);
+
+    // ── Data fetching ─────────────────────────────────────────────────────────
     const fetchGraphData = async () => {
         try {
             setLoading(true);
             setError(null);
-            
+
             let data = null;
             try {
                 data = await getKnowledgeGraphVisualization(projectId);
             } catch (vizErr) {
-                console.warn('Knowledge graph visualization endpoint failed, falling back:', vizErr);
-                // Fallback: use the learning API endpoint
+                console.warn('KG viz endpoint failed, falling back:', vizErr);
                 try {
                     const kgData = await getKnowledgeGraph(projectId);
                     const topicsData = await getTopics(projectId);
-                    
                     const allTopics = topicsData?.all || (Array.isArray(topicsData) ? topicsData : []);
-                    const byDoc = topicsData?.by_doc || {};
-                    
-                    // Build graph data from topics
                     const nodes = [];
                     const edges = [];
-                    
-                    // Add topic nodes
                     const addedTopics = new Set();
+
                     if (kgData?.graph?.nodes?.length > 0) {
                         kgData.graph.nodes.forEach(n => {
                             nodes.push({ id: n.id, label: n.label, type: 'topic', document: n.document });
                             addedTopics.add(n.id);
                         });
                     }
-                    
-                    // Add any missing topics from documents
                     allTopics.forEach(t => {
-                        if (!addedTopics.has(t)) {
-                            nodes.push({ id: t, label: t, type: 'topic', document: 'Unknown' });
-                        }
+                        if (!addedTopics.has(t)) nodes.push({ id: t, label: t, type: 'topic', document: 'Unknown' });
                     });
-                    
-                    // Add edges from graph
                     if (kgData?.graph?.edges) {
-                        kgData.graph.edges.forEach(e => {
-                            edges.push({
-                                source: e.source || e.from_topic,
-                                target: e.target || e.to_topic,
-                                type: e.type || e.relation_type || 'related',
-                                weight: e.weight || 0.5
-                            });
-                        });
+                        kgData.graph.edges.forEach(e => edges.push({
+                            source: e.source || e.from_topic,
+                            target: e.target || e.to_topic,
+                            type: e.type || e.relation_type || 'related',
+                            weight: e.weight || 0.5
+                        }));
                     }
-                    
                     data = { project_name: 'Knowledge Graph', nodes, edges, stats: kgData?.stats || {} };
                 } catch (fallbackErr) {
                     console.error('Fallback also failed:', fallbackErr);
                     throw vizErr;
                 }
             }
-            
+
             setGraphData(data);
-            setLoading(false); // MUST be in same sync block as setGraphData — see useEffect below
-            
-            // Initialize session (fire-and-forget — do NOT await, it would
-            // separate setGraphData and setLoading into different React batches,
-            // causing the Cytoscape useEffect to fire while the container is
-            // still hidden behind the loading spinner)
+            setLoading(false);
+
             startLearningSession(projectId).then(session => {
                 setSessionId(session.session_id);
                 setSessionStartTime(Date.now());
@@ -454,7 +607,7 @@ const KnowledgeGraphView = ({ projectId }) => {
                 console.warn('Session tracking unavailable:', sessionErr.message);
                 setSessionStartTime(Date.now());
             });
-            
+
         } catch (err) {
             console.error('Error fetching graph:', err);
             setError(err.message || 'Failed to load knowledge graph');
@@ -462,7 +615,6 @@ const KnowledgeGraphView = ({ projectId }) => {
         }
     };
 
-    // Fetch topic summary
     const fetchTopicSummary = async (topic, forceRegenerate = false) => {
         try {
             setSummaryLoading(true);
@@ -470,18 +622,12 @@ const KnowledgeGraphView = ({ projectId }) => {
             setTopicSummary(data);
         } catch (err) {
             console.error('Error fetching summary:', err);
-            setTopicSummary({
-                topic,
-                summary: 'Failed to load summary. Please try again.',
-                sources: [],
-                cached: false
-            });
+            setTopicSummary({ topic, summary: 'Failed to load summary. Please try again.', sources: [], cached: false });
         } finally {
             setSummaryLoading(false);
         }
     };
 
-    // Fetch suggestions (non-blocking)
     const fetchSuggestions = async (currentTopic = null) => {
         try {
             const data = await getLearningSuggestions(projectId, currentTopic, 3);
@@ -492,15 +638,11 @@ const KnowledgeGraphView = ({ projectId }) => {
         }
     };
 
-    // Close topic panel
     const closeTopic = async () => {
         if (topicStartTime && selectedTopic) {
             const duration = Date.now() - topicStartTime;
-            try {
-                await recordGraphInteraction(projectId, selectedTopic, 'summary_view', duration);
-            } catch (e) { /* analytics optional */ }
+            try { await recordGraphInteraction(projectId, selectedTopic, 'summary_view', duration); } catch (e) { }
         }
-        // Clear graph highlighting
         if (cyRef.current) {
             cyRef.current.elements().removeClass('neighbor highlighted dimmed');
             cyRef.current.elements().unselect();
@@ -510,12 +652,10 @@ const KnowledgeGraphView = ({ projectId }) => {
         setTopicStartTime(null);
     };
 
-    // Zoom controls
-    const zoomIn = () => cyRef.current?.zoom(cyRef.current.zoom() * 1.2);
-    const zoomOut = () => cyRef.current?.zoom(cyRef.current.zoom() / 1.2);
+    const zoomIn = () => cyRef.current?.zoom(cyRef.current.zoom() * 1.68);
+    const zoomOut = () => cyRef.current?.zoom(cyRef.current.zoom() / 1.68);
     const fitGraph = () => cyRef.current?.fit(undefined, 50);
 
-    // Toggle pan mode
     const togglePanMode = () => {
         setIsPanMode(!isPanMode);
         if (cyRef.current) {
@@ -524,271 +664,325 @@ const KnowledgeGraphView = ({ projectId }) => {
         }
     };
 
-    // Initialize on mount
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
     useEffect(() => {
         fetchGraphData();
-        
-        // Resize observer to tell Cytoscape when container changes size
+
         const resizeObserver = new ResizeObserver(() => {
             if (cyRef.current) {
                 cyRef.current.resize();
                 cyRef.current.fit(undefined, 50);
             }
         });
-        if (containerRef.current) {
-            resizeObserver.observe(containerRef.current);
-        }
-        
-        // Cleanup on unmount
+        if (containerRef.current) resizeObserver.observe(containerRef.current);
+
         return () => {
             resizeObserver.disconnect();
+            cancelAnimationFrame(glowRafRef.current);
             if (sessionIdRef.current && sessionStartTimeRef.current) {
                 const totalTime = Date.now() - sessionStartTimeRef.current;
                 endLearningSession(sessionIdRef.current, Array.from(topicsVisitedRef.current), totalTime);
             }
-            if (cyRef.current) {
-                cyRef.current.destroy();
-            }
+            if (cyRef.current) cyRef.current.destroy();
         };
     }, [projectId]);
 
-    // Initialize Cytoscape when data changes
-    // Use double-rAF to ensure the container div has been painted with
-    // proper dimensions before Cytoscape tries to render into it.
-    // When loading changes from true→false and graphData is set in the
-    // same render batch, the container appears in the DOM but may have
-    // 0x0 dimensions until the browser paints.
     useEffect(() => {
         if (graphData) {
             let innerRaf = null;
             const outerRaf = requestAnimationFrame(() => {
-                innerRaf = requestAnimationFrame(() => {
-                    initCytoscape(graphData);
-                });
+                innerRaf = requestAnimationFrame(() => initCytoscape(graphData));
             });
             return () => {
                 cancelAnimationFrame(outerRaf);
                 if (innerRaf !== null) cancelAnimationFrame(innerRaf);
             };
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [graphData]);
 
-    // Navigate to suggested topic
     const navigateToTopic = async (topic) => {
         setSelectedTopic(topic);
         setTopicsVisited(prev => new Set([...prev, topic]));
         await fetchTopicSummary(topic);
-        
-        // Highlight node in graph
+
         if (cyRef.current) {
             const node = cyRef.current.getElementById(topic);
             if (node.length) {
-                // Highlight neighborhood
                 cyRef.current.elements().removeClass('neighbor highlighted dimmed');
                 cyRef.current.elements().addClass('dimmed');
                 const neighborhood = node.neighborhood().add(node);
                 neighborhood.nodes().removeClass('dimmed').addClass('neighbor');
                 neighborhood.edges().removeClass('dimmed').addClass('highlighted');
                 node.removeClass('neighbor dimmed');
-                
-                cyRef.current.animate({
-                    center: { eles: node },
-                    zoom: 1.5
-                }, { duration: 300 });
+                cyRef.current.animate({ center: { eles: node }, zoom: 1.5 }, { duration: 300 });
                 node.select();
             }
         }
     };
 
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center h-[600px] bg-[#FDF6F0] rounded-2xl">
-                <div className="text-center">
-                    <Loader2 className="w-12 h-12 text-[#C8A288] animate-spin mx-auto mb-4" />
-                    <p className="text-[#8a6a5c]">Loading knowledge graph...</p>
-                </div>
-            </div>
-        );
-    }
+    // ── Loading / error / empty states ────────────────────────────────────────
+    const stateContainerCls = `flex items-center justify-center h-[600px] rounded-2xl border transition-colors duration-300 ${isDark ? 'bg-[#221810] border-[#5a3a20]' : 'bg-[#FFF5ED] border-white/10'
+        }`;
 
-    if (error) {
-        return (
-            <div className="flex items-center justify-center h-[600px] bg-[#FDF6F0] rounded-2xl">
-                <div className="text-center">
-                    <Network className="w-12 h-12 text-red-400 mx-auto mb-4" />
-                    <p className="text-red-500 mb-4">{error}</p>
-                    <button
-                        onClick={fetchGraphData}
-                        className="px-4 py-2 bg-[#C8A288] text-white rounded-lg hover:bg-[#A08072] transition-colors"
-                    >
-                        Try Again
-                    </button>
-                </div>
+    if (loading) return (
+        <div className={stateContainerCls}>
+            <div className="text-center">
+                <Loader2 className="w-12 h-12 text-[#FFD700] animate-spin mx-auto mb-4" />
+                <p className={isDark ? 'text-[#a08060]' : 'text-[#A0A0A0]'}>Igniting knowledge core…</p>
             </div>
-        );
-    }
+        </div>
+    );
 
-    // No topics found
-    if (!graphData?.nodes?.length) {
-        return (
-            <div className="flex items-center justify-center h-[600px] bg-[#FDF6F0] rounded-2xl">
-                <div className="text-center">
-                    <Network className="w-12 h-12 text-[#E6D5CC] mx-auto mb-4" />
-                    <p className="text-[#4A3B32] font-semibold mb-2">No Topics Found</p>
-                    <p className="text-sm text-[#8a6a5c] mb-4">Upload documents to generate topics and build the knowledge graph.</p>
-                    <button
-                        onClick={fetchGraphData}
-                        className="px-4 py-2 bg-[#C8A288] text-white rounded-lg hover:bg-[#A08072] transition-colors"
-                    >
-                        Refresh
-                    </button>
-                </div>
+    if (error) return (
+        <div className={stateContainerCls}>
+            <div className="text-center">
+                <Network className="w-12 h-12 text-red-500 mx-auto mb-4" />
+                <p className="text-red-400 mb-4">{error}</p>
+                <button
+                    onClick={fetchGraphData}
+                    className="px-4 py-2 bg-[#FFD700] text-[#0A0A0C] font-semibold rounded-lg hover:bg-yellow-500 transition-colors"
+                >
+                    Try Again
+                </button>
             </div>
-        );
-    }
+        </div>
+    );
 
+    if (!graphData?.nodes?.length) return (
+        <div className={stateContainerCls}>
+            <div className="text-center">
+                <Network className={`w-12 h-12 mx-auto mb-4 ${isDark ? 'text-[#5a3a20]' : 'text-[#3A3A3A]'}`} />
+                <p className={`font-semibold mb-2 ${isDark ? 'text-[#a08060]' : 'text-white'}`}>No Cosmic Entities Found</p>
+                <p className={`text-sm mb-4 ${isDark ? 'text-[#7a5c3a]' : 'text-[#A0A0A0]'}`}>Upload documents to ignite the central sun.</p>
+                <button onClick={fetchGraphData} className="px-4 py-2 bg-[#FFD700] text-[#0A0A0C] font-semibold rounded-lg hover:bg-yellow-500 transition-colors">
+                    Refresh Cosmos
+                </button>
+            </div>
+        </div>
+    );
+
+    // ── Main render ───────────────────────────────────────────────────────────
     return (
-        <div className="flex flex-col lg:flex-row h-full min-h-[600px] gap-4 p-0 md:p-4">
-            {/* Main Graph Container */}
-            <div className="flex-1 relative bg-[#FDF6F0] md:rounded-2xl border-y md:border border-[#E6D5CC] overflow-hidden min-h-[500px]">
+        <div
+            ref={wrapRef}
+            className="flex h-full min-h-[600px] relative p-0 overflow-hidden md:rounded-2xl border-y md:border shadow-inner transition-colors duration-300"
+            style={{ borderColor: isDark ? '#5a3a20' : '#EED9CA' }}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+        >
+            {/* ── Ambient cursor glow canvas (pointer-events:none, sits above Cy canvas) */}
+            <canvas
+                ref={glowCanvasRef}
+                className="absolute inset-0 z-[5] pointer-events-none"
+                style={{ mixBlendMode: isDark ? 'screen' : 'multiply' }}
+            />
+
+            {/* ── Main Graph Container ─────────────────────────────────────── */}
+            <div
+                className="flex-1 w-full relative min-h-[500px] transition-colors duration-300"
+                style={{ background: P.canvas }}
+            >
                 {/* Header */}
-                <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-[#FDF6F0] to-transparent p-3 md:p-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <Network className="w-5 h-5 text-[#C8A288] shrink-0" />
-                            <h2 className="font-semibold text-[#4A3B32] text-sm md:text-base">
-                                {graphData?.project_name || 'Knowledge Graph'}
-                            </h2>
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="text-xs text-[#8a6a5c] bg-white/80 px-2 py-1 rounded-full">
-                                    {graphData?.nodes?.filter(n => n.type === 'topic').length || 0} topics
-                                </span>
-                                <span className="text-xs text-[#8a6a5c] bg-white/80 px-2 py-1 rounded-full">
-                                    {graphData?.nodes?.filter(n => n.type === 'book').length || 0} docs
-                                </span>
-                                <span className="text-xs text-[#8a6a5c] bg-white/80 px-2 py-1 rounded-full">
-                                    {graphData?.edges?.length || 0} links
-                                </span>
+                {!zenMode && (
+                    <div
+                        className="absolute left-0 right-0 z-10 p-3 md:p-4 pointer-events-none transition-all duration-300 top-0"
+                        style={{
+                            background: isDark
+                                ? `linear-gradient(to bottom, ${P.toolbarBg}ee, transparent)`
+                                : 'linear-gradient(to bottom, rgba(0,0,0,0.60), transparent)'
+                        }}
+                    >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pointer-events-auto">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <Network className="w-5 h-5 text-[#FFD700] shrink-0 drop-shadow-[0_0_8px_rgba(255,215,0,0.8)]" />
+                                <h2 className="font-semibold text-white tracking-wide text-sm md:text-base">
+                                    {graphData?.project_name || 'Knowledge Cosmos'}
+                                </h2>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                    {[
+                                        `${graphData?.nodes?.filter(n => n.type === 'topic').length || 0} Orbs`,
+                                        `${graphData?.nodes?.filter(n => n.type === 'book').length || 0} Suns`,
+                                        `${graphData?.edges?.length || 0} Links`,
+                                    ].map(label => (
+                                        <span key={label} className="text-xs text-white/80 bg-white/10 backdrop-blur-md px-2 py-1 rounded-full border border-white/10">
+                                            {label}
+                                        </span>
+                                    ))}
+                                </div>
                             </div>
                         </div>
-                        
-                        {/* Controls */}
-                        <div className="flex items-center gap-1.5 md:gap-2">
-                            <button
-                                onClick={togglePanMode}
-                                className={`p-2 rounded-lg transition-colors ${
-                                    isPanMode 
-                                        ? 'bg-[#C8A288] text-white' 
-                                        : 'bg-white text-[#4A3B32] hover:bg-[#E6D5CC]'
-                                }`}
-                                title="Toggle pan mode (drag to move)"
-                            >
-                                <Hand className="w-4 h-4" />
-                            </button>
-                            <button
-                                onClick={zoomIn}
-                                className="p-2 bg-white rounded-lg hover:bg-[#E6D5CC] transition-colors"
-                                title="Zoom in"
-                            >
-                                <ZoomIn className="w-4 h-4 text-[#4A3B32]" />
-                            </button>
-                            <button
-                                onClick={zoomOut}
-                                className="p-2 bg-white rounded-lg hover:bg-[#E6D5CC] transition-colors"
-                                title="Zoom out"
-                            >
-                                <ZoomOut className="w-4 h-4 text-[#4A3B32]" />
-                            </button>
-                            <button
-                                onClick={fitGraph}
-                                className="p-2 bg-white rounded-lg hover:bg-[#E6D5CC] transition-colors"
-                                title="Fit to view"
-                            >
-                                <Maximize2 className="w-4 h-4 text-[#4A3B32]" />
-                            </button>
-                            <button
-                                onClick={fetchGraphData}
-                                className="p-2 bg-white rounded-lg hover:bg-[#E6D5CC] transition-colors"
-                                title="Refresh graph"
-                            >
-                                <RefreshCw className="w-4 h-4 text-[#4A3B32]" />
-                            </button>
-                        </div>
                     </div>
+                )}
+
+                {/* Floating Controls */}
+                <div className={`absolute z-30 pointer-events-auto transition-all duration-500 flex ${selectedTopic
+                        ? 'flex-col top-1/4 md:top-1/2 -translate-y-1/2 right-4 md:right-[416px]'
+                        : `flex-row ${zenMode ? 'top-[52px]' : 'top-4'} right-4`
+                    } gap-1.5 md:gap-2`}>
+                    {[
+                        { icon: <Hand className="w-4 h-4" />, action: togglePanMode, title: 'Toggle pan mode', active: isPanMode },
+                        { icon: <ZoomIn className="w-4 h-4" />, action: zoomIn, title: 'Zoom in' },
+                        { icon: <ZoomOut className="w-4 h-4" />, action: zoomOut, title: 'Zoom out' },
+                        { icon: <Target className="w-4 h-4" />, action: fitGraph, title: 'Fit to view' },
+                        { icon: <RefreshCw className="w-4 h-4" />, action: fetchGraphData, title: 'Refresh' },
+                    ].map(({ icon, action, title, active }) => (
+                        <button
+                            key={title}
+                            onClick={action}
+                            title={title}
+                            className={`p-2 rounded-lg transition-colors border shadow-lg backdrop-blur-md ${active
+                                    ? 'bg-[#FFD700]/20 border-[#FFD700]/50 text-[#FFD700]'
+                                    : isDark
+                                        ? 'bg-[#3a2c1e]/80 border-[#7a5c3a]/40 text-[#a08060] hover:bg-[#4a3828] hover:text-[#c09060]'
+                                        : 'bg-black/40 border-white/10 text-white/70 hover:bg-white/10 hover:text-white'
+                                }`}
+                        >{icon}</button>
+                    ))}
                 </div>
-                
+
                 {/* Cytoscape Container */}
-                <div 
-                    ref={containerRef} 
+                <div
+                    ref={containerRef}
                     className="w-full h-full"
                     style={{ cursor: isPanMode ? 'grab' : 'default', minHeight: '400px' }}
                 />
-                
-                {/* Legend */}
-                <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg p-3 shadow-sm max-w-[200px]">
-                    <p className="text-xs font-medium text-[#4A3B32] mb-2">Legend</p>
-                    <div className="flex flex-col gap-1.5 text-xs text-[#8a6a5c]">
+
+                {/* Glassmorphism Hover Info Panel */}
+                <div className={`absolute bottom-4 left-4 z-20 transition-all duration-500 ease-out transform ${hoveredNodeData ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-4 opacity-0 scale-95 pointer-events-none'
+                    }`}>
+                    {hoveredNodeData && (
+                        <div
+                            className="w-64 sm:w-72 backdrop-blur-xl shadow-xl rounded-2xl p-4 border"
+                            style={{
+                                background: isDark ? 'rgba(46,31,18,0.95)' : 'rgba(62,47,40,0.95)',
+                                borderColor: isDark ? '#5a3a20' : 'rgba(188,154,113,0.30)'
+                            }}
+                        >
+                            <div className="flex flex-col gap-1.5">
+                                <span className={`text-[10px] uppercase tracking-widest font-bold ${hoveredNodeData.type === 'book' ? 'text-[#FF4500]' : 'text-[#FFD700]'
+                                    }`}>
+                                    {hoveredNodeData.type === 'book' ? 'Core Sun' : 'Cosmic Orb'}
+                                </span>
+                                <h4 className="font-bold text-white text-lg leading-tight drop-shadow-md">
+                                    {hoveredNodeData.label}
+                                </h4>
+                                <div className="flex items-center gap-2 text-xs text-white/60 mt-1">
+                                    <Network className="w-3.5 h-3.5" />
+                                    <span>{hoveredNodeData.degree || 0} Connection{(hoveredNodeData.degree || 0) !== 1 ? 's' : ''}</span>
+                                </div>
+                                {hoveredNodeData.type === 'book' && (
+                                    <p className="text-white/50 text-[10px] leading-relaxed mt-2 italic border-t border-white/10 pt-2">
+                                        Gravitational anchor representing a source document.
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Legend — Constellations */}
+                <div
+                    className={`absolute top-24 right-4 backdrop-blur-md rounded-xl p-3 shadow-lg transition-opacity duration-300 ${hoveredNodeData ? 'opacity-20' : 'opacity-100'}`}
+                    style={{
+                        background: P.legendBg,
+                        borderWidth: 1,
+                        borderStyle: 'solid',
+                        borderColor: P.legendBorder
+                    }}
+                >
+                    <p className="text-[10px] uppercase tracking-wider font-bold text-white/60 mb-2">Constellations</p>
+                    <div className="flex flex-col gap-2 text-xs" style={{ color: isDark ? '#a08060' : 'rgba(255,255,255,0.8)' }}>
                         <div className="flex items-center gap-2">
-                            <div className="w-4 h-4 bg-[#A08072] rounded border border-[#7B5B4E] shrink-0" />
-                            <span>Document</span>
+                            <div className="w-4 h-4 bg-[radial-gradient(ellipse_at_center,_#FFFFFF,_#FFA500,_#8B0000)] rounded-full shadow-[0_0_8px_rgba(255,0,0,0.8)] shrink-0" />
+                            <span>Core Sun (Doc)</span>
                         </div>
                         <div className="flex items-center gap-2">
-                            <div className="w-4 h-4 bg-[#FDF6F0] border-2 border-[#D4BFB4] rounded shrink-0" />
-                            <span>Topic</span>
+                            <div
+                                className="w-3 h-3 rounded-full shrink-0"
+                                style={{
+                                    background: isDark
+                                        ? 'radial-gradient(ellipse at center, #4a3520, #3a2c1e)'
+                                        : 'radial-gradient(ellipse at center, #FFF8DC, #FFD700, #DAA520)',
+                                    border: `1.5px solid ${isDark ? '#7a5c3a' : '#D4A373'}`,
+                                    boxShadow: isDark
+                                        ? '0 0 6px rgba(122,80,48,0.6)'
+                                        : '0 0 6px rgba(255,215,0,0.8)'
+                                }}
+                            />
+                            <span>Orb (Topic)</span>
                         </div>
                         <div className="flex items-center gap-2">
-                            <div className="w-4 h-4 bg-[#F0E4DA] border-2 border-[#C8A288] rounded shrink-0" />
-                            <span>Key Topic</span>
+                            <div
+                                className="w-4 h-4 rounded-full shrink-0"
+                                style={{
+                                    background: isDark
+                                        ? 'radial-gradient(ellipse at center, #5a4028, #3a2c1e)'
+                                        : 'radial-gradient(ellipse at center, #FFF8DC, #FFD700, #DAA520)',
+                                    border: `2px solid ${isDark ? '#9a7050' : '#D4A373'}`,
+                                    boxShadow: isDark
+                                        ? '0 0 10px rgba(154,112,80,0.8)'
+                                        : '0 0 12px rgba(255,215,0,1)'
+                                }}
+                            />
+                            <span>Key Orb</span>
                         </div>
                     </div>
                 </div>
-                
+
                 {/* Analytics Mini Card */}
                 {analytics && (
-                    <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur-sm rounded-lg p-3 shadow-sm">
+                    <div
+                        className="absolute bottom-4 right-4 backdrop-blur-md rounded-xl p-3 shadow-lg"
+                        style={{
+                            background: isDark ? '#2e1f12' : 'rgba(62,47,40,0.95)',
+                            border: `1px solid ${isDark ? '#5a3a20' : 'rgba(188,154,113,0.30)'}`
+                        }}
+                    >
                         <div className="flex items-center gap-2 mb-2">
-                            <BarChart3 className="w-4 h-4 text-[#C8A288]" />
-                            <span className="text-xs font-medium text-[#4A3B32]">Progress</span>
+                            <BarChart3 className="w-4 h-4 text-[#FFD700]" />
+                            <span className="text-xs font-semibold text-white tracking-wide">Progress</span>
                         </div>
-                        <div className="text-xs text-[#8a6a5c]">
-                            <p>{analytics.coverage_percent}% coverage</p>
-                            <p>{analytics.total_topics_visited}/{analytics.total_topics_available} topics</p>
+                        <div className="text-[11px] text-white/70 space-y-0.5">
+                            <p>{analytics.coverage_percent}% explored</p>
+                            <p>{analytics.total_topics_visited}/{analytics.total_topics_available} discoveries</p>
                         </div>
                     </div>
                 )}
             </div>
-            
-            {/* Right Panel - Topic Summary (Mobile Bottom Drawer, Desktop Sidebar) */}
+
+            {/* ── Right Panel — Topic Summary ──────────────────────────────── */}
             <div className={`
-                fixed inset-x-0 bottom-0 z-50 lg:static lg:w-96 lg:z-auto
-                transition-all duration-300 ease-in-out
-                ${selectedTopic ? 'translate-y-0 opacity-100' : 'translate-y-full lg:translate-y-0 lg:opacity-50'}
-                h-[55vh] lg:h-full shadow-2xl lg:shadow-none
+                fixed md:absolute inset-x-0 bottom-0 z-50 md:inset-y-0 md:right-0 md:left-auto md:w-[400px] md:z-40
+                transition-transform duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]
+                ${selectedTopic ? 'translate-y-0 md:translate-x-0' : 'translate-y-full md:translate-y-0 md:translate-x-[110%]'}
+                h-[60vh] md:h-full
             `}>
-                {/* Close backdrop for mobile */}
                 {selectedTopic && (
                     <div className="absolute -top-10 left-0 right-0 h-10 lg:hidden" onClick={closeTopic} />
                 )}
 
-                {/* Topic Summary Panel */}
-                <div className="h-full bg-white rounded-t-3xl lg:rounded-2xl border border-[#E6D5CC] lg:border overflow-hidden flex flex-col">
+                <div className={`h-full backdrop-blur-2xl md:backdrop-blur-3xl rounded-t-3xl md:rounded-none md:border-l overflow-hidden flex flex-col ${zenMode ? 'pt-12' : ''} ${isDark
+                        ? 'bg-[#1e140c]/90 border-[#5a3a20] md:shadow-[-20px_0_40px_rgba(10,6,2,0.9)]'
+                        : 'bg-black/60 border-white/10 md:shadow-[-20px_0_40px_rgba(0,0,0,0.8)]'
+                    }`}>
                     {selectedTopic ? (
                         <>
-                            {/* Drag handle for mobile */}
-                            <div className="w-full flex justify-center py-2 lg:hidden bg-gradient-to-r from-[#C8A288]/5 to-[#C8A288]/10" onClick={closeTopic}>
+                            {/* Drag handle */}
+                            <div className="w-full flex justify-center py-2 lg:hidden" onClick={closeTopic}
+                                style={{ background: isDark ? 'rgba(46,31,18,0.5)' : 'rgba(200,162,136,0.08)' }}>
                                 <div className="w-12 h-1.5 bg-[#E6D5CC] rounded-full" />
                             </div>
 
                             {/* Topic Header */}
-                            <div className="p-4 border-b border-[#E6D5CC] bg-gradient-to-r from-[#C8A288]/10 to-transparent">
+                            <div className="p-4 border-b border-white/10 bg-white/5">
                                 <div className="flex items-start justify-between">
                                     <div className="flex-1 min-w-0">
-                                        <h3 className="font-semibold text-[#4A3B32] text-base md:text-lg truncate">
+                                        <h3 className="font-semibold text-white text-base md:text-lg truncate drop-shadow-md">
                                             {selectedTopic}
                                         </h3>
                                         {topicSummary?.cached && (
-                                            <span className="text-xs text-[#8a6a5c] flex items-center gap-1 mt-1">
+                                            <span className="text-xs text-white/50 flex items-center gap-1 mt-1">
                                                 <Clock className="w-3 h-3" /> Cached
                                             </span>
                                         )}
@@ -796,46 +990,41 @@ const KnowledgeGraphView = ({ projectId }) => {
                                     <div className="flex items-center gap-2 ml-2">
                                         <button
                                             onClick={() => fetchTopicSummary(selectedTopic, true)}
-                                            className="p-1.5 hover:bg-[#E6D5CC] rounded-lg transition-colors"
+                                            className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
                                             title="Regenerate summary"
                                             disabled={summaryLoading}
                                         >
-                                            <RefreshCw className={`w-4 h-4 text-[#8a6a5c] ${summaryLoading ? 'animate-spin' : ''}`} />
+                                            <RefreshCw className={`w-4 h-4 text-white/70 ${summaryLoading ? 'animate-spin' : ''}`} />
                                         </button>
-                                        <button
-                                            onClick={closeTopic}
-                                            className="p-1.5 hover:bg-[#E6D5CC] rounded-lg transition-colors"
-                                        >
-                                            <X className="w-4 h-4 text-[#8a6a5c]" />
+                                        <button onClick={closeTopic} className="p-1.5 hover:bg-white/10 rounded-lg transition-colors">
+                                            <X className="w-4 h-4 text-white/70" />
                                         </button>
                                     </div>
                                 </div>
                             </div>
-                            
+
                             {/* Summary Content */}
                             <div className="flex-1 overflow-y-auto p-4">
                                 {summaryLoading ? (
                                     <div className="flex items-center justify-center h-full">
-                                        <div className="text-center">
-                                            <Loader2 className="w-8 h-8 text-[#C8A288] animate-spin mx-auto mb-2" />
-                                            <p className="text-sm text-[#8a6a5c]">Generating summary...</p>
+                                        <div className="text-center mt-10">
+                                            <Loader2 className="w-8 h-8 text-[#FFD700] animate-spin mx-auto mb-3" />
+                                            <p className="text-sm text-white/60">Deciphering stellar emissions…</p>
                                         </div>
                                     </div>
                                 ) : topicSummary ? (
-                                    <div className="prose prose-sm max-w-none overflow-x-auto">
+                                    <div className="prose prose-sm prose-invert max-w-none overflow-x-auto text-white/80">
                                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                             {topicSummary.summary}
                                         </ReactMarkdown>
-                                        
-                                        {/* Sources */}
                                         {topicSummary.sources?.length > 0 && (
-                                            <div className="mt-4 pt-4 border-t border-[#E6D5CC]">
-                                                <p className="text-xs font-medium text-[#8a6a5c] mb-2">Sources</p>
+                                            <div className="mt-6 pt-4 border-t border-white/10">
+                                                <p className="text-[10px] uppercase tracking-wider font-bold text-[#FFD700] mb-3">Origin Systems</p>
                                                 <div className="flex flex-wrap gap-2">
                                                     {topicSummary.sources.map((source, idx) => (
-                                                        <span 
+                                                        <span
                                                             key={idx}
-                                                            className="text-xs bg-[#FDF6F0] text-[#4A3B32] px-2 py-1 rounded-full"
+                                                            className="text-[11px] bg-white/5 border border-white/10 text-white/80 px-2.5 py-1 rounded-full"
                                                         >
                                                             {source.doc_name}
                                                         </span>
@@ -845,17 +1034,17 @@ const KnowledgeGraphView = ({ projectId }) => {
                                         )}
                                     </div>
                                 ) : (
-                                    <p className="text-[#8a6a5c] text-center">Click a topic to see its summary</p>
+                                    <p className="text-white/40 text-center mt-10 text-sm">Target an orb to scan its data</p>
                                 )}
                             </div>
                         </>
                     ) : (
                         <div className="flex-1 flex items-center justify-center p-8">
                             <div className="text-center px-4">
-                                <Target className="w-12 h-12 text-[#E6D5CC] mx-auto mb-4" />
-                                <p className="text-[#8a6a5c] text-sm md:text-base">Click on a topic node to see its summary</p>
-                                <p className="text-xs text-[#8a6a5c]/60 mt-2">
-                                    Summaries are generated from your documents using AI
+                                <Target className="w-12 h-12 text-white/20 mx-auto mb-4" />
+                                <p className="text-white/60 text-sm md:text-base">Target an orb to extract knowledge</p>
+                                <p className="text-xs text-white/30 mt-2">
+                                    Summaries are decoded from your documents in real-time
                                 </p>
                             </div>
                         </div>

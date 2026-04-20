@@ -256,7 +256,11 @@ const Dashboard = () => {
 
     const handleCreateProject = async (e) => {
         e.preventDefault();
-        if (!newProjectName.trim() || selectedFiles.length === 0) return;
+        if (!newProjectName.trim()) {
+            toast.warning('Please enter a project name before creating.');
+            return;
+        }
+        if (selectedFiles.length === 0) return;
         setIsCreating(true);
         const initialStatus = {};
         selectedFiles.forEach(f => initialStatus[f.name] = 'pending');
@@ -493,7 +497,13 @@ const Dashboard = () => {
                                     <div className="grid grid-cols-2 gap-4">
                                         {/* Book Store card */}
                                         <button
-                                            onClick={() => setModalStep('store')}
+                                            onClick={() => {
+                                                if (!newProjectName.trim()) {
+                                                    toast.warning('Please enter a project name first.');
+                                                    return;
+                                                }
+                                                setModalStep('store');
+                                            }}
                                             className="group flex flex-col items-center text-center p-5 rounded-2xl border-2 border-[#E6D5CC] hover:border-emerald-400 hover:bg-emerald-50/50 transition-all duration-200 hover:shadow-lg"
                                         >
                                             <div className="h-12 w-12 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center mb-3 shadow-md shadow-emerald-500/20 group-hover:scale-110 transition-transform">
@@ -506,7 +516,13 @@ const Dashboard = () => {
 
                                         {/* Upload card */}
                                         <button
-                                            onClick={() => setModalStep('upload')}
+                                            onClick={() => {
+                                                if (!newProjectName.trim()) {
+                                                    toast.warning('Please enter a project name first.');
+                                                    return;
+                                                }
+                                                setModalStep('upload');
+                                            }}
                                             className="group flex flex-col items-center text-center p-5 rounded-2xl border-2 border-[#E6D5CC] hover:border-[#C8A288] hover:bg-[#FDF6F0] transition-all duration-200 hover:shadow-lg"
                                         >
                                             <div className="h-12 w-12 bg-gradient-to-br from-[#C8A288] to-[#B08B72] rounded-xl flex items-center justify-center mb-3 shadow-md shadow-[#C8A288]/20 group-hover:scale-110 transition-transform">

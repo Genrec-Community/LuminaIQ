@@ -1,12 +1,52 @@
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from services.rag_service import rag_service
+from services.user_data_service import user_data
 from models.schemas import ChatRequest, ChatResponse, ChatMessage, SummaryRequest
 from typing import Any, List
 from api.deps import get_current_user
 from db.client import get_supabase_client, async_db
+from utils.logger import logger
 
 router = APIRouter()
+
+
+async def get_user_context_string(user_id: str) -> str:
+    try:
+        settings = await user_data.get_settings(user_id)
+        if not settings:
+            return ""
+            
+        context_parts = []
+        name = settings.get("studentName", "")
+        if name: context_parts.append(f"Student Name: {name}")
+        
+        goal = settings.get("learningGoal", "")
+        if goal: context_parts.append(f"Learning Goal: {goal}")
+        
+        level = settings.get("selfLevel", "")
+        if level:
+            level_map = {
+                "beginner": "Beginner (Just starting out)",
+                "intermediate": "Intermediate (Knows the basics)",
+                "advanced": "Advanced (Looking to master)"
+            }
+            context_parts.append(f"Knowledge Level: {level_map.get(level, level)}")
+            
+        style = settings.get("learningStyle", "")
+        if style:
+            style_map = {
+                "visual": "Visual (Prefers diagrams & summaries)",
+                "reading": "Reading (Deep text-based study)",
+                "practice": "Practice (Quizzes & exercises)",
+                "balanced": "Balanced (Mix of everything)"
+            }
+            context_parts.append(f"Preferred Learning Style: {style_map.get(style, style)}")
+            
+        return "\n".join(context_parts)
+    except Exception as e:
+        logger.error(f"Error fetching user settings for context: {e}")
+        return ""
 
 
 @router.get("/history/{project_id}", response_model=List[ChatMessage])
@@ -67,13 +107,15 @@ async def chat_message(
             {"role": msg["role"], "content": msg["content"]} for msg in history_res.data
         ]
 
+        user_context_str = await get_user_context_string(current_user["id"])
+
         result = await rag_service.get_answer(
             project_id=request.project_id,
             question=request.message,
             selected_documents=request.selected_documents,
-            chat_history=chat_history_dicts[
-                :-1
-            ],  # Exclude current msg to avoid duplication if RAG appends it
+            chat_history=chat_history_dicts[:-1],  # Exclude current msg to avoid duplication if RAG appends it
+            system_prompt=request.system_prompt,
+            user_context=user_context_str,
         )
 
         # Save Assistant Message (non-blocking)
@@ -127,6 +169,8 @@ async def chat_stream(
             {"role": msg["role"], "content": msg["content"]} for msg in history_res.data
         ]
 
+        user_context_str = await get_user_context_string(current_user["id"])
+
         # Wrapper generator to intercept and save the final answer
         async def stream_and_save():
             full_answer = ""
@@ -137,6 +181,8 @@ async def chat_stream(
                 question=request.message,
                 selected_documents=request.selected_documents,
                 chat_history=chat_history_dicts[:-1],
+                system_prompt=request.system_prompt,
+                user_context=user_context_str,
             ):
                 # Check for sources marker
                 if "__SOURCES__:" in chunk:

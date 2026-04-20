@@ -76,6 +76,7 @@ class ChatRequest(BaseModel):
     message: str
     selected_documents: Optional[List[str]] = None
     session_history: List[ChatMessage] = []
+    system_prompt: Optional[str] = None
 
 
 class SourceInfo(BaseModel):

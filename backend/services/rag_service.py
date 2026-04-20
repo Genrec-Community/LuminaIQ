@@ -61,7 +61,7 @@ class RAGService:
         self.llm = llm_service._get_client(temperature=0.1)
 
     def _get_retrieval_chain(
-        self, collection_name: str, selected_documents: Optional[List[str]] = None
+        self, collection_name: str, selected_documents: Optional[List[str]] = None, system_prompt: Optional[str] = None, user_context: Optional[str] = None
     ):
         """Create a RAG chain for a specific collection"""
 
@@ -84,13 +84,39 @@ class RAGService:
         retriever = vector_store.as_retriever(search_kwargs=search_kwargs)
 
         # 2. Prompt
-        system_prompt = """You are Lumina IQ, an elite educational intelligence system designed to transform raw study material into clear, structured understanding.
+        # Build identity preamble from user profile
+        if user_context:
+            identity_block = f"""=== STUDENT PROFILE (HIGHEST PRIORITY) ===
+{user_context}
+
+CRITICAL RULE:
+- If the student asks ANY question about themselves — "who am I", "what is my name", "what am I studying for", "tell me about myself" — answer ONLY using the STUDENT PROFILE above.
+- Do NOT use document content to describe the student. The student is the READER, not the subject.
+- If the student asks "who am I" and the profile has their name, greet them by name and describe what you know from their profile.
+
+===================================================
+
+"""
+        else:
+            identity_block = """=== STUDENT PROFILE ===
+No profile information has been set yet.
+
+CRITICAL RULE:
+- If the student asks about themselves ("who am I", "what is my name", etc.), tell them:
+  "I don't have your personal details yet. Please go to **Settings > Profile** and fill in your name and learning goal — then I'll be able to answer personal questions about you!"
+- Do NOT try to infer who the student is from the document content.
+
+===================================================
+
+"""
+
+        base_system_prompt = identity_block + (system_prompt or """You are Lumina IQ, an elite educational intelligence system designed to transform raw study material into clear, structured understanding.
 
 Your objective is NOT just accuracy — it is clarity, usefulness, and insight.
 
 You are given context extracted from user documents. Each excerpt represents a numbered source:
-- First excerpt → Source 1 → cite as 
-- Second excerpt → Source 2 → cite as 
+- First excerpt → Source 1 → cite as <source 1>
+- Second excerpt → Source 2 → cite as <source 2>
 ...and so on.
 
 ---
@@ -108,7 +134,7 @@ CORE DIRECTIVES:
 ---
 
 2. CITATIONS (IMPORTANT BUT NOT PARALYZING)
-- Use citation format: , 
+- Use citation format: <source 1>, <source 2>
 - Place citations inline next to facts.
 - If a statement clearly comes from context → cite it.
 - If citation is slightly uncertain → still answer, but prioritize clarity over rigid citation.
@@ -172,16 +198,12 @@ FINAL RULE:
 Your job is not to prove correctness.
 
 Your job is to make the user understand.
+""")
 
----
-
-Context:
-{context}
-"""
 
         prompt = ChatPromptTemplate.from_messages(
             [
-                ("system", system_prompt),
+                ("system", base_system_prompt),
                 MessagesPlaceholder(variable_name="chat_history"),
                 ("human", "{input}"),
             ]
@@ -199,11 +221,13 @@ Context:
         question: str,
         selected_documents: Optional[List[str]] = None,
         chat_history: List[Dict[str, str]] = [],
+        system_prompt: Optional[str] = None,
+        user_context: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Generate answer using RAG pipeline (LangChain) with retry logic"""
         try:
             collection_name = f"project_{project_id}"
-            chain = self._get_retrieval_chain(collection_name, selected_documents)
+            chain = self._get_retrieval_chain(collection_name, selected_documents, system_prompt, user_context)
 
             # Convert history to LangChain format
             history_messages = []
@@ -273,6 +297,8 @@ Context:
         question: str,
         selected_documents: Optional[List[str]] = None,
         chat_history: List[Dict[str, str]] = [],
+        system_prompt: Optional[str] = None,
+        user_context: Optional[str] = None,
     ):
         """Generate answer using RAG pipeline with streaming (LangChain) - Optimized with retry"""
         max_retries = 3
@@ -304,7 +330,7 @@ Context:
 
         for attempt in range(max_retries):
             try:
-                chain = self._get_retrieval_chain(collection_name, selected_documents)
+                chain = self._get_retrieval_chain(collection_name, selected_documents, system_prompt, user_context)
                 sources_data = []
                 has_yielded = False
 
@@ -388,6 +414,8 @@ Context:
                             question=question,
                             selected_documents=selected_documents,
                             chat_history=chat_history,
+                            system_prompt=system_prompt,
+                            user_context=user_context,
                         )
                         yield result["answer"]
                         import json
