@@ -66,7 +66,7 @@ api.interceptors.response.use(
 
                 if (session?.access_token) {
                     // Exchange the fresh Supabase token for a new app JWT
-                    const resp = await api.post('/auth/google', {
+                    const resp = await api.post(''/api/v1/auth/google'', {
                         access_token: session.access_token
                     });
                     const newToken = resp.data?.access_token;
@@ -133,7 +133,7 @@ export const signup = async (email, password, fullName) => {
 };
 
 export const loginWithGoogle = async (accessToken) => {
-    const response = await api.post('/auth/google', { access_token: accessToken });
+    const response = await api.post(''/api/v1/auth/google'', { access_token: accessToken });
     return response.data;
 };
 
