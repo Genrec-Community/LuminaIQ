@@ -1,4 +1,3 @@
-from langchain_openai import OpenAIEmbeddings
 from config.settings import settings
 from typing import List
 from utils.logger import logger
@@ -11,6 +10,9 @@ class EmbeddingService:
     """
     High-performance embedding service with dedicated thread pool.
 
+    Uses AzureOpenAIEmbeddings via langchain_openai, backed by the Azure
+    OpenAI resource endpoint and API key from settings.
+
     Optimizations:
     - Dedicated thread pool (not shared default executor)
     - Configurable worker count for parallel API calls
@@ -22,13 +24,18 @@ class EmbeddingService:
     MAX_WORKERS_SEARCH = 2
 
     def __init__(self):
-        os.environ["OPENAI_API_KEY"] = settings.EMBEDDING_API_KEY
-        
-        self.embeddings = OpenAIEmbeddings(
+        from langchain_openai import AzureOpenAIEmbeddings
+
+        self.embeddings = AzureOpenAIEmbeddings(
             model=settings.EMBEDDING_MODEL,
-            openai_api_key=settings.EMBEDDING_API_KEY,
-            openai_api_base=settings.EMBEDDING_BASE_URL
+            azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
+            api_key=settings.AZURE_OPENAI_API_KEY,
+            openai_api_version=settings.AZURE_OPENAI_API_VERSION,
+            # Azure deployment name for embeddings; defaults to the model name
+            # if your resource uses the model name as the deployment name.
+            azure_deployment=settings.AZURE_OPENAI_EMBED_DEPLOYMENT,
         )
+
         # Dedicated thread pool for batch embedding calls (document processing)
         self._batch_executor = ThreadPoolExecutor(
             max_workers=self.MAX_WORKERS_BATCH, thread_name_prefix="embed_batch"
@@ -37,16 +44,18 @@ class EmbeddingService:
         self._search_executor = ThreadPoolExecutor(
             max_workers=self.MAX_WORKERS_SEARCH, thread_name_prefix="embed_search"
         )
-        logger.info(f"[EmbeddingService] Initialized with {self.MAX_WORKERS_BATCH} batch workers and {self.MAX_WORKERS_SEARCH} search workers")
-    
-
+        logger.info(
+            f"[EmbeddingService] Initialized with AzureOpenAIEmbeddings "
+            f"| model={settings.EMBEDDING_MODEL} "
+            f"| deployment={settings.AZURE_OPENAI_EMBED_DEPLOYMENT} "
+            f"| {self.MAX_WORKERS_BATCH} batch workers / {self.MAX_WORKERS_SEARCH} search workers"
+        )
 
     async def generate_embeddings(self, texts: List[str]) -> List[List[float]]:
         """
         Generate embeddings for a batch of texts (documents/passages).
 
         Uses dedicated thread pool for faster concurrent API calls.
-        E5 instruct models require 'passage: ' prefix for document chunks.
         """
         try:
             if not texts:
@@ -66,10 +75,7 @@ class EmbeddingService:
             raise
 
     async def generate_embedding(self, text: str) -> List[float]:
-        """Generate embedding for a single text (search query).
-        
-        E5 instruct models require 'query: ' prefix for search queries.
-        """
+        """Generate embedding for a single text (search query)."""
         try:
             loop = asyncio.get_running_loop()
             return await loop.run_in_executor(

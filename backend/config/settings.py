@@ -19,15 +19,15 @@ class Settings(BaseSettings):
     AZURE_OPENAI_API_VERSION: str = "2024-12-01-preview"
 
     # Deployment name in Azure (your .env uses AZURE_OPENAI_DEPLOYMENT)
-    AZURE_OPENAI_DEPLOYMENT: str = "gpt4o"
+    AZURE_OPENAI_DEPLOYMENT: str = "gpt-4.1-mini"
 
     # Alias kept for backward-compat with any service that imports this name
     @property
     def AZURE_OPENAI_CHAT_DEPLOYMENT(self) -> str:
         return self.AZURE_OPENAI_DEPLOYMENT
 
-    # Embedding deployment (optional — currently using Together AI)
-    AZURE_OPENAI_EMBED_DEPLOYMENT: str = "text-embedding-3-large"
+    # Embedding deployment name (Azure OpenAI — text-embedding-3-small)
+    AZURE_OPENAI_EMBED_DEPLOYMENT: str = "text-embedding-3-small"
 
     # ─────────────────────────────────────────────────────────
     # Legacy OpenAI-compatible LLM fields
@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     # ─────────────────────────────────────────────────────────
     LLM_API_KEY: str = Field(default="")
     LLM_BASE_URL: str = Field(default="")
-    LLM_MODEL: str = Field(default="gpt4o")
+    LLM_MODEL: str = Field(default="gpt-4.1-mini")
 
     # Webhook
     MAIN_API_WEBHOOK_SECRET: str = Field(default="supersecretwebhook")
