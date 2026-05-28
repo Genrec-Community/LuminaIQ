@@ -16,30 +16,44 @@ from typing import List, Dict
 from utils.logger import logger
 
 
-def _build_client(temperature: float = 0.7, max_tokens: int = 4000):
+def _build_client(
+    temperature: float = 0.7,
+    max_tokens: int = 4000,
+):
     """
-    Returns either an AzureChatOpenAI or ChatOpenAI client
-    depending on which credentials are populated in settings.
+    Returns either:
+    - AzureChatOpenAI (preferred)
+    - ChatOpenAI fallback for legacy providers
     """
-    if settings.AZURE_OPENAI_ENDPOINT and settings.AZURE_OPENAI_API_KEY:
-        # Use ChatOpenAI compatible client because the provided endpoint/key 
-        # behaves like a standard OpenAI proxy (GitHub Models / Azure Global)
-        from langchain_openai import ChatOpenAI
+
+    # Azure OpenAI
+    if (
+        settings.AZURE_OPENAI_ENDPOINT
+        and settings.AZURE_OPENAI_API_KEY
+    ):
+        from langchain_openai import AzureChatOpenAI
+
         logger.debug(
-            f"[LLMService] Using Azure/GitHub Proxy ChatOpenAI — "
+            f"[LLMService] Using Azure OpenAI | "
             f"deployment={settings.AZURE_OPENAI_DEPLOYMENT}"
         )
-        return ChatOpenAI(
-            model=settings.AZURE_OPENAI_DEPLOYMENT,
-            openai_api_base=settings.AZURE_OPENAI_ENDPOINT,
-            openai_api_key=settings.AZURE_OPENAI_API_KEY,
+
+        return AzureChatOpenAI(
+            azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
+            api_key=settings.AZURE_OPENAI_API_KEY,
+            azure_deployment=settings.AZURE_OPENAI_DEPLOYMENT,
+            api_version=settings.AZURE_OPENAI_API_VERSION,
             temperature=temperature,
             max_tokens=max_tokens,
         )
 
-    # Fallback: legacy OpenAI-compatible (Groq etc.)
+    # Fallback OpenAI-compatible providers
     from langchain_openai import ChatOpenAI
-    logger.warning("[LLMService] Azure vars not set — falling back to ChatOpenAI")
+
+    logger.warning(
+        "[LLMService] Azure OpenAI not configured — using fallback ChatOpenAI"
+    )
+
     return ChatOpenAI(
         model=settings.LLM_MODEL or "gpt-3.5-turbo",
         openai_api_key=settings.LLM_API_KEY,
@@ -47,7 +61,6 @@ def _build_client(temperature: float = 0.7, max_tokens: int = 4000):
         temperature=temperature,
         max_tokens=max_tokens,
     )
-
 
 def _convert_messages(messages: List[Dict[str, str]]):
     """Convert dict messages to LangChain message objects."""
