@@ -272,3 +272,35 @@ Before running the deployment command, you must create a resource group, contain
 | **OCR / PDF Upload Fails (500 Error)** | Missing system OCR packages | Ensure backend is deployed via **Docker** (`backend/Dockerfile`) which contains `poppler-utils` and `tesseract-ocr`. |
 | **Supabase Auth Redirect 404** | Site URL not whitelisted in Supabase | In Supabase Dashboard → **Authentication** → **URL Configuration**, add your deployed Vercel/Azure domain to **Redirect URLs**. |
 | **504 Gateway Timeout on AI Generation** | Reverse proxy timeout exceeded | Long LLM operations stream progress. Ensure reverse proxy timeout is set to at least 90 seconds (Azure Container Apps default is 300s). |
+
+---
+
+## 6. Configuring Your Custom Domain (`luminaiq.com`)
+
+If you own the custom domain **`luminaiq.com`**, follow these steps to connect your domain:
+
+### 1. Linking `luminaiq.com` to Your Frontend (Vercel or Azure Static Web Apps)
+- **If hosted on Vercel**:
+  1. Go to **Vercel Dashboard** → Your Project → **Settings** → **Domains**.
+  2. Add `luminaiq.com` and `www.luminaiq.com`.
+  3. In your domain registrar (GoDaddy, Namecheap, Cloudflare, etc.), add the DNS records shown by Vercel:
+     - **A Record**: Host `@` → Value `76.76.21.21`
+     - **CNAME Record**: Host `www` → Value `cname.vercel-dns.com`
+- **If hosted on Azure Static Web Apps**:
+  1. Go to **Azure Portal** → Your Static Web App → **Custom Domains** → **Add**.
+  2. Enter `luminaiq.com` and follow the TXT/CNAME validation prompt to verify ownership.
+
+### 2. Linking `api.luminaiq.com` to Your Azure Container App Backend (Optional)
+If you want your API served from a clean subdomain:
+1. In Azure Portal → **Azure Container Apps** (`luminaiq-backend`) → **Custom domains** → **Add custom domain**.
+2. Add `api.luminaiq.com`.
+3. Create a **CNAME Record** in your domain DNS:
+   - **Host**: `api`
+   - **Value**: Your Container App FQDN (`luminaiq-backend.<hash>.centralindia.azurecontainerapps.io`)
+
+### 3. Required CORS & Authentication Configuration
+Whenever using `luminaiq.com`, ensure:
+- Your backend `BACKEND_CORS_ORIGINS` includes: `https://luminaiq.com,https://www.luminaiq.com`
+- In **Supabase Dashboard** → **Authentication** → **URL Configuration**:
+  - Set **Site URL** to `https://luminaiq.com`
+  - Add `https://luminaiq.com/**` and `https://www.luminaiq.com/**` to **Redirect URLs**.
