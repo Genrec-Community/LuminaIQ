@@ -2,9 +2,14 @@ Write-Host "====================================================================
 Write-Host "LuminaIQ - Azure Container Apps Deployment Script (PowerShell)"
 Write-Host "=============================================================================="
 
+Write-Host "[1/2] Creating Azure Container App Environment 'luminaiq-env'..."
+az containerapp env create --name luminaiq-env --resource-group LuminaIQ-RG --location centralindia
+
+Write-Host "[2/2] Creating Azure Container App 'luminaiq-backend'..."
 az containerapp create `
   --name luminaiq-backend `
   --resource-group LuminaIQ-RG `
+  --environment luminaiq-env `
   --image luminaiqacr.azurecr.io/luminaiq-backend:latest `
   --target-port 8000 `
   --ingress external `

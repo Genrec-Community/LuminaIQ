@@ -216,12 +216,15 @@ Before running the deployment command, you must create a resource group, contain
    ```
    *(Alternatively, if using local Docker Desktop: `docker build -t luminaiq-backend ./backend` followed by `az acr login --name luminaiqacr`, tag and push).*
 
-5. **Deploy to Azure Container Apps**:
+5. **Create Container Apps Environment & Deploy to Azure Container Apps**:
    Now that your image is built and stored in ACR, run:
    ```powershell
+   az containerapp env create --name luminaiq-env --resource-group LuminaIQ-RG --location centralindia
+
    az containerapp create `
      --name luminaiq-backend `
      --resource-group LuminaIQ-RG `
+     --environment luminaiq-env `
      --image luminaiqacr.azurecr.io/luminaiq-backend:latest `
      --target-port 8000 `
      --ingress 'external' `

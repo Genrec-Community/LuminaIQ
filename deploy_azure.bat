@@ -3,10 +3,14 @@ echo ===========================================================================
 echo LuminaIQ - Azure Container Apps Deployment Script (Windows CMD)
 echo ==============================================================================
 
-echo [1/3] Creating Azure Container App 'luminaiq-backend'...
+echo [1/2] Creating Azure Container App Environment 'luminaiq-env'...
+az containerapp env create --name luminaiq-env --resource-group LuminaIQ-RG --location centralindia
+
+echo [2/2] Creating Azure Container App 'luminaiq-backend'...
 az containerapp create ^
   --name luminaiq-backend ^
   --resource-group LuminaIQ-RG ^
+  --environment luminaiq-env ^
   --image luminaiqacr.azurecr.io/luminaiq-backend:latest ^
   --target-port 8000 ^
   --ingress external ^
