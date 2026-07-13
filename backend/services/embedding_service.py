@@ -24,17 +24,42 @@ class EmbeddingService:
     MAX_WORKERS_SEARCH = 2
 
     def __init__(self):
-        from langchain_openai import AzureOpenAIEmbeddings
+        azure_key = settings.AZURE_OPENAI_API_KEY or settings.MODEL_API_KEY
+        if settings.AZURE_OPENAI_ENDPOINT and azure_key:
+            from langchain_openai import AzureOpenAIEmbeddings
 
-        self.embeddings = AzureOpenAIEmbeddings(
-            model=settings.EMBEDDING_MODEL,
-            azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
-            api_key=settings.AZURE_OPENAI_API_KEY,
-            openai_api_version=settings.AZURE_OPENAI_API_VERSION,
-            # Azure deployment name for embeddings; defaults to the model name
-            # if your resource uses the model name as the deployment name.
-            azure_deployment=settings.AZURE_OPENAI_EMBED_DEPLOYMENT,
-        )
+            self.embeddings = AzureOpenAIEmbeddings(
+                model=settings.EMBEDDING_MODEL,
+                azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
+                api_key=azure_key,
+                openai_api_version=settings.AZURE_OPENAI_API_VERSION,
+                azure_deployment=settings.AZURE_OPENAI_EMBED_DEPLOYMENT,
+            )
+            logger.info(
+                f"[EmbeddingService] Initialized with AzureOpenAIEmbeddings "
+                f"| model={settings.EMBEDDING_MODEL} "
+                f"| deployment={settings.AZURE_OPENAI_EMBED_DEPLOYMENT}"
+            )
+        else:
+            from langchain_openai import OpenAIEmbeddings
+
+            fallback_key = (
+                settings.EMBEDDING_API_KEY
+                or settings.MODEL_API_KEY
+                or settings.LLM_API_KEY
+                or settings.AZURE_OPENAI_API_KEY
+            )
+            fallback_base = settings.EMBEDDING_BASE_URL or settings.LLM_BASE_URL or None
+
+            self.embeddings = OpenAIEmbeddings(
+                model=settings.EMBEDDING_MODEL or "text-embedding-3-small",
+                openai_api_key=fallback_key,
+                openai_api_base=fallback_base,
+            )
+            logger.info(
+                f"[EmbeddingService] Initialized with fallback OpenAIEmbeddings "
+                f"| model={settings.EMBEDDING_MODEL}"
+            )
 
         # Dedicated thread pool for batch embedding calls (document processing)
         self._batch_executor = ThreadPoolExecutor(
@@ -43,12 +68,6 @@ class EmbeddingService:
         # Dedicated thread pool for search queries (user-facing, prevents starvation)
         self._search_executor = ThreadPoolExecutor(
             max_workers=self.MAX_WORKERS_SEARCH, thread_name_prefix="embed_search"
-        )
-        logger.info(
-            f"[EmbeddingService] Initialized with AzureOpenAIEmbeddings "
-            f"| model={settings.EMBEDDING_MODEL} "
-            f"| deployment={settings.AZURE_OPENAI_EMBED_DEPLOYMENT} "
-            f"| {self.MAX_WORKERS_BATCH} batch workers / {self.MAX_WORKERS_SEARCH} search workers"
         )
 
     async def generate_embeddings(self, texts: List[str]) -> List[List[float]]:

@@ -1,13 +1,18 @@
 from pydantic_settings import BaseSettings
-from pydantic import Field
-from typing import Optional, List
+from pydantic import Field, field_validator
+from typing import Optional, List, Union
 
 
 class Settings(BaseSettings):
     # Supabase Configuration
-    SUPABASE_URL: str
-    SUPABASE_KEY: str
-    SUPABASE_SERVICE_KEY: str
+    SUPABASE_URL: str = Field(default="")
+    SUPABASE_KEY: str = Field(default="")
+    SUPABASE_SERVICE_KEY: str = Field(default="")
+
+    # ─────────────────────────────────────────────────────────
+    # Unified / Single Variable for Model API Key
+    # ─────────────────────────────────────────────────────────
+    MODEL_API_KEY: Optional[str] = None
 
     # ─────────────────────────────────────────────────────────
     # Azure OpenAI (primary LLM — used for chat, topics, graph)
@@ -19,7 +24,7 @@ class Settings(BaseSettings):
     AZURE_OPENAI_API_VERSION: str = "2024-12-01-preview"
 
     # Deployment name in Azure (your .env uses AZURE_OPENAI_DEPLOYMENT)
-    AZURE_OPENAI_DEPLOYMENT: str = "gpt-4.1-mini"
+    AZURE_OPENAI_DEPLOYMENT: str = "gpt-5-mini"
 
     # Alias kept for backward-compat with any service that imports this name
     @property
@@ -43,11 +48,11 @@ class Settings(BaseSettings):
     MAIN_API_WEBHOOK_URL: str = Field(default="http://localhost:8000/api/v1/webhook/document-ready")
 
     # ─────────────────────────────────────────────────────────
-    # Embeddings — Azure OpenAI (text-embedding-3-small)
+    # Embeddings — Azure OpenAI / OpenAI-compatible
     # ─────────────────────────────────────────────────────────
-    EMBEDDING_API_KEY: str
-    EMBEDDING_BASE_URL: str
-    EMBEDDING_MODEL: str
+    EMBEDDING_API_KEY: str = Field(default="")
+    EMBEDDING_BASE_URL: str = Field(default="")
+    EMBEDDING_MODEL: str = Field(default="text-embedding-3-small")
     EMBEDDING_DIMENSION: int = 1536
 
     # ─────────────────────────────────────────────────────────
@@ -82,6 +87,19 @@ class Settings(BaseSettings):
         "https://lumina-iq-livid.vercel.app",
         "https://luminaiq.fun",
     ]
+
+    @field_validator("BACKEND_CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
+        if isinstance(v, str):
+            if v.startswith("["):
+                import json
+                try:
+                    return json.loads(v)
+                except Exception:
+                    pass
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v
 
     UPLOAD_DIR: str = "./uploads"
     MAX_FILE_SIZE: int = 10485760  # 10MB

@@ -26,10 +26,13 @@ def _build_client(
     - ChatOpenAI fallback for legacy providers
     """
 
+    # Resolve API Key: support unified MODEL_API_KEY or explicit keys
+    azure_api_key = settings.AZURE_OPENAI_API_KEY or settings.MODEL_API_KEY
+
     # Azure OpenAI
     if (
         settings.AZURE_OPENAI_ENDPOINT
-        and settings.AZURE_OPENAI_API_KEY
+        and azure_api_key
     ):
         from langchain_openai import AzureChatOpenAI
 
@@ -40,7 +43,7 @@ def _build_client(
 
         return AzureChatOpenAI(
             azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
-            api_key=settings.AZURE_OPENAI_API_KEY,
+            api_key=azure_api_key,
             azure_deployment=settings.AZURE_OPENAI_DEPLOYMENT,
             api_version=settings.AZURE_OPENAI_API_VERSION,
             temperature=temperature,
@@ -54,9 +57,15 @@ def _build_client(
         "[LLMService] Azure OpenAI not configured — using fallback ChatOpenAI"
     )
 
+    fallback_api_key = (
+        settings.LLM_API_KEY
+        or settings.MODEL_API_KEY
+        or settings.AZURE_OPENAI_API_KEY
+    )
+
     return ChatOpenAI(
-        model=settings.LLM_MODEL or "gpt-3.5-turbo",
-        openai_api_key=settings.LLM_API_KEY,
+        model=settings.LLM_MODEL or "gpt-4.1-mini",
+        openai_api_key=fallback_api_key,
         openai_api_base=settings.LLM_BASE_URL or None,
         temperature=temperature,
         max_tokens=max_tokens,
@@ -87,7 +96,10 @@ class LLMService:
     RETRY_TOKEN_MULTIPLIER = 3
 
     def __init__(self):
-        using_azure = bool(settings.AZURE_OPENAI_ENDPOINT and settings.AZURE_OPENAI_API_KEY)
+        using_azure = bool(
+            settings.AZURE_OPENAI_ENDPOINT
+            and (settings.AZURE_OPENAI_API_KEY or settings.MODEL_API_KEY)
+        )
         if using_azure:
             logger.info(
                 f"[LLMService] Initialized with Azure OpenAI — "
