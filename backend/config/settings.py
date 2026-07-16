@@ -1,6 +1,32 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, DotEnvSettingsSource, EnvSettingsSource
 from pydantic import Field, field_validator
-from typing import Optional, List, Union
+from typing import Optional, List, Union, Any
+
+
+class CustomDotEnvSettingsSource(DotEnvSettingsSource):
+    def decode_complex_value(self, field_name: str, field: Any, value: Any) -> Any:
+        if field_name == "BACKEND_CORS_ORIGINS" and isinstance(value, str):
+            if not value.strip().startswith("["):
+                return [origin.strip() for origin in value.split(",") if origin.strip()]
+        try:
+            return super().decode_complex_value(field_name, field, value)
+        except Exception:
+            if isinstance(value, str):
+                return [origin.strip() for origin in value.split(",") if origin.strip()]
+            raise
+
+
+class CustomEnvSettingsSource(EnvSettingsSource):
+    def decode_complex_value(self, field_name: str, field: Any, value: Any) -> Any:
+        if field_name == "BACKEND_CORS_ORIGINS" and isinstance(value, str):
+            if not value.strip().startswith("["):
+                return [origin.strip() for origin in value.split(",") if origin.strip()]
+        try:
+            return super().decode_complex_value(field_name, field, value)
+        except Exception:
+            if isinstance(value, str):
+                return [origin.strip() for origin in value.split(",") if origin.strip()]
+            raise
 
 
 class Settings(BaseSettings):
@@ -76,12 +102,14 @@ class Settings(BaseSettings):
     # Application
     # ─────────────────────────────────────────────────────────
     ENVIRONMENT: str = "development"
+    PORT: int = 8000
+    HOST: str = "0.0.0.0"
     SECRET_KEY: str = "supersecretkey"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8  # 8 days
 
     # CORS
-    BACKEND_CORS_ORIGINS: List[str] = [
+    BACKEND_CORS_ORIGINS: Union[List[str], str] = [
         "http://localhost:5173",
         "http://localhost:3000",
         "https://lumina-iq-livid.vercel.app",
@@ -145,9 +173,32 @@ class Settings(BaseSettings):
     BOOK_STORE_MAX_DESCRIPTION: int = 2000
     BOOK_IMPORT_TEXTS_BUCKET: str = "texts"   # Supabase bucket for extracted .txt files
 
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        return (
+            init_settings,
+            CustomEnvSettingsSource(settings_cls),
+            CustomDotEnvSettingsSource(
+                settings_cls,
+                env_file=dotenv_settings.env_file,
+                env_file_encoding=dotenv_settings.env_file_encoding,
+                case_sensitive=dotenv_settings.case_sensitive,
+                env_prefix=dotenv_settings.env_prefix,
+            ),
+            file_secret_settings,
+        )
+
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "ignore"
 
 
 settings = Settings()
