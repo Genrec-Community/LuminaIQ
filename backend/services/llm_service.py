@@ -102,11 +102,11 @@ class LLMService:
         )
         if using_azure:
             logger.info(
-                f"[LLMService] Initialized with Azure OpenAI — "
+                f"[LLMService] Initialized with Azure OpenAI | "
                 f"deployment={settings.AZURE_OPENAI_DEPLOYMENT}"
             )
         else:
-            logger.warning("[LLMService] Azure OpenAI not configured — using fallback LLM.")
+            logger.warning("[LLMService] Azure OpenAI not configured | using fallback LLM.")
 
     def _get_client(self, temperature: float = 0.7, max_tokens: int = 4000):
         return _build_client(temperature=temperature, max_tokens=max_tokens)
