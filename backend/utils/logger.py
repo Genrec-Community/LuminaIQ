@@ -65,15 +65,21 @@ def setup_logger(name: str = "lumina") -> logging.Logger:
     """
     Setup application logger with filtering and coloring.
     """
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
 
     if not logger.handlers:
         handler = logging.StreamHandler(sys.stdout)
 
-        # Use colored formatter
+        # Use colored formatter with standard ASCII pipe to prevent Windows cp1252 charmap errors
         formatter = ColoredFormatter(
-            "%(asctime)s │ %(levelname)-8s │ %(message)s", datefmt="%H:%M:%S"
+            "%(asctime)s | %(levelname)-8s | %(message)s", datefmt="%H:%M:%S"
         )
         handler.setFormatter(formatter)
         logger.addHandler(handler)
