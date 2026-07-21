@@ -10,7 +10,7 @@ import Dashboard from './pages/Dashboard';
 import ProjectView from './pages/ProjectView';
 import Settings from './pages/Settings';
 import BookStore from './pages/BookStore';
-
+import Landing from './pages/Landing';
 
 function App() {
     return (
@@ -20,6 +20,7 @@ function App() {
                     <ToastProvider>
                         <Router>
                             <Routes>
+                                <Route path="/" element={<Landing />} />
                                 <Route path="/login" element={<Login />} />
                                 
                                 {/* Protected Routes */}
@@ -29,8 +30,6 @@ function App() {
                                     <Route path="/settings" element={<Settings />} />
                                     <Route path="/bookstore" element={<BookStore />} />
                                 </Route>
-
-                                <Route path="/" element={<Navigate to="/dashboard" replace />} />
                             </Routes>
                         </Router>
                         <XPToast />

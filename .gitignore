@@ -351,3 +351,14 @@ nul
 # LuminaIQ temp files
 backend/temp/
 *.pdf
+
+# Workspace and temporary scripts
+workspace-*
+backend/check_*.py
+backend/test_*.py
+backend/run_container_test.bat
+backend/container_logs.txt
+*.yaml
+frontend/migrate.py
+update_qdrant.py
+fix_yaml.py

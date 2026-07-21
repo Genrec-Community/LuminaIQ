@@ -289,7 +289,14 @@ Your job is to make the user understand.
 
         except Exception as e:
             logger.error(f"Error in RAG pipeline: {str(e)}")
-            raise
+            
+            friendly_message = str(e)
+            if "Not found: Collection" in str(e) or "doesn't exist" in str(e):
+                friendly_message = "Document chunks are still processing or failed to upload. Please try re-uploading the document if this persists."
+            elif "Connection error" in str(e) or "APIConnectionError" in str(e):
+                friendly_message = "Failed to connect to the AI service. Please check your backend configuration or try again later."
+                
+            raise Exception(friendly_message)
 
     async def get_answer_stream(
         self,
@@ -428,7 +435,14 @@ Your job is to make the user understand.
                         return
 
                 logger.error(f"Error in RAG stream: {str(e)}")
-                yield f"Error: {str(e)}"
+                
+                friendly_message = str(e)
+                if "Not found: Collection" in str(e) or "doesn't exist" in str(e):
+                    friendly_message = "Document chunks are still processing or failed to upload. Please try re-uploading the document if this persists."
+                elif "Connection error" in str(e) or "APIConnectionError" in str(e):
+                    friendly_message = "Failed to connect to the AI service. Please check your backend configuration or try again later."
+                
+                yield f"Error: {friendly_message}"
                 return
 
     async def generate_summary(

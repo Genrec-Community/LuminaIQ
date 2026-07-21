@@ -455,9 +455,9 @@ class DocumentService:
         await asyncio.gather(*tasks)
 
         if failed_batches:
-            logger.warning(
-                f"[{filename}] Completed with {len(failed_batches)} failed batches: {failed_batches}"
-            )
+            error_msg = f"Embedding completed with {len(failed_batches)} failed batches."
+            logger.error(f"[{filename}] {error_msg}")
+            raise Exception(error_msg)
         else:
             logger.info(f"[{filename}] Embedding completed: {total_batches} batches")
 

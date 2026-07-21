@@ -39,24 +39,23 @@ class QdrantService:
     GRPC_OPTIONS = {
         "grpc.max_send_message_length": 64 * 1024 * 1024,   # 64MB
         "grpc.max_receive_message_length": 64 * 1024 * 1024, # 64MB
-        "grpc.keepalive_time_ms": 30000,                     # 30s keepalive
-        "grpc.keepalive_timeout_ms": 10000,                   # 10s timeout
     }
 
     def __init__(self):
         # Async client for all direct operations — does NOT block the event loop
-        self.async_client = AsyncQdrantClient(
-            url=settings.QDRANT_URL,
-            api_key=settings.QDRANT_API_KEY,
-            timeout=self.ASYNC_TIMEOUT,
-            grpc_options=self.GRPC_OPTIONS,
-        )
+        # Initialize async client using default REST or whatever qdrant_client defaults to
+        kwargs = {
+            "url": settings.QDRANT_URL,
+            "api_key": settings.QDRANT_API_KEY,
+            "timeout": self.ASYNC_TIMEOUT,
+        }
+
+        self.async_client = AsyncQdrantClient(**kwargs)
         # Sync client kept ONLY for LangChain QdrantVectorStore compatibility
         self._sync_client = QdrantClient(
             url=settings.QDRANT_URL,
             api_key=settings.QDRANT_API_KEY,
             timeout=self.SYNC_TIMEOUT,
-            grpc_options=self.GRPC_OPTIONS,
         )
         logger.info(
             f"[QdrantService] Initialized with AsyncQdrantClient | "
