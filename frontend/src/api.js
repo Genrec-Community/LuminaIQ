@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Fallback to localhost so a missing VITE_MAIN_API_URL env var doesn't silently
 // send every request to '/undefined/...' on deployed builds.
-export const API_URL = import.meta.env.VITE_MAIN_API_URL || 'http://localhost:8000/api/v1';
+export const API_URL = 'https://luminaiq-backend-api.azurewebsites.net/api/v1';
 
 export const api = axios.create({
     baseURL: API_URL,
