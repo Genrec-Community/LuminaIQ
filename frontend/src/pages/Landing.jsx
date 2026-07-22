@@ -789,7 +789,7 @@ function Pricing() {
 /* ─────────────────────────  faq  ─────────────────────────── */
 
 function FAQ() {
-  const [openIndex, setOpenIndex] = React.useState<number | null>(0);
+  const [openIndex, setOpenIndex] = React.useState(0);
 
   return (
     <section id="faq" className="relative py-20 sm:py-28">
