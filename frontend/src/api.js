@@ -9,7 +9,7 @@ export const api = axios.create({
     headers: {
         'Content-Type': 'application/json',
     },
-    timeout: 60000, // 60s — handles cloud cold starts (Azure App Service can take 30-50s to wake)
+    timeout: 180000, // 180s — allows long-running LLM requests for building Knowledge Graph
 });
 
 // Inject auth token on every request from localStorage.
