@@ -1424,7 +1424,7 @@ const ProjectView = () => {
                                                                 }
                                                             }}
                                                         >
-                                                            {msg.content}
+                                                            {msg.role === 'assistant' ? msg.content.replace(/(?:&lt;|<|\[)?source\s+(\d+)(?:&gt;|>|\])?/gi, '[$1]($1)') : msg.content}
                                                         </ReactMarkdown>
                                                     </div>
                                                 ) : (
@@ -1885,8 +1885,16 @@ const ProjectView = () => {
 
                                             {/* Document Info */}
                                             <div className="flex-1 min-w-0">
-                                                <p className={`text-sm font-medium truncate leading-tight ${isSelected ? 'text-[#4A3B32]' : 'text-[#5a4a42]'
-                                                    }`}>
+                                                <p 
+                                                    onClick={(e) => {
+                                                        if (!isReady) return;
+                                                        e.stopPropagation();
+                                                        handleOpenSource({ doc_id: doc.id, doc_name: doc.filename });
+                                                    }}
+                                                    className={`text-sm font-medium truncate leading-tight hover:underline cursor-pointer ${isSelected ? 'text-[#4A3B32]' : 'text-[#5a4a42]'
+                                                    }`}
+                                                    title="Click to view document"
+                                                >
                                                     {doc.filename}
                                                 </p>
                                                 <div className="flex items-center gap-2 mt-1">
@@ -1914,17 +1922,31 @@ const ProjectView = () => {
                                                 </div>
                                             </div>
 
-                                            {/* Delete Button */}
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    requestDelete(doc);
-                                                }}
-                                                className="shrink-0 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-500 text-[#8a6a5c]/50 transition-all"
-                                                title="Delete document"
-                                            >
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                            </button>
+                                            {/* Actions */}
+                                            <div className="flex items-center opacity-0 group-hover:opacity-100 transition-all shrink-0">
+                                                {isReady && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleOpenSource({ doc_id: doc.id, doc_name: doc.filename });
+                                                        }}
+                                                        className="p-1.5 rounded-lg hover:bg-[#E6D5CC]/50 text-[#8a6a5c] transition-all"
+                                                        title="View Document"
+                                                    >
+                                                        <Eye className="h-3.5 w-3.5" />
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        requestDelete(doc);
+                                                    }}
+                                                    className="p-1.5 rounded-lg hover:bg-red-50 hover:text-red-500 text-[#8a6a5c] transition-all"
+                                                    title="Delete document"
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </button>
+                                            </div>
                                         </div>
                                     );
                                 })
