@@ -20,7 +20,7 @@ class EmbeddingService:
     """
 
     # Optimal workers for I/O-bound embedding API calls
-    MAX_WORKERS_BATCH = 3
+    MAX_WORKERS_BATCH = 15  # Increased from 3 to handle large books significantly faster
     MAX_WORKERS_SEARCH = 2
 
     def __init__(self):
