@@ -200,17 +200,29 @@ class FileParser:
 
         Returns extracted text (may be short/empty for scanned PDFs) or None.
         """
-        # Method 1: PyMuPDF4LLM
+        # Check page count to avoid PyMuPDF4LLM slowdowns on large books
         try:
-            import pymupdf4llm
-            logger.info("[FileParser] Trying PyMuPDF4LLM...")
-            text = pymupdf4llm.to_markdown(file_path)
-            if text and text.strip():
-                logger.info(f"[FileParser] PyMuPDF4LLM: {len(text)} chars")
-                return text.strip()
-            logger.warning("[FileParser] PyMuPDF4LLM returned empty text")
-        except Exception as e:
-            logger.warning(f"[FileParser] PyMuPDF4LLM failed: {e}")
+            import fitz
+            doc = fitz.open(file_path)
+            page_count = doc.page_count
+            doc.close()
+        except Exception:
+            page_count = 0
+
+        # Method 1: PyMuPDF4LLM
+        if page_count <= 30:
+            try:
+                import pymupdf4llm
+                logger.info(f"[FileParser] Trying PyMuPDF4LLM ({page_count} pages)...")
+                text = pymupdf4llm.to_markdown(file_path)
+                if text and text.strip():
+                    logger.info(f"[FileParser] PyMuPDF4LLM: {len(text)} chars")
+                    return text.strip()
+                logger.warning("[FileParser] PyMuPDF4LLM returned empty text")
+            except Exception as e:
+                logger.warning(f"[FileParser] PyMuPDF4LLM failed: {e}")
+        else:
+            logger.info(f"[FileParser] Skipping PyMuPDF4LLM (document too large: {page_count} pages)")
 
         # Method 2: PyPDF2
         try:

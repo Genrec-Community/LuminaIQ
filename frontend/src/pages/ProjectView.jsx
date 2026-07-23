@@ -1936,7 +1936,7 @@ const ProjectView = () => {
                                     <p className="text-sm font-medium text-[#8a6a5c]">No documents yet</p>
                                     <p className="text-xs text-[#8a6a5c]/60 mt-1">Upload PDF, TXT, or DOCX files</p>
                                     <button
-                                        onClick={() => setShowRightSidebarUpload(true)}
+                                        onClick={() => setShowAddDocModal(true)}
                                         className="mt-4 px-4 py-2 bg-[#C8A288] text-white text-xs font-semibold rounded-lg hover:bg-[#B08B72] transition-colors shadow-sm"
                                     >
                                         Upload First Document
