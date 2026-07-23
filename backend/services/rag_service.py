@@ -203,7 +203,7 @@ Your job is to make the user understand.
 
         prompt = ChatPromptTemplate.from_messages(
             [
-                ("system", base_system_prompt),
+                ("system", base_system_prompt + "\n\nUse the following context to answer the user's question:\n{context}"),
                 MessagesPlaceholder(variable_name="chat_history"),
                 ("human", "{input}"),
             ]

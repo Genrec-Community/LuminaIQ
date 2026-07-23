@@ -41,14 +41,21 @@ def _build_client(
             f"deployment={settings.AZURE_OPENAI_DEPLOYMENT}"
         )
 
-        return AzureChatOpenAI(
-            azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
-            api_key=azure_api_key,
-            azure_deployment=settings.AZURE_OPENAI_DEPLOYMENT,
-            api_version=settings.AZURE_OPENAI_API_VERSION,
-            temperature=temperature,
-            max_tokens=max_tokens,
-        )
+        kwargs = {
+            "azure_endpoint": settings.AZURE_OPENAI_ENDPOINT,
+            "api_key": azure_api_key,
+            "azure_deployment": settings.AZURE_OPENAI_DEPLOYMENT,
+            "api_version": settings.AZURE_OPENAI_API_VERSION,
+            "max_tokens": max_tokens,
+        }
+        
+        # Models like gpt-5-mini and o1 do not support custom temperatures
+        if "gpt-5-mini" in settings.AZURE_OPENAI_DEPLOYMENT.lower() or "o1" in settings.AZURE_OPENAI_DEPLOYMENT.lower():
+            kwargs["temperature"] = 1.0
+        else:
+            kwargs["temperature"] = temperature
+            
+        return AzureChatOpenAI(**kwargs)
 
     # Fallback OpenAI-compatible providers
     from langchain_openai import ChatOpenAI

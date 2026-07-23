@@ -1,3 +1,17 @@
+import os
+import sys
+
+# Ensure the app root is in PYTHONPATH
+app_root = os.path.dirname(os.path.abspath(__file__))
+if app_root not in sys.path:
+    sys.path.insert(0, app_root)
+
+print(f"DEBUG: CWD is {os.getcwd()}", flush=True)
+print(f"DEBUG: __file__ is {__file__}", flush=True)
+print(f"DEBUG: app_root is {app_root}", flush=True)
+print(f"DEBUG: sys.path is {sys.path}", flush=True)
+print(f"DEBUG: Contents of app_root: {os.listdir(app_root)}", flush=True)
+
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware

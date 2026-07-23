@@ -62,7 +62,7 @@ Return ONLY a valid JSON array of topic strings:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"CONTENT:\n{text[:14000]}"}
             ]
-            response = await llm_service.chat_completion(messages, temperature=0.3, max_tokens=4000)
+            response = await llm_service.chat_completion(messages, max_tokens=4000)
             
             # DIAGNOSTIC: Log raw LLM output
             print("\n====== RAW LLM OUTPUT ======\n")
