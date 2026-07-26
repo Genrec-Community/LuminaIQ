@@ -16,7 +16,7 @@ class UserLogin(BaseModel):
     password: str
 
 
-class GoogleLoginRequest(BaseModel):
+class TokenExchangeRequest(BaseModel):
     access_token: str
 
 

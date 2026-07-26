@@ -5,10 +5,13 @@ import { useAuth } from '../context/AuthContext';
 
 const Login = () => {
     const navigate = useNavigate();
-    const { login, signup, loginWithGoogle } = useAuth();
+    const { login, signup, loginWithGoogle, requestOtp, verifyOtpCode } = useAuth();
     const [isLogin, setIsLogin] = useState(true);
+    const [isOtpMode, setIsOtpMode] = useState(false);
+    const [otpSent, setOtpSent] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [otpCode, setOtpCode] = useState('');
     const [fullName, setFullName] = useState('');
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState(null); // { type: 'success' | 'error', text: '' }
@@ -19,7 +22,22 @@ const Login = () => {
         setMessage(null);
 
         try {
-            if (isLogin) {
+            if (isOtpMode) {
+                if (!otpSent) {
+                    await requestOtp(email);
+                    setOtpSent(true);
+                    setMessage({
+                        type: 'success',
+                        text: 'OTP sent! Please check your email for the 6-digit code.'
+                    });
+                } else {
+                    await verifyOtpCode(email, otpCode);
+                    // The auth listener will exchange the token and redirect,
+                    // but we can also do navigate here if we want to be safe, 
+                    // though AuthContext handles it. We'll just wait.
+                    setMessage({ type: 'success', text: 'Verified! Redirecting...' });
+                }
+            } else if (isLogin) {
                 const success = await login(email, password);
                 if (success) navigate('/dashboard');
             } else {
@@ -75,10 +93,10 @@ const Login = () => {
                             <BookOpen className="h-8 w-8" />
                         </div>
                         <h1 className="text-3xl font-bold mb-2 text-[#4A3B32]">
-                            {isLogin ? 'Welcome Back' : 'Join Lumina IQ'}
+                            {isOtpMode ? 'Passwordless Login' : isLogin ? 'Welcome Back' : 'Join Lumina IQ'}
                         </h1>
                         <p className="text-[#8a6a5c] text-sm">
-                            {isLogin ? 'Enter your credentials to access your workspace' : 'Start your intelligent learning journey today'}
+                            {isOtpMode ? 'We will send a one-time code to your email' : isLogin ? 'Enter your credentials to access your workspace' : 'Start your intelligent learning journey today'}
                         </p>
                     </div>
 
@@ -95,7 +113,7 @@ const Login = () => {
                         )}
 
                         <div className="space-y-4">
-                            {!isLogin && (
+                            {!isLogin && !isOtpMode && (
                                 <div className="relative group">
                                     <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
                                         <User className="h-5 w-5 text-[#8a6a5c] group-focus-within:text-[#C8A288] transition-colors" />
@@ -107,6 +125,7 @@ const Login = () => {
                                         onChange={(e) => setFullName(e.target.value)}
                                         className="w-full pl-12 pr-4 py-4 bg-white border-2 border-[#E6D5CC] rounded-xl outline-none focus:border-[#C8A288] focus:ring-4 focus:ring-[#C8A288]/10 transition-all text-[#4A3B32] placeholder-[#d2bab0] font-medium"
                                         placeholder="Full Name"
+                                        disabled={loading}
                                     />
                                 </div>
                             )}
@@ -122,22 +141,44 @@ const Login = () => {
                                     onChange={(e) => setEmail(e.target.value)}
                                     className="w-full pl-12 pr-4 py-4 bg-white border-2 border-[#E6D5CC] rounded-xl outline-none focus:border-[#C8A288] focus:ring-4 focus:ring-[#C8A288]/10 transition-all text-[#4A3B32] placeholder-[#d2bab0] font-medium"
                                     placeholder="name@example.com"
+                                    disabled={loading || (isOtpMode && otpSent)}
                                 />
                             </div>
 
-                            <div className="relative group">
-                                <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                                    <Lock className="h-5 w-5 text-[#8a6a5c] group-focus-within:text-[#C8A288] transition-colors" />
+                            {!isOtpMode && (
+                                <div className="relative group">
+                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                                        <Lock className="h-5 w-5 text-[#8a6a5c] group-focus-within:text-[#C8A288] transition-colors" />
+                                    </div>
+                                    <input
+                                        type="password"
+                                        required
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        className="w-full pl-12 pr-4 py-4 bg-white border-2 border-[#E6D5CC] rounded-xl outline-none focus:border-[#C8A288] focus:ring-4 focus:ring-[#C8A288]/10 transition-all text-[#4A3B32] placeholder-[#d2bab0] font-medium"
+                                        placeholder="••••••••"
+                                        disabled={loading}
+                                    />
                                 </div>
-                                <input
-                                    type="password"
-                                    required
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full pl-12 pr-4 py-4 bg-white border-2 border-[#E6D5CC] rounded-xl outline-none focus:border-[#C8A288] focus:ring-4 focus:ring-[#C8A288]/10 transition-all text-[#4A3B32] placeholder-[#d2bab0] font-medium"
-                                    placeholder="••••••••"
-                                />
-                            </div>
+                            )}
+
+                            {isOtpMode && otpSent && (
+                                <div className="relative group">
+                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                                        <Lock className="h-5 w-5 text-[#8a6a5c] group-focus-within:text-[#C8A288] transition-colors" />
+                                    </div>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={otpCode}
+                                        onChange={(e) => setOtpCode(e.target.value)}
+                                        className="w-full pl-12 pr-4 py-4 bg-white border-2 border-[#E6D5CC] rounded-xl outline-none focus:border-[#C8A288] focus:ring-4 focus:ring-[#C8A288]/10 transition-all text-[#4A3B32] placeholder-[#d2bab0] font-medium tracking-widest text-center"
+                                        placeholder="123456"
+                                        maxLength={6}
+                                        disabled={loading}
+                                    />
+                                </div>
+                            )}
                         </div>
 
                         <button
@@ -149,7 +190,7 @@ const Login = () => {
                                 <Loader2 className="h-6 w-6 animate-spin" />
                             ) : (
                                 <>
-                                    {isLogin ? 'Sign In' : 'Create Account'}
+                                    {isOtpMode ? (otpSent ? 'Verify OTP' : 'Send Code') : isLogin ? 'Sign In' : 'Create Account'}
                                     <ArrowRight className="h-5 w-5" />
                                 </>
                             )}
@@ -183,19 +224,35 @@ const Login = () => {
                         Google
                     </button>
 
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setIsOtpMode(!isOtpMode);
+                            setOtpSent(false);
+                            setMessage(null);
+                        }}
+                        disabled={loading}
+                        className="w-full mt-4 py-4 bg-white border-2 border-[#E6D5CC] text-[#4A3B32] rounded-xl font-bold text-lg hover:bg-[#FDF6F0] focus:ring-4 focus:ring-[#C8A288]/10 transition-all flex items-center justify-center gap-3 active:scale-[0.98]"
+                    >
+                        <Mail className="h-5 w-5 text-[#8a6a5c]" />
+                        {isOtpMode ? 'Use Password Instead' : 'Login with Email Code'}
+                    </button>
+
                     <div className="mt-8 pt-6 border-t border-[#FDF6F0] text-center">
-                        <p className="text-[#8a6a5c] text-sm">
-                            {isLogin ? "New to Lumina IQ? " : "Already have an account? "}
-                            <button
-                                onClick={() => {
-                                    setIsLogin(!isLogin);
-                                    setMessage(null);
-                                }}
-                                className="text-[#C8A288] font-bold hover:text-[#B08B72] hover:underline transition-colors ml-1"
-                            >
-                                {isLogin ? 'Create an account' : 'Sign in'}
-                            </button>
-                        </p>
+                        {!isOtpMode && (
+                            <p className="text-[#8a6a5c] text-sm">
+                                {isLogin ? "New to Lumina IQ? " : "Already have an account? "}
+                                <button
+                                    onClick={() => {
+                                        setIsLogin(!isLogin);
+                                        setMessage(null);
+                                    }}
+                                    className="text-[#C8A288] font-bold hover:text-[#B08B72] hover:underline transition-colors ml-1"
+                                >
+                                    {isLogin ? 'Create an account' : 'Sign in'}
+                                </button>
+                            </p>
+                        )}
                     </div>
                 </div>
             </div>

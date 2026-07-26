@@ -65,15 +65,15 @@ async def login(user_in: UserLogin):
             detail=str(e),
         )
 
-from models.schemas import GoogleLoginRequest
+from models.schemas import TokenExchangeRequest
 
-@router.post("/google", response_model=Any)
-async def google_login(request: GoogleLoginRequest):
+@router.post("/exchange", response_model=Any)
+async def exchange_token(request: TokenExchangeRequest):
     """
-    Exchange Google/Supabase Token for App Token
+    Exchange Supabase OAuth or OTP Token for App Token
     """
     try:
-        return await auth_service.login_with_google(request.access_token)
+        return await auth_service.exchange_supabase_token(request.access_token)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

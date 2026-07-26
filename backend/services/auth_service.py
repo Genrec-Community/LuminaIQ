@@ -172,12 +172,12 @@ class AuthService:
             logger.error(f"Login error: {str(e)}")
             raise
 
-    async def login_with_google(self, supabase_token: str) -> Dict[str, Any]:
-        """Exchange Supabase OAuth token for App JWT"""
+    async def exchange_supabase_token(self, supabase_token: str) -> Dict[str, Any]:
+        """Exchange Supabase OAuth or OTP token for App JWT"""
         try:
             user = self.client.auth.get_user(supabase_token)
             if not user or not user.user:
-                raise Exception("Invalid Google Token")
+                raise Exception("Invalid Supabase Token")
             
             u = user.user
             email = u.email
@@ -199,7 +199,7 @@ class AuthService:
                 }
             }
         except Exception as e:
-            logger.error(f"Google Login Error: {e}")
+            logger.error(f"Token Exchange Error: {e}")
             raise
 
 auth_service = AuthService()

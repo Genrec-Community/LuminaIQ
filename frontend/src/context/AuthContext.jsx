@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { api, login as apiLogin, signup as apiSignup, loginWithGoogle as apiLoginGoogle } from '../api';
+import { api, login as apiLogin, signup as apiSignup, exchangeToken as apiExchangeToken } from '../api';
 import { supabase } from '../supabaseClient';
 
 const AuthContext = createContext(null);
@@ -49,7 +49,7 @@ export const AuthProvider = ({ children }) => {
                 if (!currentToken) {
                     tokenExchanged.current = true;
                     try {
-                        const data = await apiLoginGoogle(session.access_token);
+                        const data = await apiExchangeToken(session.access_token);
                         if (data.access_token) {
                             localStorage.setItem('token', data.access_token);
                             localStorage.setItem('user', JSON.stringify(data.user));
@@ -57,7 +57,7 @@ export const AuthProvider = ({ children }) => {
                             setUser(data.user);
                         }
                     } catch (e) {
-                        console.error("Google Token Exchange Failed:", e);
+                        console.error("Token Exchange Failed:", e);
                         tokenExchanged.current = false; // Reset on failure
                     }
                 }
@@ -83,7 +83,7 @@ export const AuthProvider = ({ children }) => {
                 if (!currentToken) {
                     try {
                         // Exchange Supabase Access Token for App JWT
-                        const data = await apiLoginGoogle(session.access_token);
+                        const data = await apiExchangeToken(session.access_token);
 
                         if (data.access_token) {
                             localStorage.setItem('token', data.access_token);
@@ -95,7 +95,7 @@ export const AuthProvider = ({ children }) => {
                             window.location.href = '/dashboard';
                         }
                     } catch (e) {
-                        console.error("Google Token Exchange Failed:", e);
+                        console.error("Token Exchange Failed:", e);
                         tokenExchanged.current = false; // Reset on failure to allow retry
                         await supabase.auth.signOut(); // Clear invalid supabase session
                     }
@@ -155,6 +155,30 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    const requestOtp = async (email) => {
+        try {
+            const { error } = await supabase.auth.signInWithOtp({ email });
+            if (error) throw error;
+            return true;
+        } catch (error) {
+            console.error("OTP Request failed", error);
+            throw error;
+        }
+    };
+
+    const verifyOtpCode = async (email, token) => {
+        try {
+            const { data, error } = await supabase.auth.verifyOtp({ email, token, type: 'email' });
+            if (error) throw error;
+            // The authListener will automatically catch the SIGNED_IN event 
+            // and perform the token exchange.
+            return data;
+        } catch (error) {
+            console.error("OTP Verification failed", error);
+            throw error;
+        }
+    };
+
     const logout = async () => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
@@ -164,7 +188,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, login, signup, loginWithGoogle, logout, loading }}>
+        <AuthContext.Provider value={{ user, login, signup, loginWithGoogle, requestOtp, verifyOtpCode, logout, loading }}>
 
             {!loading && children}
         </AuthContext.Provider >
