@@ -43,6 +43,7 @@ const LearningPathView = ({
     setSelectedDocuments, 
     documentTopics,
     documents = [],
+    onTopicsChange,
     completedTopics = new Set(),
     onStartQuiz,
     onTopicComplete,
@@ -175,6 +176,7 @@ const LearningPathView = ({
             // Clear cache so fresh data is loaded
             sessionStorage.removeItem(`lumina_path_${projectId}`);
             await loadData();
+            if (onTopicsChange) onTopicsChange();
             recordActivity(projectId, 'path', { action: 'build_graph', topicCount: topicsToUse.length });
         } catch (error) {
             console.error('Failed to build graph:', error);
@@ -387,7 +389,7 @@ const LearningPathView = ({
                                 className="w-full sm:w-auto px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#C8A288] font-medium max-w-full truncate"
                                 style={{ background: cardBg2, borderColor: cardBorder, color: bodyText, maxWidth: '100%' }}
                             >
-                                <option value="all">All Documents ({availableTopics?.length || 0} topics)</option>
+                                <option value="all">All Documents ({Math.max(availableTopics?.length || 0, learningPath?.learning_path?.length || 0)} topics)</option>
                                 {Object.entries(documentTopics || {}).map(([docId, topics]) => {
                                     const topicCount = topics?.length || 0;
                                     if (topicCount === 0) return null;

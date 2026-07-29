@@ -1631,6 +1631,7 @@ const ProjectView = () => {
                             documentTopics={documentTopics}
                             documents={documents}
                             completedTopics={learningProgress}
+                            onTopicsChange={fetchTopics}
                             onStartQuiz={(topic, mode, docsToSelect) => {
                                 // Set documents for context
                                 if (docsToSelect && docsToSelect.length > 0) {

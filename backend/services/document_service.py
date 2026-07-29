@@ -385,7 +385,7 @@ class DocumentService:
         failed_batches = []
 
         async def process_batch(batch_idx: int, start_index: int, batch_data: List[str]):
-            retries = 3
+            retries = 6
             for attempt in range(retries):
                 try:
                     async with embed_semaphore:
@@ -422,6 +422,7 @@ class DocumentService:
                         logger.info(
                             f"[{filename}] Progress: {completed[0]}/{total_batches} batches"
                         )
+                        
                     return
 
                 except Exception as e:
@@ -435,7 +436,8 @@ class DocumentService:
                     )
 
                     if is_retryable and attempt < retries - 1:
-                        wait_time = (2 ** attempt) + (0.1 * (batch_idx % 5))
+                        # Much higher backoff for rate limiting: 1s, 4s, 16s, 64s, 256s
+                        wait_time = (4 ** attempt) + (2.0 * (batch_idx % 5))
                         logger.warning(
                             f"[{filename}] Batch {batch_idx + 1} retry {attempt + 1}/{retries} "
                             f"in {wait_time:.1f}s: {e}"

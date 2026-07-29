@@ -690,7 +690,7 @@ const Dashboard = () => {
                                         </div>
 
                                         {/* Public/Private Toggle — shown once file selected */}
-                                        {selectedFiles.length > 0 && (
+                                        {selectedFiles.length === 1 && (
                                             <div className="rounded-2xl border-2 border-[#E6D5CC] overflow-hidden">
                                                 <button
                                                     type="button"
@@ -750,6 +750,17 @@ const Dashboard = () => {
                                                         )}
                                                     </div>
                                                 )}
+                                            </div>
+                                        )}
+                                        {selectedFiles.length > 1 && (
+                                            <div className="p-4 bg-[#FDF6F0] rounded-xl border border-[#E6D5CC] flex items-start gap-3">
+                                                <div className="h-8 w-8 bg-[#E6D5CC] rounded-xl flex items-center justify-center shrink-0">
+                                                    <Lock className="h-4 w-4 text-[#8a6a5c]" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-bold text-[#4A3B32]">Batch Upload (Private)</p>
+                                                    <p className="text-xs text-[#8a6a5c]">To share books in the public Book Store, please upload them one at a time.</p>
+                                                </div>
                                             </div>
                                         )}
                                     </div>

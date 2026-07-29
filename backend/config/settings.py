@@ -130,7 +130,7 @@ class Settings(BaseSettings):
         return v
 
     UPLOAD_DIR: str = "./uploads"
-    MAX_FILE_SIZE: int = 10485760  # 10MB
+    MAX_FILE_SIZE: int = 104857600  # 100MB
     ALLOWED_EXTENSIONS: List[str] = [
         "pdf", "docx", "txt", "html", "md",
         # Image formats — processed via Azure CV OCR

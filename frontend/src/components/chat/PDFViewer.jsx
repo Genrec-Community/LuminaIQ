@@ -22,14 +22,8 @@ const PDFViewer = ({ url, highlightText, onClose, title = "PDF Viewer", initialP
         // Custom search function to find the page of the text
         if (highlightText) {
             findMatchPage(pdf).then(pageObj => {
-                if (pageObj && pageObj.pageIndex !== undefined && containerRef.current) {
-                    // Small delay to ensure pages are rendered
-                    setTimeout(() => {
-                        const pageNode = document.getElementById(`pdf-page-${pageObj.pageIndex + 1}`);
-                        if (pageNode) {
-                            pageNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        }
-                    }, 500);
+                if (pageObj && pageObj.pageIndex !== undefined) {
+                    setPageNumber(pageObj.pageIndex + 1);
                 }
             });
         }
@@ -120,6 +114,28 @@ const PDFViewer = ({ url, highlightText, onClose, title = "PDF Viewer", initialP
                 </div>
                 
                 <div className="flex items-center gap-1.5 ml-4 shrink-0">
+                    <div className="flex items-center gap-2 mr-2">
+                        <button 
+                            onClick={() => setPageNumber(p => Math.max(1, p - 1))} 
+                            disabled={pageNumber <= 1}
+                            className="p-1.5 text-[#8a6a5c] hover:bg-[#E6D5CC]/50 rounded-lg disabled:opacity-50 transition-colors"
+                            title="Previous Page"
+                        >
+                            <ChevronLeft className="h-4 w-4" />
+                        </button>
+                        <span className="text-xs font-semibold text-[#4A3B32]">
+                            {pageNumber} / {numPages || '--'}
+                        </span>
+                        <button 
+                            onClick={() => setPageNumber(p => Math.min(numPages || p, p + 1))} 
+                            disabled={pageNumber >= (numPages || 1)}
+                            className="p-1.5 text-[#8a6a5c] hover:bg-[#E6D5CC]/50 rounded-lg disabled:opacity-50 transition-colors"
+                            title="Next Page"
+                        >
+                            <ChevronRight className="h-4 w-4" />
+                        </button>
+                    </div>
+                    <div className="w-px h-4 bg-[#E6D5CC] mx-1" />
                     <button onClick={zoomOut} className="p-1.5 text-[#8a6a5c] hover:bg-[#E6D5CC]/50 rounded-lg transition-colors" title="Zoom Out">
                         <ZoomOut className="h-4 w-4" />
                     </button>
@@ -165,21 +181,18 @@ const PDFViewer = ({ url, highlightText, onClose, title = "PDF Viewer", initialP
                         }
                         className="flex flex-col items-center mx-auto gap-4"
                     >
-                        {numPages && Array.from(new Array(numPages), (el, index) => (
-                            <div id={`pdf-page-${index + 1}`} key={`page_${index + 1}`} className="shadow-lg bg-white relative rounded overflow-hidden">
+                        {numPages && (
+                            <div className="shadow-lg bg-white relative rounded overflow-hidden">
                                 <Page 
-                                    pageNumber={index + 1} 
+                                    pageNumber={pageNumber} 
                                     scale={scale}
                                     renderAnnotationLayer={false}
                                     renderTextLayer={true}
                                     customTextRenderer={textRenderer}
                                     className="min-h-full"
                                 />
-                                <div className="absolute bottom-2 right-2 bg-black/50 text-white text-[10px] px-2 py-0.5 rounded-full z-10 font-medium">
-                                    {index + 1}
-                                </div>
                             </div>
-                        ))}
+                        )}
                     </Document>
                 )}
             </div>

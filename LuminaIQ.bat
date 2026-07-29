@@ -1,15 +1,12 @@
 @echo off
-cd /d "%~dp0"
-echo Starting LuminaIQ Services...
+echo Starting LuminaIQ Backend...
+start cmd /k "cd backend && python run.py"
 
-:: Start Frontend
-echo Starting Frontend...
-start "LuminaIQ - Frontend" cmd /k "cd frontend && npm run dev"
+echo Starting LuminaIQ Frontend...
+start cmd /k "cd frontend && npm run dev"
 
-:: Start Backend Main API
-echo Starting Backend (Main API)...
-start "LuminaIQ - Backend Main" cmd /k "cd backend && uv run run.py"
-
-
-
-echo All services started!
+echo ==================================================
+echo LuminaIQ is starting up!
+echo Frontend will be at http://localhost:5173
+echo Backend will be at http://localhost:8000
+echo ==================================================

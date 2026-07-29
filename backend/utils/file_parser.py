@@ -224,7 +224,31 @@ class FileParser:
         else:
             logger.info(f"[FileParser] Skipping PyMuPDF4LLM (document too large: {page_count} pages)")
 
-        # Method 2: PyPDF2
+        # Method 2: Raw PyMuPDF/fitz (Fastest & most memory-efficient for large books)
+        try:
+            import fitz
+            logger.info("[FileParser] Trying raw PyMuPDF...")
+            doc = fitz.open(file_path)
+            pages_text = []
+            for i, page in enumerate(doc):
+                try:
+                    page_text = page.get_text()
+                    if page_text:
+                        pages_text.append(page_text)
+                except Exception as page_err:
+                    logger.warning(f"[FileParser] PyMuPDF page {i} failed: {page_err}")
+            doc.close()
+            if pages_text:
+                text = "\n\n".join(pages_text)
+                logger.info(
+                    f"[FileParser] Raw PyMuPDF: {len(text)} chars from {len(pages_text)} pages"
+                )
+                return text.strip()
+            logger.warning("[FileParser] Raw PyMuPDF extracted no text")
+        except Exception as e:
+            logger.warning(f"[FileParser] Raw PyMuPDF failed: {e}")
+
+        # Method 3: PyPDF2 (Slow fallback for corrupted PDFs)
         try:
             from PyPDF2 import PdfReader
             logger.info("[FileParser] Trying PyPDF2...")
@@ -248,30 +272,6 @@ class FileParser:
             logger.warning("[FileParser] PyPDF2 not installed")
         except Exception as e:
             logger.warning(f"[FileParser] PyPDF2 failed: {e}")
-
-        # Method 3: Raw PyMuPDF/fitz
-        try:
-            import fitz
-            logger.info("[FileParser] Trying raw PyMuPDF...")
-            doc = fitz.open(file_path)
-            pages_text = []
-            for i, page in enumerate(doc):
-                try:
-                    page_text = page.get_text()
-                    if page_text:
-                        pages_text.append(page_text)
-                except Exception as page_err:
-                    logger.warning(f"[FileParser] PyMuPDF page {i} failed: {page_err}")
-            doc.close()
-            if pages_text:
-                text = "\n\n".join(pages_text)
-                logger.info(
-                    f"[FileParser] Raw PyMuPDF: {len(text)} chars from {len(pages_text)} pages"
-                )
-                return text.strip()
-            logger.warning("[FileParser] Raw PyMuPDF extracted no text")
-        except Exception as e:
-            logger.warning(f"[FileParser] Raw PyMuPDF failed: {e}")
 
         return None
 
