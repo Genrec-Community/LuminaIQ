@@ -1,4 +1,4 @@
-from db.client import get_supabase_client
+from db.client import get_supabase_client, async_db
 from config.settings import settings
 from utils.logger import logger
 from typing import List, Dict, Any, Optional
@@ -11,10 +11,10 @@ class ProjectService:
     async def create_project(self, user_id: str, name: str) -> Dict[str, Any]:
         """Create a new project"""
         try:
-            response = self.client.table("projects").insert({
+            response = await async_db(lambda: self.client.table("projects").insert({
                 "user_id": user_id,
                 "name": name
-            }).execute()
+            }).execute())
             
             if response.data:
                 logger.info(f"Created project: {name}")
@@ -29,7 +29,7 @@ class ProjectService:
     async def get_projects(self, user_id: str) -> List[Dict[str, Any]]:
         """Get all projects for a user"""
         try:
-            response = self.client.table("projects").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
+            response = await async_db(lambda: self.client.table("projects").select("*").eq("user_id", user_id).order("created_at", desc=True).execute())
             
             # Enrich with doc count if possible (separate query or join?)
             # Supabase JS client doesn't support deep joins easily in one go like raw SQL for counts usually.
@@ -40,7 +40,7 @@ class ProjectService:
             for p in projects:
                 # This is N+1 query, but okay for small scale prototype. 
                 # Better way: use a postgres function or view.
-                doc_res = self.client.table("documents").select("id", count="exact").eq("project_id", p["id"]).execute()
+                doc_res = await async_db(lambda: self.client.table("documents").select("id", count="exact").eq("project_id", p["id"]).execute())
                 p["docs"] = doc_res.count
                 
             return projects
@@ -51,7 +51,7 @@ class ProjectService:
     async def get_project(self, project_id: str) -> Optional[Dict[str, Any]]:
         """Get a specific project"""
         try:
-            response = self.client.table("projects").select("*").eq("id", project_id).execute()
+            response = await async_db(lambda: self.client.table("projects").select("*").eq("id", project_id).execute())
             if response.data:
                 return response.data[0]
             return None
@@ -62,7 +62,7 @@ class ProjectService:
     async def delete_project(self, project_id: str) -> bool:
         """Delete a project"""
         try:
-            self.client.table("projects").delete().eq("id", project_id).execute()
+            await async_db(lambda: self.client.table("projects").delete().eq("id", project_id).execute())
             logger.info(f"Deleted project: {project_id}")
             return True
         except Exception as e:

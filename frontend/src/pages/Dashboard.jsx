@@ -12,6 +12,7 @@ import { useToast } from '../context/ToastContext';
 import { getRotatingLoadingMessage } from '../utils/LoadingMessages';
 import { DashboardSkeleton } from '../components/Skeleton';
 import { getCachedProjects, setCachedProjects, clearProjectsCache } from '../utils/projectCache';
+import Joyride, { STATUS } from 'react-joyride';
 
 const Dashboard = () => {
     const navigate = useNavigate();
@@ -56,6 +57,45 @@ const Dashboard = () => {
     const [bsImportingId, setBsImportingId] = useState(null);
     const [bsImportedIds, setBsImportedIds] = useState(new Set());
     const [bsCreatedProjectId, setBsCreatedProjectId] = useState(null);
+
+    const [{ run, steps }, setTourState] = useState({
+        run: false,
+        steps: [
+            {
+                content: <h2>Welcome to LuminaIQ! Let's get started.</h2>,
+                locale: { skip: 'Skip tutorial' },
+                placement: 'center',
+                target: 'body',
+            },
+            {
+                content: 'Here you can create a new project. You can upload documents like PDFs or import community books.',
+                placement: 'bottom',
+                target: '#tour-new-project',
+                title: 'Create a Project',
+            },
+            {
+                content: 'Check out the Book Store to see public projects and publish your own.',
+                placement: 'bottom',
+                target: '#tour-bookstore',
+                title: 'Book Store',
+            }
+        ],
+    });
+
+    useEffect(() => {
+        const hasSeenDashboardTutorial = localStorage.getItem('hasSeenDashboardTutorial');
+        if (!hasSeenDashboardTutorial) {
+            setTourState(prev => ({ ...prev, run: true }));
+        }
+    }, []);
+
+    const handleJoyrideCallback = (data) => {
+        const { status } = data;
+        if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status)) {
+            localStorage.setItem('hasSeenDashboardTutorial', 'true');
+            setTourState(prev => ({ ...prev, run: false }));
+        }
+    };
 
     useEffect(() => {
         let interval;
@@ -328,6 +368,19 @@ const Dashboard = () => {
 
     return (
         <div className="min-h-screen bg-[#FDF6F0] font-sans text-[#4A3B32]">
+            <Joyride
+                callback={handleJoyrideCallback}
+                continuous
+                run={run}
+                steps={steps}
+                showSkipButton
+                styles={{
+                    options: {
+                        primaryColor: '#C8A288',
+                        zIndex: 10000,
+                    }
+                }}
+            />
             {/* Header */}
             <header className="bg-white border-b border-[#E6D5CC] sticky top-0 z-10">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
@@ -372,6 +425,7 @@ const Dashboard = () => {
                             />
                         </div>
                         <button
+                            id="tour-bookstore"
                             onClick={() => navigate('/bookstore')}
                             className="px-6 py-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl font-medium hover:bg-emerald-100 transition-colors flex items-center justify-center gap-2 w-full md:w-auto"
                         >
@@ -379,6 +433,7 @@ const Dashboard = () => {
                             <span>Book Store</span>
                         </button>
                         <button
+                            id="tour-new-project"
                             onClick={openNewProjectModal}
                             className="px-6 py-3 bg-[#C8A288] text-white rounded-xl font-medium hover:bg-[#B08B72] transition-colors flex items-center justify-center gap-2 shadow-lg shadow-[#C8A288]/20 w-full md:w-auto"
                         >
@@ -428,6 +483,7 @@ const Dashboard = () => {
 
                     {/* New Project Card Placeholder */}
                     <button
+                        id="tour-new-project-card"
                         onClick={openNewProjectModal}
                         className="flex flex-col items-center justify-center p-6 rounded-2xl border-2 border-dashed border-[#E6D5CC] hover:border-[#C8A288] hover:bg-[#FDF6F0]/50 transition-all group h-full min-h-[200px]"
                     >

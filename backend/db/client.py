@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 # Dedicated thread pool for Supabase calls — prevents blocking the event loop
 _db_executor = ThreadPoolExecutor(
-    max_workers=8,
+    max_workers=64,
     thread_name_prefix="supabase_db"
 )
 

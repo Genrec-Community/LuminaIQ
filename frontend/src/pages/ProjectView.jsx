@@ -101,6 +101,7 @@ import { CommandPicker, CommandParamForm } from '../components/chat/ChatCommands
 import { ToolLoadingCard, ToolResultCard, ToolErrorCard } from '../components/chat/ToolResultCard';
 import PDFViewer from '../components/chat/PDFViewer';
 import ErrorBoundary from '../components/ErrorBoundary';
+import Joyride, { STATUS } from 'react-joyride';
 
 const ProjectView = () => {
     const { projectId } = useParams();
@@ -115,6 +116,51 @@ const ProjectView = () => {
     });
     const [messages, setMessages] = useState([]);
     const messagesEndRef = useRef(null);
+
+    const [{ run, steps }, setTourState] = useState({
+        run: false,
+        steps: [
+            {
+                content: <h2>Welcome to your project workspace!</h2>,
+                locale: { skip: 'Skip tutorial' },
+                placement: 'center',
+                target: 'body',
+            },
+            {
+                content: 'This is your Learning Path, which guides you through topics.',
+                placement: 'right',
+                target: '#tour-nav-path',
+                title: 'Learning Path',
+            },
+            {
+                content: 'Explore connections between topics using the Knowledge Graph.',
+                placement: 'right',
+                target: '#tour-nav-knowledge',
+                title: 'Knowledge Graph',
+            },
+            {
+                content: 'Access automatically generated Notes, Quizzes, Flashcards and more here.',
+                placement: 'right',
+                target: '#tour-nav-general',
+                title: 'Study Tools',
+            }
+        ],
+    });
+
+    useEffect(() => {
+        const hasSeenProjectTutorial = localStorage.getItem('hasSeenProjectTutorial');
+        if (!hasSeenProjectTutorial) {
+            setTourState(prev => ({ ...prev, run: true }));
+        }
+    }, []);
+
+    const handleJoyrideCallback = (data) => {
+        const { status } = data;
+        if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status)) {
+            localStorage.setItem('hasSeenProjectTutorial', 'true');
+            setTourState(prev => ({ ...prev, run: false }));
+        }
+    };
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -837,6 +883,7 @@ const ProjectView = () => {
     // Sidebar Navigation Item
     const NavItem = ({ id, icon: Icon, label }) => (
         <button
+            id={`tour-nav-${id}`}
             onClick={() => {
                 setActiveTab(id);
                 setIsMobileMenuOpen(false);
@@ -932,6 +979,20 @@ const ProjectView = () => {
                 color: '#e8e2dc'
             } : { background: '#FDF6F0', color: '#4A3B32' }}>
 
+            <Joyride
+                callback={handleJoyrideCallback}
+                continuous
+                run={run}
+                steps={steps}
+                showSkipButton
+                styles={{
+                    options: {
+                        primaryColor: '#C8A288',
+                        zIndex: 10000,
+                    }
+                }}
+            />
+
             {/* Mobile Sidebar Overlay */}
             {isMobileMenuOpen && (
                 <div
@@ -989,6 +1050,7 @@ const ProjectView = () => {
                             {/* General Section - Expandable */}
                             <div className={leftCollapsed ? '' : ''}>
                                 <button
+                                    id="tour-nav-general"
                                     onClick={() => setActiveTab(activeTab === 'general' ? 'chat' : 'general')}
                                     className={`w-full flex items-center ${leftCollapsed ? 'justify-center px-3 py-4' : 'gap-4 px-5 py-4'} rounded-xl transition-colors ${activeTab === 'general' || activeTab === 'qa' || activeTab === 'quiz' || activeTab === 'notes' || activeTab === 'flashcards' || activeTab === 'mindmap'
                                         ? 'bg-[#C8A288] text-white font-semibold shadow-md shadow-[#C8A288]/20'
