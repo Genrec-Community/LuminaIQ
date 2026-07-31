@@ -63,6 +63,8 @@ import {
     subscribeDocumentProgress,
 } from '../api';
 import { useToast } from '../context/ToastContext';
+import Joyride, { STATUS } from 'react-joyride';
+import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { useGamification } from '../context/GamificationContext';
 import { recordActivity } from '../utils/studyActivity';
@@ -101,12 +103,13 @@ import { CommandPicker, CommandParamForm } from '../components/chat/ChatCommands
 import { ToolLoadingCard, ToolResultCard, ToolErrorCard } from '../components/chat/ToolResultCard';
 import PDFViewer from '../components/chat/PDFViewer';
 import ErrorBoundary from '../components/ErrorBoundary';
-import Joyride, { STATUS } from 'react-joyride';
+
 
 const ProjectView = () => {
     const { projectId } = useParams();
     const navigate = useNavigate();
     const toast = useToast();
+    const { user } = useAuth();
     const { settings } = useSettings();
     const isDark = settings?.darkMode ?? false;
     const { data: gamificationData } = useGamification();
@@ -148,20 +151,20 @@ const ProjectView = () => {
     });
 
     useEffect(() => {
-        if (!loading && !error) {
-            const hasSeenProjectTutorial = localStorage.getItem('hasSeenProjectTutorial');
+        if (!loading && !error && user?.id) {
+            const hasSeenProjectTutorial = localStorage.getItem(`hasSeenProjectTutorial_${user.id}`);
             if (!hasSeenProjectTutorial) {
                 setTimeout(() => {
                     setTourState(prev => ({ ...prev, run: true }));
                 }, 500);
             }
         }
-    }, [loading, error]);
+    }, [loading, error, user?.id]);
 
     const handleJoyrideCallback = (data) => {
         const { status } = data;
-        if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status)) {
-            localStorage.setItem('hasSeenProjectTutorial', 'true');
+        if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status) && user?.id) {
+            localStorage.setItem(`hasSeenProjectTutorial_${user.id}`, 'true');
             setTourState(prev => ({ ...prev, run: false }));
         }
     };

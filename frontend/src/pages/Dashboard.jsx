@@ -83,8 +83,8 @@ const Dashboard = () => {
     });
 
     useEffect(() => {
-        if (!isLoadingProjects && !fetchError) {
-            const hasSeenDashboardTutorial = localStorage.getItem('hasSeenDashboardTutorial');
+        if (!isLoadingProjects && !fetchError && user?.id) {
+            const hasSeenDashboardTutorial = localStorage.getItem(`hasSeenDashboardTutorial_${user.id}`);
             if (!hasSeenDashboardTutorial) {
                 setTimeout(() => {
                     setTourState(prev => ({ ...prev, run: true }));
@@ -95,8 +95,8 @@ const Dashboard = () => {
 
     const handleJoyrideCallback = (data) => {
         const { status } = data;
-        if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status)) {
-            localStorage.setItem('hasSeenDashboardTutorial', 'true');
+        if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status) && user?.id) {
+            localStorage.setItem(`hasSeenDashboardTutorial_${user.id}`, 'true');
             setTourState(prev => ({ ...prev, run: false }));
         }
     };

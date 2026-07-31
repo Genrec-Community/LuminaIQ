@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
 import { useGamification } from '../context/GamificationContext';
+import { useAuth } from '../context/AuthContext';
 
 /**
  * TextInput — MUST be defined at module level (outside Settings component).
@@ -102,6 +103,7 @@ const Settings = () => {
     const navigate = useNavigate();
     const { settings, updateSetting, resetSettings } = useSettings();
     const { data: gamificationData } = useGamification();
+    const { user } = useAuth();
     const [activeSection, setActiveSection] = useState('profile');
 
     const isDark = settings?.darkMode ?? false;
@@ -662,6 +664,31 @@ const Settings = () => {
                     description="Denser layout with reduced spacing"
                     icon={Smartphone}
                 />
+
+                {/* Reset Tutorials */}
+                <div className="p-4 rounded-2xl border flex items-center justify-between" style={{ background: paper, borderColor: border }}>
+                    <div className="flex items-center gap-3.5">
+                        <div className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: inputBg }}>
+                            <Sparkles className="h-5 w-5 text-[#C8A288]" />
+                        </div>
+                        <div>
+                            <p className="font-semibold text-sm" style={{ color: heading }}>App Tutorials</p>
+                            <p className="text-xs mt-0.5" style={{ color: muted }}>Reset onboarding tours and show them again</p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => {
+                            if (user?.id) {
+                                localStorage.removeItem(`hasSeenDashboardTutorial_${user.id}`);
+                                localStorage.removeItem(`hasSeenProjectTutorial_${user.id}`);
+                                navigate('/dashboard');
+                            }
+                        }}
+                        className="px-4 py-2 bg-[#FDF6F0] hover:bg-[#E6D5CC] text-[#C8A288] border border-[#E6D5CC] rounded-xl font-semibold text-sm transition-colors shrink-0"
+                    >
+                        Restart Tour
+                    </button>
+                </div>
             </div>
         </div>
     );
