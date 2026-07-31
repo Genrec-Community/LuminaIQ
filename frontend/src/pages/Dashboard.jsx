@@ -91,7 +91,7 @@ const Dashboard = () => {
                 }, 500);
             }
         }
-    }, [isLoadingProjects, fetchError]);
+    }, [isLoadingProjects, fetchError, user?.id]);
 
     const handleJoyrideCallback = (data) => {
         const { status } = data;
