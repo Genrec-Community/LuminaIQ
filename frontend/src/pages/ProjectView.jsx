@@ -148,11 +148,15 @@ const ProjectView = () => {
     });
 
     useEffect(() => {
-        const hasSeenProjectTutorial = localStorage.getItem('hasSeenProjectTutorial');
-        if (!hasSeenProjectTutorial) {
-            setTourState(prev => ({ ...prev, run: true }));
+        if (!loading && !error) {
+            const hasSeenProjectTutorial = localStorage.getItem('hasSeenProjectTutorial');
+            if (!hasSeenProjectTutorial) {
+                setTimeout(() => {
+                    setTourState(prev => ({ ...prev, run: true }));
+                }, 500);
+            }
         }
-    }, []);
+    }, [loading, error]);
 
     const handleJoyrideCallback = (data) => {
         const { status } = data;
