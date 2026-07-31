@@ -63,7 +63,7 @@ import {
     subscribeDocumentProgress,
 } from '../api';
 import { useToast } from '../context/ToastContext';
-import Joyride, { STATUS } from 'react-joyride';
+import { Joyride, STATUS } from 'react-joyride';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { useGamification } from '../context/GamificationContext';

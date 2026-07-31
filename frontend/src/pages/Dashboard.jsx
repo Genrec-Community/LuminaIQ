@@ -12,7 +12,7 @@ import { useToast } from '../context/ToastContext';
 import { getRotatingLoadingMessage } from '../utils/LoadingMessages';
 import { DashboardSkeleton } from '../components/Skeleton';
 import { getCachedProjects, setCachedProjects, clearProjectsCache } from '../utils/projectCache';
-import Joyride, { STATUS } from 'react-joyride';
+import { Joyride, STATUS } from 'react-joyride';
 
 const Dashboard = () => {
     const navigate = useNavigate();
