@@ -27,6 +27,45 @@ Primary sources are limited to official project/vendor documentation, first-part
 | P1 | Add endpoint, job, and model observability tied to SLOs | Existing logs expose full URLs but do not provide stage latency, queue age, or model token metrics | Performance changes become measurable rather than anecdotal |
 | P2 | Modernize ASGI lifecycle/middleware and right-size workers from load tests | Timeout and request logging add middleware work; worker count hard-codes multiplied limits | More predictable cancellation, shutdown, and capacity behavior |
 
+## Implementation status
+
+Implemented on `dev/rework-embedding`:
+
+- CI/CD now targets the Azure App Service used by the frontend, embeds the Git
+  commit in the deployed artifact, enables remote dependency build, verifies
+  `/health`, and gates the frontend deployment on that check.
+- Graph Build generates with process-wide bounded concurrency two, removes
+  fixed sleeps, raises provider/parse failures, preserves the active graph on
+  generation failure, and rejects stale cross-worker publication. Migrations
+  004 and 006 provide atomic and ordered publication but remain unapplied.
+- Qdrant uses direct collection existence checks, coordinates initialization
+  per collection, and creates only missing payload indexes.
+- Authentication, settings, and flashcard hot paths move synchronous Supabase
+  work off the event loop. All LLM and RAG synthesis calls share one
+  per-process provider concurrency gate with queue/provider timing logs.
+- Request logs exclude query strings, FastAPI uses lifespan, request timing is
+  pure ASGI, project-load failures propagate, semantic search is cancellable,
+  and document progress has reconnect plus persisted-status polling fallback.
+- JSX is included in ESLint with Rules of Hooks enforced and dependency issues
+  reported. Remaining dependency warnings are visible technical debt.
+- Migration 005, a lease-safe job module, and a standalone worker entrypoint
+  establish the durable-job foundation. Both feature flags are false and the
+  worker refuses to claim work until durable originals and pipeline integration
+  exist.
+
+Intentionally not activated or provisioned:
+
+- Durable document processing cannot be enabled until the live Supabase schema,
+  private original-document bucket, retention policy, and retry-safe pipeline
+  stages are verified. Current uploads therefore retain their legacy path.
+- Migrations 004-006 require review and application to the live Supabase project
+  before their capabilities can be enabled.
+- Database indexes require production `EXPLAIN` evidence; none were added
+  blindly. Application Insights, alerting, new worker deployments, minimum
+  replicas, PTUs, and other potentially billable resources were not created.
+- Azure structured output requires confirmation that the deployed model and API
+  version support the required schema before replacing repair parsing.
+
 ## Current-state findings
 
 ### Deployment topology is split
