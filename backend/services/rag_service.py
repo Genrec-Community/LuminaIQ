@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional
 
 from llama_index.core import PromptTemplate
@@ -190,10 +191,18 @@ def _friendly_error(error: Exception) -> str:
     return message
 
 
+@asynccontextmanager
+async def _unlimited_request_slot():
+    yield
+
+
 class RAGService:
-    def __init__(self, client=None, llm=None):
+    def __init__(self, client=None, llm=None, request_slot=None):
         self.client = client or get_supabase_client()
         self.llm = llm or llm_service._get_client(temperature=0.1)
+        self._request_slot = request_slot or getattr(
+            llm_service, "request_slot", _unlimited_request_slot
+        )
 
     async def _retrieve(
         self,
@@ -248,11 +257,12 @@ class RAGService:
             synthesizer = self._synthesizer(
                 system_prompt, user_context, history, streaming=False
             )
-            response = await retry_with_backoff(
-                lambda: synthesizer.asynthesize(question, nodes),
-                max_retries=2,
-                base_delay=1.0,
-            )
+            async with self._request_slot():
+                response = await retry_with_backoff(
+                    lambda: synthesizer.asynthesize(question, nodes),
+                    max_retries=2,
+                    base_delay=1.0,
+                )
             return {"answer": str(response), "sources": _sources(nodes)}
         except Exception as error:
             logger.error(f"LlamaIndex RAG error: {error}")
@@ -284,11 +294,12 @@ class RAGService:
             synthesizer = self._synthesizer(
                 system_prompt, user_context, history, streaming=True
             )
-            response = await synthesizer.asynthesize(question, nodes)
-            async for token in response.async_response_gen():
-                if token:
-                    yielded = True
-                    yield token
+            async with self._request_slot():
+                response = await synthesizer.asynthesize(question, nodes)
+                async for token in response.async_response_gen():
+                    if token:
+                        yielded = True
+                        yield token
             yield f"\n\n__SOURCES__:{json.dumps(_sources(nodes))}"
         except Exception as error:
             logger.error(f"LlamaIndex streaming RAG error: {error}")

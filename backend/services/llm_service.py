@@ -2,6 +2,7 @@
 
 import asyncio
 import time
+from contextlib import asynccontextmanager
 from typing import Dict, List, Tuple
 
 from config.settings import settings
@@ -65,6 +66,11 @@ class LLMService:
             settings.AZURE_OPENAI_ENDPOINT
             and (settings.AZURE_OPENAI_API_KEY or settings.MODEL_API_KEY)
         )
+
+    @asynccontextmanager
+    async def request_slot(self):
+        async with self._request_semaphore:
+            yield
 
     def _get_client(self, temperature: float = 0.7, max_tokens: int = 4000):
         max_tokens = max(max_tokens, 2000)
