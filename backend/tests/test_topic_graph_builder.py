@@ -1,6 +1,7 @@
 import asyncio
 import json
 import unittest
+from weakref import WeakValueDictionary
 
 from services.topic_graph_builder import (
     LLMRelationshipGenerator,
@@ -17,6 +18,7 @@ class _InMemoryStore:
         self.events = events
         self.cleared_projects = []
         self.upserted_edges = []
+        self.latest_build_started_at = None
 
     async def has_relationships(self, project_id):
         return bool(self.relationships)
@@ -33,12 +35,19 @@ class _InMemoryStore:
         self.upserted_edges.extend(edges)
         self.relationships.extend(edges)
 
-    async def replace_relationships(self, project_id, edges):
+    async def replace_relationships(self, project_id, edges, build_started_at):
+        if (
+            self.latest_build_started_at is not None
+            and build_started_at < self.latest_build_started_at
+        ):
+            return False
+        self.latest_build_started_at = build_started_at
         if self.events is not None:
             self.events.append("replace")
         self.cleared_projects.append(project_id)
         self.upserted_edges.extend(edges)
         self.relationships = list(edges)
+        return True
 
 
 class _RelationshipGenerator:
@@ -60,6 +69,16 @@ class _BlockingGenerator:
         self.started.set()
         await self.release.wait()
         return []
+
+
+class _DelayedGenerator:
+    def __init__(self, delay, edge):
+        self.delay = delay
+        self.edge = edge
+
+    async def generate(self, project_id, batch_topics, all_topics):
+        await asyncio.sleep(self.delay)
+        return [{"project_id": project_id, **self.edge}]
 
 
 class _ConcurrentGenerator:
@@ -235,6 +254,51 @@ class TopicGraphBuilderTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(2, result["edges_created"])
 
+    async def test_older_cross_process_build_cannot_replace_newer_graph(self):
+        class WorkerOneBuilder(TopicGraphBuilder):
+            _build_locks = WeakValueDictionary()
+            _locks_meta_lock = asyncio.Lock()
+
+        class WorkerTwoBuilder(TopicGraphBuilder):
+            _build_locks = WeakValueDictionary()
+            _locks_meta_lock = asyncio.Lock()
+
+        store = _InMemoryStore(existing=True)
+        old_builder = WorkerOneBuilder(
+            store,
+            _DelayedGenerator(
+                0.05,
+                {
+                    "from_topic": "Old",
+                    "to_topic": "Graph",
+                    "relation_type": "related",
+                    "weight": 0.5,
+                },
+            ),
+        )
+        new_builder = WorkerTwoBuilder(
+            store,
+            _DelayedGenerator(
+                0.01,
+                {
+                    "from_topic": "New",
+                    "to_topic": "Graph",
+                    "relation_type": "related",
+                    "weight": 0.5,
+                },
+            ),
+        )
+
+        old_task = asyncio.create_task(old_builder.build("project-1", ["A", "B"], True))
+        await asyncio.sleep(0.005)
+        new_result = await new_builder.build("project-1", ["A", "B"], True)
+        old_result = await old_task
+
+        self.assertEqual(1, new_result["edges_created"])
+        self.assertEqual(0, old_result["edges_created"])
+        self.assertIn("superseded", old_result["message"].lower())
+        self.assertEqual("New", store.relationships[0]["from_topic"])
+
 
 class LLMRelationshipGeneratorTests(unittest.IsolatedAsyncioTestCase):
     async def test_generate_normalizes_model_output(self):
@@ -317,8 +381,10 @@ class SupabaseTopicGraphStoreTests(unittest.IsolatedAsyncioTestCase):
 
         store = SupabaseTopicGraphStore(Client())
 
-        with self.assertRaisesRegex(RuntimeError, "migration 004"):
-            await store.replace_relationships("project-1", [])
+        with self.assertRaisesRegex(RuntimeError, "migrations 004/006"):
+            await store.replace_relationships(
+                "project-1", [], "2026-08-22T00:00:00+00:00"
+            )
 
 
 if __name__ == "__main__":

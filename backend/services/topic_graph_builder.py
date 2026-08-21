@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Protocol, TypedDict
 from uuid import uuid4
 from weakref import WeakValueDictionary
@@ -22,8 +23,11 @@ class TopicGraphStore(Protocol):
     async def upsert_relationships(self, edges: List[Dict[str, Any]]) -> None: ...
 
     async def replace_relationships(
-        self, project_id: str, edges: List[Dict[str, Any]]
-    ) -> None: ...
+        self,
+        project_id: str,
+        edges: List[Dict[str, Any]],
+        build_started_at: str,
+    ) -> bool: ...
 
 
 class RelationshipGenerator(Protocol):
@@ -94,6 +98,7 @@ class TopicGraphBuilder:
             }
 
         logger.info(f"Building Topic Graph for {len(unique_topics)} topics")
+        build_started_at = datetime.now(timezone.utc).isoformat()
         batches = self._create_batches(unique_topics)
         async def generate_batch(index: int, batch: List[str]):
             async with self._batch_semaphore:
@@ -121,7 +126,14 @@ class TopicGraphBuilder:
 
         # Publish only after every provider batch has completed successfully.
         if force_rebuild:
-            await self._store.replace_relationships(project_id, unique_edges)
+            published = await self._store.replace_relationships(
+                project_id, unique_edges, build_started_at
+            )
+            if not published:
+                return {
+                    "edges_created": 0,
+                    "message": "Build superseded by a newer Topic Graph build",
+                }
         elif unique_edges:
             await self._store.upsert_relationships(unique_edges)
 
@@ -202,18 +214,30 @@ class SupabaseTopicGraphStore:
             )
 
     async def replace_relationships(
-        self, project_id: str, edges: List[Dict[str, Any]]
-    ) -> None:
+        self,
+        project_id: str,
+        edges: List[Dict[str, Any]],
+        build_started_at: str,
+    ) -> bool:
         from db.client import async_db
 
         try:
-            await async_db(
+            result = await async_db(
                 lambda: self._client.rpc(
                     "replace_topic_graph_relationships",
-                    {"p_project_id": project_id, "p_edges": edges},
+                    {
+                        "p_project_id": project_id,
+                        "p_edges": edges,
+                        "p_build_started_at": build_started_at,
+                    },
                 ).execute()
             )
-            return
+            data = result.data
+            if isinstance(data, bool):
+                return data
+            if isinstance(data, list) and len(data) == 1 and isinstance(data[0], bool):
+                return data[0]
+            raise RuntimeError("Atomic Topic Graph RPC returned an invalid result")
         except Exception as error:
             message = str(error)
             missing_rpc = "PGRST202" in message or (
@@ -223,7 +247,7 @@ class SupabaseTopicGraphStore:
             if not missing_rpc:
                 raise
             raise RuntimeError(
-                "Atomic Topic Graph migration 004 is not installed; "
+                "Atomic Topic Graph migrations 004/006 are not installed; "
                 "refusing destructive replacement"
             ) from error
 

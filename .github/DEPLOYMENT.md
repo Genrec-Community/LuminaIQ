@@ -32,9 +32,10 @@ Runtime Supabase, Qdrant, OCR, and model credentials remain on App Service and
 the Vercel project; they are not copied into CI.
 
 Apply reviewed Supabase migrations before merging application code that uses
-them. In particular, `backend/migrations/004_atomic_topic_graph.sql` must be
-installed before Graph Build replacement is enabled. The backend fails closed
-rather than deleting an active graph when that RPC is missing.
+them. In particular, `backend/migrations/004_atomic_topic_graph.sql` and
+`006_ordered_topic_graph_publication.sql` must be installed in order before
+Graph Build replacement is enabled. The backend fails closed rather than
+deleting an active graph when either RPC migration is missing.
 
 Set Vercel's production `VITE_MAIN_API_URL` to the same App Service origin with
 the `/api/v1` suffix. CI embeds the commit in `build_info.py` inside the ZIP and
