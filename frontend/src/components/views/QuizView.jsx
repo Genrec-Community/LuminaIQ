@@ -93,18 +93,19 @@ const QuizView = ({
         try {
             const perfData = await getPerformance(projectId);
             
-            // perfData is an array of { topic, correct, wrong, ... }
+            // The backend returns newest-first performance rows in a wrapper.
             // Calculate average score across all recent quizzes
             let totalCorrect = 0;
             let totalWrong = 0;
             let quizCount = 0;
             
-            if (perfData && Array.isArray(perfData)) {
+            const performance = perfData?.performance || [];
+            if (Array.isArray(performance)) {
                 // Use up to last 10 entries for adaptive calculation
-                const recent = perfData.slice(-10);
+                const recent = performance.slice(0, 10);
                 recent.forEach(entry => {
-                    totalCorrect += (entry.correct || 0);
-                    totalWrong += (entry.wrong || 0);
+                    totalCorrect += (entry.correct_count || 0);
+                    totalWrong += (entry.wrong_count || 0);
                     quizCount++;
                 });
             }
