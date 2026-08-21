@@ -21,6 +21,10 @@ class TopicGraphStore(Protocol):
 
     async def upsert_relationships(self, edges: List[Dict[str, Any]]) -> None: ...
 
+    async def replace_relationships(
+        self, project_id: str, edges: List[Dict[str, Any]]
+    ) -> None: ...
+
 
 class RelationshipGenerator(Protocol):
     async def generate(
@@ -117,9 +121,11 @@ class TopicGraphBuilder:
 
         # Publish only after every provider batch has completed successfully.
         if force_rebuild:
-            await self._store.clear_relationships(project_id)
-        if unique_edges:
+            await self._store.replace_relationships(project_id, unique_edges)
+        elif unique_edges:
             await self._store.upsert_relationships(unique_edges)
+
+        if unique_edges:
             logger.info(
                 f"Upserted {len(unique_edges)} topic relationships for {project_id}"
             )
@@ -194,6 +200,35 @@ class SupabaseTopicGraphStore:
                 .upsert(rows, on_conflict="project_id,from_topic,to_topic")
                 .execute()
             )
+
+    async def replace_relationships(
+        self, project_id: str, edges: List[Dict[str, Any]]
+    ) -> None:
+        from db.client import async_db
+
+        try:
+            await async_db(
+                lambda: self._client.rpc(
+                    "replace_topic_graph_relationships",
+                    {"p_project_id": project_id, "p_edges": edges},
+                ).execute()
+            )
+            return
+        except Exception as error:
+            message = str(error)
+            missing_rpc = "PGRST202" in message or (
+                "replace_topic_graph_relationships" in message
+                and ("not find" in message.lower() or "404" in message)
+            )
+            if not missing_rpc:
+                raise
+            logger.warning(
+                "Atomic Topic Graph RPC is not installed; using rollout fallback"
+            )
+
+        await self.clear_relationships(project_id)
+        if edges:
+            await self.upsert_relationships(edges)
 
 
 class LLMRelationshipGenerator:

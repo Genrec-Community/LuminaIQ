@@ -29,6 +29,13 @@ class _InMemoryStore:
         self.upserted_edges.extend(edges)
         self.relationships.extend(edges)
 
+    async def replace_relationships(self, project_id, edges):
+        if self.events is not None:
+            self.events.append("replace")
+        self.cleared_projects.append(project_id)
+        self.upserted_edges.extend(edges)
+        self.relationships = list(edges)
+
 
 class _RelationshipGenerator:
     def __init__(self, edges=None):
@@ -217,7 +224,7 @@ class TopicGraphBuilderTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual({"generate:A", "generate:D"}, set(events[:2]))
         self.assertEqual({"generated:A", "generated:D"}, set(events[2:4]))
-        self.assertEqual(["clear", "upsert"], events[4:])
+        self.assertEqual(["replace"], events[4:])
         self.assertEqual(
             [("A", "B"), ("D", "E")],
             [(edge["from_topic"], edge["to_topic"]) for edge in store.relationships],
