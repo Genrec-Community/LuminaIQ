@@ -41,6 +41,7 @@ Because the architecture cleanly separates the frontend (Vercel), the database/a
    - `AZURE_OPENAI_ENDPOINT` (from Step 1.1)
    - `AZURE_OPENAI_API_KEY` (from Step 1.1)
    - `AZURE_OPENAI_DEPLOYMENT` (the name of your chat model deployment)
+   - `AZURE_OPENAI_MODEL` (the actual model family, such as `gpt-4.1-mini`; required when the deployment has a custom name)
    - `AZURE_OPENAI_EMBED_DEPLOYMENT` (`text-embedding-3-small`)
    - `AZURE_OPENAI_API_VERSION` (e.g., `2024-12-01-preview`)
    - `AZURE_CV_ENDPOINT` (from Step 1.2)

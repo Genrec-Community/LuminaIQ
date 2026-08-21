@@ -44,7 +44,7 @@ python -m venv .venv
 
 - The frontend authenticates with Supabase, exchanges that session for a custom backend JWT, and stores the app JWT in `localStorage`; changes to auth normally span `AuthContext.jsx`, `api.js`, `auth_service.py`, and `api/deps.py`.
 - `frontend/src/api.js` hard-codes the production backend URL. `VITE_MAIN_API_URL` in `.env.example` currently has no effect; only the Supabase frontend variables are read from Vite env.
-- Supabase is the relational store and file store. Qdrant uses one collection per project named `project_{project_id}`. Azure OpenAI supplies chat and embeddings; Azure CV handles OCR.
+- Supabase is the relational store and file store. Qdrant uses one collection per project named `project_{project_id}`. LlamaIndex owns LLM, embedding, chunking, and RAG orchestration over the existing Qdrant payload schema; Azure OpenAI supplies the models and Azure CV handles OCR.
 - Document processing runs extraction -> extracted-text storage -> chunking -> embeddings -> topics -> knowledge graph in `backend/services/document_service.py`.
 - Background jobs, document progress, caches, queues, semaphores, and `asyncio.create_task` work are process-local. They are not shared across Gunicorn workers and do not survive restarts; do not describe them as durable or globally limited.
 
@@ -54,7 +54,7 @@ python -m venv .venv
 - EventSource progress auth puts the JWT in a query parameter. Avoid logging request URLs or propagating this pattern to new endpoints.
 - The current upload pipeline stores extracted text in the `texts` bucket and deletes the original temp file. The PDF URL path expects originals in the `documents` bucket, so preserve or explicitly resolve this mismatch when changing uploads or document viewing.
 - The checked-in SQL is not a complete, ordered migration history. `supabase_schema_all_tables.sql` references a missing `supabase_schema_flashcards_mindmaps.sql`, while runtime code uses additional tables/columns not created by the available files. Confirm the live schema and add an explicit migration; do not treat the aggregate schema file as authoritative.
-- `frontend/.env.production` is tracked. Do not print, copy, or commit credential values from environment files.
+- Frontend environment files are ignored except `.env.example`; configure production values in Vercel and never commit credential values.
 
 ## High-Coupling Areas
 

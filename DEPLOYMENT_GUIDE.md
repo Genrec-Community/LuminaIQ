@@ -78,6 +78,7 @@ MODEL_API_KEY=your-model-api-key-here
 AZURE_OPENAI_ENDPOINT=https://your-resource-name.openai.azure.com/
 AZURE_OPENAI_API_KEY=your-azure-openai-api-key
 AZURE_OPENAI_DEPLOYMENT=gpt-4.1-mini
+AZURE_OPENAI_MODEL=gpt-4.1-mini
 AZURE_OPENAI_EMBED_DEPLOYMENT=text-embedding-3-small
 AZURE_OPENAI_API_VERSION=2024-12-01-preview
 
@@ -90,7 +91,8 @@ LLM_MODEL=z-ai/glm-4.5-air:free
 
 EMBEDDING_API_KEY=your-embedding-api-key
 EMBEDDING_BASE_URL=https://openrouter.ai/api/v1
-EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+EMBEDDING_MODEL=openai/text-embedding-3-small
+EMBEDDING_DIMENSION=1536
 
 # ==============================================================================
 # 2. Supabase Configuration (Database & Storage)
@@ -167,7 +169,7 @@ Prior to deployment, the following critical bugs in the codebase were identified
 3. Select your repository. If using Blueprint, Render will automatically read `render.yaml` and configure Docker runtime.
 4. Under **Environment Variables**, add:
    - `MODEL_API_KEY` (or `AZURE_OPENAI_API_KEY` / `LLM_API_KEY`)
-   - `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_DEPLOYMENT` (if using Azure OpenAI)
+   - `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT`, and `AZURE_OPENAI_MODEL` (if using Azure OpenAI). `AZURE_OPENAI_MODEL` is required when the deployment has a custom name.
    - `SUPABASE_URL`, `SUPABASE_KEY`, `SUPABASE_SERVICE_KEY`
    - `BACKEND_CORS_ORIGINS`: Set to your frontend URL (e.g., `https://your-app.vercel.app`)
 5. Deploy service. Once live, copy your backend URL (e.g., `https://luminaiq-backend.onrender.com`).
@@ -230,12 +232,13 @@ Before running the deployment command, you must create a resource group, contain
      --ingress 'external' `
      --env-vars `
          MODEL_API_KEY="your-azure-openai-key-here" `
-         AZURE_OPENAI_ENDPOINT="https://liq.openai.azure.com/" `
+         AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/" `
          AZURE_OPENAI_DEPLOYMENT="gpt-5-mini" `
+         AZURE_OPENAI_MODEL="gpt-5-mini" `
          AZURE_OPENAI_EMBED_DEPLOYMENT="text-embedding-3-small" `
-         SUPABASE_URL="https://bcosfvilvwyxtrctsmez.supabase.co" `
-         SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJjb3Nmdmlsdnd5eHRyY3RzbWV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY3ODIyMTMsImV4cCI6MjA4MjM1ODIxM30.bj9wwAT41fkvGX6CLrmyQT16-Fph4_mgqSXZintsNX0" `
-         SUPABASE_SERVICE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJjb3Nmdmlsdnd5eHRyY3RzbWV6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2Njc4MjIxMywiZXhwIjoyMDgyMzU4MjEzfQ.Fyog6EUERO2Uo7EhlOHQAkRIXnQQEP8e-Klig9kp8I4"
+         SUPABASE_URL="https://your-project.supabase.co" `
+         SUPABASE_KEY="your-supabase-anon-key" `
+         SUPABASE_SERVICE_KEY="your-supabase-service-role-key"
    ```
 
 #### Step 3: Deploy Frontend to Azure Static Web Apps
