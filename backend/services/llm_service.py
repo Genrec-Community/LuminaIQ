@@ -1,5 +1,7 @@
 """Application-scoped LlamaIndex LLM clients for Azure/OpenAI-compatible chat."""
 
+import asyncio
+import time
 from typing import Dict, List, Tuple
 
 from config.settings import settings
@@ -53,6 +55,7 @@ class LLMService:
 
     def __init__(self):
         self._clients = {}
+        self._request_semaphore = asyncio.Semaphore(settings.MAX_CONCURRENT_LLM)
         provider = "Azure OpenAI" if self._using_azure else "OpenAI-compatible"
         logger.info(f"[LLMService] LlamaIndex provider: {provider}")
 
@@ -130,25 +133,33 @@ class LLMService:
         max_tokens: int = 4000,
     ) -> str:
         max_tokens = max(max_tokens, 2000)
-        client = self._get_client(temperature=temperature, max_tokens=max_tokens)
-        response = await client.achat(_convert_messages(messages))
-        answer, finish_reason, reasoning_tokens = _response_details(response)
+        queued_at = time.perf_counter()
+        async with self._request_semaphore:
+            started_at = time.perf_counter()
+            client = self._get_client(temperature=temperature, max_tokens=max_tokens)
+            response = await client.achat(_convert_messages(messages))
+            answer, finish_reason, reasoning_tokens = _response_details(response)
 
-        if len(answer) < self.EMPTY_RESPONSE_MIN_CHARS and (
-            finish_reason == "length" or reasoning_tokens > max_tokens * 0.5
-        ):
-            retry_tokens = min(max_tokens * self.RETRY_TOKEN_MULTIPLIER, 6000)
-            logger.warning(
-                f"[LLMService] Token starvation; retrying with {retry_tokens} tokens"
-            )
-            retry_client = self._get_client(
-                temperature=temperature, max_tokens=retry_tokens
-            )
-            retry_response = await retry_client.achat(_convert_messages(messages))
-            answer, _, _ = _response_details(retry_response)
+            if len(answer) < self.EMPTY_RESPONSE_MIN_CHARS and (
+                finish_reason == "length" or reasoning_tokens > max_tokens * 0.5
+            ):
+                retry_tokens = min(max_tokens * self.RETRY_TOKEN_MULTIPLIER, 6000)
+                logger.warning(
+                    f"[LLMService] Token starvation; retrying with {retry_tokens} tokens"
+                )
+                retry_client = self._get_client(
+                    temperature=temperature, max_tokens=retry_tokens
+                )
+                retry_response = await retry_client.achat(_convert_messages(messages))
+                answer, _, _ = _response_details(retry_response)
 
-        logger.info(f"[LLMService] Completion: {len(answer)} chars")
-        return answer
+            logger.info(
+                "[LLMService] Completion: %s chars | queue=%.1fms provider=%.1fms",
+                len(answer),
+                (started_at - queued_at) * 1000,
+                (time.perf_counter() - started_at) * 1000,
+            )
+            return answer
 
     async def chat_completion_stream(
         self,
@@ -156,13 +167,23 @@ class LLMService:
         temperature: float = 0.7,
         max_tokens: int = 4000,
     ):
-        client = self._get_client(
-            temperature=temperature, max_tokens=max(max_tokens, 2000)
-        )
-        stream = await client.astream_chat(_convert_messages(messages))
-        async for event in stream:
-            if event.delta:
-                yield event.delta
+        queued_at = time.perf_counter()
+        async with self._request_semaphore:
+            started_at = time.perf_counter()
+            client = self._get_client(
+                temperature=temperature, max_tokens=max(max_tokens, 2000)
+            )
+            stream = await client.astream_chat(_convert_messages(messages))
+            try:
+                async for event in stream:
+                    if event.delta:
+                        yield event.delta
+            finally:
+                logger.info(
+                    "[LLMService] Stream: queue=%.1fms provider=%.1fms",
+                    (started_at - queued_at) * 1000,
+                    (time.perf_counter() - started_at) * 1000,
+                )
 
 
 llm_service = LLMService()
