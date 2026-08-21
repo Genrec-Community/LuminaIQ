@@ -358,6 +358,10 @@ backend/check_*.py
 backend/test_*.py
 backend/run_container_test.bat
 backend/container_logs.txt
+container_logs.txt
+backend/deploy.zip
+backend/main_backup.py
+services/parallel_embedding_processor.py
 *.yaml
 frontend/migrate.py
 update_qdrant.py
