@@ -144,6 +144,7 @@ begin
     update public.document_jobs
     set status = 'processing',
         stage = 'claimed',
+        progress = 0,
         attempts = attempts + 1,
         worker_id = btrim(p_worker_id),
         lease_token = gen_random_uuid(),
