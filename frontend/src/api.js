@@ -42,6 +42,13 @@ api.interceptors.response.use(
     async (error) => {
         const config = error.config;
         const status = error.response?.status;
+        const url = config?.url || '';
+
+        // Auth failures must surface directly. Refreshing an exchange request
+        // through this interceptor would queue it behind itself and deadlock.
+        if (url.includes('/auth/') || url.startsWith('auth/')) {
+            return Promise.reject(error);
+        }
 
         // ── 401 Unauthorized: try to refresh the app JWT via Supabase ──
         if (status === 401 && config && !config._retried) {
@@ -66,9 +73,11 @@ api.interceptors.response.use(
 
                 if (session?.access_token) {
                     // Exchange the fresh Supabase token for a new app JWT
-                    const resp = await api.post('auth/exchange', {
-                        access_token: session.access_token
-                    });
+                    const resp = await axios.post(
+                        `${API_URL}/auth/exchange`,
+                        { access_token: session.access_token },
+                        { timeout: api.defaults.timeout }
+                    );
                     const newToken = resp.data?.access_token;
 
                     if (newToken) {
@@ -96,12 +105,6 @@ api.interceptors.response.use(
             } finally {
                 isRefreshing = false;
             }
-        }
-
-        // ── Skip retry for auth endpoints to surface errors immediately ──
-        const url = config?.url || '';
-        if (url.includes('/auth/')) {
-            return Promise.reject(error);
         }
 
         // ── Retry for transient server errors (503, 429, 502, network) ──
