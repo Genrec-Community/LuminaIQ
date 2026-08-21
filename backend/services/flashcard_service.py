@@ -1,5 +1,5 @@
 from typing import List, Optional, Dict, Any
-from db.client import get_supabase_client
+from db.client import get_supabase_client, async_db
 from utils.logger import logger
 from services.rag_service import rag_service
 from services.llm_service import llm_service
@@ -14,32 +14,36 @@ class FlashcardService:
         """Get all flashcard sets for a project with card counts"""
         try:
             # Get flashcard sets
-            response = self.supabase.table('flashcard_sets') \
-                .select('*') \
-                .eq('user_id', user_id) \
-                .eq('project_id', project_id) \
-                .order('created_at', desc=True) \
+            response = await async_db(
+                lambda: self.supabase.table('flashcard_sets')
+                .select('*')
+                .eq('user_id', user_id)
+                .eq('project_id', project_id)
+                .order('created_at', desc=True)
                 .execute()
+            )
             
             sets = response.data or []
             
-            # Get card counts and cards for each set
+            if not sets:
+                return []
+
+            set_ids = [flashcard_set['id'] for flashcard_set in sets]
+            cards_response = await async_db(
+                lambda: self.supabase.table('flashcards')
+                .select('*')
+                .in_('set_id', set_ids)
+                .order('position')
+                .execute()
+            )
+            cards_by_set = {set_id: [] for set_id in set_ids}
+            for card in cards_response.data or []:
+                cards_by_set.get(card.get('set_id'), []).append(card)
+
             for flashcard_set in sets:
-                cards_response = self.supabase.table('flashcards') \
-                    .select('id', count='exact') \
-                    .eq('set_id', flashcard_set['id']) \
-                    .execute()
-                
-                flashcard_set['card_count'] = cards_response.count or 0
-                
-                # Get cards for the set
-                cards_data = self.supabase.table('flashcards') \
-                    .select('*') \
-                    .eq('set_id', flashcard_set['id']) \
-                    .order('position') \
-                    .execute()
-                
-                flashcard_set['cards'] = cards_data.data or []
+                cards = cards_by_set[flashcard_set['id']]
+                flashcard_set['cards'] = cards
+                flashcard_set['card_count'] = len(cards)
             
             return sets
         
