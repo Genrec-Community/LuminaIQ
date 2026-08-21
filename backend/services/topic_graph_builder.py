@@ -222,13 +222,10 @@ class SupabaseTopicGraphStore:
             )
             if not missing_rpc:
                 raise
-            logger.warning(
-                "Atomic Topic Graph RPC is not installed; using rollout fallback"
-            )
-
-        await self.clear_relationships(project_id)
-        if edges:
-            await self.upsert_relationships(edges)
+            raise RuntimeError(
+                "Atomic Topic Graph migration 004 is not installed; "
+                "refusing destructive replacement"
+            ) from error
 
 
 class LLMRelationshipGenerator:

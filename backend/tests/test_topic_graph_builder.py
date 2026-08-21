@@ -2,7 +2,11 @@ import asyncio
 import json
 import unittest
 
-from services.topic_graph_builder import LLMRelationshipGenerator, TopicGraphBuilder
+from services.topic_graph_builder import (
+    LLMRelationshipGenerator,
+    SupabaseTopicGraphStore,
+    TopicGraphBuilder,
+)
 
 
 class _InMemoryStore:
@@ -297,6 +301,24 @@ class LLMRelationshipGeneratorTests(unittest.IsolatedAsyncioTestCase):
 
         with self.assertRaisesRegex(ValueError, "no JSON array"):
             await generator.generate("project-1", ["A", "B"], ["A", "B"])
+
+
+class SupabaseTopicGraphStoreTests(unittest.IsolatedAsyncioTestCase):
+    async def test_missing_atomic_rpc_fails_without_destructive_fallback(self):
+        class Request:
+            def execute(self):
+                raise RuntimeError(
+                    "PGRST202 Could not find function replace_topic_graph_relationships"
+                )
+
+        class Client:
+            def rpc(self, name, payload):
+                return Request()
+
+        store = SupabaseTopicGraphStore(Client())
+
+        with self.assertRaisesRegex(RuntimeError, "migration 004"):
+            await store.replace_relationships("project-1", [])
 
 
 if __name__ == "__main__":
