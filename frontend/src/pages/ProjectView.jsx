@@ -463,10 +463,12 @@ const ProjectView = () => {
     const fetchDocuments = async () => {
         const data = await getDocuments(projectId);
         const nextDocuments = data.documents || [];
-        setDocuments(nextDocuments);
-        setIsProcessingDocs(nextDocuments.some(document =>
+        const hasProcessingDocuments = nextDocuments.some(document =>
             ['pending', 'processing', 'embedding', 'queued'].includes(document.upload_status)
-        ));
+        );
+        setDocuments(nextDocuments);
+        setIsProcessingDocs(hasProcessingDocuments);
+        if (hasProcessingDocuments) topicsFetchedRef.current = false;
         return data;
     };
 
@@ -503,6 +505,7 @@ const ProjectView = () => {
                 );
                 setDocuments(nextDocuments);
                 setIsProcessingDocs(stillProcessing);
+                if (stillProcessing) topicsFetchedRef.current = false;
                 if (!stillProcessing && !topicsFetchedRef.current) {
                     topicsFetchedRef.current = true;
                     fetchTopics();
