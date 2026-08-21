@@ -1,0 +1,129 @@
+name: CI/CD
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - dev/rework-embedding
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend tests and benchmark
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt
+      - name: Run regression tests
+        run: python -m unittest discover -s tests -v
+      - name: Benchmark Topic Graph builds
+        run: >-
+          python benchmarks/benchmark_knowledge_graph.py
+          --output benchmark-results/knowledge-graph.json
+      - name: Upload benchmark report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: knowledge-graph-benchmark
+          path: backend/benchmark-results/knowledge-graph.json
+          if-no-files-found: error
+          retention-days: 30
+
+  frontend:
+    name: Frontend lint and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+
+  deploy-backend:
+    name: Deploy backend to Azure
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs:
+      - backend
+      - frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sign in to Azure with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Build and push backend image
+        run: >-
+          az acr build
+          --registry "${{ vars.AZURE_ACR_NAME }}"
+          --image "luminaiq-backend:${{ github.sha }}"
+          --image "luminaiq-backend:latest"
+          backend
+      - name: Deploy immutable image to Container Apps
+        run: >-
+          az containerapp update
+          --name "${{ vars.AZURE_CONTAINER_APP_NAME }}"
+          --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}"
+          --image "${{ vars.AZURE_ACR_LOGIN_SERVER }}/luminaiq-backend:${{ github.sha }}"
+
+  deploy-frontend:
+    name: Deploy frontend to Vercel
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs:
+      - backend
+      - frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    env:
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Pull production configuration
+        working-directory: frontend
+        run: >-
+          npx vercel@latest pull --yes --environment=production
+          --token="${{ secrets.VERCEL_TOKEN }}"
+      - name: Build frontend
+        working-directory: frontend
+        run: npx vercel@latest build --prod --token="${{ secrets.VERCEL_TOKEN }}"
+      - name: Deploy prebuilt frontend
+        working-directory: frontend
+        run: >-
+          npx vercel@latest deploy --prebuilt --prod
+          --token="${{ secrets.VERCEL_TOKEN }}"
