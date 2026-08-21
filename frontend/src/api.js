@@ -1,8 +1,9 @@
 import axios from 'axios';
 
-// Fallback to localhost so a missing VITE_MAIN_API_URL env var doesn't silently
-// send every request to '/undefined/...' on deployed builds.
-export const API_URL = 'https://luminaiq-api-v2.azurewebsites.net/api/v1';
+export const API_URL = (
+    import.meta.env.VITE_MAIN_API_URL ||
+    'https://luminaiq-api-v2.azurewebsites.net/api/v1'
+).replace(/\/$/, '');
 
 export const api = axios.create({
     baseURL: API_URL,
@@ -112,8 +113,10 @@ api.interceptors.response.use(
             return Promise.reject(error);
         }
 
-        const isRetryable = status === 503 || status === 429 || status === 502 || !error.response;
-        if (isRetryable) {
+        const method = config.method?.toLowerCase();
+        const isSafeMethod = ['get', 'head', 'options'].includes(method);
+        const isRetryableStatus = status === 503 || status === 429 || status === 502 || !error.response;
+        if (isSafeMethod && isRetryableStatus) {
             config._retryCount = (config._retryCount || 0) + 1;
             const delay = Math.min(1000 * Math.pow(2, config._retryCount - 1), 10000);
             console.log(`Retrying request (attempt ${config._retryCount}/3) in ${delay}ms...`);
