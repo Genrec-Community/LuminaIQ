@@ -289,8 +289,11 @@ const ProjectView = () => {
         }
     }, [isAssessmentContext]);
 
-    // Combined sidebar hidden state
-    const isSidebarHidden = isQuizActive || isQAActive || zenMode;
+    // Assessment views may hide navigation only while they are the active owner.
+    const isAssessmentActive =
+        (activeTab === 'quiz' && isQuizActive) ||
+        (activeTab === 'qa' && isQAActive);
+    const isSidebarHidden = isAssessmentActive || zenMode;
 
     // File Upload Ref
     const fileInputRef = useRef(null);

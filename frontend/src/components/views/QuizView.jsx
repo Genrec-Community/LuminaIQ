@@ -150,6 +150,10 @@ const QuizView = ({
             onQuizActiveChange(isActive);
         }
     }, [mcqLoading, evalLoading, mcqTest, evalTest, onQuizActiveChange]);
+
+    useEffect(() => () => {
+        onQuizActiveChange?.(false);
+    }, [onQuizActiveChange]);
     
     // Handle pre-selected topic from Learning Path
     useEffect(() => {

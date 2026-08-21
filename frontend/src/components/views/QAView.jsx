@@ -68,6 +68,10 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
         }
     }, [qaLoading, qaTest, onQAActiveChange]);
 
+    useEffect(() => () => {
+        onQAActiveChange?.(false);
+    }, [onQAActiveChange]);
+
     const fetchSavedTests = async () => {
         setSavedLoading(true);
         try {
