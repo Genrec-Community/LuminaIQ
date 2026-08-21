@@ -280,6 +280,14 @@ const ProjectView = () => {
     // Quiz/Q&A Active State (hides sidebars during generation/active)
     const [isQuizActive, setIsQuizActive] = useState(false);
     const [isQAActive, setIsQAActive] = useState(false);
+    const isAssessmentContext = activeTab === 'quiz' || activeTab === 'qa';
+
+    useEffect(() => {
+        if (isAssessmentContext) {
+            setShowAITutor(false);
+            setTutorTopic(null);
+        }
+    }, [isAssessmentContext]);
 
     // Combined sidebar hidden state
     const isSidebarHidden = isQuizActive || isQAActive || zenMode;
@@ -1247,13 +1255,15 @@ const ProjectView = () => {
                                     >
                                         <Search className="h-5 w-5" />
                                     </button>
-                                    <button
-                                        onClick={() => setShowAITutor(!showAITutor)}
-                                        className={`p-2.5 rounded-lg transition-colors ${showAITutor ? 'bg-[#C8A288] text-white' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30'}`}
-                                        title="AI Tutor"
-                                    >
-                                        <Brain className="h-5 w-5" />
-                                    </button>
+                                    {!isAssessmentContext && (
+                                        <button
+                                            onClick={() => setShowAITutor(!showAITutor)}
+                                            className={`p-2.5 rounded-lg transition-colors ${showAITutor ? 'bg-[#C8A288] text-white' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30'}`}
+                                            title="AI Tutor"
+                                        >
+                                            <Brain className="h-5 w-5" />
+                                        </button>
+                                    )}
                                     <button
                                         onClick={() => setShowPomodoro(!showPomodoro)}
                                         className={`p-2.5 rounded-lg transition-colors ${showPomodoro ? 'bg-[#C8A288] text-white' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30'}`}
@@ -2082,7 +2092,7 @@ const ProjectView = () => {
             )}
 
             {/* AI Tutor Chat Panel - self-positioned, draggable */}
-            {showAITutor && (
+            {showAITutor && !isAssessmentContext && (
                 <AITutorChat
                     projectId={projectId}
                     selectedDocuments={selectedDocuments}
