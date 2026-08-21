@@ -170,13 +170,14 @@ Return ONLY a valid JSON array of topic strings:
             if len(sorted_topics) >= 3:
                 try:
                     from services.knowledge_graph_service import knowledge_graph
+                    from services.topic_graph import topic_graph_builder
 
                     # Check if graph already exists
                     stats = await knowledge_graph.get_graph_stats(project_id)
                     if stats.get("total_edges", 0) == 0:
                         # Build graph in background (don't await, fire and forget)
                         asyncio.create_task(
-                            knowledge_graph.build_graph_from_topics(
+                            topic_graph_builder.build(
                                 project_id, sorted_topics
                             )
                         )

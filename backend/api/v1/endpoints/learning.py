@@ -39,6 +39,7 @@ from services.learning_service import (
     spaced_repetition,
 )
 from services.knowledge_graph_service import knowledge_graph
+from services.topic_graph import topic_graph_builder
 from services.llm_service import llm_service
 from api.deps import get_current_user
 from utils.logger import logger
@@ -464,7 +465,7 @@ async def build_knowledge_graph(
     DSA: Adjacency List graph representation
     """
     try:
-        result = await knowledge_graph.build_graph_from_topics(
+        result = await topic_graph_builder.build(
             project_id=project_id,
             topics=request.topics,
             force_rebuild=request.force_rebuild,

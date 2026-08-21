@@ -200,7 +200,7 @@ class DocumentService:
             # ── 7. Auto-build knowledge graph from all project topics ──────────
             await progress.emit(document_id, "graph", 0, "Building knowledge graph...")
             try:
-                from services.knowledge_graph_service import knowledge_graph
+                from services.topic_graph import topic_graph_builder
 
                 docs = await async_db(
                     lambda: get_supabase_client()
@@ -231,7 +231,7 @@ class DocumentService:
                         f"Auto-building knowledge graph with {len(all_topics)} topics"
                     )
                     async with llm_semaphore:
-                        await knowledge_graph.build_graph_from_topics(
+                        await topic_graph_builder.build(
                             project_id, all_topics, force_rebuild=True
                         )
                     logger.info(f"Knowledge graph built for {filename}")
@@ -530,7 +530,7 @@ class DocumentService:
                     logger.error(f"Failed to generate topics: {topic_err}")
 
                 try:
-                    from services.knowledge_graph_service import knowledge_graph
+                    from services.topic_graph import topic_graph_builder
                     docs = await async_db(
                         lambda: get_supabase_client()
                         .table("documents")
@@ -553,7 +553,7 @@ class DocumentService:
                         all_topics.extend(current_doc.data[0].get("topics") or [])
                     all_topics = list(set(all_topics))
                     if len(all_topics) >= 2:
-                        await knowledge_graph.build_graph_from_topics(
+                        await topic_graph_builder.build(
                             project_id, all_topics, force_rebuild=True
                         )
                 except Exception as kg_err:
