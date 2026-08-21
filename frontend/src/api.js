@@ -609,12 +609,12 @@ export const getSuggestedTopic = async (projectId) => {
 
 // ============== Search API ==============
 
-export const searchDocuments = async (projectId, query, documentIds = null, limit = 10) => {
+export const searchDocuments = async (projectId, query, documentIds = null, limit = 10, signal = undefined) => {
     const response = await api.post(`/documents/${projectId}/search`, {
         query,
         document_ids: documentIds,
         limit
-    });
+    }, { signal });
     return response.data;
 };
 

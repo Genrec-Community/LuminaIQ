@@ -1,19 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     Search, X, FileText, MessageSquare, BookOpen,
     Clock, ArrowRight, Loader2, Tag, ChevronRight,
     Sparkles, Filter
 } from 'lucide-react';
 import { searchDocuments, getRecentSearches, saveRecentSearch as saveRecentSearchApi, clearRecentSearches as clearRecentSearchesApi } from '../api';
-
-// Simple debounce helper (no lodash dependency)
-const debounce = (fn, ms) => {
-    let timer;
-    return (...args) => {
-        clearTimeout(timer);
-        timer = setTimeout(() => fn(...args), ms);
-    };
-};
 
 const GlobalSearch = ({
     projectId,
@@ -42,15 +33,19 @@ const GlobalSearch = ({
 
     // Load recent searches from API
     useEffect(() => {
+        let cancelled = false;
         const load = async () => {
             try {
                 const data = await getRecentSearches(projectId);
-                setRecentSearches(data.searches || []);
+                if (!cancelled) setRecentSearches(data.searches || []);
             } catch (err) {
-                console.warn('Failed to load recent searches:', err);
+                if (!cancelled) console.warn('Failed to load recent searches:', err);
             }
         };
         load();
+        return () => {
+            cancelled = true;
+        };
     }, [projectId]);
 
     // Focus input when opened
@@ -60,49 +55,57 @@ const GlobalSearch = ({
         }
     }, [isOpen]);
 
-    // Debounced search
-    const performSearch = useCallback(
-        debounce(async (searchQuery) => {
-            if (!searchQuery.trim()) {
-                setResults({ documents: [], topics: [], semantic: [] });
-                return;
-            }
+    useEffect(() => {
+        const searchQuery = query.trim();
+        if (!isOpen || !searchQuery) {
+            setResults({ documents: [], topics: [], semantic: [] });
+            setLoading(false);
+            return;
+        }
 
+        const controller = new AbortController();
+        let cancelled = false;
+        const timer = setTimeout(async () => {
             setLoading(true);
             const lowerQuery = searchQuery.toLowerCase();
-
-            // Local search for documents
             const matchedDocs = documents.filter(doc =>
                 doc.filename.toLowerCase().includes(lowerQuery)
             );
-
-            // Local search for topics
             const matchedTopics = allTopics.filter(topic =>
                 topic.toLowerCase().includes(lowerQuery)
             );
 
-            // Semantic search via API
-            let semanticResults = [];
             try {
-                const data = await searchDocuments(projectId, searchQuery, null, 5);
-                semanticResults = data.results || [];
+                const data = await searchDocuments(
+                    projectId, searchQuery, null, 5, controller.signal
+                );
+                if (!cancelled) {
+                    setResults({
+                        documents: matchedDocs,
+                        topics: matchedTopics,
+                        semantic: data.results || [],
+                    });
+                }
             } catch (error) {
-                console.error('Semantic search failed:', error);
+                if (!cancelled && error.code !== 'ERR_CANCELED') {
+                    console.error('Semantic search failed:', error);
+                    setResults({
+                        documents: matchedDocs,
+                        topics: matchedTopics,
+                        semantic: [],
+                    });
+                }
+            } finally {
+                if (!cancelled) setLoading(false);
             }
+        }, 300);
 
-            setResults({
-                documents: matchedDocs,
-                topics: matchedTopics,
-                semantic: semanticResults,
-            });
-            setLoading(false);
-        }, 300),
-        [documents, allTopics, projectId]
-    );
-
-    useEffect(() => {
-        performSearch(query);
-    }, [query, performSearch]);
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+            controller.abort();
+        };
+    }, [query, isOpen, documents, allTopics, projectId]);
 
     const saveRecentSearch = (searchQuery) => {
         if (!searchQuery.trim()) return;
