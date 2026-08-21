@@ -1,3 +1,5 @@
+import asyncio
+
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http.exceptions import UnexpectedResponse
 from qdrant_client.models import (
@@ -47,6 +49,8 @@ class QdrantService:
         }
 
         self.async_client = AsyncQdrantClient(**kwargs)
+        self._initialized_collections = set()
+        self._collection_locks = {}
         logger.info(
             f"[QdrantService] Initialized with AsyncQdrantClient | "
             f"async_timeout={self.ASYNC_TIMEOUT}s"
@@ -57,29 +61,34 @@ class QdrantService:
     ):
         """Create a collection and its indexes when it does not already exist."""
         try:
-            if await self.async_client.collection_exists(collection_name):
-                logger.info(f"Collection already exists: {collection_name}")
+            if collection_name in self._initialized_collections:
                 return
 
-            try:
-                created = await self.async_client.create_collection(
-                    collection_name=collection_name,
-                    vectors_config=VectorParams(
-                        size=vector_size, distance=Distance.COSINE
-                    ),
-                )
-            except UnexpectedResponse as e:
-                if e.status_code != 409:
-                    raise
-                logger.info(f"Collection already exists: {collection_name}")
-                return
+            lock = self._collection_locks.setdefault(collection_name, asyncio.Lock())
+            async with lock:
+                if collection_name in self._initialized_collections:
+                    return
 
-            if not created:
-                logger.info(f"Collection already exists: {collection_name}")
-                return
+                exists = await self.async_client.collection_exists(collection_name)
+                if not exists:
+                    try:
+                        created = await self.async_client.create_collection(
+                            collection_name=collection_name,
+                            vectors_config=VectorParams(
+                                size=vector_size, distance=Distance.COSINE
+                            ),
+                        )
+                        if created:
+                            logger.info(f"Created collection: {collection_name}")
+                    except UnexpectedResponse as error:
+                        if error.status_code != 409:
+                            raise
+                        logger.info(f"Collection concurrently created: {collection_name}")
+                else:
+                    logger.info(f"Collection already exists: {collection_name}")
 
-            logger.info(f"Created collection: {collection_name}")
-            await self._ensure_indexes(collection_name)
+                await self._ensure_indexes(collection_name)
+                self._initialized_collections.add(collection_name)
 
         except Exception as e:
             logger.error(f"Error creating collection: {str(e)}")
@@ -88,18 +97,21 @@ class QdrantService:
     async def _ensure_indexes(self, collection_name: str):
         """Create payload indexes if they don't exist (async)"""
         try:
-            await self.async_client.create_payload_index(
-                collection_name=collection_name,
-                field_name="document_id",
-                field_schema=PayloadSchemaType.KEYWORD,
-                wait=True,
-            )
-            await self.async_client.create_payload_index(
-                collection_name=collection_name,
-                field_name="chunk_id",
-                field_schema=PayloadSchemaType.INTEGER,
-                wait=True,
-            )
+            collection = await self.async_client.get_collection(collection_name)
+            payload_schema = getattr(collection, "payload_schema", {}) or {}
+            required_indexes = {
+                "document_id": PayloadSchemaType.KEYWORD,
+                "chunk_id": PayloadSchemaType.INTEGER,
+            }
+            for field_name, field_schema in required_indexes.items():
+                if field_name in payload_schema:
+                    continue
+                await self.async_client.create_payload_index(
+                    collection_name=collection_name,
+                    field_name=field_name,
+                    field_schema=field_schema,
+                    wait=True,
+                )
             logger.info(f"Verified/Created indexes for {collection_name}")
         except Exception as e:
             if "already exists" not in str(e).lower():
