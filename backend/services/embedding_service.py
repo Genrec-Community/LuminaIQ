@@ -19,8 +19,6 @@ class EmbeddingService:
     - Connection reuse via persistent client
     """
 
-    # Optimal workers for I/O-bound embedding API calls
-    MAX_WORKERS_BATCH = 15  # Increased from 3 to handle large books significantly faster
     MAX_WORKERS_SEARCH = 2
 
     def __init__(self):
@@ -34,6 +32,8 @@ class EmbeddingService:
                 api_key=azure_key,
                 openai_api_version=settings.AZURE_OPENAI_API_VERSION,
                 azure_deployment=settings.AZURE_OPENAI_EMBED_DEPLOYMENT,
+                request_timeout=settings.EMBEDDING_REQUEST_TIMEOUT_S,
+                max_retries=0,
             )
             logger.info(
                 f"[EmbeddingService] Initialized with AzureOpenAIEmbeddings "
@@ -55,6 +55,8 @@ class EmbeddingService:
                 model=settings.EMBEDDING_MODEL or "text-embedding-3-small",
                 openai_api_key=fallback_key,
                 openai_api_base=fallback_base,
+                request_timeout=settings.EMBEDDING_REQUEST_TIMEOUT_S,
+                max_retries=0,
             )
             logger.info(
                 f"[EmbeddingService] Initialized with fallback OpenAIEmbeddings "
@@ -63,7 +65,8 @@ class EmbeddingService:
 
         # Dedicated thread pool for batch embedding calls (document processing)
         self._batch_executor = ThreadPoolExecutor(
-            max_workers=self.MAX_WORKERS_BATCH, thread_name_prefix="embed_batch"
+            max_workers=settings.MAX_GLOBAL_EMBEDDINGS,
+            thread_name_prefix="embed_batch",
         )
         # Dedicated thread pool for search queries (user-facing, prevents starvation)
         self._search_executor = ThreadPoolExecutor(

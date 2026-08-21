@@ -11,6 +11,7 @@ from services.qdrant_service import qdrant_service
 from utils.logger import logger
 from utils.embedding_queue import get_embedding_queue, EmbeddingJob, EmbeddingQueue
 from utils.progress_manager import get_progress_manager
+from utils.embedding_scheduler import embedding_point_id, get_embedding_scheduler
 
 
 class DocumentService:
@@ -366,102 +367,65 @@ class DocumentService:
         """
         progress = get_progress_manager()
 
-        batches = []
-        for i in range(0, len(chunks), self.batch_size):
-            batch_data = chunks[i: i + self.batch_size]
-            batches.append((i, batch_data))
-
-        total_batches = len(batches)
-
-        embed_semaphore = EmbeddingQueue.get_embed_semaphore()
-        db_semaphore = EmbeddingQueue.get_db_semaphore()
+        total_batches = (len(chunks) + self.batch_size - 1) // self.batch_size
 
         logger.info(
             f"[{filename}] Starting embedding: {len(chunks)} chunks, "
-            f"{total_batches} batches (global limits)"
+            f"{total_batches} batches (worker limits)"
         )
 
-        completed = [0]
-        failed_batches = []
+        async def write_batch(start_index, batch_data, batch_embeddings):
+            batch_metadata = [
+                {
+                    "document_id": document_id,
+                    "document_name": filename,
+                    "chunk_id": start_index + offset,
+                }
+                for offset in range(len(batch_data))
+            ]
+            await qdrant_service.upsert_chunks(
+                collection_name=collection_name,
+                chunks=batch_data,
+                embeddings=batch_embeddings,
+                metadata=batch_metadata,
+            )
 
-        async def process_batch(batch_idx: int, start_index: int, batch_data: List[str]):
-            retries = 6
-            for attempt in range(retries):
-                try:
-                    async with embed_semaphore:
-                        batch_embeddings = await embedding_service.generate_embeddings(
-                            batch_data
-                        )
+        async def finalize_vectors():
+            keep_ids = [
+                embedding_point_id(collection_name, document_id, chunk_id)
+                for chunk_id in range(len(chunks))
+            ]
+            await qdrant_service.delete_vectors_except(
+                collection_name,
+                document_id,
+                keep_ids,
+            )
 
-                    batch_metadata = [
-                        {
-                            "document_id": document_id,
-                            "document_name": filename,
-                            "chunk_id": start_index + k,
-                        }
-                        for k in range(len(batch_data))
-                    ]
+        async def report_progress(completed_batches, batch_count):
+            pct = int((completed_batches / batch_count) * 100)
+            await progress.emit(
+                document_id,
+                "embedding",
+                pct,
+                f"Batch {completed_batches}/{batch_count}",
+            )
+            if completed_batches % 5 == 0 or completed_batches == batch_count:
+                logger.info(
+                    f"[{filename}] Progress: {completed_batches}/{batch_count} batches"
+                )
 
-                    async with db_semaphore:
-                        await qdrant_service.upsert_chunks(
-                            collection_name=collection_name,
-                            chunks=batch_data,
-                            embeddings=batch_embeddings,
-                            metadata=batch_metadata,
-                        )
-
-                    completed[0] += 1
-                    pct = int((completed[0] / total_batches) * 100)
-
-                    await progress.emit(
-                        document_id, "embedding", pct,
-                        f"Batch {completed[0]}/{total_batches}"
-                    )
-
-                    if completed[0] % 5 == 0 or completed[0] == total_batches:
-                        logger.info(
-                            f"[{filename}] Progress: {completed[0]}/{total_batches} batches"
-                        )
-                        
-                    return
-
-                except Exception as e:
-                    error_str = str(e).lower()
-                    is_retryable = any(
-                        x in error_str
-                        for x in [
-                            "429", "too many requests", "timeout",
-                            "timed out", "connection", "temporary", "unavailable",
-                        ]
-                    )
-
-                    if is_retryable and attempt < retries - 1:
-                        # Much higher backoff for rate limiting: 1s, 4s, 16s, 64s, 256s
-                        wait_time = (4 ** attempt) + (2.0 * (batch_idx % 5))
-                        logger.warning(
-                            f"[{filename}] Batch {batch_idx + 1} retry {attempt + 1}/{retries} "
-                            f"in {wait_time:.1f}s: {e}"
-                        )
-                        await asyncio.sleep(wait_time)
-                        continue
-
-                    logger.error(f"[{filename}] Batch {batch_idx + 1} failed: {e}")
-                    if attempt == retries - 1:
-                        failed_batches.append(batch_idx)
-                        return  # Let other batches complete
-
-        tasks = [
-            process_batch(idx, start_idx, batch)
-            for idx, (start_idx, batch) in enumerate(batches)
-        ]
-        await asyncio.gather(*tasks)
-
-        if failed_batches:
-            error_msg = f"Embedding completed with {len(failed_batches)} failed batches."
-            logger.error(f"[{filename}] {error_msg}")
-            raise Exception(error_msg)
-        else:
-            logger.info(f"[{filename}] Embedding completed: {total_batches} batches")
+        scheduler = get_embedding_scheduler()
+        await scheduler.process(
+            chunks=chunks,
+            batch_size=self.batch_size,
+            embed_batch=embedding_service.generate_embeddings,
+            write_batch=write_batch,
+            on_progress=report_progress,
+            label=filename,
+            document_key=f"{collection_name}:{document_id}",
+            finalize=finalize_vectors,
+        )
+        logger.info(f"[{filename}] Embedding completed: {total_batches} batches")
 
     # ──────────────────────────────────────────────────────────────────────────
     # Database helpers

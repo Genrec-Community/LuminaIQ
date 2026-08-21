@@ -150,7 +150,7 @@ class Settings(BaseSettings):
     # Document upload + embedding pipeline
     MAX_CONCURRENT_DOCUMENT_UPLOADS: int = 10
 
-    # Global limits inside the embedding pipeline (shared across all docs)
+    # Per-worker limits inside the embedding pipeline (shared across local docs)
     MAX_GLOBAL_DB_OPERATIONS: int = 20      # Qdrant write concurrency
     MAX_GLOBAL_EMBEDDINGS: int = 15         # Concurrent embedding API calls
     MAX_CONCURRENT_LLM: int = 5             # Concurrent LLM calls (topic/graph gen)
@@ -158,6 +158,9 @@ class Settings(BaseSettings):
     # Batch size for embedding API calls
     EMBEDDING_BATCH_SIZE: int = 50
     EMBEDDING_DELAY_MS: int = 0  # 0 = no artificial delay (Azure has no rate limits)
+    EMBEDDING_MAX_RETRIES: int = 5
+    EMBEDDING_MAX_RETRY_DELAY_S: float = 8.0
+    EMBEDDING_REQUEST_TIMEOUT_S: float = 60.0
 
     # Gunicorn workers for production
     # Recommended: (2 * CPU cores) + 1. Azure 1-core = 3 workers.

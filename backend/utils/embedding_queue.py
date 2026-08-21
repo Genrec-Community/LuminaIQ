@@ -1,15 +1,15 @@
 """
-Parallel Embedding Processor with Global Concurrency Control
+Document Pipeline Queue with Process-Local Concurrency Control
 
-Processes all documents in parallel BUT with shared resource limits.
-This prevents database timeouts when multiple PDFs are uploaded together.
+Limits concurrent document pipelines within one backend process. Embedding batch
+scheduling and Qdrant write concurrency belong to embedding_scheduler.py.
 
 All limits are driven by config/settings.py — adjust there for easy tuning.
 
 Features:
 - Immediate processing (no queue delays)
 - Parallel document processing with configurable cap
-- GLOBAL concurrency limits prevent Qdrant timeouts
+- Process-local document and LLM concurrency limits
 - Progress tracking per document
 """
 
@@ -75,10 +75,9 @@ def _load_limits():
 
 class EmbeddingQueue:
     """
-    Parallel Embedding Processor with Global Concurrency Control.
+    Document pipeline queue with process-local concurrency control.
 
-    KEY DESIGN: Uses global semaphores to prevent overwhelming Qdrant
-    when multiple documents are uploaded simultaneously.
+    Embedding and Qdrant batch limits are enforced by EmbeddingBatchScheduler.
 
     All limits are sourced from settings.py — change them there.
 
@@ -93,8 +92,6 @@ class EmbeddingQueue:
 
     # Singleton semaphores — created once per process, shared by all requests
     _doc_semaphore: Optional[asyncio.Semaphore] = None
-    _db_semaphore: Optional[asyncio.Semaphore] = None
-    _embed_semaphore: Optional[asyncio.Semaphore] = None
     _llm_semaphore: Optional[asyncio.Semaphore] = None
 
     def __init__(self):
@@ -120,14 +117,6 @@ class EmbeddingQueue:
             EmbeddingQueue._doc_semaphore = asyncio.Semaphore(
                 limits["MAX_CONCURRENT_DOCUMENTS"]
             )
-        if EmbeddingQueue._db_semaphore is None:
-            EmbeddingQueue._db_semaphore = asyncio.Semaphore(
-                limits["MAX_GLOBAL_DB_OPERATIONS"]
-            )
-        if EmbeddingQueue._embed_semaphore is None:
-            EmbeddingQueue._embed_semaphore = asyncio.Semaphore(
-                limits["MAX_GLOBAL_EMBEDDINGS"]
-            )
         if EmbeddingQueue._llm_semaphore is None:
             EmbeddingQueue._llm_semaphore = asyncio.Semaphore(
                 limits["MAX_CONCURRENT_LLM"]
@@ -142,24 +131,6 @@ class EmbeddingQueue:
         )
 
     # ── Public semaphore accessors ────────────────────────────────────────────
-
-    @classmethod
-    def get_db_semaphore(cls) -> asyncio.Semaphore:
-        """Global DB operation semaphore (shared across all concurrent docs)"""
-        if cls._db_semaphore is None:
-            cls._db_semaphore = asyncio.Semaphore(
-                cls._get_limits()["MAX_GLOBAL_DB_OPERATIONS"]
-            )
-        return cls._db_semaphore
-
-    @classmethod
-    def get_embed_semaphore(cls) -> asyncio.Semaphore:
-        """Global embedding API semaphore"""
-        if cls._embed_semaphore is None:
-            cls._embed_semaphore = asyncio.Semaphore(
-                cls._get_limits()["MAX_GLOBAL_EMBEDDINGS"]
-            )
-        return cls._embed_semaphore
 
     @classmethod
     def get_doc_semaphore(cls) -> asyncio.Semaphore:

@@ -7,6 +7,7 @@ from qdrant_client.models import (
     Filter,
     FieldCondition,
     MatchValue,
+    HasIdCondition,
     Range,
     PayloadSchemaType,
 )
@@ -15,7 +16,7 @@ from typing import List, Dict, Any, Optional
 from uuid import uuid4
 from utils.logger import logger
 from services.embedding_service import embedding_service
-import asyncio
+from utils.embedding_scheduler import embedding_point_id
 
 
 class QdrantService:
@@ -25,13 +26,10 @@ class QdrantService:
     Features:
     - AsyncQdrantClient for all direct operations (non-blocking event loop)
     - Sync client retained only for LangChain VectorStore compatibility
-    - Automatic retry with exponential backoff for transient failures
+    - Embedding writes are retried by EmbeddingBatchScheduler
     - Longer timeout for large batch operations
     - clone_document_vectors() for instant book imports (no re-embedding)
     """
-
-    MAX_RETRIES = 3
-    RETRY_BASE_DELAY = 1.0  # seconds
 
     # Connection pool and timeout settings for multi-user load
     ASYNC_TIMEOUT = 120        # Longer timeout for batch embedding upserts
@@ -119,10 +117,22 @@ class QdrantService:
         No longer blocks the event loop — other user requests can be served
         while upserts are in progress.
         """
+        if not (len(chunks) == len(embeddings) == len(metadata)):
+            raise ValueError(
+                "Chunk, embedding, and metadata counts must match before Qdrant upsert"
+            )
+
         points = []
-        for i, (chunk, embedding, meta) in enumerate(zip(chunks, embeddings, metadata)):
+        for chunk, embedding, meta in zip(chunks, embeddings, metadata):
+            document_id = meta.get("document_id")
+            chunk_id = meta.get("chunk_id")
+            point_id = (
+                embedding_point_id(collection_name, document_id, chunk_id)
+                if document_id is not None and chunk_id is not None
+                else str(uuid4())
+            )
             point = PointStruct(
-                id=str(uuid4()),
+                id=point_id,
                 vector=embedding,
                 payload={
                     "text": chunk,
@@ -138,43 +148,8 @@ class QdrantService:
             )
             points.append(point)
 
-        # Retry logic with exponential backoff
-        last_error = None
-        for attempt in range(self.MAX_RETRIES):
-            try:
-                await self.async_client.upsert(collection_name=collection_name, points=points)
-                logger.info(f"Upserted {len(points)} chunks to {collection_name}")
-                return
-            except Exception as e:
-                last_error = e
-                error_str = str(e).lower()
-
-                is_retryable = any(
-                    x in error_str
-                    for x in [
-                        "timeout",
-                        "timed out",
-                        "connection",
-                        "temporary",
-                        "unavailable",
-                        "reset",
-                        "broken pipe",
-                    ]
-                )
-
-                if is_retryable and attempt < self.MAX_RETRIES - 1:
-                    delay = self.RETRY_BASE_DELAY * (2 ** attempt)
-                    logger.warning(
-                        f"Qdrant upsert failed (attempt {attempt + 1}/{self.MAX_RETRIES}), "
-                        f"retrying in {delay:.1f}s: {e}"
-                    )
-                    await asyncio.sleep(delay)
-                else:
-                    logger.error(f"Error upserting chunks: {str(e)}")
-                    raise
-
-        if last_error:
-            raise last_error
+        await self.async_client.upsert(collection_name=collection_name, points=points)
+        logger.info(f"Upserted {len(points)} chunks to {collection_name}")
 
     def get_vector_store(self, collection_name: str):
         """Get LangChain VectorStore instance (uses sync client for LangChain compat)"""
@@ -298,7 +273,12 @@ class QdrantService:
             logger.error(f"Error getting initial chunks: {str(e)}")
             return []
 
-    async def delete_vectors(self, collection_name: str, document_id: str):
+    async def delete_vectors(
+        self,
+        collection_name: str,
+        document_id: str,
+        raise_on_error: bool = False,
+    ):
         """Delete vectors for a specific document (fully async)"""
         try:
             from qdrant_client.models import FilterSelector
@@ -321,6 +301,35 @@ class QdrantService:
 
         except Exception as e:
             logger.error(f"Error deleting vectors: {str(e)}")
+            if raise_on_error:
+                raise
+
+    async def delete_vectors_except(
+        self,
+        collection_name: str,
+        document_id: str,
+        keep_ids: List[str],
+    ):
+        """Remove legacy and stale points after a complete replacement succeeds."""
+        from qdrant_client.models import FilterSelector
+
+        await self.async_client.delete(
+            collection_name=collection_name,
+            points_selector=FilterSelector(
+                filter=Filter(
+                    must=[
+                        FieldCondition(
+                            key="document_id", match=MatchValue(value=document_id)
+                        )
+                    ],
+                    must_not=[HasIdCondition(has_id=keep_ids)],
+                )
+            ),
+        )
+        logger.info(
+            f"Removed legacy/stale vectors for document {document_id} "
+            f"from {collection_name}"
+        )
 
     async def clone_document_vectors(
         self,
