@@ -105,4 +105,8 @@ async def root():
 @app.get("/health")
 async def health():
     """Health check endpoint"""
-    return {"status": "healthy", "service": "lumina-backend"}
+    return {
+        "status": "healthy",
+        "service": "lumina-backend",
+        "build_sha": os.getenv("BUILD_SHA", "development"),
+    }

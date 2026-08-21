@@ -14,10 +14,10 @@ environment variables:
 - `AZURE_CLIENT_ID`
 - `AZURE_TENANT_ID`
 - `AZURE_SUBSCRIPTION_ID`
-- `AZURE_ACR_NAME`
-- `AZURE_ACR_LOGIN_SERVER`, for example `luminaiqacr.azurecr.io`
-- `AZURE_CONTAINER_APP_NAME`
+- `AZURE_WEBAPP_NAME`, currently `luminaiq-api-v2`
 - `AZURE_RESOURCE_GROUP`
+- `BACKEND_API_URL`, without `/api/v1`, for example
+  `https://luminaiq-api-v2.azurewebsites.net`
 - `VERCEL_ORG_ID`
 - `VERCEL_PROJECT_ID`
 
@@ -26,7 +26,11 @@ Configure one environment secret:
 - `VERCEL_TOKEN`
 
 The Azure identity uses GitHub OIDC rather than a stored Azure password. Give
-it permission to submit ACR builds and update the target Container App, then
-add a federated credential scoped to this repository's `production`
-environment. Runtime Supabase, Qdrant, OCR, and model credentials remain on
-the Azure Container App and Vercel project; they are not copied into CI.
+it permission to deploy and configure the target App Service, then add a
+federated credential scoped to this repository's `production` environment.
+Runtime Supabase, Qdrant, OCR, and model credentials remain on App Service and
+the Vercel project; they are not copied into CI.
+
+Set Vercel's production `VITE_MAIN_API_URL` to the same App Service origin with
+the `/api/v1` suffix. The backend deploy is stamped with `BUILD_SHA`; CI checks
+that `/health` reports the expected commit before the frontend is released.
