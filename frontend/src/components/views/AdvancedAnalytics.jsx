@@ -7,8 +7,10 @@ import {
 } from 'lucide-react';
 import { getPerformance, getLearningDashboard, getWeakTopics, getPomodoro, getStreak } from '../../api';
 import { getActivityHeatmap, getAccuracyTrend, getMaxDailyActivity, fetchActivity } from '../../utils/studyActivity';
+import { useSettings } from '../../context/SettingsContext';
 
 const AdvancedAnalytics = ({ projectId, documents = [], bookIsolation = true }) => {
+    const { settings } = useSettings();
     const [selectedBook, setSelectedBook] = useState('all');
     const [loading, setLoading] = useState(true);
     const [analytics, setAnalytics] = useState(null);
@@ -194,7 +196,7 @@ const AdvancedAnalytics = ({ projectId, documents = [], bookIsolation = true }) 
             </div>
 
             {/* Streak Banner */}
-            {stats?.streak > 0 && (
+            {settings.showStreaks !== false && stats?.streak > 0 && (
                 <div className="bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-2xl p-4 flex items-center gap-4">
                     <div className="h-14 w-14 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
                         <Flame className="h-8 w-8" />

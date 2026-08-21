@@ -108,6 +108,18 @@ const Settings = () => {
 
     const isDark = settings?.darkMode ?? false;
 
+    const handleReminderToggle = async (enabled) => {
+        if (!enabled) {
+            updateSetting('studyReminders', false);
+            return;
+        }
+        if (typeof Notification === 'undefined') return;
+        const permission = Notification.permission === 'default'
+            ? await Notification.requestPermission()
+            : Notification.permission;
+        updateSetting('studyReminders', permission === 'granted');
+    };
+
     // Shorthand theme tokens used throughout this page
     const bg     = isDark ? '#1c1814' : '#FDF6F0';
     const paper  = isDark ? '#252018' : '#FFFFFF';
@@ -388,7 +400,7 @@ const Settings = () => {
                         <div>
                             <p className="font-bold text-[#4A3B32]">Book-Level Isolation</p>
                             <p className="text-xs text-[#8a6a5c] mt-0.5 max-w-sm leading-relaxed">
-                                Track progress, analytics, and paths separately per document
+                                Track study-time analytics separately per document
                             </p>
                         </div>
                     </div>
@@ -704,19 +716,32 @@ const Settings = () => {
             <div className="space-y-3">
                 <ToggleSwitch
                     enabled={settings.studyReminders}
-                    onChange={(v) => updateSetting('studyReminders', v)}
+                    onChange={handleReminderToggle}
                     label="Study Reminders"
-                    description="Browser notifications for study sessions"
+                    description="Daily browser reminder while LuminaIQ is open"
                     icon={Bell}
-                    comingSoon
                 />
+                {settings.studyReminders && (
+                    <div className="p-4 rounded-2xl border" style={{ background: paper, borderColor: border }}>
+                        <label className="text-sm font-semibold" style={{ color: heading }} htmlFor="reminder-time">
+                            Daily Reminder Time
+                        </label>
+                        <input
+                            id="reminder-time"
+                            type="time"
+                            value={settings.reminderTime || '09:00'}
+                            onChange={(event) => updateSetting('reminderTime', event.target.value)}
+                            className="mt-2 w-full px-4 py-2.5 rounded-xl border outline-none focus:ring-2 focus:ring-[#C8A288]"
+                            style={{ background: inputBg, color: heading, borderColor: border }}
+                        />
+                    </div>
+                )}
                 <ToggleSwitch
                     enabled={settings.soundEnabled}
                     onChange={(v) => updateSetting('soundEnabled', v)}
                     label="Sound Effects"
-                    description="Play sounds for timers and achievements"
+                    description="Play a sound when a timer completes"
                     icon={Volume2}
-                    comingSoon
                 />
                 <ToggleSwitch
                     enabled={settings.showStreaks}
@@ -724,23 +749,7 @@ const Settings = () => {
                     label="Show Streaks"
                     description="Display your daily study streak"
                     icon={Flame}
-                    comingSoon
                 />
-            </div>
-
-            {/* Coming soon info */}
-            <div className="p-4 rounded-2xl border" style={{ background: isDark ? '#2a1e10' : '#fffbf2', borderColor: isDark ? '#5a3a20' : '#fde68a' }}>
-                <div className="flex items-start gap-3">
-                    <div className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5" style={{ background: isDark ? '#3a2810' : '#fef3c7' }}>
-                        <Sparkles className="h-4 w-4 text-amber-500" />
-                    </div>
-                    <div>
-                        <p className="font-semibold text-sm" style={{ color: isDark ? '#d4a060' : '#78350f' }}>Features in Development</p>
-                        <p className="text-xs mt-0.5 leading-relaxed" style={{ color: isDark ? '#a07840' : '#92400e' }}>
-                            Study reminders, sound effects, and streaks are being built. Settings marked with "Soon" will be enabled in a future update.
-                        </p>
-                    </div>
-                </div>
             </div>
 
         </div>
@@ -856,4 +865,3 @@ const Settings = () => {
 };
 
 export default Settings;
-

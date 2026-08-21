@@ -807,6 +807,8 @@ const ProjectView = () => {
             if (learningGoal) contextParts.push(`Their learning goal is: ${learningGoal}.`);
             if (selfLevel) contextParts.push(`Self-assessed level: ${selfLevel}.`);
             if (tutorStyle && tutorStyle !== 'balanced') contextParts.push(`Preferred tutor style: ${tutorStyle}.`);
+            if (settings.subjectsOfInterest?.length) contextParts.push(`Interests: ${settings.subjectsOfInterest.join(', ')}.`);
+            if (settings.dailyStudyGoal) contextParts.push(`Daily study goal: ${settings.dailyStudyGoal} minutes.`);
             if (contextParts.length > 0) {
                 history.unshift({ role: 'system', content: contextParts.join(' ') });
             }
@@ -1790,6 +1792,7 @@ const ProjectView = () => {
                             documents={documents}
                             selectedDocuments={selectedDocuments}
                             documentTopics={documentTopics}
+                            bookIsolation={settings.bookIsolation}
                         />
                     )}
 

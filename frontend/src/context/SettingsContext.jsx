@@ -29,7 +29,7 @@ const defaultSettings = {
     pomodoroBreak: 5,
     pomodoroLongBreak: 15,
     pomodoroAutoStart: false,
-    studyReminders: true,
+    studyReminders: false,
     reminderTime: '09:00',
     soundEnabled: true,
     showStreaks: true,
@@ -130,6 +130,46 @@ export const SettingsProvider = ({ children }) => {
             document.documentElement.classList.remove('compact');
         }
     }, [settings.compactMode]);
+
+    useEffect(() => {
+        if (
+            !loaded ||
+            !user ||
+            !settings.studyReminders ||
+            typeof Notification === 'undefined' ||
+            Notification.permission !== 'granted'
+        ) {
+            return;
+        }
+
+        let timer;
+        const scheduleNextReminder = () => {
+            const [parsedHours, parsedMinutes] = (settings.reminderTime || '09:00')
+                .split(':')
+                .map(Number);
+            const hours = Number.isInteger(parsedHours) && parsedHours >= 0 && parsedHours <= 23
+                ? parsedHours
+                : 9;
+            const minutes = Number.isInteger(parsedMinutes) && parsedMinutes >= 0 && parsedMinutes <= 59
+                ? parsedMinutes
+                : 0;
+            const now = new Date();
+            const next = new Date(now);
+            next.setHours(hours, minutes, 0, 0);
+            if (next <= now) next.setDate(next.getDate() + 1);
+
+            timer = setTimeout(() => {
+                new Notification('Time to study with LuminaIQ', {
+                    body: `Ready for your ${settings.dailyStudyGoal || 30}-minute study goal?`,
+                    tag: 'luminaiq-study-reminder',
+                });
+                scheduleNextReminder();
+            }, next.getTime() - now.getTime());
+        };
+
+        scheduleNextReminder();
+        return () => clearTimeout(timer);
+    }, [loaded, user, settings.studyReminders, settings.reminderTime, settings.dailyStudyGoal]);
 
     const queueSave = useCallback((next) => {
         const generation = saveGenerationRef.current;

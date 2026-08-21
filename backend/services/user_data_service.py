@@ -73,7 +73,7 @@ class UserDataService:
             "pomodoroLongBreak": 15,
             "pomodoroAutoStart": False,
             "fontSize": "md",
-            "studyReminders": True,
+            "studyReminders": False,
             "reminderTime": "09:00",
             "soundEnabled": True,
             "showStreaks": True,

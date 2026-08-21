@@ -15,7 +15,7 @@ const PomodoroTimer = ({
     onSessionComplete,
     compact = false 
 }) => {
-    const { settings } = useSettings();
+    const { settings, updateSetting } = useSettings();
     
     // Timer states
     const [mode, setMode] = useState('work'); // 'work', 'break', 'longBreak'
@@ -24,7 +24,7 @@ const PomodoroTimer = ({
     const [sessionsCompleted, setSessionsCompleted] = useState(0);
     const [totalFocusTime, setTotalFocusTime] = useState(0);
     const [showSettings, setShowSettings] = useState(false);
-    const [soundEnabled, setSoundEnabled] = useState(settings.soundEnabled !== false);
+    const soundEnabled = settings.soundEnabled !== false;
     
     // Custom durations
     const [workDuration, setWorkDuration] = useState(settings.pomodoroWork || 25);
@@ -275,7 +275,7 @@ const PomodoroTimer = ({
                     </div>
                     <div className="flex items-center gap-2">
                         <button
-                            onClick={() => setSoundEnabled(!soundEnabled)}
+                            onClick={() => updateSetting('soundEnabled', !soundEnabled)}
                             className="p-2 hover:bg-white/20 rounded-lg transition-colors"
                         >
                             {soundEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}

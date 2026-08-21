@@ -7,6 +7,7 @@ import {
     Rocket, Lock, Sparkles, X
 } from 'lucide-react';
 import { useGamification } from '../context/GamificationContext';
+import { useSettings } from '../context/SettingsContext';
 
 // Icon mapping for badges
 const BADGE_ICONS = {
@@ -44,6 +45,7 @@ const CATEGORY_COLORS = {
  */
 const GamificationPanel = ({ onClose }) => {
     const { data } = useGamification();
+    const { settings } = useSettings();
     const [activeTab, setActiveTab] = useState('overview');
 
     if (!data) {
@@ -164,7 +166,7 @@ const GamificationPanel = ({ onClose }) => {
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                {activeTab === 'overview' && renderOverview(stats, data, earnedBadgeIds, allBadges)}
+                {activeTab === 'overview' && renderOverview(stats, data, earnedBadgeIds, allBadges, settings.showStreaks !== false)}
                 {activeTab === 'badges' && renderBadges(data.badges || [], allBadges, earnedBadgeIds)}
                 {activeTab === 'levels' && renderLevels(data, allLevels)}
             </div>
@@ -174,28 +176,30 @@ const GamificationPanel = ({ onClose }) => {
 
 // ===================== Tab Renderers =====================
 
-function renderOverview(stats, data, earnedBadgeIds, allBadges) {
+function renderOverview(stats, data, earnedBadgeIds, allBadges, showStreaks) {
     const streakDays = data.streak_days ?? 0;
     return (
         <div className="space-y-4">
             {/* Streak Banner */}
-            <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
-                style={{ background: 'linear-gradient(135deg, #3a2208 0%, #5a3210 100%)', border: '1px solid rgba(200,162,136,0.25)' }}>
-                <span className="text-2xl" role="img" aria-label="flame">🔥</span>
-                <div className="flex-1">
-                    <p className="text-white font-black text-lg leading-none">{streakDays} Day{streakDays !== 1 ? 's' : ''}</p>
-                    <p className="text-[#C8A288] text-[11px] font-medium mt-0.5">
-                        {streakDays === 0 ? 'Start your streak by studying today!' :
-                         streakDays === 1 ? 'Day 1 — keep it going tomorrow!' :
-                         streakDays < 7 ? 'Building momentum — keep it up!' :
-                         streakDays < 30 ? `${streakDays}-day warrior! Don't break the chain.` :
-                         `Legendary ${streakDays}-day streak! 🏆`}
-                    </p>
+            {showStreaks && (
+                <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
+                    style={{ background: 'linear-gradient(135deg, #3a2208 0%, #5a3210 100%)', border: '1px solid rgba(200,162,136,0.25)' }}>
+                    <span className="text-2xl" role="img" aria-label="flame">🔥</span>
+                    <div className="flex-1">
+                        <p className="text-white font-black text-lg leading-none">{streakDays} Day{streakDays !== 1 ? 's' : ''}</p>
+                        <p className="text-[#C8A288] text-[11px] font-medium mt-0.5">
+                            {streakDays === 0 ? 'Start your streak by studying today!' :
+                             streakDays === 1 ? 'Day 1 — keep it going tomorrow!' :
+                             streakDays < 7 ? 'Building momentum — keep it up!' :
+                             streakDays < 30 ? `${streakDays}-day warrior! Don't break the chain.` :
+                             `Legendary ${streakDays}-day streak! 🏆`}
+                        </p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-[10px] text-[#C8A288]/60 font-medium uppercase tracking-wider">Current Streak</p>
+                    </div>
                 </div>
-                <div className="text-right">
-                    <p className="text-[10px] text-[#C8A288]/60 font-medium uppercase tracking-wider">Current Streak</p>
-                </div>
-            </div>
+            )}
 
             {/* Quick Stats Grid */}
             <div>
