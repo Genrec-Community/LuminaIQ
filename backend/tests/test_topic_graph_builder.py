@@ -6,21 +6,28 @@ from services.topic_graph_builder import LLMRelationshipGenerator, TopicGraphBui
 
 
 class _InMemoryStore:
-    def __init__(self, existing=False):
-        self.existing = existing
+    def __init__(self, existing=False, events=None):
+        self.relationships = (
+            [{"from_topic": "Old A", "to_topic": "Old B"}] if existing else []
+        )
+        self.events = events
         self.cleared_projects = []
         self.upserted_edges = []
 
     async def has_relationships(self, project_id):
-        return self.existing
+        return bool(self.relationships)
 
     async def clear_relationships(self, project_id):
+        if self.events is not None:
+            self.events.append("clear")
         self.cleared_projects.append(project_id)
-        self.existing = False
+        self.relationships = []
 
     async def upsert_relationships(self, edges):
+        if self.events is not None:
+            self.events.append("upsert")
         self.upserted_edges.extend(edges)
-        self.existing = bool(edges)
+        self.relationships.extend(edges)
 
 
 class _RelationshipGenerator:
@@ -44,6 +51,37 @@ class _BlockingGenerator:
         return []
 
 
+class _ConcurrentGenerator:
+    def __init__(self, events=None, fail_topic=None):
+        self.events = events
+        self.fail_topic = fail_topic
+        self.active_calls = 0
+        self.peak_concurrency = 0
+
+    async def generate(self, project_id, batch_topics, all_topics):
+        self.active_calls += 1
+        self.peak_concurrency = max(self.peak_concurrency, self.active_calls)
+        if self.events is not None:
+            self.events.append(f"generate:{batch_topics[0]}")
+        try:
+            await asyncio.sleep(0.01)
+            if self.fail_topic in batch_topics:
+                raise RuntimeError("provider unavailable")
+            if self.events is not None:
+                self.events.append(f"generated:{batch_topics[0]}")
+            return [
+                {
+                    "project_id": project_id,
+                    "from_topic": batch_topics[0],
+                    "to_topic": batch_topics[1],
+                    "relation_type": "related",
+                    "weight": 0.5,
+                }
+            ]
+        finally:
+            self.active_calls -= 1
+
+
 class _LLM:
     def __init__(self, response):
         self.response = response
@@ -58,7 +96,7 @@ class TopicGraphBuilderTests(unittest.IsolatedAsyncioTestCase):
     async def test_existing_graph_skips_generation(self):
         store = _InMemoryStore(existing=True)
         generator = _RelationshipGenerator()
-        builder = TopicGraphBuilder(store, generator, inter_batch_delay_seconds=0)
+        builder = TopicGraphBuilder(store, generator)
 
         result = await builder.build("project-1", ["A", "B"])
 
@@ -77,18 +115,11 @@ class TopicGraphBuilderTests(unittest.IsolatedAsyncioTestCase):
         }
         store = _InMemoryStore(existing=True)
         generator = _RelationshipGenerator([duplicate_edge])
-        delays = []
-
-        async def record_delay(delay):
-            delays.append(delay)
-
         builder = TopicGraphBuilder(
             store,
             generator,
             batch_size=4,
             batch_overlap=1,
-            inter_batch_delay_seconds=0.5,
-            sleep=record_delay,
         )
 
         result = await builder.build(
@@ -102,13 +133,10 @@ class TopicGraphBuilderTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(["project-1"], store.cleared_projects)
         self.assertEqual([duplicate_edge], store.upserted_edges)
         self.assertEqual(2, len(generator.calls))
-        self.assertEqual([0.5], delays)
 
     async def test_concurrent_build_for_same_project_returns_without_waiting(self):
         generator = _BlockingGenerator()
-        builder = TopicGraphBuilder(
-            _InMemoryStore(), generator, inter_batch_delay_seconds=0
-        )
+        builder = TopicGraphBuilder(_InMemoryStore(), generator)
 
         first = asyncio.create_task(builder.build("project-1", ["A", "B"], True))
         await generator.started.wait()
@@ -120,19 +148,81 @@ class TopicGraphBuilderTests(unittest.IsolatedAsyncioTestCase):
             {"edges_created": 0, "message": "Build already in progress"}, second
         )
 
-    async def test_operational_failure_is_returned_at_the_interface(self):
+    async def test_operational_failure_is_raised_at_the_interface(self):
         class BrokenStore(_InMemoryStore):
             async def has_relationships(self, project_id):
                 raise RuntimeError("database unavailable")
 
+        builder = TopicGraphBuilder(BrokenStore(), _RelationshipGenerator())
+
+        with self.assertRaisesRegex(RuntimeError, "database unavailable"):
+            await builder.build("project-1", ["A", "B"])
+
+    async def test_failed_batch_preserves_active_graph(self):
+        store = _InMemoryStore(existing=True)
+        original_relationships = list(store.relationships)
+        generator = _ConcurrentGenerator(fail_topic="D")
         builder = TopicGraphBuilder(
-            BrokenStore(), _RelationshipGenerator(), inter_batch_delay_seconds=0
+            store, generator, batch_size=3, batch_overlap=0, batch_concurrency=2
         )
 
-        result = await builder.build("project-1", ["A", "B"])
+        with self.assertRaisesRegex(RuntimeError, "provider unavailable"):
+            await builder.build("project-1", ["A", "B", "C", "D", "E", "F"], True)
 
-        self.assertEqual(0, result["edges_created"])
-        self.assertEqual("Error: database unavailable", result["message"])
+        self.assertEqual(original_relationships, store.relationships)
+        self.assertEqual([], store.cleared_projects)
+        self.assertEqual([], store.upserted_edges)
+
+    async def test_batch_concurrency_is_bounded(self):
+        generator = _ConcurrentGenerator()
+        builder = TopicGraphBuilder(
+            _InMemoryStore(),
+            generator,
+            batch_size=3,
+            batch_overlap=0,
+        )
+
+        await builder.build("project-1", list("ABCDEFGHIJKL"), True)
+
+        self.assertEqual(2, generator.peak_concurrency)
+
+    async def test_batch_concurrency_is_shared_across_projects(self):
+        generator = _ConcurrentGenerator()
+        builder = TopicGraphBuilder(
+            _InMemoryStore(),
+            generator,
+            batch_size=3,
+            batch_overlap=0,
+            batch_concurrency=2,
+        )
+
+        await asyncio.gather(
+            builder.build("project-1", list("ABCDEF"), True),
+            builder.build("project-2", list("GHIJKL"), True),
+        )
+
+        self.assertEqual(2, generator.peak_concurrency)
+
+    async def test_successful_replacement_happens_after_ordered_generation(self):
+        events = []
+        store = _InMemoryStore(existing=True, events=events)
+        generator = _ConcurrentGenerator(events=events)
+        builder = TopicGraphBuilder(
+            store, generator, batch_size=3, batch_overlap=0, batch_concurrency=2
+        )
+
+        result = await builder.build(
+            "project-1", ["A", "B", "C", "D", "E", "F"], True
+        )
+
+        self.assertEqual({"generate:A", "generate:D"}, set(events[:2]))
+        self.assertEqual({"generated:A", "generated:D"}, set(events[2:4]))
+        self.assertEqual(["clear", "upsert"], events[4:])
+        self.assertEqual(
+            [("A", "B"), ("D", "E")],
+            [(edge["from_topic"], edge["to_topic"]) for edge in store.relationships],
+        )
+        self.assertEqual(2, result["edges_created"])
 
 
 class LLMRelationshipGeneratorTests(unittest.IsolatedAsyncioTestCase):
@@ -177,6 +267,29 @@ class LLMRelationshipGeneratorTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(1, len(edges))
         self.assertEqual(("A", "B"), (edges[0]["from_topic"], edges[0]["to_topic"]))
+
+    async def test_provider_failure_is_not_reported_as_empty_relationships(self):
+        class FailingLLM:
+            async def chat_completion(self, messages, **kwargs):
+                raise RuntimeError("provider unavailable")
+
+        generator = LLMRelationshipGenerator(FailingLLM())
+
+        with self.assertRaisesRegex(RuntimeError, "provider unavailable"):
+            await generator.generate("project-1", ["A", "B"], ["A", "B"])
+
+    async def test_valid_empty_relationships_are_successful(self):
+        generator = LLMRelationshipGenerator(_LLM("[]"))
+
+        edges = await generator.generate("project-1", ["A", "B"], ["A", "B"])
+
+        self.assertEqual([], edges)
+
+    async def test_unparseable_response_fails_generation(self):
+        generator = LLMRelationshipGenerator(_LLM("not json"))
+
+        with self.assertRaisesRegex(ValueError, "no JSON array"):
+            await generator.generate("project-1", ["A", "B"], ["A", "B"])
 
 
 if __name__ == "__main__":

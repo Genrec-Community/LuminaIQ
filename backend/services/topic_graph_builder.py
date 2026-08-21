@@ -2,7 +2,7 @@
 
 import asyncio
 import json
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Protocol, TypedDict
+from typing import Any, Dict, List, Optional, Protocol, TypedDict
 from uuid import uuid4
 from weakref import WeakValueDictionary
 
@@ -29,7 +29,7 @@ class RelationshipGenerator(Protocol):
 
 
 class TopicGraphBuilder:
-    """Generate a complete Topic Graph while hiding batching and persistence."""
+    """Generate a complete Topic Graph with process-local per-project locking."""
 
     _build_locks: WeakValueDictionary = WeakValueDictionary()
     _locks_meta_lock = asyncio.Lock()
@@ -41,22 +41,23 @@ class TopicGraphBuilder:
         *,
         batch_size: int = 25,
         batch_overlap: int = 5,
-        inter_batch_delay_seconds: float = 0.5,
-        sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        batch_concurrency: int = 2,
     ):
         if batch_size <= batch_overlap:
             raise ValueError("batch_size must be greater than batch_overlap")
+        if batch_concurrency < 1:
+            raise ValueError("batch_concurrency must be at least 1")
         self._store = store
         self._generator = generator
         self._batch_size = batch_size
         self._batch_overlap = batch_overlap
-        self._inter_batch_delay_seconds = inter_batch_delay_seconds
-        self._sleep = sleep
+        self._batch_concurrency = batch_concurrency
+        self._batch_semaphore = asyncio.Semaphore(batch_concurrency)
 
     async def build(
         self, project_id: str, topics: List[str], force_rebuild: bool = False
     ) -> GraphBuildResult:
-        """Build once per project, returning rather than raising operational errors."""
+        """Build once per project, raising operational errors to the caller."""
         project_lock = await self._get_project_lock(project_id)
         if project_lock.locked():
             logger.info(
@@ -78,46 +79,55 @@ class TopicGraphBuilder:
     async def _build_locked(
         self, project_id: str, topics: List[str], force_rebuild: bool
     ) -> GraphBuildResult:
-        try:
-            unique_topics = list(dict.fromkeys(topics))
-            if len(unique_topics) < 2:
-                return {"edges_created": 0, "message": "Need at least 2 topics"}
+        unique_topics = list(dict.fromkeys(topics))
+        if len(unique_topics) < 2:
+            return {"edges_created": 0, "message": "Need at least 2 topics"}
 
-            if not force_rebuild and await self._store.has_relationships(project_id):
-                return {
-                    "edges_created": 0,
-                    "message": "Graph already exists. Use force_rebuild=True to rebuild.",
-                }
-            if force_rebuild:
-                await self._store.clear_relationships(project_id)
+        if not force_rebuild and await self._store.has_relationships(project_id):
+            return {
+                "edges_created": 0,
+                "message": "Graph already exists. Use force_rebuild=True to rebuild.",
+            }
 
-            logger.info(f"Building Topic Graph for {len(unique_topics)} topics")
-            batches = self._create_batches(unique_topics)
-            all_edges: List[Dict[str, Any]] = []
-            for index, batch in enumerate(batches):
+        logger.info(f"Building Topic Graph for {len(unique_topics)} topics")
+        batches = self._create_batches(unique_topics)
+        async def generate_batch(index: int, batch: List[str]):
+            async with self._batch_semaphore:
                 logger.info(
                     f"Processing batch {index + 1}/{len(batches)} ({len(batch)} topics)"
                 )
-                all_edges.extend(
-                    await self._generator.generate(project_id, batch, unique_topics)
-                )
-                if index < len(batches) - 1 and self._inter_batch_delay_seconds:
-                    await self._sleep(self._inter_batch_delay_seconds)
+                return await self._generator.generate(project_id, batch, unique_topics)
 
-            unique_edges = self._deduplicate(all_edges)
-            if unique_edges:
-                await self._store.upsert_relationships(unique_edges)
-                logger.info(
-                    f"Upserted {len(unique_edges)} topic relationships for {project_id}"
-                )
-
-            return {
-                "edges_created": len(unique_edges),
-                "message": f"Successfully created {len(unique_edges)} relationships",
-            }
+        tasks = [
+            asyncio.create_task(generate_batch(index, batch))
+            for index, batch in enumerate(batches)
+        ]
+        try:
+            batch_edges = await asyncio.gather(*tasks)
         except Exception as error:
-            logger.exception(f"Error building Topic Graph: {error}")
-            return {"edges_created": 0, "message": f"Error: {error}"}
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            logger.exception(f"Error generating Topic Graph: {error}")
+            raise
+
+        unique_edges = self._deduplicate(
+            [edge for edges in batch_edges for edge in edges]
+        )
+
+        # Publish only after every provider batch has completed successfully.
+        if force_rebuild:
+            await self._store.clear_relationships(project_id)
+        if unique_edges:
+            await self._store.upsert_relationships(unique_edges)
+            logger.info(
+                f"Upserted {len(unique_edges)} topic relationships for {project_id}"
+            )
+
+        return {
+            "edges_created": len(unique_edges),
+            "message": f"Successfully created {len(unique_edges)} relationships",
+        }
 
     def _create_batches(self, topics: List[str]) -> List[List[str]]:
         if len(topics) <= self._batch_size:
@@ -234,7 +244,7 @@ OUTPUT FORMAT - Return ONLY valid JSON, no markdown:
             )
         except Exception as error:
             logger.error(f"LLM call failed for Topic Graph batch: {error}")
-            return []
+            raise
 
         relations = self._parse_json_with_repair(response)
         topics_by_normalized_name = {
@@ -279,7 +289,7 @@ OUTPUT FORMAT - Return ONLY valid JSON, no markdown:
 
     def _parse_json_with_repair(self, response: str) -> List[Dict[str, Any]]:
         if not response:
-            return []
+            raise ValueError("Topic Graph provider returned an empty response")
 
         clean_response = response.strip()
         if clean_response.startswith("```"):
@@ -291,7 +301,7 @@ OUTPUT FORMAT - Return ONLY valid JSON, no markdown:
         start = clean_response.find("[")
         if start == -1:
             logger.warning("No JSON array start '[' found")
-            return []
+            raise ValueError("Topic Graph provider response has no JSON array")
 
         end = clean_response.rfind("]")
         if end > start:
@@ -319,7 +329,7 @@ OUTPUT FORMAT - Return ONLY valid JSON, no markdown:
             return objects
 
         logger.error("Failed to parse or repair JSON response")
-        return []
+        raise ValueError("Topic Graph provider response is not valid JSON")
 
     @staticmethod
     def _repair_truncated_json_array(json_str: str) -> Optional[str]:

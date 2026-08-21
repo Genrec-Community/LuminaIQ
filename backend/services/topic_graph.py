@@ -10,4 +10,5 @@ from services.topic_graph_builder import (
 topic_graph_builder = TopicGraphBuilder(
     store=SupabaseTopicGraphStore(),
     generator=LLMRelationshipGenerator(),
+    batch_concurrency=2,
 )
