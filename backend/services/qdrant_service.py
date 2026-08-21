@@ -1,4 +1,5 @@
 from qdrant_client import AsyncQdrantClient
+from qdrant_client.http.exceptions import UnexpectedResponse
 from qdrant_client.models import (
     Distance,
     VectorParams,
@@ -54,23 +55,30 @@ class QdrantService:
     async def create_collection(
         self, collection_name: str, vector_size: int = settings.EMBEDDING_DIMENSION
     ):
-        """Create a new collection and ensure indexes exist (fully async)"""
+        """Create a collection and its indexes when it does not already exist."""
         try:
-            collections = await self.async_client.get_collections()
-            exists = any(col.name == collection_name for col in collections.collections)
+            if await self.async_client.collection_exists(collection_name):
+                logger.info(f"Collection already exists: {collection_name}")
+                return
 
-            if not exists:
-                await self.async_client.create_collection(
+            try:
+                created = await self.async_client.create_collection(
                     collection_name=collection_name,
                     vectors_config=VectorParams(
                         size=vector_size, distance=Distance.COSINE
                     ),
                 )
-                logger.info(f"Created collection: {collection_name}")
-            else:
+            except UnexpectedResponse as e:
+                if e.status_code != 409:
+                    raise
                 logger.info(f"Collection already exists: {collection_name}")
+                return
 
-            # Always ensure indexes exist
+            if not created:
+                logger.info(f"Collection already exists: {collection_name}")
+                return
+
+            logger.info(f"Created collection: {collection_name}")
             await self._ensure_indexes(collection_name)
 
         except Exception as e:
