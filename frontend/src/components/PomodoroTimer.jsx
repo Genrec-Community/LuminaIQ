@@ -33,30 +33,52 @@ const PomodoroTimer = ({
     
     const audioRef = useRef(null);
     const intervalRef = useRef(null);
+    const loadedRef = useRef(false);
+    const latestSessionRef = useRef({ sessionsCompleted: 0, totalFocusTime: 0 });
 
     // Load session history from API
     useEffect(() => {
+        let cancelled = false;
+        loadedRef.current = false;
         const load = async () => {
             try {
                 const data = await getPomodoro(projectId, documentId);
-                setSessionsCompleted(data.sessions || 0);
-                setTotalFocusTime((data.focusTime || 0) * 60); // API stores minutes, timer uses seconds
+                if (cancelled) return;
+                const loadedSessions = data.sessions || 0;
+                const loadedFocusTime = (data.focusTime || 0) * 60;
+                latestSessionRef.current = {
+                    sessionsCompleted: loadedSessions,
+                    totalFocusTime: loadedFocusTime,
+                };
+                setSessionsCompleted(loadedSessions);
+                setTotalFocusTime(loadedFocusTime); // API stores minutes, timer uses seconds
+                loadedRef.current = true;
             } catch (err) {
                 console.warn('Failed to load pomodoro data:', err);
             }
         };
         load();
+        return () => {
+            cancelled = true;
+        };
     }, [documentId, projectId]);
 
-    // Save session history to API
-    const saveSession = useCallback(() => {
+    useEffect(() => {
+        latestSessionRef.current = { sessionsCompleted, totalFocusTime };
+    }, [sessionsCompleted, totalFocusTime]);
+
+    // Persist checkpoints instead of writing on every timer tick.
+    const saveSession = useCallback((snapshot = latestSessionRef.current) => {
+        if (!loadedRef.current) return;
         savePomodoro(
-            sessionsCompleted,
-            Math.round(totalFocusTime / 60), // convert seconds to minutes
+            snapshot.sessionsCompleted,
+            Math.round(snapshot.totalFocusTime / 60), // convert seconds to minutes
             projectId,
             documentId
         ).catch(err => console.warn('Failed to save pomodoro:', err));
-    }, [documentId, projectId, sessionsCompleted, totalFocusTime]);
+    }, [documentId, projectId]);
+
+    useEffect(() => () => saveSession(), [saveSession]);
 
     // Timer logic
     useEffect(() => {
@@ -84,10 +106,12 @@ const PomodoroTimer = ({
         };
     }, [isRunning, mode]);
 
-    // Save on changes
+    // Keep a coarse checkpoint during long-running sessions.
     useEffect(() => {
-        saveSession();
-    }, [sessionsCompleted, totalFocusTime, saveSession]);
+        if (isRunning && mode === 'work' && totalFocusTime > 0 && totalFocusTime % 60 === 0) {
+            saveSession();
+        }
+    }, [isRunning, mode, saveSession, totalFocusTime]);
 
     const handleTimerComplete = () => {
         setIsRunning(false);
@@ -96,6 +120,10 @@ const PomodoroTimer = ({
         if (mode === 'work') {
             const newSessions = sessionsCompleted + 1;
             setSessionsCompleted(newSessions);
+            saveSession({
+                sessionsCompleted: newSessions,
+                totalFocusTime: totalFocusTime + 1,
+            });
             
             // Track pomodoro activity for heatmap
             if (projectId) {
@@ -170,12 +198,14 @@ const PomodoroTimer = ({
     };
 
     const resetTimer = () => {
+        saveSession();
         setIsRunning(false);
         setMode('work');
         setTimeLeft(workDuration * 60);
     };
 
     const switchMode = (newMode) => {
+        saveSession();
         setIsRunning(false);
         setMode(newMode);
         switch (newMode) {
@@ -206,6 +236,11 @@ const PomodoroTimer = ({
         longBreak: { bg: 'from-blue-500 to-indigo-600', text: 'text-white', ring: 'ring-blue-500' },
     };
 
+    const toggleTimer = () => {
+        if (isRunning) saveSession();
+        setIsRunning(running => !running);
+    };
+
     if (compact) {
         return (
             <div className="flex items-center gap-3 p-3 bg-white rounded-xl border border-[#E6D5CC]">
@@ -217,7 +252,7 @@ const PomodoroTimer = ({
                     <p className="text-xs text-[#8a6a5c]">{mode === 'work' ? 'Focus' : 'Break'}</p>
                 </div>
                 <button
-                    onClick={() => setIsRunning(!isRunning)}
+                    onClick={toggleTimer}
                     className={`h-10 w-10 rounded-lg bg-gradient-to-br ${modeColors[mode].bg} flex items-center justify-center text-white`}
                 >
                     {isRunning ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5 ml-0.5" />}
@@ -322,7 +357,7 @@ const PomodoroTimer = ({
                         <RotateCcw className="h-6 w-6" />
                     </button>
                     <button
-                        onClick={() => setIsRunning(!isRunning)}
+                        onClick={toggleTimer}
                         className={`px-8 py-4 bg-gradient-to-r ${modeColors[mode].bg} text-white rounded-xl font-bold text-lg flex items-center gap-3 shadow-lg hover:shadow-xl transition-all transform hover:scale-105`}
                     >
                         {isRunning ? (
