@@ -26,6 +26,9 @@ class _InMemoryStore:
         for edge in edges:
             self.relationships.setdefault(edge["project_id"], []).append(edge)
 
+    async def replace_relationships(self, project_id, edges):
+        self.relationships[project_id] = list(edges)
+
 
 class _FakeRelationshipGenerator:
     def __init__(self, latency_seconds, batch_concurrency):
