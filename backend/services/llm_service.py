@@ -1,122 +1,127 @@
-"""
-LLM Service — Azure OpenAI
+"""Application-scoped LlamaIndex LLM clients for Azure/OpenAI-compatible chat."""
 
-Uses langchain_openai.AzureChatOpenAI, driven by:
-    AZURE_OPENAI_API_KEY       (from .env)
-    AZURE_OPENAI_ENDPOINT      (from .env)
-    AZURE_OPENAI_DEPLOYMENT    (from .env, e.g. "gpt4o")
-    AZURE_OPENAI_API_VERSION   (from .env, e.g. "2024-12-01-preview")
+from typing import Dict, List, Tuple
 
-Falls back to legacy OpenAI-compatible client if Azure vars are not set.
-"""
-
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from config.settings import settings
-from typing import List, Dict
+from llama_index.core.llms import ChatMessage, MessageRole
 from utils.logger import logger
 
 
-def _build_client(
-    temperature: float = 0.7,
-    max_tokens: int = 4000,
-):
-    """
-    Returns either:
-    - AzureChatOpenAI (preferred)
-    - ChatOpenAI fallback for legacy providers
-    """
+def _active_model() -> str:
+    if settings.AZURE_OPENAI_ENDPOINT:
+        return settings.AZURE_OPENAI_MODEL or settings.AZURE_OPENAI_DEPLOYMENT
+    return settings.LLM_MODEL or "gpt-4.1-mini"
 
-    # Resolve API Key: support unified MODEL_API_KEY or explicit keys
-    azure_api_key = settings.AZURE_OPENAI_API_KEY or settings.MODEL_API_KEY
 
-    # Azure OpenAI
-    if (
-        settings.AZURE_OPENAI_ENDPOINT
-        and azure_api_key
-    ):
-        from langchain_openai import AzureChatOpenAI
+def _temperature_for_model(requested: float) -> float:
+    model = _active_model().lower()
+    return 1.0 if "gpt-5" in model or model.startswith("o1") else requested
 
-        logger.debug(
-            f"[LLMService] Using Azure OpenAI | "
-            f"deployment={settings.AZURE_OPENAI_DEPLOYMENT}"
+
+def _convert_messages(messages: List[Dict[str, str]]) -> List[ChatMessage]:
+    roles = {
+        "system": MessageRole.SYSTEM,
+        "assistant": MessageRole.ASSISTANT,
+        "user": MessageRole.USER,
+    }
+    return [
+        ChatMessage(
+            role=roles.get(message.get("role", "user"), MessageRole.USER),
+            content=message.get("content", ""),
         )
+        for message in messages
+    ]
 
-        kwargs = {
-            "azure_endpoint": settings.AZURE_OPENAI_ENDPOINT,
-            "api_key": azure_api_key,
-            "azure_deployment": settings.AZURE_OPENAI_DEPLOYMENT,
-            "api_version": settings.AZURE_OPENAI_API_VERSION,
-            "max_tokens": max_tokens,
-        }
-        
-        # Models like gpt-5-mini and o1 do not support custom temperatures
-        if "gpt-5-mini" in settings.AZURE_OPENAI_DEPLOYMENT.lower() or "o1" in settings.AZURE_OPENAI_DEPLOYMENT.lower():
-            kwargs["temperature"] = 1.0
-        else:
-            kwargs["temperature"] = temperature
-            
-        return AzureChatOpenAI(**kwargs)
 
-    # Fallback OpenAI-compatible providers
-    from langchain_openai import ChatOpenAI
-
-    logger.warning(
-        "[LLMService] Azure OpenAI not configured — using fallback ChatOpenAI"
-    )
-
-    fallback_api_key = (
-        settings.LLM_API_KEY
-        or settings.MODEL_API_KEY
-        or settings.AZURE_OPENAI_API_KEY
-    )
-
-    return ChatOpenAI(
-        model=settings.LLM_MODEL or "gpt-4.1-mini",
-        openai_api_key=fallback_api_key,
-        openai_api_base=settings.LLM_BASE_URL or None,
-        temperature=temperature,
-        max_tokens=max_tokens,
-    )
-
-def _convert_messages(messages: List[Dict[str, str]]):
-    """Convert dict messages to LangChain message objects."""
-    converted = []
-    for msg in messages:
-        role = msg.get("role", "user")
-        content = msg.get("content", "")
-        if role == "user":
-            converted.append(HumanMessage(content=content))
-        elif role == "assistant":
-            converted.append(AIMessage(content=content))
-        elif role == "system":
-            converted.append(SystemMessage(content=content))
-        else:
-            converted.append(HumanMessage(content=content))
-    return converted
+def _response_details(response) -> Tuple[str, str, int]:
+    answer = response.message.content or ""
+    raw = getattr(response, "raw", None)
+    finish_reason = ""
+    reasoning_tokens = 0
+    try:
+        finish_reason = raw.choices[0].finish_reason or ""
+        details = getattr(raw.usage, "completion_tokens_details", None)
+        reasoning_tokens = getattr(details, "reasoning_tokens", 0) or 0
+    except (AttributeError, IndexError, TypeError):
+        pass
+    return answer, finish_reason, reasoning_tokens
 
 
 class LLMService:
-    # Minimum tokens we require in the actual response.
-    # If the model returns fewer chars than this, we suspect token starvation.
     EMPTY_RESPONSE_MIN_CHARS = 20
-    # Multiplier applied when retrying after an empty/short response
     RETRY_TOKEN_MULTIPLIER = 3
 
     def __init__(self):
-        using_azure = bool(
+        self._clients = {}
+        provider = "Azure OpenAI" if self._using_azure else "OpenAI-compatible"
+        logger.info(f"[LLMService] LlamaIndex provider: {provider}")
+
+    @property
+    def _using_azure(self) -> bool:
+        return bool(
             settings.AZURE_OPENAI_ENDPOINT
             and (settings.AZURE_OPENAI_API_KEY or settings.MODEL_API_KEY)
         )
-        if using_azure:
-            logger.info(
-                f"[LLMService] Initialized with Azure OpenAI | "
-                f"deployment={settings.AZURE_OPENAI_DEPLOYMENT}"
-            )
-        else:
-            logger.warning("[LLMService] Azure OpenAI not configured | using fallback LLM.")
 
     def _get_client(self, temperature: float = 0.7, max_tokens: int = 4000):
-        return _build_client(temperature=temperature, max_tokens=max_tokens)
+        max_tokens = max(max_tokens, 2000)
+        effective_temperature = _temperature_for_model(temperature)
+        cache_key = (effective_temperature, max_tokens)
+        if cache_key in self._clients:
+            return self._clients[cache_key]
+
+        if self._using_azure:
+            from llama_index.llms.azure_openai import AzureOpenAI
+
+            client = AzureOpenAI(
+                engine=settings.AZURE_OPENAI_DEPLOYMENT,
+                model=_active_model(),
+                azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
+                api_key=settings.AZURE_OPENAI_API_KEY or settings.MODEL_API_KEY,
+                api_version=settings.AZURE_OPENAI_API_VERSION,
+                temperature=effective_temperature,
+                max_tokens=max_tokens,
+                timeout=settings.LLM_REQUEST_TIMEOUT_S,
+                max_retries=settings.LLM_MAX_RETRIES,
+                reuse_client=True,
+            )
+        else:
+            api_key = (
+                settings.LLM_API_KEY
+                or settings.MODEL_API_KEY
+                or settings.AZURE_OPENAI_API_KEY
+            )
+            if settings.LLM_BASE_URL:
+                from llama_index.llms.openai_like import OpenAILike
+
+                client = OpenAILike(
+                    model=settings.LLM_MODEL or "gpt-4.1-mini",
+                    api_key=api_key,
+                    api_base=settings.LLM_BASE_URL,
+                    context_window=settings.LLM_CONTEXT_WINDOW,
+                    is_chat_model=True,
+                    is_function_calling_model=False,
+                    temperature=effective_temperature,
+                    max_tokens=max_tokens,
+                    timeout=settings.LLM_REQUEST_TIMEOUT_S,
+                    max_retries=settings.LLM_MAX_RETRIES,
+                    reuse_client=True,
+                )
+            else:
+                from llama_index.llms.openai import OpenAI
+
+                client = OpenAI(
+                    model=settings.LLM_MODEL or "gpt-4.1-mini",
+                    api_key=api_key,
+                    temperature=effective_temperature,
+                    max_tokens=max_tokens,
+                    timeout=settings.LLM_REQUEST_TIMEOUT_S,
+                    max_retries=settings.LLM_MAX_RETRIES,
+                    reuse_client=True,
+                )
+
+        self._clients[cache_key] = client
+        return client
 
     async def chat_completion(
         self,
@@ -124,63 +129,26 @@ class LLMService:
         temperature: float = 0.7,
         max_tokens: int = 4000,
     ) -> str:
-        """Generate chat completion (non-streaming).
-        
-        Automatically retries with a larger token budget if the model returns
-        an empty or near-empty response — this handles reasoning models that
-        consume their entire token allowance on internal chain-of-thought.
-        """
-        # Cap absolute minimum — never go below 2000 or things will always be empty
         max_tokens = max(max_tokens, 2000)
-        try:
-            client = self._get_client(temperature=temperature, max_tokens=max_tokens)
-            lc_messages = _convert_messages(messages)
-            logger.info(
-                f"[LLMService] Sending {len(lc_messages)} messages "
-                f"(temp={temperature}, max_tokens={max_tokens})"
+        client = self._get_client(temperature=temperature, max_tokens=max_tokens)
+        response = await client.achat(_convert_messages(messages))
+        answer, finish_reason, reasoning_tokens = _response_details(response)
+
+        if len(answer) < self.EMPTY_RESPONSE_MIN_CHARS and (
+            finish_reason == "length" or reasoning_tokens > max_tokens * 0.5
+        ):
+            retry_tokens = min(max_tokens * self.RETRY_TOKEN_MULTIPLIER, 6000)
+            logger.warning(
+                f"[LLMService] Token starvation; retrying with {retry_tokens} tokens"
             )
-            response = await client.ainvoke(lc_messages)
-            answer = response.content if getattr(response, "content", None) else ""
-
-            # Detect token starvation: finish_reason='length' + empty content
-            metadata = getattr(response, "response_metadata", {})
-            finish_reason = metadata.get("finish_reason", "")
-            reasoning_tokens = (
-                metadata.get("token_usage", {})
-                .get("completion_tokens_details", {})
-                .get("reasoning_tokens", 0)
+            retry_client = self._get_client(
+                temperature=temperature, max_tokens=retry_tokens
             )
+            retry_response = await retry_client.achat(_convert_messages(messages))
+            answer, _, _ = _response_details(retry_response)
 
-            if not answer or len(answer) < self.EMPTY_RESPONSE_MIN_CHARS:
-                logger.warning(
-                    f"[LLMService] Empty/short response — finish_reason={finish_reason!r}, "
-                    f"reasoning_tokens={reasoning_tokens}. "
-                    f"Metadata: {metadata}"
-                )
-                # If finish_reason is 'length', the model ran out of token budget.
-                # Retry once with a much larger cap to give the model breathing room.
-                if finish_reason == "length" or reasoning_tokens > max_tokens * 0.5:
-                    # Cap retry max_tokens to prevent "Request too large" 413 error (e.g. Groq 8000 TPM)
-                    retry_tokens = min(max_tokens * self.RETRY_TOKEN_MULTIPLIER, 6000)
-                    logger.warning(
-                        f"[LLMService] Retrying with {retry_tokens} tokens "
-                        f"(token starvation detected — reasoning used {reasoning_tokens} tokens)"
-                    )
-                    retry_client = self._get_client(temperature=temperature, max_tokens=retry_tokens)
-                    retry_response = await retry_client.ainvoke(lc_messages)
-                    answer = retry_response.content if getattr(retry_response, "content", None) else ""
-                    logger.info(f"[LLMService] Retry completion: {len(answer)} chars")
-
-            if not answer:
-                logger.error(f"[LLMService] Still empty after retry. Metadata: {metadata}")
-            else:
-                logger.info(f"[LLMService] Completion: {len(answer)} chars")
-            return answer
-        except Exception as e:
-            logger.error(f"[LLMService] chat_completion error: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
-            raise
+        logger.info(f"[LLMService] Completion: {len(answer)} chars")
+        return answer
 
     async def chat_completion_stream(
         self,
@@ -188,17 +156,13 @@ class LLMService:
         temperature: float = 0.7,
         max_tokens: int = 4000,
     ):
-        """Generate streaming chat completion."""
-        max_tokens = max(max_tokens, 2000)
-        try:
-            client = self._get_client(temperature=temperature, max_tokens=max_tokens)
-            lc_messages = _convert_messages(messages)
-            async for chunk in client.astream(lc_messages):
-                if chunk.content:
-                    yield chunk.content
-        except Exception as e:
-            logger.error(f"[LLMService] streaming error: {e}")
-            raise
+        client = self._get_client(
+            temperature=temperature, max_tokens=max(max_tokens, 2000)
+        )
+        stream = await client.astream_chat(_convert_messages(messages))
+        async for event in stream:
+            if event.delta:
+                yield event.delta
 
 
 llm_service = LLMService()

@@ -1,15 +1,15 @@
 from typing import List, Dict, Any, Optional
 from db.client import get_supabase_client
-from services.llm_service import LLMService
-from services.rag_service import RAGService
+from services.llm_service import llm_service
+from services.rag_service import rag_service
 from utils.logger import logger
 import json
 
 class MindmapService:
     def __init__(self):
         self.supabase = get_supabase_client()
-        self.llm_service = LLMService()
-        self.rag_service = RAGService()
+        self.llm_service = llm_service
+        self.rag_service = rag_service
     
     async def get_mindmaps(self, user_id: str, project_id: str) -> List[Dict[str, Any]]:
         """Get all mindmaps for a project"""

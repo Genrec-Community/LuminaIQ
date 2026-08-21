@@ -1,4 +1,9 @@
-from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, DotEnvSettingsSource, EnvSettingsSource
+from pydantic_settings import (
+    BaseSettings,
+    PydanticBaseSettingsSource,
+    DotEnvSettingsSource,
+    EnvSettingsSource,
+)
 from pydantic import Field, field_validator
 from typing import Optional, List, Union, Any
 
@@ -51,6 +56,9 @@ class Settings(BaseSettings):
 
     # Deployment name in Azure (your .env uses AZURE_OPENAI_DEPLOYMENT)
     AZURE_OPENAI_DEPLOYMENT: str = "gpt-5-mini"
+    # Actual model family. Required for custom-named Azure deployments; deployments
+    # named after their model remain backward-compatible when this is unset.
+    AZURE_OPENAI_MODEL: Optional[str] = None
 
     # Alias kept for backward-compat with any service that imports this name
     @property
@@ -68,10 +76,15 @@ class Settings(BaseSettings):
     LLM_API_KEY: str = Field(default="")
     LLM_BASE_URL: str = Field(default="")
     LLM_MODEL: str = Field(default="gpt-4.1-mini")
+    LLM_CONTEXT_WINDOW: int = 128000
+    LLM_REQUEST_TIMEOUT_S: float = 60.0
+    LLM_MAX_RETRIES: int = 2
 
     # Webhook
     MAIN_API_WEBHOOK_SECRET: str = Field(default="supersecretwebhook")
-    MAIN_API_WEBHOOK_URL: str = Field(default="http://localhost:8000/api/v1/webhook/document-ready")
+    MAIN_API_WEBHOOK_URL: str = Field(
+        default="http://localhost:8000/api/v1/webhook/document-ready"
+    )
 
     # ─────────────────────────────────────────────────────────
     # Embeddings — Azure OpenAI / OpenAI-compatible
@@ -122,6 +135,7 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             if v.startswith("["):
                 import json
+
                 try:
                     return json.loads(v)
                 except Exception:
@@ -132,13 +146,27 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "./uploads"
     MAX_FILE_SIZE: int = 104857600  # 100MB
     ALLOWED_EXTENSIONS: List[str] = [
-        "pdf", "docx", "txt", "html", "md",
+        "pdf",
+        "docx",
+        "txt",
+        "html",
+        "md",
         # Image formats — processed via Azure CV OCR
-        "jpg", "jpeg", "png", "bmp", "tiff", "tif", "gif", "webp",
+        "jpg",
+        "jpeg",
+        "png",
+        "bmp",
+        "tiff",
+        "tif",
+        "gif",
+        "webp",
     ]
 
+    # LlamaIndex SentenceSplitter values are token counts, not characters.
     CHUNK_SIZE: int = 800
     CHUNK_OVERLAP: int = 80
+    RAG_TOP_K: int = 5
+    RAG_HISTORY_MESSAGES: int = 8
 
     # ─────────────────────────────────────────────────────────
     # Concurrency — all limits in one place for easy tuning
@@ -151,9 +179,9 @@ class Settings(BaseSettings):
     MAX_CONCURRENT_DOCUMENT_UPLOADS: int = 10
 
     # Per-worker limits inside the embedding pipeline (shared across local docs)
-    MAX_GLOBAL_DB_OPERATIONS: int = 20      # Qdrant write concurrency
-    MAX_GLOBAL_EMBEDDINGS: int = 15         # Concurrent embedding API calls
-    MAX_CONCURRENT_LLM: int = 5             # Concurrent LLM calls (topic/graph gen)
+    MAX_GLOBAL_DB_OPERATIONS: int = 20  # Qdrant write concurrency
+    MAX_GLOBAL_EMBEDDINGS: int = 15  # Concurrent embedding API calls
+    MAX_CONCURRENT_LLM: int = 5  # Concurrent LLM calls (topic/graph gen)
 
     # Batch size for embedding API calls
     EMBEDDING_BATCH_SIZE: int = 50
@@ -161,6 +189,7 @@ class Settings(BaseSettings):
     EMBEDDING_MAX_RETRIES: int = 5
     EMBEDDING_MAX_RETRY_DELAY_S: float = 8.0
     EMBEDDING_REQUEST_TIMEOUT_S: float = 60.0
+    EMBEDDING_QUERY_MAX_RETRIES: int = 2
 
     # Gunicorn workers for production
     # Recommended: (2 * CPU cores) + 1. Azure 1-core = 3 workers.
@@ -174,7 +203,7 @@ class Settings(BaseSettings):
     # ─────────────────────────────────────────────────────────
     BOOK_STORE_PAGE_SIZE: int = 20
     BOOK_STORE_MAX_DESCRIPTION: int = 2000
-    BOOK_IMPORT_TEXTS_BUCKET: str = "texts"   # Supabase bucket for extracted .txt files
+    BOOK_IMPORT_TEXTS_BUCKET: str = "texts"  # Supabase bucket for extracted .txt files
 
     @classmethod
     def settings_customise_sources(

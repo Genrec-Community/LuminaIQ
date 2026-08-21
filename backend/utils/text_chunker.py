@@ -1,38 +1,45 @@
 from typing import List
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+from llama_index.core.node_parser import SentenceSplitter
+
 
 class TextChunker:
+    """LlamaIndex sentence-aware token chunking for document ingestion."""
+
     def __init__(self, chunk_size: int = 800, overlap: int = 100):
-        self.splitter = RecursiveCharacterTextSplitter(
+        self.chunk_size = chunk_size
+        self.overlap = overlap
+        self.splitter = self._build_splitter(chunk_size, overlap)
+
+    @staticmethod
+    def _build_splitter(chunk_size: int, overlap: int) -> SentenceSplitter:
+        return SentenceSplitter(
             chunk_size=chunk_size,
-            chunk_overlap=overlap,
-            length_function=len,
-            is_separator_regex=False,
-            separators=["\n\n", "\n", " ", ""]
+            chunk_overlap=min(overlap, max(0, chunk_size - 1)),
+            paragraph_separator="\n\n",
         )
 
-    def chunk_text(self, text: str, chunk_size: int = None, overlap: int = None) -> List[str]:
-        """
-        Split text using LangChain's RecursiveCharacterTextSplitter.
-        If chunk_size/overlap provided here, they override init values (re-initializing splitter).
-        """
+    def chunk_text(
+        self,
+        text: str,
+        chunk_size: int = None,
+        overlap: int = None,
+    ) -> List[str]:
         if not text:
             return []
-            
-        # If overrides are provided and different, create a temporary splitter
-        current_splitter = self.splitter
-        if (chunk_size is not None and chunk_size != self.splitter._chunk_size) or \
-           (overlap is not None and overlap != self.splitter._chunk_overlap):
-            current_splitter = RecursiveCharacterTextSplitter(
-                chunk_size=chunk_size or self.splitter._chunk_size,
-                chunk_overlap=overlap or self.splitter._chunk_overlap,
-                separators=["\n\n", "\n", " ", ""]
-            )
-            
-        return current_splitter.split_text(text)
-    
-    def chunk_by_tokens(self, text: str, max_tokens: int = 512, overlap_tokens: int = 50) -> List[str]:
-        """
-        Approximate token-based chunking using char count (1 token ~ 4 chars).
-        """
-        return self.chunk_text(text, chunk_size=max_tokens*4, overlap=overlap_tokens*4)
+        size = chunk_size or self.chunk_size
+        chunk_overlap = self.overlap if overlap is None else overlap
+        splitter = (
+            self.splitter
+            if size == self.chunk_size and chunk_overlap == self.overlap
+            else self._build_splitter(size, chunk_overlap)
+        )
+        return splitter.split_text(text)
+
+    def chunk_by_tokens(
+        self,
+        text: str,
+        max_tokens: int = 512,
+        overlap_tokens: int = 50,
+    ) -> List[str]:
+        return self.chunk_text(text, max_tokens, overlap_tokens)

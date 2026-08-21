@@ -1,5 +1,4 @@
-from langchain_qdrant import QdrantVectorStore
-from qdrant_client import QdrantClient, AsyncQdrantClient
+from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import (
     Distance,
     VectorParams,
@@ -15,7 +14,6 @@ from config.settings import settings
 from typing import List, Dict, Any, Optional
 from uuid import uuid4
 from utils.logger import logger
-from services.embedding_service import embedding_service
 from utils.embedding_scheduler import embedding_point_id
 
 
@@ -32,11 +30,10 @@ class QdrantService:
     """
 
     # Connection pool and timeout settings for multi-user load
-    ASYNC_TIMEOUT = 120        # Longer timeout for batch embedding upserts
-    SYNC_TIMEOUT = 30          # Shorter timeout for search queries (user-facing)
+    ASYNC_TIMEOUT = 120  # Longer timeout for batch embedding upserts
     GRPC_OPTIONS = {
-        "grpc.max_send_message_length": 64 * 1024 * 1024,   # 64MB
-        "grpc.max_receive_message_length": 64 * 1024 * 1024, # 64MB
+        "grpc.max_send_message_length": 64 * 1024 * 1024,  # 64MB
+        "grpc.max_receive_message_length": 64 * 1024 * 1024,  # 64MB
     }
 
     def __init__(self):
@@ -49,18 +46,14 @@ class QdrantService:
         }
 
         self.async_client = AsyncQdrantClient(**kwargs)
-        # Sync client kept ONLY for LangChain QdrantVectorStore compatibility
-        self._sync_client = QdrantClient(
-            url=settings.QDRANT_URL,
-            api_key=settings.QDRANT_API_KEY,
-            timeout=self.SYNC_TIMEOUT,
-        )
         logger.info(
             f"[QdrantService] Initialized with AsyncQdrantClient | "
-            f"async_timeout={self.ASYNC_TIMEOUT}s, sync_timeout={self.SYNC_TIMEOUT}s"
+            f"async_timeout={self.ASYNC_TIMEOUT}s"
         )
 
-    async def create_collection(self, collection_name: str, vector_size: int = settings.EMBEDDING_DIMENSION):
+    async def create_collection(
+        self, collection_name: str, vector_size: int = settings.EMBEDDING_DIMENSION
+    ):
         """Create a new collection and ensure indexes exist (fully async)"""
         try:
             collections = await self.async_client.get_collections()
@@ -151,16 +144,6 @@ class QdrantService:
         await self.async_client.upsert(collection_name=collection_name, points=points)
         logger.info(f"Upserted {len(points)} chunks to {collection_name}")
 
-    def get_vector_store(self, collection_name: str):
-        """Get LangChain VectorStore instance (uses sync client for LangChain compat)"""
-        return QdrantVectorStore(
-            client=self._sync_client,
-            collection_name=collection_name,
-            embedding=embedding_service.embeddings,
-            content_payload_key="text",
-            metadata_payload_key="metadata",
-        )
-
     async def search(
         self,
         collection_name: str,
@@ -182,24 +165,28 @@ class QdrantService:
                     query_filter = Filter(should=should_conditions)
 
             try:
-                results = (await self.async_client.query_points(
-                    collection_name=collection_name,
-                    query=query_vector,
-                    limit=limit,
-                    query_filter=query_filter,
-                )).points
+                results = (
+                    await self.async_client.query_points(
+                        collection_name=collection_name,
+                        query=query_vector,
+                        limit=limit,
+                        query_filter=query_filter,
+                    )
+                ).points
             except Exception as search_err:
                 if "Index required" in str(search_err):
                     logger.warning(
                         f"Index missing for {collection_name}, attempting to fix..."
                     )
                     await self._ensure_indexes(collection_name)
-                    results = (await self.async_client.query_points(
-                        collection_name=collection_name,
-                        query=query_vector,
-                        limit=limit,
-                        query_filter=query_filter,
-                    )).points
+                    results = (
+                        await self.async_client.query_points(
+                            collection_name=collection_name,
+                            query=query_vector,
+                            limit=limit,
+                            query_filter=query_filter,
+                        )
+                    ).points
                 else:
                     raise search_err
 
@@ -211,6 +198,7 @@ class QdrantService:
                         "score": result.score,
                         "text": result.payload.get("text", ""),
                         "document_id": result.payload.get("document_id"),
+                        "document_name": result.payload.get("document_name"),
                         "chunk_id": result.payload.get("chunk_id"),
                     }
                 )
@@ -391,14 +379,18 @@ class QdrantService:
                 new_payload["document_id"] = target_document_id
                 new_payload["document_name"] = target_document_name
                 # Also rewrite nested metadata dict if present
-                if "metadata" in new_payload and isinstance(new_payload["metadata"], dict):
+                if "metadata" in new_payload and isinstance(
+                    new_payload["metadata"], dict
+                ):
                     new_payload["metadata"] = dict(new_payload["metadata"])
                     new_payload["metadata"]["document_id"] = target_document_id
                     new_payload["metadata"]["document_name"] = target_document_name
 
                 cloned_points.append(
                     PointStruct(
-                        id=str(uuid4()),   # New UUID — avoids ID collisions across projects
+                        id=str(
+                            uuid4()
+                        ),  # New UUID — avoids ID collisions across projects
                         vector=p.vector,
                         payload=new_payload,
                     )

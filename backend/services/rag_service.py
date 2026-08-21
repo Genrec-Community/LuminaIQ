@@ -1,476 +1,332 @@
-from typing import List, Dict, Any, Optional
+"""LlamaIndex RAG over the repository's existing Qdrant payload schema."""
+
 import asyncio
-from services.embedding_service import embedding_service
-from services.qdrant_service import qdrant_service
-from services.llm_service import llm_service
-from supabase import create_client, Client
+import json
+from typing import Any, Dict, List, Optional
+
+from llama_index.core import PromptTemplate
+from llama_index.core.response_synthesizers import (
+    ResponseMode,
+    get_response_synthesizer,
+)
+from llama_index.core.retrievers import BaseRetriever
+from llama_index.core.schema import NodeWithScore, QueryBundle, TextNode
+
 from config.settings import settings
+from db.client import async_db, get_supabase_client
+from services.embedding_service import embedding_service
+from services.llm_service import llm_service
+from services.qdrant_service import qdrant_service
 from utils.logger import logger
 
-# LangChain Imports
-from langchain_qdrant import QdrantVectorStore
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.chains import create_retrieval_chain
-from langchain.chains.combine_documents import create_stuff_documents_chain
-from langchain_core.messages import HumanMessage, AIMessage
-from langchain_core.runnables import RunnableConfig
+_sleep = asyncio.sleep
 
 
-# Retry decorator for handling 503 and transient errors
-async def retry_with_backoff(func, max_retries=3, base_delay=1.0, max_delay=10.0):
-    """Retry async function with exponential backoff"""
-    last_exception = None
+DEFAULT_RAG_PROMPT = """You are Lumina IQ, an educational intelligence system.
+Answer from the supplied document excerpts. Explain connections clearly and use
+Markdown where it improves readability. Every excerpt starts with [Source n];
+cite its facts inline as [n](n), so [Source 1] maps to [1](1). Do not invent
+facts outside the context. If the context is relevant but incomplete, explain
+the limitation. If it is entirely irrelevant, say: "I couldn't find the answer
+in the provided documents."
+"""
+
+
+async def retry_with_backoff(func, max_retries=3, base_delay=1.0, max_delay=8.0):
+    last_error = None
     for attempt in range(max_retries):
         try:
             return await func()
-        except Exception as e:
-            last_exception = e
-            error_str = str(e).lower()
-            # Check if it's a retryable error (503, rate limit, service unavailable)
-            if any(
-                x in error_str
-                for x in [
+        except Exception as error:
+            last_error = error
+            message = str(error).lower()
+            retryable = any(
+                marker in message
+                for marker in (
+                    "429",
                     "503",
-                    "service unavailable",
-                    "rate limit",
-                    "overloaded",
                     "529",
+                    "rate limit",
                     "too many requests",
-                ]
-            ):
-                if attempt < max_retries - 1:
-                    delay = min(base_delay * (2**attempt), max_delay)
-                    logger.warning(
-                        f"Retryable error (attempt {attempt + 1}/{max_retries}): {e}. Retrying in {delay}s..."
-                    )
-                    await asyncio.sleep(delay)
-                    continue
-            # Non-retryable error, raise immediately
-            raise
-    raise last_exception
+                    "overloaded",
+                    "timeout",
+                    "connection",
+                    "unavailable",
+                )
+            )
+            if not retryable or attempt == max_retries - 1:
+                raise
+            await _sleep(min(base_delay * (2**attempt), max_delay))
+    raise last_error
+
+
+class ExistingQdrantRetriever(BaseRetriever):
+    """Expose existing LuminaIQ Qdrant points as LlamaIndex nodes."""
+
+    def __init__(
+        self,
+        collection_name: str,
+        selected_documents: Optional[List[str]] = None,
+        top_k: int = 5,
+        embedding_provider=embedding_service,
+        vector_store=qdrant_service,
+    ):
+        super().__init__()
+        self.collection_name = collection_name
+        self.selected_documents = selected_documents or []
+        self.top_k = top_k
+        self.embedding_provider = embedding_provider
+        self.vector_store = vector_store
+
+    def _retrieve(self, query_bundle: QueryBundle) -> List[NodeWithScore]:
+        raise RuntimeError("ExistingQdrantRetriever must be used asynchronously")
+
+    async def _aretrieve(self, query_bundle: QueryBundle) -> List[NodeWithScore]:
+        query_vector = await self.embedding_provider.generate_embedding(
+            query_bundle.query_str
+        )
+        filters = (
+            {"document_ids": self.selected_documents}
+            if self.selected_documents
+            else None
+        )
+        results = await self.vector_store.search(
+            collection_name=self.collection_name,
+            query_vector=query_vector,
+            limit=self.top_k,
+            filter_conditions=filters,
+        )
+
+        nodes = []
+        populated_results = [result for result in results if result.get("text", "")]
+        for source_number, result in enumerate(populated_results, start=1):
+            text = result["text"]
+            node = TextNode(
+                id_=str(result.get("id", "")),
+                text=f"[Source {source_number}] {text}",
+                metadata={
+                    "source_number": source_number,
+                    "document_id": result.get("document_id", ""),
+                    "document_name": result.get("document_name") or "Unknown",
+                    "chunk_id": result.get("chunk_id"),
+                    "page": result.get("page"),
+                },
+                excluded_embed_metadata_keys=[
+                    "document_id",
+                    "document_name",
+                    "chunk_id",
+                    "page",
+                    "source_number",
+                ],
+            )
+            nodes.append(NodeWithScore(node=node, score=result.get("score")))
+        return nodes
+
+
+def _escape_prompt_value(value: str) -> str:
+    return value.replace("{", "{{").replace("}", "}}")
+
+
+def _format_history(history: List[Dict[str, str]]) -> str:
+    recent = history[-settings.RAG_HISTORY_MESSAGES :]
+    lines = []
+    for message in recent:
+        role = "Student" if message.get("role") == "user" else "Tutor"
+        lines.append(f"{role}: {message.get('content', '')}")
+    return "\n".join(lines) or "No previous conversation."
+
+
+def _build_prompt(
+    system_prompt: Optional[str],
+    user_context: Optional[str],
+    chat_history: List[Dict[str, str]],
+) -> PromptTemplate:
+    profile = user_context or "No student profile has been configured."
+    instructions = system_prompt or DEFAULT_RAG_PROMPT
+    history = _format_history(chat_history)
+    template = f"""=== STUDENT PROFILE ===
+{_escape_prompt_value(profile)}
+
+=== INSTRUCTIONS ===
+{_escape_prompt_value(instructions)}
+
+=== RECENT CONVERSATION ===
+{_escape_prompt_value(history)}
+
+=== DOCUMENT EXCERPTS ===
+{{context_str}}
+
+Question: {{query_str}}
+Answer:"""
+    return PromptTemplate(template)
+
+
+def _sources(nodes: List[NodeWithScore]) -> List[Dict[str, Any]]:
+    sources = []
+    for node in nodes:
+        content = node.get_content()
+        prefix = f"[Source {node.metadata.get('source_number')}] "
+        if content.startswith(prefix):
+            content = content[len(prefix) :]
+        sources.append(
+            {
+                "doc_id": node.metadata.get("document_id", ""),
+                "doc_name": node.metadata.get("document_name", "Unknown"),
+                "chunk_text": content,
+                "page": node.metadata.get("page"),
+                "score": node.score,
+            }
+        )
+    return sources
+
+
+def _friendly_error(error: Exception) -> str:
+    message = str(error)
+    lowered = message.lower()
+    if "not found: collection" in lowered or "doesn't exist" in lowered:
+        return "Document chunks are still processing or failed to upload. Please try again shortly."
+    if "connection" in lowered or "timeout" in lowered:
+        return "Failed to connect to the AI service. Please try again shortly."
+    return message
 
 
 class RAGService:
-    def __init__(self):
-        self.client: Client = create_client(
-            settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY
+    def __init__(self, client=None, llm=None):
+        self.client = client or get_supabase_client()
+        self.llm = llm or llm_service._get_client(temperature=0.1)
+
+    async def _retrieve(
+        self,
+        project_id: str,
+        question: str,
+        selected_documents: Optional[List[str]],
+    ) -> List[NodeWithScore]:
+        retriever = ExistingQdrantRetriever(
+            collection_name=f"project_{project_id}",
+            selected_documents=selected_documents,
+            top_k=settings.RAG_TOP_K,
         )
+        return await retriever.aretrieve(question)
 
-        # Initialize LLM via centralized llm_service
-        self.llm = llm_service._get_client(temperature=0.1)
-
-    def _get_retrieval_chain(
-        self, collection_name: str, selected_documents: Optional[List[str]] = None, system_prompt: Optional[str] = None, user_context: Optional[str] = None
+    def _synthesizer(
+        self,
+        system_prompt: Optional[str],
+        user_context: Optional[str],
+        chat_history: List[Dict[str, str]],
+        streaming: bool,
     ):
-        """Create a RAG chain for a specific collection"""
-
-        # 1. Vector Store & Retriever
-        vector_store = qdrant_service.get_vector_store(collection_name)
-
-        # Define search arguments (filters)
-        search_kwargs = {"k": 5}
-        if selected_documents:
-            from qdrant_client.models import Filter, FieldCondition, MatchValue
-
-            # Use 'should' for OR logic - match ANY of the selected documents
-            should_conditions = [
-                FieldCondition(key="document_id", match=MatchValue(value=doc_id))
-                for doc_id in selected_documents
-            ]
-            qdrant_filter = Filter(should=should_conditions)
-            search_kwargs["filter"] = qdrant_filter
-
-        retriever = vector_store.as_retriever(search_kwargs=search_kwargs)
-
-        # 2. Prompt
-        # Build identity preamble from user profile
-        if user_context:
-            identity_block = f"""=== STUDENT PROFILE (HIGHEST PRIORITY) ===
-{user_context}
-
-CRITICAL RULE:
-- If the student asks ANY question about themselves — "who am I", "what is my name", "what am I studying for", "tell me about myself" — answer ONLY using the STUDENT PROFILE above.
-- Do NOT use document content to describe the student. The student is the READER, not the subject.
-- If the student asks "who am I" and the profile has their name, greet them by name and describe what you know from their profile.
-
-===================================================
-
-"""
-        else:
-            identity_block = """=== STUDENT PROFILE ===
-No profile information has been set yet.
-
-CRITICAL RULE:
-- If the student asks about themselves ("who am I", "what is my name", etc.), tell them:
-  "I don't have your personal details yet. Please go to **Settings > Profile** and fill in your name and learning goal — then I'll be able to answer personal questions about you!"
-- Do NOT try to infer who the student is from the document content.
-
-===================================================
-
-"""
-
-        base_system_prompt = identity_block + (system_prompt or """You are Lumina IQ, an elite educational intelligence system designed to transform raw study material into clear, structured understanding.
-
-Your objective is NOT just accuracy — it is clarity, usefulness, and insight.
-
-    You are given context extracted from user documents. Each excerpt represents a numbered source:
-- First excerpt → Source 1 → cite as [1](1)
-- Second excerpt → Source 2 → cite as [2](2)
-...and so on.
-
----
-
-CORE DIRECTIVES:
-
-1. RESPONSE QUALITY
-- Deliver answers that are structured, clear, and genuinely helpful.
-- Use Markdown formatting:
-  - Headings
-  - Bullet points
-  - Bold for key ideas
-- Avoid flat text. Make it readable and intelligent.
-
----
-
-2. CITATIONS (IMPORTANT BUT NOT PARALYZING)
-- Use citation format: [1](1), [2](2)
-- Place citations inline next to facts.
-- If a statement clearly comes from context → cite it.
-- If citation is slightly uncertain → still answer, but prioritize clarity over rigid citation.
-
-DO NOT:
-- Use plain numbers
-- Use <source 1> or [[1]]
-- Add a sources list at the bottom
-
----
-
-3. INTELLIGENT ANSWERING LOGIC
-
-You must operate in 3 levels:
-
-LEVEL 1 — STRONG MATCH  
-If the context clearly contains the answer:
-→ Provide a complete, well-explained answer with citations.
-
-LEVEL 2 — PARTIAL MATCH  
-If the context is relevant but incomplete:
-→ Provide the best possible answer using available information  
-→ Clearly mention limitations  
-→ Still be helpful and explanatory
-
-LEVEL 3 — NO MATCH  
-Only if the context is completely irrelevant:
-→ Respond:
-"I couldn't find the answer in the provided documents."
-
-⚠️ DO NOT default to Level 3 unless absolutely necessary.
-
----
-
-4. REASONING (MANDATORY)
-- Do not just state facts.
-- Explain how the information connects to the question.
-- Make the logic obvious to the user.
-
----
-
-5. ANTI-HALLUCINATION (SMART, NOT PARALYZING)
-- Do NOT invent facts outside the context.
-- BUT you ARE allowed to:
-  - Interpret
-  - Summarize
-  - Connect ideas logically
-
----
-
-6. TONE
-- Confident
-- Clear
-- Intelligent
-- Slightly authoritative, but not robotic
-
----
-
-FINAL RULE:
-
-Your job is not to prove correctness.
-
-Your job is to make the user understand.
-""")
-
-
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", base_system_prompt + "\n\nUse the following context to answer the user's question:\n{context}"),
-                MessagesPlaceholder(variable_name="chat_history"),
-                ("human", "{input}"),
-            ]
+        return get_response_synthesizer(
+            llm=self.llm,
+            simple_template=_build_prompt(system_prompt, user_context, chat_history),
+            response_mode=ResponseMode.SIMPLE_SUMMARIZE,
+            use_async=True,
+            streaming=streaming,
         )
-
-        # 3. Chains
-        question_answer_chain = create_stuff_documents_chain(self.llm, prompt)
-        rag_chain = create_retrieval_chain(retriever, question_answer_chain)
-
-        return rag_chain
 
     async def get_answer(
         self,
         project_id: str,
         question: str,
         selected_documents: Optional[List[str]] = None,
-        chat_history: List[Dict[str, str]] = [],
+        chat_history: Optional[List[Dict[str, str]]] = None,
         system_prompt: Optional[str] = None,
         user_context: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Generate answer using RAG pipeline (LangChain) with retry logic"""
+        history = chat_history or []
         try:
-            collection_name = f"project_{project_id}"
-            chain = self._get_retrieval_chain(collection_name, selected_documents, system_prompt, user_context)
-
-            # Convert history to LangChain format
-            history_messages = []
-            for msg in chat_history:
-                if msg["role"] == "user":
-                    history_messages.append(HumanMessage(content=msg["content"]))
-                elif msg["role"] == "assistant":
-                    history_messages.append(AIMessage(content=msg["content"]))
-
-            # Invoke with retry logic
-            async def invoke_chain():
-                return await chain.ainvoke(
-                    {"input": question, "chat_history": history_messages}
-                )
-
-            response = await retry_with_backoff(
-                invoke_chain, max_retries=3, base_delay=1.5
+            nodes = await retry_with_backoff(
+                lambda: self._retrieve(project_id, question, selected_documents),
+                max_retries=2,
+                base_delay=0.5,
             )
+            if not nodes:
+                return {
+                    "answer": "I couldn't find the answer in the provided documents.",
+                    "sources": [],
+                }
 
-            # Process sources from 'context' in response
-            sources = []
-            if "context" in response:
-                # DIAGNOSTIC: Log retrieved chunks
-                print("\n====== RETRIEVED CHUNKS ======")
-                for i, doc in enumerate(response["context"]):
-                    print(f"\n--- Chunk {i+1} ---")
-                    print(doc.page_content[:300])
-                print("\n===========================\n")
-                
-                for i, doc in enumerate(response["context"]):
-                    # Resolve filename from doc.metadata if available
-                    doc_name = doc.metadata.get("document_name", "Unknown")
-                    doc_id = doc.metadata.get("document_id", "")
-
-                    # If name missing in metadata, try DB lookup (cached ideally)
-                    if doc_name == "Unknown" and doc_id:
-                        try:
-                            res = (
-                                self.client.table("documents")
-                                .select("filename")
-                                .eq("id", doc_id)
-                                .execute()
-                            )
-                            if res.data:
-                                doc_name = res.data[0]["filename"]
-                        except:
-                            pass
-
-                    sources.append(
-                        {
-                            "doc_id": doc_id,
-                            "doc_name": doc_name,
-                            "chunk_text": doc.page_content,
-                            "page": doc.metadata.get("page"),
-                        }
-                    )
-
-            return {"answer": response["answer"], "sources": sources}
-
-        except Exception as e:
-            logger.error(f"Error in RAG pipeline: {str(e)}")
-            
-            friendly_message = str(e)
-            if "Not found: Collection" in str(e) or "doesn't exist" in str(e):
-                friendly_message = "Document chunks are still processing or failed to upload. Please try re-uploading the document if this persists."
-            elif "Connection error" in str(e) or "APIConnectionError" in str(e):
-                friendly_message = "Failed to connect to the AI service. Please check your backend configuration or try again later."
-                
-            raise Exception(friendly_message)
+            synthesizer = self._synthesizer(
+                system_prompt, user_context, history, streaming=False
+            )
+            response = await retry_with_backoff(
+                lambda: synthesizer.asynthesize(question, nodes),
+                max_retries=2,
+                base_delay=1.0,
+            )
+            return {"answer": str(response), "sources": _sources(nodes)}
+        except Exception as error:
+            logger.error(f"LlamaIndex RAG error: {error}")
+            raise Exception(_friendly_error(error)) from error
 
     async def get_answer_stream(
         self,
         project_id: str,
         question: str,
         selected_documents: Optional[List[str]] = None,
-        chat_history: List[Dict[str, str]] = [],
+        chat_history: Optional[List[Dict[str, str]]] = None,
         system_prompt: Optional[str] = None,
         user_context: Optional[str] = None,
     ):
-        """Generate answer using RAG pipeline with streaming (LangChain) - Optimized with retry"""
-        max_retries = 3
-        base_delay = 2.0
-
-        collection_name = f"project_{project_id}"
-
-        # Preload document names in batch to avoid multiple DB calls during streaming
-        doc_name_cache = {}
-        if selected_documents:
-            try:
-                res = (
-                    self.client.table("documents")
-                    .select("id, filename")
-                    .in_("id", selected_documents)
-                    .execute()
-                )
-                for doc in res.data:
-                    doc_name_cache[doc["id"]] = doc["filename"]
-            except Exception as cache_err:
-                logger.warning(f"Failed to preload doc names: {cache_err}")
-
-        history_messages = []
-        for msg in chat_history:
-            if msg["role"] == "user":
-                history_messages.append(HumanMessage(content=msg["content"]))
-            elif msg["role"] == "assistant":
-                history_messages.append(AIMessage(content=msg["content"]))
-
-        for attempt in range(max_retries):
-            try:
-                chain = self._get_retrieval_chain(collection_name, selected_documents, system_prompt, user_context)
-                sources_data = []
-                has_yielded = False
-
-                async for chunk in chain.astream(
-                    {"input": question, "chat_history": history_messages}
-                ):
-                    # Check for answer chunks
-                    if "answer" in chunk:
-                        has_yielded = True
-                        yield chunk["answer"]
-
-                    # Capture context when available (usually at start or end)
-                    if "context" in chunk:
-                        for doc in chunk["context"]:
-                            doc_name = doc.metadata.get("document_name", "Unknown")
-                            doc_id = doc.metadata.get("document_id", "")
-
-                            # Use cached name first, then metadata, then "Unknown"
-                            if doc_id and doc_id in doc_name_cache:
-                                doc_name = doc_name_cache[doc_id]
-                            elif doc_name == "Unknown" and doc_id:
-                                try:
-                                    res = (
-                                        self.client.table("documents")
-                                        .select("filename")
-                                        .eq("id", doc_id)
-                                        .execute()
-                                    )
-                                    if res.data:
-                                        doc_name = res.data[0]["filename"]
-                                        doc_name_cache[doc_id] = doc_name
-                                except:
-                                    pass
-
-                            sources_data.append(
-                                {
-                                    "doc_id": doc_id,
-                                    "doc_name": doc_name,
-                                    "chunk_text": doc.page_content,
-                                    "page": doc.metadata.get("page"),
-                                }
-                            )
-
-                # Send sources at the end
-                import json
-
-                yield f"\n\n__SOURCES__:{json.dumps(sources_data)}"
-                return  # Success, exit retry loop
-
-            except Exception as e:
-                error_str = str(e).lower()
-                is_retryable = any(
-                    x in error_str
-                    for x in [
-                        "503",
-                        "service unavailable",
-                        "rate limit",
-                        "overloaded",
-                        "529",
-                        "too many requests",
-                    ]
-                )
-
-                if is_retryable and attempt < max_retries - 1:
-                    delay = min(base_delay * (2**attempt), 15.0)
-                    logger.warning(
-                        f"Retryable streaming error (attempt {attempt + 1}/{max_retries}): {e}. Retrying in {delay}s..."
-                    )
-                    await asyncio.sleep(delay)
-                    continue
-
-                # On final failure, try non-streaming fallback
-                if attempt == max_retries - 1:
-                    logger.warning(
-                        f"Streaming failed after {max_retries} attempts, trying non-streaming fallback..."
-                    )
-                    try:
-                        # Use non-streaming as fallback
-                        result = await self.get_answer(
-                            project_id=project_id,
-                            question=question,
-                            selected_documents=selected_documents,
-                            chat_history=chat_history,
-                            system_prompt=system_prompt,
-                            user_context=user_context,
-                        )
-                        yield result["answer"]
-                        import json
-
-                        yield f"\n\n__SOURCES__:{json.dumps(result.get('sources', []))}"
-                        return
-                    except Exception as fallback_err:
-                        logger.error(f"Fallback also failed: {fallback_err}")
-                        yield f"Error: Service temporarily unavailable. Please try again in a moment."
-                        return
-
-                logger.error(f"Error in RAG stream: {str(e)}")
-                
-                friendly_message = str(e)
-                if "Not found: Collection" in str(e) or "doesn't exist" in str(e):
-                    friendly_message = "Document chunks are still processing or failed to upload. Please try re-uploading the document if this persists."
-                elif "Connection error" in str(e) or "APIConnectionError" in str(e):
-                    friendly_message = "Failed to connect to the AI service. Please check your backend configuration or try again later."
-                
-                yield f"Error: {friendly_message}"
+        history = chat_history or []
+        nodes = []
+        yielded = False
+        try:
+            nodes = await retry_with_backoff(
+                lambda: self._retrieve(project_id, question, selected_documents),
+                max_retries=2,
+                base_delay=0.5,
+            )
+            if not nodes:
+                yield "I couldn't find the answer in the provided documents."
+                yield "\n\n__SOURCES__:[]"
                 return
+
+            synthesizer = self._synthesizer(
+                system_prompt, user_context, history, streaming=True
+            )
+            response = await synthesizer.asynthesize(question, nodes)
+            async for token in response.async_response_gen():
+                if token:
+                    yielded = True
+                    yield token
+            yield f"\n\n__SOURCES__:{json.dumps(_sources(nodes))}"
+        except Exception as error:
+            logger.error(f"LlamaIndex streaming RAG error: {error}")
+            if not yielded:
+                try:
+                    fallback = await self.get_answer(
+                        project_id=project_id,
+                        question=question,
+                        selected_documents=selected_documents,
+                        chat_history=history,
+                        system_prompt=system_prompt,
+                        user_context=user_context,
+                    )
+                    yield fallback["answer"]
+                    yield f"\n\n__SOURCES__:{json.dumps(fallback['sources'])}"
+                    return
+                except Exception as fallback_error:
+                    logger.error(f"LlamaIndex RAG fallback failed: {fallback_error}")
+            yield f"Error: {_friendly_error(error)}"
+            yield f"\n\n__SOURCES__:{json.dumps(_sources(nodes))}"
 
     async def generate_summary(
         self, project_id: str, selected_documents: Optional[List[str]] = None
     ) -> Dict[str, Any]:
-        """Generate summary with retry logic for reliability"""
-        try:
-            # 1. Check if summary already exists in DB (skip cache for selected docs)
-            if not selected_documents:
-                try:
-                    cached_res = (
-                        self.client.table("project_summaries")
-                        .select("summary")
-                        .eq("project_id", project_id)
-                        .execute()
-                    )
-                    if cached_res.data:
-                        logger.info(
-                            f"Returning cached summary for project {project_id}"
-                        )
-                        return {
-                            "answer": cached_res.data[0]["summary"],
-                            "sources": [],
-                        }
-                except Exception as cache_err:
-                    logger.warning(f"Failed to fetch cached summary: {cache_err}")
+        if not selected_documents:
+            try:
+                cached = await async_db(
+                    lambda: self.client.table("project_summaries")
+                    .select("summary")
+                    .eq("project_id", project_id)
+                    .execute()
+                )
+                if cached.data:
+                    return {"answer": cached.data[0]["summary"], "sources": []}
+            except Exception as error:
+                logger.warning(f"Summary cache read failed: {error}")
 
-            # 2. Generate if not found
+        def fetch_documents():
             query = (
                 self.client.table("documents")
                 .select("id, filename")
@@ -479,71 +335,69 @@ Your job is to make the user understand.
             )
             if selected_documents:
                 query = query.in_("id", selected_documents)
-            response = query.execute()
-            documents = response.data
-            if not documents:
-                return {"answer": "No documents available.", "sources": []}
+            return query.execute()
 
-            all_intro_text = ""
-            sources = []
-            collection_name = f"project_{project_id}"
+        documents = (await async_db(fetch_documents)).data
+        if not documents:
+            return {"answer": "No documents available.", "sources": []}
 
-            for doc in documents:
-                chunks = await qdrant_service.get_initial_chunks(
-                    collection_name, doc["id"], 3
-                )
-                if chunks:
-                    doc_text = "\n".join(chunks)
-                    all_intro_text += (
-                        f"--- Document: {doc['filename']} ---\n{doc_text}\n\n"
-                    )
-                    sources.append(
-                        {
-                            "doc_id": doc["id"],
-                            "doc_name": doc["filename"],
-                            "chunk_text": chunks[0][:100] + "...",
-                        }
-                    )
-
-            if not all_intro_text:
-                return {"answer": "Unable to read content.", "sources": []}
-
-            prompt = f"""You are an expert research assistant.
-Here are the introductions/beginnings of the documents in this project:
-
-{all_intro_text[:10000]}
-
-Please provide a concise and engaging collaborative summary of what these documents are about.
-Highlight the main topics and key themes.
-IMPORTANT: Format the output using standard Markdown. Do NOT use any HTML tags like <br>. Use standard newline characters (\\n) for spacing and line breaks.
-"""
-            messages = [HumanMessage(content=prompt)]
-
-            # Use retry logic for LLM call
-            async def invoke_llm():
-                return await self.llm.ainvoke(messages)
-
-            response = await retry_with_backoff(
-                invoke_llm, max_retries=3, base_delay=1.5
+        collection_name = f"project_{project_id}"
+        chunk_groups = await asyncio.gather(
+            *(
+                qdrant_service.get_initial_chunks(collection_name, document["id"], 3)
+                for document in documents
             )
-            # Remove any stray HTML break tags the LLM might have still generated
-            summary_text = response.content.replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
+        )
+        sections = []
+        sources = []
+        for document, chunks in zip(documents, chunk_groups):
+            if not chunks:
+                continue
+            sections.append(
+                f"--- Document: {document['filename']} ---\n" + "\n".join(chunks)
+            )
+            sources.append(
+                {
+                    "doc_id": document["id"],
+                    "doc_name": document["filename"],
+                    "chunk_text": chunks[0][:100] + "...",
+                }
+            )
 
-            # 3. Store in DB only for full project summaries
-            if not selected_documents:
-                try:
-                    self.client.table("project_summaries").upsert(
-                        {"project_id": project_id, "summary": summary_text},
+        if not sections:
+            return {"answer": "Unable to read content.", "sources": []}
+
+        summary = await llm_service.chat_completion(
+            [
+                {
+                    "role": "system",
+                    "content": "Summarize study documents clearly using Markdown.",
+                },
+                {
+                    "role": "user",
+                    "content": "\n\n".join(sections)[:10000]
+                    + "\n\nHighlight the main topics and key themes.",
+                },
+            ],
+            temperature=0.1,
+        )
+        summary = (
+            summary.replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
+        )
+
+        if not selected_documents:
+            try:
+                await async_db(
+                    lambda: self.client.table("project_summaries")
+                    .upsert(
+                        {"project_id": project_id, "summary": summary},
                         on_conflict="project_id",
-                    ).execute()
-                except Exception as store_err:
-                    logger.error(f"Failed to store summary: {store_err}")
-
-            return {"answer": summary_text, "sources": sources}
-
-        except Exception as e:
-            logger.error(f"Error generating summary: {str(e)}")
-            raise
+                    )
+                    .execute()
+                )
+            except Exception as error:
+                logger.warning(f"Summary cache write failed: {error}")
+        return {"answer": summary, "sources": sources}
 
 
 rag_service = RAGService()
