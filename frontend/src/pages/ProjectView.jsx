@@ -845,7 +845,7 @@ const ProjectView = () => {
                 Array.from(files).map(file => uploadDocument(projectId, file, null, bookOptions))
             );
             await fetchDocuments();
-            setShowUploadModal(false);
+            setShowAddDocModal(false);
         } catch (error) {
             console.error("Upload error", error);
             toast.error('Failed to upload document(s)');
