@@ -1,24 +1,42 @@
 import os
 import sys
 import time
+from contextlib import asynccontextmanager
 
 # Ensure the app root is in PYTHONPATH
 app_root = os.path.dirname(os.path.abspath(__file__))
 if app_root not in sys.path:
     sys.path.insert(0, app_root)
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.base import BaseHTTPMiddleware
 from api.v1.api import api_router
 from config.settings import settings
 from utils.logger import logger, setup_uvicorn_log_filter
-import asyncio
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    setup_uvicorn_log_filter()
+    yield
+    try:
+        from services.embedding_service import embedding_service
+
+        embedding_service.shutdown()
+    except Exception:
+        logger.exception("Failed to shut down embedding resources")
+    try:
+        from utils.embedding_queue import get_embedding_queue
+
+        await get_embedding_queue().stop()
+    except Exception:
+        logger.exception("Failed to stop embedding queue")
 
 app = FastAPI(
     title="Lumina IQ API",
     description="Backend for Lumina IQ Education Platform",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 # CORS Configuration
@@ -34,62 +52,38 @@ app.add_middleware(
 )
 
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize on startup"""
-    # Apply log filter to reduce noisy HTTP logs
-    setup_uvicorn_log_filter()
+class RequestLoggingMiddleware:
+    def __init__(self, app):
+        self.app = app
 
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
 
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Clean up resources on shutdown"""
-    try:
-        from services.embedding_service import embedding_service
-        embedding_service.shutdown()
-    except Exception:
-        pass
-    try:
-        from utils.embedding_queue import get_embedding_queue
-        queue = get_embedding_queue()
-        await queue.stop()
-    except Exception:
-        pass
+        started = time.perf_counter()
+        status_code = 500
 
+        async def send_with_status(message):
+            nonlocal status_code
+            if message["type"] == "http.response.start":
+                status_code = message["status"]
+            await send(message)
 
-# Request timeout middleware — prevents a single stuck request from blocking others
-class RequestTimeoutMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        # Skip timeout for SSE streams and file uploads
-        path = request.url.path
-        if "/progress/" in path or "/upload" in path:
-            return await call_next(request)
         try:
-            return await asyncio.wait_for(call_next(request), timeout=90.0)
-        except asyncio.TimeoutError:
-            from fastapi.responses import JSONResponse
-            return JSONResponse(
-                status_code=504,
-                content={"detail": "Request timed out. Please try again."},
+            await self.app(scope, receive, send_with_status)
+        finally:
+            duration_ms = (time.perf_counter() - started) * 1000
+            logger.info(
+                "%s %s -> %s %.1fms",
+                scope.get("method", ""),
+                scope.get("path", ""),
+                status_code,
+                duration_ms,
             )
 
 
-app.add_middleware(RequestTimeoutMiddleware)
-
-
-@app.middleware("http")
-async def log_all_requests(request: Request, call_next):
-    started = time.perf_counter()
-    response = await call_next(request)
-    duration_ms = (time.perf_counter() - started) * 1000
-    logger.info(
-        "%s %s -> %s %.1fms",
-        request.method,
-        request.url.path,
-        response.status_code,
-        duration_ms,
-    )
-    return response
+app.add_middleware(RequestLoggingMiddleware)
 
 
 # Handle CORS preflight requests to prevent hanging
