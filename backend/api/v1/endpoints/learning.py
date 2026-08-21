@@ -41,7 +41,7 @@ from services.learning_service import (
 from services.knowledge_graph_service import knowledge_graph
 from services.topic_graph import topic_graph_builder
 from services.llm_service import llm_service
-from api.deps import get_current_user
+from api.deps import get_current_user, require_project_owner
 from utils.logger import logger
 import json
 
@@ -464,6 +464,7 @@ async def build_knowledge_graph(
 
     DSA: Adjacency List graph representation
     """
+    await require_project_owner(project_id, current_user)
     try:
         result = await topic_graph_builder.build(
             project_id=project_id,
