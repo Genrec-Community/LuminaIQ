@@ -5,6 +5,8 @@ import {
 } from 'lucide-react';
 import { generateFlashcardsLegacy as generateFlashcards } from '../../api';
 
+const EMPTY_DOCUMENTS = [];
+
 const FlashCard = ({ card, index, total, flipped, onFlip }) => {
     return (
         <div
@@ -75,7 +77,7 @@ const FlashCard = ({ card, index, total, flipped, onFlip }) => {
     );
 };
 
-const TopicFlashcards = ({ projectId, topic, selectedDocuments = [], onClose }) => {
+const TopicFlashcards = ({ projectId, topic, selectedDocuments = EMPTY_DOCUMENTS, onClose }) => {
     const [loading, setLoading] = useState(true);
     const [flashcards, setFlashcards] = useState([]);
     const [error, setError] = useState(null);

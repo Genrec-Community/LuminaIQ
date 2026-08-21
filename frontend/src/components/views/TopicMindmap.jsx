@@ -5,6 +5,8 @@ import {
 } from 'lucide-react';
 import { generateMindmapLegacy as generateMindmap } from '../../api';
 
+const EMPTY_DOCUMENTS = [];
+
 const NODE_COLORS = [
     { bg: 'bg-blue-100', border: 'border-blue-300', text: 'text-blue-800', line: '#93c5fd' },
     { bg: 'bg-emerald-100', border: 'border-emerald-300', text: 'text-emerald-800', line: '#6ee7b7' },
@@ -110,7 +112,7 @@ const MindmapNode = ({ node, depth = 0, colorIndex = 0, isLast = false }) => {
 };
 
 
-const TopicMindmap = ({ projectId, topic, selectedDocuments = [], onClose }) => {
+const TopicMindmap = ({ projectId, topic, selectedDocuments = EMPTY_DOCUMENTS, onClose }) => {
     const [loading, setLoading] = useState(true);
     const [mindmapData, setMindmapData] = useState(null);
     const [error, setError] = useState(null);

@@ -898,16 +898,49 @@ export const generateMindmapLegacy = async (projectId, topic, selectedDocuments 
         topic,
         selected_documents: selectedDocuments
     });
-    return response.data;
+    const graph = response.data?.data;
+    const nodes = Array.isArray(graph?.nodes) ? graph.nodes : [];
+    const edges = Array.isArray(graph?.edges) ? graph.edges : [];
+    const nodesById = new Map(nodes.map(node => [node.id, node]));
+    const childrenByParent = new Map();
+
+    for (const node of nodes) {
+        const parentId = node.parent || edges.find(edge => edge.to === node.id)?.from;
+        if (nodesById.has(parentId) && parentId !== node.id) {
+            const children = childrenByParent.get(parentId) || [];
+            children.push(node.id);
+            childrenByParent.set(parentId, children);
+        }
+    }
+
+    const root = nodes.find(node => node.level === 0) || nodes[0];
+    const buildTree = (nodeId, ancestors = new Set()) => {
+        if (ancestors.has(nodeId)) return null;
+        const node = nodesById.get(nodeId);
+        if (!node) return null;
+        const nextAncestors = new Set(ancestors).add(nodeId);
+        const children = (childrenByParent.get(nodeId) || [])
+            .map(childId => buildTree(childId, nextAncestors))
+            .filter(Boolean);
+        return { ...node, children };
+    };
+    return {
+        success: Boolean(root),
+        mindmap: root ? buildTree(root.id) : null
+    };
 };
 
 export const generateFlashcardsLegacy = async (projectId, topic, numCards = 8, selectedDocuments = []) => {
-    // For Learning Path, we generate flashcards on-the-fly without saving
-    // This would need a separate endpoint or we can use the LLM directly
-    // For now, return a placeholder structure
-    return {
+    const flashcardSet = await generateFlashcardsWithAI(
+        projectId,
         topic,
-        cards: []
+        numCards,
+        selectedDocuments
+    );
+    const flashcards = flashcardSet?.cards || [];
+    return {
+        success: flashcards.length > 0,
+        flashcards
     };
 };
 
