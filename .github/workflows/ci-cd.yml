@@ -32,7 +32,7 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Benchmark Topic Graph builds
         run: >-
-          python benchmarks/benchmark_knowledge_graph.py
+          python -m benchmarks.benchmark_knowledge_graph
           --output benchmark-results/knowledge-graph.json
       - name: Upload benchmark report
         if: always()

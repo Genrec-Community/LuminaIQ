@@ -5,7 +5,7 @@
 Run from `backend/`:
 
 ```bash
-.venv/bin/python benchmarks/benchmark_knowledge_graph.py \
+.venv/bin/python -m benchmarks.benchmark_knowledge_graph \
   --output benchmark-results/knowledge-graph.json
 ```
 
