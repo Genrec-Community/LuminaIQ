@@ -1,23 +1,18 @@
 import os
 import sys
+import time
 
 # Ensure the app root is in PYTHONPATH
 app_root = os.path.dirname(os.path.abspath(__file__))
 if app_root not in sys.path:
     sys.path.insert(0, app_root)
 
-print(f"DEBUG: CWD is {os.getcwd()}", flush=True)
-print(f"DEBUG: __file__ is {__file__}", flush=True)
-print(f"DEBUG: app_root is {app_root}", flush=True)
-print(f"DEBUG: sys.path is {sys.path}", flush=True)
-print(f"DEBUG: Contents of app_root: {os.listdir(app_root)}", flush=True)
-
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from api.v1.api import api_router
 from config.settings import settings
-from utils.logger import setup_uvicorn_log_filter
+from utils.logger import logger, setup_uvicorn_log_filter
 import asyncio
 
 app = FastAPI(
@@ -84,8 +79,17 @@ app.add_middleware(RequestTimeoutMiddleware)
 
 @app.middleware("http")
 async def log_all_requests(request: Request, call_next):
-    print(f"INCOMING → {request.method} {request.url}")
-    return await call_next(request)
+    started = time.perf_counter()
+    response = await call_next(request)
+    duration_ms = (time.perf_counter() - started) * 1000
+    logger.info(
+        "%s %s -> %s %.1fms",
+        request.method,
+        request.url.path,
+        response.status_code,
+        duration_ms,
+    )
+    return response
 
 
 # Handle CORS preflight requests to prevent hanging

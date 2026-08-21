@@ -418,26 +418,34 @@ const ProjectView = () => {
 
                         if (stage === 'completed' || stage === 'failed') {
                             // Refresh this document's status from DB to get error_message etc.
-                            const refreshed = await fetchDocuments();
-                            const remaining = (refreshed?.documents || []).filter(d =>
-                                d.upload_status === 'pending' ||
-                                d.upload_status === 'processing' ||
-                                d.upload_status === 'embedding' ||
-                                d.upload_status === 'queued'
-                            );
-                            if (remaining.length === 0) {
-                                setIsProcessingDocs(false);
-                                if (!topicsFetchedRef.current) {
-                                    fetchTopics();
-                                    topicsFetchedRef.current = true;
+                            try {
+                                const refreshed = await fetchDocuments();
+                                const remaining = (refreshed?.documents || []).filter(d =>
+                                    d.upload_status === 'pending' ||
+                                    d.upload_status === 'processing' ||
+                                    d.upload_status === 'embedding' ||
+                                    d.upload_status === 'queued'
+                                );
+                                if (remaining.length === 0) {
+                                    setIsProcessingDocs(false);
+                                    if (!topicsFetchedRef.current) {
+                                        fetchTopics();
+                                        topicsFetchedRef.current = true;
+                                    }
                                 }
+                            } catch (refreshError) {
+                                console.warn(`Failed to refresh completed document ${doc.id}`, refreshError);
                             }
                         }
                     },
                     (err) => {
                         // SSE failed (network drop etc.) — fall back to one-time poll
                         console.warn(`SSE connection lost for doc ${doc.id}, falling back to poll`);
-                        setTimeout(() => fetchDocuments(), 5000);
+                        setTimeout(() => {
+                            fetchDocuments().catch(refreshError =>
+                                console.warn('Document fallback poll failed', refreshError)
+                            );
+                        }, 5000);
                     }
                 );
                 sseCleanups.push(cleanup);
@@ -457,14 +465,13 @@ const ProjectView = () => {
     }, [projectId]);
 
     const fetchDocuments = async () => {
-        try {
-            const data = await getDocuments(projectId);
-            setDocuments(data.documents || []);
-            return data;
-        } catch (error) {
-            console.error("Failed to fetch documents", error);
-            return null;
-        }
+        const data = await getDocuments(projectId);
+        const nextDocuments = data.documents || [];
+        setDocuments(nextDocuments);
+        setIsProcessingDocs(nextDocuments.some(document =>
+            ['pending', 'processing', 'embedding', 'queued'].includes(document.upload_status)
+        ));
+        return data;
     };
 
     const fetchTopics = async () => {
@@ -893,11 +900,11 @@ const ProjectView = () => {
             // Success: Remove from documents list
             setDocuments(prev => prev.filter(d => d.id !== docId));
             setSelectedDocuments(prev => prev.filter(id => id !== docId));
-            fetchDocuments();
+            fetchDocuments().catch(error => console.error('Failed to refresh documents', error));
         } catch (error) {
             console.error("Delete failed", error);
             toast.error('Failed to delete document');
-            fetchDocuments();
+            fetchDocuments().catch(error => console.error('Failed to refresh documents', error));
             // Remove from deleting set on error so user can retry
             setDeletingDocIds(prev => {
                 const next = new Set(prev);
@@ -2248,7 +2255,7 @@ const ProjectView = () => {
                         setShowAddDocModal(false);
                     }}
                     onImported={(doc) => {
-                        fetchDocuments();
+                        fetchDocuments().catch(error => console.error('Failed to refresh documents', error));
                     }}
                     onClose={() => setShowAddDocModal(false)}
                 />
