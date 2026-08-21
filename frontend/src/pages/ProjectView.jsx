@@ -438,14 +438,10 @@ const ProjectView = () => {
                             }
                         }
                     },
-                    (err) => {
-                        // SSE failed (network drop etc.) — fall back to one-time poll
-                        console.warn(`SSE connection lost for doc ${doc.id}, falling back to poll`);
-                        setTimeout(() => {
-                            fetchDocuments().catch(refreshError =>
-                                console.warn('Document fallback poll failed', refreshError)
-                            );
-                        }, 5000);
+                    () => {
+                        // EventSource reconnects automatically; the shared status
+                        // poll below remains the persisted-state fallback.
+                        console.warn(`SSE connection interrupted for doc ${doc.id}`);
                     }
                 );
                 sseCleanups.push(cleanup);
@@ -492,6 +488,36 @@ const ProjectView = () => {
             console.error('Failed to fetch topics', error);
         }
     };
+
+    useEffect(() => {
+        if (!isProcessingDocs) return;
+
+        let cancelled = false;
+        const poll = async () => {
+            try {
+                const data = await getDocuments(projectId);
+                if (cancelled) return;
+                const nextDocuments = data.documents || [];
+                const stillProcessing = nextDocuments.some(document =>
+                    ['pending', 'processing', 'embedding', 'queued'].includes(document.upload_status)
+                );
+                setDocuments(nextDocuments);
+                setIsProcessingDocs(stillProcessing);
+                if (!stillProcessing && !topicsFetchedRef.current) {
+                    topicsFetchedRef.current = true;
+                    fetchTopics();
+                }
+            } catch (error) {
+                if (!cancelled) console.warn('Document status poll failed', error);
+            }
+        };
+
+        const interval = setInterval(poll, 5000);
+        return () => {
+            cancelled = true;
+            clearInterval(interval);
+        };
+    }, [isProcessingDocs, projectId]);
 
     // fetchTopics on tab change — only if topics haven't been loaded yet
     useEffect(() => {

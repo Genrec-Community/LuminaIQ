@@ -999,7 +999,6 @@ export const subscribeDocumentProgress = (documentId, onEvent, onError = null) =
     eventSource.onerror = (err) => {
         console.error('SSE connection error:', err);
         if (onError) onError(err);
-        eventSource.close();
     };
 
     // Return cleanup function
