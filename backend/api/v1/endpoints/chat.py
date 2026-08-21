@@ -4,7 +4,7 @@ from services.rag_service import rag_service
 from services.user_data_service import user_data
 from models.schemas import ChatRequest, ChatResponse, ChatMessage, SummaryRequest
 from typing import Any, List
-from api.deps import get_current_user
+from api.deps import get_current_user, require_project_owner
 from db.client import get_supabase_client, async_db
 from utils.logger import logger
 
@@ -16,33 +16,37 @@ async def get_user_context_string(user_id: str) -> str:
         settings = await user_data.get_settings(user_id)
         if not settings:
             return ""
-            
+
         context_parts = []
         name = settings.get("studentName", "")
-        if name: context_parts.append(f"Student Name: {name}")
-        
+        if name:
+            context_parts.append(f"Student Name: {name}")
+
         goal = settings.get("learningGoal", "")
-        if goal: context_parts.append(f"Learning Goal: {goal}")
-        
+        if goal:
+            context_parts.append(f"Learning Goal: {goal}")
+
         level = settings.get("selfLevel", "")
         if level:
             level_map = {
                 "beginner": "Beginner (Just starting out)",
                 "intermediate": "Intermediate (Knows the basics)",
-                "advanced": "Advanced (Looking to master)"
+                "advanced": "Advanced (Looking to master)",
             }
             context_parts.append(f"Knowledge Level: {level_map.get(level, level)}")
-            
+
         style = settings.get("learningStyle", "")
         if style:
             style_map = {
                 "visual": "Visual (Prefers diagrams & summaries)",
                 "reading": "Reading (Deep text-based study)",
                 "practice": "Practice (Quizzes & exercises)",
-                "balanced": "Balanced (Mix of everything)"
+                "balanced": "Balanced (Mix of everything)",
             }
-            context_parts.append(f"Preferred Learning Style: {style_map.get(style, style)}")
-            
+            context_parts.append(
+                f"Preferred Learning Style: {style_map.get(style, style)}"
+            )
+
         return "\n".join(context_parts)
     except Exception as e:
         logger.error(f"Error fetching user settings for context: {e}")
@@ -58,6 +62,7 @@ async def get_chat_history(
     """
     try:
         client = get_supabase_client()
+        await require_project_owner(project_id, current_user, client=client)
         response = await async_db(
             lambda: client.table("chat_messages")
             .select("*")
@@ -70,6 +75,8 @@ async def get_chat_history(
             ChatMessage(role=msg["role"], content=msg["content"])
             for msg in response.data
         ]
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, str(e))
 
@@ -83,15 +90,22 @@ async def chat_message(
     """
     try:
         client = get_supabase_client()
+        await require_project_owner(
+            request.project_id,
+            current_user,
+            client=client,
+        )
         # Save User Message (non-blocking)
         await async_db(
-            lambda: client.table("chat_messages").insert(
+            lambda: client.table("chat_messages")
+            .insert(
                 {
                     "project_id": request.project_id,
                     "role": "user",
                     "content": request.message,
                 }
-            ).execute()
+            )
+            .execute()
         )
 
         # Fetch full history for context (non-blocking)
@@ -113,25 +127,31 @@ async def chat_message(
             project_id=request.project_id,
             question=request.message,
             selected_documents=request.selected_documents,
-            chat_history=chat_history_dicts[:-1],  # Exclude current msg to avoid duplication if RAG appends it
+            chat_history=chat_history_dicts[
+                :-1
+            ],  # Exclude current msg to avoid duplication if RAG appends it
             system_prompt=request.system_prompt,
             user_context=user_context_str,
         )
 
         # Save Assistant Message (non-blocking)
         await async_db(
-            lambda: client.table("chat_messages").insert(
+            lambda: client.table("chat_messages")
+            .insert(
                 {
                     "project_id": request.project_id,
                     "role": "assistant",
                     "content": result["answer"],
                     "sources": result["sources"],
                 }
-            ).execute()
+            )
+            .execute()
         )
 
         return result
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, str(e))
 
@@ -145,15 +165,22 @@ async def chat_stream(
     """
     try:
         client = get_supabase_client()
+        await require_project_owner(
+            request.project_id,
+            current_user,
+            client=client,
+        )
         # Save User Message (non-blocking)
         await async_db(
-            lambda: client.table("chat_messages").insert(
+            lambda: client.table("chat_messages")
+            .insert(
                 {
                     "project_id": request.project_id,
                     "role": "user",
                     "content": request.message,
                 }
-            ).execute()
+            )
+            .execute()
         )
 
         # Fetch full history (non-blocking)
@@ -198,7 +225,7 @@ async def chat_stream(
                     except:
                         pass
 
-                    yield chunk  # Forward the marker to frontend
+                    yield f"__SOURCES__:{parts[1]}"
                 else:
                     full_answer += chunk
                     yield chunk
@@ -206,19 +233,24 @@ async def chat_stream(
             # Save Assistant Message after stream ends (non-blocking)
             try:
                 await async_db(
-                    lambda: get_supabase_client().table("chat_messages").insert(
+                    lambda: get_supabase_client()
+                    .table("chat_messages")
+                    .insert(
                         {
                             "project_id": request.project_id,
                             "role": "assistant",
                             "content": full_answer,
                             "sources": sources,
                         }
-                    ).execute()
+                    )
+                    .execute()
                 )
             except Exception as save_err:
                 print(f"Failed to save assistant message: {save_err}")
 
         return StreamingResponse(stream_and_save(), media_type="text/event-stream")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, str(e))
 
@@ -231,9 +263,16 @@ async def get_project_summary(
     Generate a summary for the project documents
     """
     try:
+        await require_project_owner(
+            request.project_id,
+            current_user,
+            client=get_supabase_client(),
+        )
         result = await rag_service.generate_summary(
             request.project_id, request.selected_documents
         )
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, str(e))

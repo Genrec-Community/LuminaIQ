@@ -15,6 +15,8 @@ from jose import jwt, JWTError
 from config.settings import settings
 from utils.progress_manager import get_progress_manager
 from utils.logger import logger
+from api.deps import require_document_owner
+from db.client import get_supabase_client
 
 router = APIRouter()
 
@@ -22,7 +24,9 @@ router = APIRouter()
 async def _verify_token(token: str) -> dict:
     """Verify JWT token from query parameter (EventSource can't send headers)"""
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
         user_id = payload.get("sub")
         if user_id is None:
             raise HTTPException(
@@ -40,7 +44,9 @@ async def _verify_token(token: str) -> dict:
 @router.get("/{document_id}")
 async def stream_document_progress(
     document_id: str,
-    token: str = Query(..., description="JWT auth token (EventSource can't send headers)"),
+    token: str = Query(
+        ..., description="JWT auth token (EventSource can't send headers)"
+    ),
 ):
     """
     SSE endpoint for real-time document processing progress.
@@ -58,7 +64,12 @@ async def stream_document_progress(
         };
     """
     # Authenticate via query param
-    await _verify_token(token)
+    current_user = await _verify_token(token)
+    await require_document_owner(
+        document_id,
+        current_user,
+        client=get_supabase_client(),
+    )
 
     progress_manager = get_progress_manager()
 
@@ -67,12 +78,14 @@ async def stream_document_progress(
             if event.stage == "keepalive":
                 yield ": keepalive\n\n"
             else:
-                data = json.dumps({
-                    "stage": event.stage,
-                    "progress": event.progress,
-                    "message": event.message,
-                    "timestamp": event.timestamp,
-                })
+                data = json.dumps(
+                    {
+                        "stage": event.stage,
+                        "progress": event.progress,
+                        "message": event.message,
+                        "timestamp": event.timestamp,
+                    }
+                )
                 yield f"data: {data}\n\n"
 
                 # Stop streaming on terminal events

@@ -22,7 +22,7 @@ from utils.logger import logger
 
 
 class JobStatus(Enum):
-    PENDING = "pending"      # Just created, waiting for semaphore
+    PENDING = "pending"  # Just created, waiting for semaphore
     PROCESSING = "processing"
     COMPLETED = "completed"
     FAILED = "failed"
@@ -57,6 +57,7 @@ def _load_limits():
     """
     try:
         from config.settings import settings
+
         return {
             "MAX_CONCURRENT_DOCUMENTS": settings.MAX_CONCURRENT_DOCUMENT_UPLOADS,
             "MAX_GLOBAL_DB_OPERATIONS": settings.MAX_GLOBAL_DB_OPERATIONS,
@@ -243,15 +244,23 @@ class EmbeddingQueue:
                     f"Duration: {duration:.1f}s | Speed: {chunks_per_sec:.1f} chunks/s"
                 )
 
+        except asyncio.CancelledError:
+            job.status = JobStatus.FAILED
+            job.error_message = "Processing cancelled"
+            job.completed_at = datetime.now()
+            raise
         except Exception as e:
             job.status = JobStatus.FAILED
             job.error_message = str(e)
             job.completed_at = datetime.now()
             logger.error(f"[EmbeddingQueue] Failed {job.filename}: {e}")
             import traceback
+
             logger.error(f"[EmbeddingQueue] Traceback: {traceback.format_exc()}")
 
         finally:
+            # Status remains queryable without retaining the document text.
+            job.chunks = []
             self._active_tasks.pop(job.job_id, None)
 
     # ── Status & stats ────────────────────────────────────────────────────────
@@ -281,21 +290,26 @@ class EmbeddingQueue:
                 return self.get_job_status(job.job_id)
         return None
 
-    def get_queue_stats(self) -> Dict:
+    def get_queue_stats(self, user_id: Optional[str] = None) -> Dict:
         """Get overall queue statistics"""
         limits = self._get_limits()
-        pending = [j for j in self._jobs.values() if j.status == JobStatus.PENDING]
-        processing = [j for j in self._jobs.values() if j.status == JobStatus.PROCESSING]
-        completed = [j for j in self._jobs.values() if j.status == JobStatus.COMPLETED]
-        failed = [j for j in self._jobs.values() if j.status == JobStatus.FAILED]
+        jobs = [
+            job
+            for job in self._jobs.values()
+            if user_id is None or job.user_id == user_id
+        ]
+        pending = [j for j in jobs if j.status == JobStatus.PENDING]
+        processing = [j for j in jobs if j.status == JobStatus.PROCESSING]
+        completed = [j for j in jobs if j.status == JobStatus.COMPLETED]
+        failed = [j for j in jobs if j.status == JobStatus.FAILED]
 
         return {
             "queued": len(pending),
             "processing": len(processing),
             "completed": len(completed),
             "failed": len(failed),
-            "total": len(self._jobs),
-            "active_tasks": len(self._active_tasks),
+            "total": len(jobs),
+            "active_tasks": len(processing) + len(pending),
             "limits": {
                 "max_concurrent_docs": limits["MAX_CONCURRENT_DOCUMENTS"],
                 "max_db_ops": limits["MAX_GLOBAL_DB_OPERATIONS"],

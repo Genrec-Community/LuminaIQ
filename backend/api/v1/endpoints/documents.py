@@ -17,7 +17,12 @@ from services.embedding_service import embedding_service
 from services.qdrant_service import qdrant_service
 from models.schemas import DocumentUploadResponse, DocumentList
 from config.settings import settings
-from api.deps import get_current_user
+from api.deps import (
+    get_current_user,
+    require_document_in_project,
+    require_document_owner,
+    require_project_owner,
+)
 from utils.embedding_queue import get_embedding_queue
 from utils.logger import logger
 from db.client import async_db, get_supabase_client
@@ -66,6 +71,12 @@ async def upload_document(
     """
     temp_path = None
     try:
+        await require_project_owner(
+            project_id,
+            current_user,
+            client=document_service.client,
+        )
+
         # 1. Validate File Type
         allowed_mimes = [
             # Document formats
@@ -136,10 +147,7 @@ async def upload_document(
         }
 
         response = await async_db(
-            lambda: get_supabase_client()
-            .table("documents")
-            .insert(doc_data)
-            .execute()
+            lambda: get_supabase_client().table("documents").insert(doc_data).execute()
         )
 
         if not response.data:
@@ -214,6 +222,11 @@ async def list_documents(
 ):
     """List all documents for a project"""
     try:
+        await require_project_owner(
+            project_id,
+            current_user,
+            client=document_service.client,
+        )
         response = await async_db(
             lambda: document_service.client.table("documents")
             .select("*")
@@ -221,6 +234,8 @@ async def list_documents(
             .execute()
         )
         return {"documents": response.data}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, str(e))
 
@@ -236,11 +251,29 @@ async def get_document_url(
     Tries common storage path patterns and returns the first that works.
     """
     supabase = get_supabase_client()
+    await require_project_owner(project_id, current_user, client=supabase)
+    await require_document_in_project(
+        document_id,
+        project_id,
+        client=supabase,
+    )
     BUCKET = "documents"
     EXPIRY = 3600 * 24  # 24 hours
 
     # Try common storage path conventions
-    extensions = ["pdf", "txt", "docx", "doc", "pptx", "ppt", "xlsx", "xls", "png", "jpg", "jpeg"]
+    extensions = [
+        "pdf",
+        "txt",
+        "docx",
+        "doc",
+        "pptx",
+        "ppt",
+        "xlsx",
+        "xls",
+        "png",
+        "jpg",
+        "jpeg",
+    ]
     candidate_paths = [f"{project_id}/{document_id}.{ext}" for ext in extensions]
     candidate_paths.insert(0, f"{project_id}/{document_id}")  # no extension
 
@@ -260,6 +293,7 @@ async def get_document_url(
     if not url:
         # Final fallback — try fetching the doc record to find file type hint
         try:
+
             def _get_doc():
                 return (
                     get_supabase_client()
@@ -269,25 +303,35 @@ async def get_document_url(
                     .single()
                     .execute()
                 )
+
             doc_res = await async_db(_get_doc)
             if doc_res.data:
                 filename = doc_res.data.get("filename", "")
                 ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
                 if ext:
+
                     def _try_ext():
                         path = f"{project_id}/{document_id}.{ext}"
                         try:
-                            result = supabase.storage.from_(BUCKET).create_signed_url(path, EXPIRY)
+                            result = supabase.storage.from_(BUCKET).create_signed_url(
+                                path, EXPIRY
+                            )
                             if isinstance(result, dict):
-                                return result.get("signedURL") or result.get("signed_url")
+                                return result.get("signedURL") or result.get(
+                                    "signed_url"
+                                )
                         except Exception:
                             return None
+
                     url = await async_db(_try_ext)
         except Exception:
             pass
 
     if not url:
-        raise HTTPException(404, "Document file not found in storage. It may have been uploaded as text-only.")
+        raise HTTPException(
+            404,
+            "Document file not found in storage. It may have been uploaded as text-only.",
+        )
 
     return {"url": url}
 
@@ -298,8 +342,20 @@ async def delete_document(
 ):
     """Delete a document"""
     try:
+        await require_project_owner(
+            project_id,
+            current_user,
+            client=document_service.client,
+        )
+        await require_document_in_project(
+            document_id,
+            project_id,
+            client=document_service.client,
+        )
         await document_service.delete_document(project_id, document_id)
         return {"message": "Document deleted successfully"}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, str(e))
 
@@ -316,7 +372,7 @@ async def get_queue_status(current_user: dict = Depends(get_current_user)):
     """
     try:
         queue = get_embedding_queue()
-        return queue.get_queue_stats()
+        return queue.get_queue_stats(current_user["id"])
     except Exception as e:
         raise HTTPException(500, str(e))
 
@@ -327,11 +383,18 @@ async def get_document_queue_status(
 ):
     """Get queue status for a specific document."""
     try:
+        await require_document_owner(
+            document_id,
+            current_user,
+            client=document_service.client,
+        )
         queue = get_embedding_queue()
         doc_status = queue.get_document_status(document_id)
         if not doc_status:
             return {"status": "not_in_queue", "message": "Document not found in queue"}
         return doc_status
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, str(e))
 
@@ -344,6 +407,11 @@ async def search_documents(
 ):
     """Semantic search across documents in a project."""
     try:
+        await require_project_owner(
+            project_id,
+            current_user,
+            client=document_service.client,
+        )
         collection_name = f"project_{project_id}"
 
         # Generate embedding for the search query
@@ -397,6 +465,8 @@ async def search_documents(
 
         return {"results": search_results, "query": request.query}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Search error: {str(e)}")
         raise HTTPException(500, f"Search failed: {str(e)}")
