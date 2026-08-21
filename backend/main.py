@@ -11,6 +11,7 @@ if app_root not in sys.path:
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from api.v1.api import api_router
+from build_info import BUILD_SHA
 from config.settings import settings
 from utils.logger import logger, setup_uvicorn_log_filter
 
@@ -106,5 +107,5 @@ async def health():
     return {
         "status": "healthy",
         "service": "lumina-backend",
-        "build_sha": os.getenv("BUILD_SHA", "development"),
+        "build_sha": BUILD_SHA,
     }

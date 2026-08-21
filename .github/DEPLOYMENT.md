@@ -32,5 +32,6 @@ Runtime Supabase, Qdrant, OCR, and model credentials remain on App Service and
 the Vercel project; they are not copied into CI.
 
 Set Vercel's production `VITE_MAIN_API_URL` to the same App Service origin with
-the `/api/v1` suffix. The backend deploy is stamped with `BUILD_SHA`; CI checks
-that `/health` reports the expected commit before the frontend is released.
+the `/api/v1` suffix. CI embeds the commit in `build_info.py` inside the ZIP and
+checks that `/health` reports that immutable artifact value before releasing
+the frontend. Remote Oryx build is enabled so `requirements.txt` is installed.

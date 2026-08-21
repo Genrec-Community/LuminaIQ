@@ -83,16 +83,23 @@ jobs:
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       - name: Package tested backend
         working-directory: backend
-        run: >-
-          zip -r ../backend-deploy.zip .
-          -x '.venv/*' '__pycache__/* '*.pyc' 'temp/*' 'tests/*'
-          'benchmark-results/*' '.env'
-      - name: Stamp release revision
+        run: |
+          printf 'BUILD_SHA = "%s"\n' "${{ github.sha }}" > build_info.py
+          zip -r ../backend-deploy.zip . \
+            -x '.venv/*' '__pycache__/* '*.pyc' 'temp/*' 'tests/*' \
+            'benchmark-results/*' '.env'
+      - name: Configure App Service build and startup
         run: >-
           az webapp config appsettings set
           --name "${{ vars.AZURE_WEBAPP_NAME }}"
           --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}"
-          --settings BUILD_SHA="${{ github.sha }}"
+          --settings SCM_DO_BUILD_DURING_DEPLOYMENT=true
+      - name: Configure backend startup command
+        run: >-
+          az webapp config set
+          --name "${{ vars.AZURE_WEBAPP_NAME }}"
+          --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}"
+          --startup-file "python -m uvicorn main:app --host 0.0.0.0 --port 8000"
       - name: Deploy backend package
         run: >-
           az webapp deploy
