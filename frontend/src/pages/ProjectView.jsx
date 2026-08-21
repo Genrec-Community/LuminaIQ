@@ -63,7 +63,7 @@ import {
     subscribeDocumentProgress,
 } from '../api';
 import { useToast } from '../context/ToastContext';
-import { Joyride, STATUS } from 'react-joyride';
+import { ACTIONS, Joyride, STATUS } from 'react-joyride';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { useGamification } from '../context/GamificationContext';
@@ -110,7 +110,7 @@ const ProjectView = () => {
     const navigate = useNavigate();
     const toast = useToast();
     const { user } = useAuth();
-    const { settings } = useSettings();
+    const { settings, updateSetting, loaded: settingsLoaded } = useSettings();
     const isDark = settings?.darkMode ?? false;
     const { data: gamificationData } = useGamification();
     const [showGamification, setShowGamification] = useState(false);
@@ -149,25 +149,6 @@ const ProjectView = () => {
             }
         ],
     });
-
-    useEffect(() => {
-        if (!loading && !error && user?.id) {
-            const hasSeenProjectTutorial = localStorage.getItem(`hasSeenProjectTutorial_${user.id}`);
-            if (!hasSeenProjectTutorial) {
-                setTimeout(() => {
-                    setTourState(prev => ({ ...prev, run: true }));
-                }, 500);
-            }
-        }
-    }, [loading, error, user?.id]);
-
-    const handleJoyrideCallback = (data) => {
-        const { status } = data;
-        if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status) && user?.id) {
-            localStorage.setItem(`hasSeenProjectTutorial_${user.id}`, 'true');
-            setTourState(prev => ({ ...prev, run: false }));
-        }
-    };
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -311,6 +292,34 @@ const ProjectView = () => {
 
     // Ref to ensure fetchTopics is only called once per mount, not on every tab change
     const topicsFetchedRef = useRef(false);
+
+    useEffect(() => {
+        if (projectViewLoading || fetchError || !user?.id || !settingsLoaded) return;
+
+        const storageKey = `hasSeenProjectTutorial_${user.id}`;
+        const locallyCompleted = localStorage.getItem(storageKey) === 'true';
+        if (settings.hasSeenProjectTutorial || locallyCompleted) {
+            if (locallyCompleted && !settings.hasSeenProjectTutorial) {
+                updateSetting('hasSeenProjectTutorial', true);
+            }
+            return;
+        }
+
+        const timer = setTimeout(() => {
+            setTourState(prev => ({ ...prev, run: true }));
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [projectViewLoading, fetchError, user?.id, settingsLoaded, settings.hasSeenProjectTutorial, updateSetting]);
+
+    const handleJoyrideCallback = (data) => {
+        const { action, status } = data;
+        const completed = [STATUS.FINISHED, STATUS.SKIPPED].includes(status) || action === ACTIONS.CLOSE;
+        if (completed && user?.id) {
+            localStorage.setItem(`hasSeenProjectTutorial_${user.id}`, 'true');
+            updateSetting('hasSeenProjectTutorial', true);
+            setTourState(prev => ({ ...prev, run: false }));
+        }
+    };
 
     useEffect(() => {
         let intervalId;

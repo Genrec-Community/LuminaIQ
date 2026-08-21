@@ -8,15 +8,17 @@ import {
 import { createProject, uploadDocument, getProjects, deleteProject, getPublicBooks, importBook } from '../api';
 
 import { useAuth } from '../context/AuthContext';
+import { useSettings } from '../context/SettingsContext';
 import { useToast } from '../context/ToastContext';
 import { getRotatingLoadingMessage } from '../utils/LoadingMessages';
 import { DashboardSkeleton } from '../components/Skeleton';
 import { getCachedProjects, setCachedProjects, clearProjectsCache } from '../utils/projectCache';
-import { Joyride, STATUS } from 'react-joyride';
+import { ACTIONS, Joyride, STATUS } from 'react-joyride';
 
 const Dashboard = () => {
     const navigate = useNavigate();
     const { user, logout } = useAuth();
+    const { settings, updateSetting, loaded: settingsLoaded } = useSettings();
     const toast = useToast();
     const [showNewProjectModal, setShowNewProjectModal] = useState(false);
     const [newProjectName, setNewProjectName] = useState('');
@@ -83,20 +85,29 @@ const Dashboard = () => {
     });
 
     useEffect(() => {
-        if (!isLoadingProjects && !fetchError && user?.id) {
-            const hasSeenDashboardTutorial = localStorage.getItem(`hasSeenDashboardTutorial_${user.id}`);
-            if (!hasSeenDashboardTutorial) {
-                setTimeout(() => {
-                    setTourState(prev => ({ ...prev, run: true }));
-                }, 500);
+        if (isLoadingProjects || fetchError || !user?.id || !settingsLoaded) return;
+
+        const storageKey = `hasSeenDashboardTutorial_${user.id}`;
+        const locallyCompleted = localStorage.getItem(storageKey) === 'true';
+        if (settings.hasSeenDashboardTutorial || locallyCompleted) {
+            if (locallyCompleted && !settings.hasSeenDashboardTutorial) {
+                updateSetting('hasSeenDashboardTutorial', true);
             }
+            return;
         }
-    }, [isLoadingProjects, fetchError, user?.id]);
+
+        const timer = setTimeout(() => {
+            setTourState(prev => ({ ...prev, run: true }));
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [isLoadingProjects, fetchError, user?.id, settingsLoaded, settings.hasSeenDashboardTutorial, updateSetting]);
 
     const handleJoyrideCallback = (data) => {
-        const { status } = data;
-        if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status) && user?.id) {
+        const { action, status } = data;
+        const completed = [STATUS.FINISHED, STATUS.SKIPPED].includes(status) || action === ACTIONS.CLOSE;
+        if (completed && user?.id) {
             localStorage.setItem(`hasSeenDashboardTutorial_${user.id}`, 'true');
+            updateSetting('hasSeenDashboardTutorial', true);
             setTourState(prev => ({ ...prev, run: false }));
         }
     };

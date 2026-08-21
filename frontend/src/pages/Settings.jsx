@@ -101,7 +101,7 @@ const TextInput = ({ value, onChange, label, description, icon: Icon, placeholde
 
 const Settings = () => {
     const navigate = useNavigate();
-    const { settings, updateSetting, resetSettings } = useSettings();
+    const { settings, updateSetting, updateSettings, resetSettings } = useSettings();
     const { data: gamificationData } = useGamification();
     const { user } = useAuth();
     const [activeSection, setActiveSection] = useState('profile');
@@ -677,10 +677,14 @@ const Settings = () => {
                         </div>
                     </div>
                     <button
-                        onClick={() => {
+                        onClick={async () => {
                             if (user?.id) {
                                 localStorage.removeItem(`hasSeenDashboardTutorial_${user.id}`);
                                 localStorage.removeItem(`hasSeenProjectTutorial_${user.id}`);
+                                await updateSettings({
+                                    hasSeenDashboardTutorial: false,
+                                    hasSeenProjectTutorial: false,
+                                });
                                 navigate('/dashboard');
                             }
                         }}
@@ -852,5 +856,4 @@ const Settings = () => {
 };
 
 export default Settings;
-
 
