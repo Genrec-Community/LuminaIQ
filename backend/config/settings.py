@@ -178,6 +178,13 @@ class Settings(BaseSettings):
     # Document upload + embedding pipeline
     MAX_CONCURRENT_DOCUMENT_UPLOADS: int = 10
 
+    # Durable document jobs are rollout-gated separately from the current upload
+    # path. Neither flag is consumed by uploads or the API yet.
+    DOCUMENT_JOBS_ENABLED: bool = False
+    DOCUMENT_WORKER_ENABLED: bool = False
+    DOCUMENT_JOB_LEASE_SECONDS: int = 300
+    DOCUMENT_JOB_POLL_INTERVAL_SECONDS: float = 5.0
+
     # Per-worker limits inside the embedding pipeline (shared across local docs)
     MAX_GLOBAL_DB_OPERATIONS: int = 20  # Qdrant write concurrency
     MAX_GLOBAL_EMBEDDINGS: int = 15  # Concurrent embedding API calls
@@ -185,7 +192,7 @@ class Settings(BaseSettings):
 
     # Batch size for embedding API calls
     EMBEDDING_BATCH_SIZE: int = 50
-    EMBEDDING_DELAY_MS: int = 0  # 0 = no artificial delay (Azure has no rate limits)
+    EMBEDDING_DELAY_MS: int = 0  # Quota handling uses bounded concurrency and retries.
     EMBEDDING_MAX_RETRIES: int = 5
     EMBEDDING_MAX_RETRY_DELAY_S: float = 8.0
     EMBEDDING_REQUEST_TIMEOUT_S: float = 60.0
