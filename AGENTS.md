@@ -27,9 +27,10 @@ Backend, from `backend/`:
 python -m venv .venv
 .venv/bin/pip install -r requirements.txt
 .venv/bin/python run.py
+.venv/bin/python -m unittest discover -s tests -v
 ```
 
-- There is no configured automated backend test runner and `pytest` is not a dependency. `test_signed_url.py` is a live Supabase diagnostic; `test_ocr.py` has a hard-coded Windows file path and is not portable.
+- Backend regression tests use standard-library `unittest` under `backend/tests/`; `pytest` is not a dependency. Root `test_signed_url.py` is a live Supabase diagnostic and `test_ocr.py` has a hard-coded Windows path, so neither belongs in the automated suite.
 - For a focused syntax check, run `.venv/bin/python -m py_compile path/to/file.py` from `backend/`.
 - Docker production startup is `backend/Dockerfile` -> `backend/startup.sh`, which hard-codes four Gunicorn workers. This overrides the three-worker default in `settings.py` and the configurable path in `run.py`.
 
