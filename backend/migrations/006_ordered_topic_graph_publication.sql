@@ -10,8 +10,6 @@ alter table public.topic_graph_publications enable row level security;
 revoke all on table public.topic_graph_publications from public, anon, authenticated;
 grant select, insert, update, delete on table public.topic_graph_publications to service_role;
 
-drop function if exists public.replace_topic_graph_relationships(uuid, jsonb);
-
 create function public.replace_topic_graph_relationships(
     p_project_id uuid,
     p_edges jsonb,

@@ -36,6 +36,8 @@ them. In particular, `backend/migrations/004_atomic_topic_graph.sql` and
 `006_ordered_topic_graph_publication.sql` must be installed in order before
 Graph Build replacement is enabled. The backend fails closed rather than
 deleting an active graph when either RPC migration is missing.
+Migration 006 intentionally retains the migration-004 two-argument RPC during
+rolling deployment; remove that legacy overload only after old instances drain.
 
 Set Vercel's production `VITE_MAIN_API_URL` to the same App Service origin with
 the `/api/v1` suffix. CI embeds the commit in `build_info.py` inside the ZIP and
