@@ -1,10 +1,10 @@
 from datetime import datetime, timedelta
+import asyncio
 import re
-import time
 from typing import Optional, Dict, Any
 from jose import jwt, JWTError
 from passlib.context import CryptContext
-from db.client import get_supabase_client
+from db.client import get_supabase_client, async_db
 from config.settings import settings
 from utils.logger import logger
 
@@ -57,13 +57,15 @@ class AuthService:
                     logger.info(f"Signup attempt {attempt + 1}/{max_retries} for: {email}")
                     
                     # Use Standard Sign Up (triggers confirmation email if enabled in Supabase)
-                    response = self.client.auth.sign_up({
-                        "email": email,
-                        "password": password,
-                        "options": {
-                            "data": {"full_name": full_name}
-                        }
-                    })
+                    response = await async_db(
+                        lambda: self.client.auth.sign_up({
+                            "email": email,
+                            "password": password,
+                            "options": {
+                                "data": {"full_name": full_name}
+                            }
+                        })
+                    )
                     
                     if response.user:
                         logger.info(f"User signed up successfully: {email}")
@@ -84,7 +86,7 @@ class AuthService:
                     if any(keyword in error_msg for keyword in ['timeout', 'timed out', 'connection', 'network']):
                         if attempt < max_retries - 1:
                             logger.warning(f"Signup timeout on attempt {attempt + 1}, retrying in {retry_delay}s...")
-                            time.sleep(retry_delay)
+                            await asyncio.sleep(retry_delay)
                             retry_delay *= 2  # Exponential backoff
                             continue
                         else:
@@ -114,10 +116,12 @@ class AuthService:
             for attempt in range(max_retries):
                 try:
                     # Authenticate with Supabase to verify credentials
-                    response = self.client.auth.sign_in_with_password({
-                        "email": email,
-                        "password": password
-                    })
+                    response = await async_db(
+                        lambda: self.client.auth.sign_in_with_password({
+                            "email": email,
+                            "password": password
+                        })
+                    )
 
                     logger.info(f"Supabase response received for: {email}")
 
@@ -155,7 +159,7 @@ class AuthService:
                     if any(keyword in error_msg for keyword in ['timeout', 'timed out', 'connection', 'network']):
                         if attempt < max_retries - 1:
                             logger.warning(f"Login timeout on attempt {attempt + 1}, retrying in {retry_delay}s...")
-                            time.sleep(retry_delay)
+                            await asyncio.sleep(retry_delay)
                             retry_delay *= 2  # Exponential backoff
                             continue
                         else:
@@ -175,7 +179,9 @@ class AuthService:
     async def exchange_supabase_token(self, supabase_token: str) -> Dict[str, Any]:
         """Exchange Supabase OAuth or OTP token for App JWT"""
         try:
-            user = self.client.auth.get_user(supabase_token)
+            user = await async_db(
+                lambda: self.client.auth.get_user(supabase_token)
+            )
             if not user or not user.user:
                 raise Exception("Invalid Supabase Token")
             
