@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { getUserSettings, saveUserSettings } from '../api';
 import { useAuth } from './AuthContext';
 
@@ -36,24 +36,48 @@ const defaultSettings = {
     compactMode: false,
     tutorStyle: 'balanced',
     quizDifficulty: 'adaptive',
+    hasSeenDashboardTutorial: false,
+    hasSeenProjectTutorial: false,
 };
+
+const freshDefaults = () => ({
+    ...defaultSettings,
+    subjectsOfInterest: [],
+    darkMode: localStorage.getItem('lumina_dark_mode') === '1',
+});
 
 export const SettingsProvider = ({ children }) => {
     const { user } = useAuth();
-    const [settings, setSettings] = useState(defaultSettings);
+    const [settings, setSettings] = useState(freshDefaults);
     const [loaded, setLoaded] = useState(false);
+    const settingsRef = useRef(settings);
+    const saveQueueRef = useRef(Promise.resolve());
+    const saveGenerationRef = useRef(0);
 
     // Load settings from API only when user is authenticated
     useEffect(() => {
+        let cancelled = false;
+        const generation = ++saveGenerationRef.current;
+        saveQueueRef.current = Promise.resolve();
+        setLoaded(false);
+
+        const initial = freshDefaults();
+        settingsRef.current = initial;
+        setSettings(initial);
+
         if (!user) {
             setLoaded(true);
-            return;
+            return () => {
+                cancelled = true;
+            };
         }
         const load = async () => {
             try {
                 const data = await getUserSettings();
-                if (data?.settings) {
-                    setSettings(prev => ({ ...prev, ...data.settings }));
+                if (!cancelled && generation === saveGenerationRef.current && data?.settings) {
+                    const next = { ...freshDefaults(), ...data.settings };
+                    settingsRef.current = next;
+                    setSettings(next);
                     // Keep localStorage in sync with server value so the
                     // FOUC-prevention script (index.html) always has fresh data
                     localStorage.setItem(
@@ -64,11 +88,16 @@ export const SettingsProvider = ({ children }) => {
             } catch (err) {
                 console.warn('Failed to load settings from API, using defaults', err);
             } finally {
-                setLoaded(true);
+                if (!cancelled && generation === saveGenerationRef.current) {
+                    setLoaded(true);
+                }
             }
         };
         load();
-    }, [user]);
+        return () => {
+            cancelled = true;
+        };
+    }, [user?.id]);
 
     // Apply dark mode — toggle html.dark for CSS cascade.
     // Also persist to localStorage so index.html blocking script can read it
@@ -87,9 +116,10 @@ export const SettingsProvider = ({ children }) => {
     useEffect(() => {
         const el = document.documentElement;
         el.classList.remove('app-font-sm', 'app-font-md', 'app-font-lg', 'app-font-xl');
-        if (settings.fontSize && settings.fontSize !== 'md') {
-            el.classList.add(`app-font-${settings.fontSize}`);
-        }
+        const fontSize = ['sm', 'md', 'lg', 'xl'].includes(settings.fontSize)
+            ? settings.fontSize
+            : 'md';
+        el.classList.add(`app-font-${fontSize}`);
     }, [settings.fontSize]);
 
     // Apply compact mode whenever settings change
@@ -101,28 +131,46 @@ export const SettingsProvider = ({ children }) => {
         }
     }, [settings.compactMode]);
 
-    const updateSetting = useCallback((key, value) => {
-        setSettings(prev => {
-            const next = { ...prev, [key]: value };
-            // Fire-and-forget save to API
-            saveUserSettings(next).catch(err =>
-                console.warn('Failed to save settings:', err)
-            );
-            return next;
-        });
+    const queueSave = useCallback((next) => {
+        const generation = saveGenerationRef.current;
+        const save = saveQueueRef.current
+            .catch(() => undefined)
+            .then(() => {
+                if (generation !== saveGenerationRef.current) return next;
+                return saveUserSettings(next);
+            });
+        saveQueueRef.current = save;
+        return save;
     }, []);
+
+    const updateSettings = useCallback((updates) => {
+        const next = { ...settingsRef.current, ...updates };
+        settingsRef.current = next;
+        setSettings(next);
+        const save = queueSave(next);
+        save.catch(err => {
+            console.warn('Failed to save settings:', err);
+        });
+        return save;
+    }, [queueSave]);
+
+    const updateSetting = useCallback((key, value) => (
+        updateSettings({ [key]: value })
+    ), [updateSettings]);
 
     const resetSettings = useCallback(async () => {
         try {
-            await saveUserSettings(defaultSettings);
-        } catch {
-            // ignore
+            const next = freshDefaults();
+            settingsRef.current = next;
+            setSettings(next);
+            await queueSave(next);
+        } catch (err) {
+            console.warn('Failed to reset settings:', err);
         }
-        setSettings(defaultSettings);
-    }, []);
+    }, [queueSave]);
 
     return (
-        <SettingsContext.Provider value={{ settings, updateSetting, resetSettings, loaded }}>
+        <SettingsContext.Provider value={{ settings, updateSetting, updateSettings, resetSettings, loaded }}>
             {children}
         </SettingsContext.Provider>
     );

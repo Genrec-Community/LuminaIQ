@@ -13,7 +13,7 @@ Tables managed:
 
 from typing import List, Dict, Any, Optional
 from datetime import date, datetime, timedelta
-from db.client import get_supabase_client
+from db.client import get_supabase_client, async_db
 from utils.logger import logger
 from uuid import uuid4
 
@@ -27,8 +27,8 @@ class UserDataService:
     async def get_settings(self, user_id: str) -> Dict[str, Any]:
         """Get user settings, returning defaults if none exist."""
         try:
-            result = (
-                self.client.table("user_settings")
+            result = await async_db(
+                lambda: self.client.table("user_settings")
                 .select("settings, updated_at")
                 .eq("user_id", user_id)
                 .execute()
@@ -38,39 +38,50 @@ class UserDataService:
             return self._default_settings()
         except Exception as e:
             logger.error(f"Error getting settings: {e}")
-            return self._default_settings()
+            raise
 
     async def save_settings(self, user_id: str, settings: Dict[str, Any]) -> Dict[str, Any]:
         """Upsert user settings."""
         try:
-            result = self.client.table("user_settings").upsert(
-                {
-                    "user_id": user_id,
-                    "settings": settings,
-                    "updated_at": datetime.utcnow().isoformat(),
-                },
-                on_conflict="user_id",
-            ).execute()
+            result = await async_db(
+                lambda: self.client.table("user_settings").upsert(
+                    {
+                        "user_id": user_id,
+                        "settings": settings,
+                        "updated_at": datetime.utcnow().isoformat(),
+                    },
+                    on_conflict="user_id",
+                ).execute()
+            )
             return result.data[0]["settings"] if result.data else settings
         except Exception as e:
             logger.error(f"Error saving settings: {e}")
-            return settings
+            raise
 
     def _default_settings(self) -> Dict[str, Any]:
         return {
-            "bookIsolation": False,
+            "studentName": "",
+            "learningGoal": "",
+            "selfLevel": "intermediate",
+            "learningStyle": "balanced",
+            "subjectsOfInterest": [],
+            "dailyStudyGoal": 30,
+            "bookIsolation": True,
             "darkMode": False,
             "pomodoroWork": 25,
             "pomodoroBreak": 5,
             "pomodoroLongBreak": 15,
             "pomodoroAutoStart": False,
-            "studyReminders": False,
+            "fontSize": "md",
+            "studyReminders": True,
             "reminderTime": "09:00",
             "soundEnabled": True,
             "showStreaks": True,
             "compactMode": False,
             "tutorStyle": "balanced",
-            "quizDifficulty": "medium",
+            "quizDifficulty": "adaptive",
+            "hasSeenDashboardTutorial": False,
+            "hasSeenProjectTutorial": False,
         }
 
     # ===================== 2. Bookmarks =====================
