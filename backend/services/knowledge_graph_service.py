@@ -44,6 +44,35 @@ class KnowledgeGraph:
     def __init__(self):
         self.client = get_supabase_client()
 
+    async def _get_edges(self, project_id: str) -> List[Dict[str, Any]]:
+        result = await async_db(
+            lambda: self.client.table("topic_relations")
+            .select("*")
+            .eq("project_id", project_id)
+            .execute()
+        )
+        return result.data or []
+
+    async def _get_completed_documents(self, project_id: str) -> List[Dict[str, Any]]:
+        result = await async_db(
+            lambda: self.client.table("documents")
+            .select("id, filename, topics")
+            .eq("project_id", project_id)
+            .eq("upload_status", "completed")
+            .execute()
+        )
+        return result.data or []
+
+    @staticmethod
+    def _topic_document_mapping(documents: List[Dict[str, Any]]) -> Dict[str, str]:
+        topic_doc_map = {}
+        for doc in documents:
+            doc_name = doc.get("filename", "Unknown")
+            for topic in doc.get("topics") or []:
+                if topic not in topic_doc_map:
+                    topic_doc_map[topic] = doc_name
+        return topic_doc_map
+
     async def add_relationship(
         self,
         project_id: str,
@@ -348,23 +377,8 @@ class KnowledgeGraph:
     async def _get_topic_document_mapping(self, project_id: str) -> Dict[str, str]:
         """Get mapping of topic -> document name"""
         try:
-            result = await async_db(lambda: 
-                self.client.table("documents")
-                .select("id, filename, topics")
-                .eq("project_id", project_id)
-                .eq("upload_status", "completed")
-                .execute()
-            )
-
-            topic_doc_map = {}
-            for doc in result.data or []:
-                doc_name = doc.get("filename", "Unknown")
-                topics = doc.get("topics") or []
-                for topic in topics:
-                    if topic not in topic_doc_map:
-                        topic_doc_map[topic] = doc_name
-
-            return topic_doc_map
+            documents = await self._get_completed_documents(project_id)
+            return self._topic_document_mapping(documents)
 
         except Exception as e:
             logger.error(f"Error getting topic-document mapping: {e}")
@@ -424,48 +438,89 @@ class KnowledgeGraph:
     async def get_graph_stats(self, project_id: str) -> Dict[str, Any]:
         """Get statistics about the knowledge graph."""
         try:
-            result = await async_db(lambda: 
-                self.client.table("topic_relations")
-                .select("*")
-                .eq("project_id", project_id)
-                .execute()
-            )
-
-            edges = result.data or []
-
-            if not edges:
-                return {
-                    "total_nodes": 0,
-                    "total_edges": 0,
-                    "prerequisites": 0,
-                    "related": 0,
-                    "subtopics": 0,
-                    "has_cycle": False,
-                }
-
-            nodes = set()
-            edge_counts = {"prerequisite": 0, "related": 0, "subtopic": 0}
-
-            for edge in edges:
-                nodes.add(edge["from_topic"])
-                nodes.add(edge["to_topic"])
-                edge_type = edge.get("relation_type", "related")
-                edge_counts[edge_type] = edge_counts.get(edge_type, 0) + 1
-
-            has_cycle = await self.detect_cycle(project_id)
-
-            return {
-                "total_nodes": len(nodes),
-                "total_edges": len(edges),
-                "prerequisites": edge_counts.get("prerequisite", 0),
-                "related": edge_counts.get("related", 0),
-                "subtopics": edge_counts.get("subtopic", 0),
-                "has_cycle": has_cycle,
-            }
+            return self._build_graph_stats(await self._get_edges(project_id))
 
         except Exception as e:
             logger.error(f"Error getting graph stats: {e}")
             return {}
+
+    @staticmethod
+    def _build_graph_stats(edges: List[Dict[str, Any]]) -> Dict[str, Any]:
+        nodes = set()
+        edge_counts = {"prerequisite": 0, "related": 0, "subtopic": 0}
+        graph = defaultdict(list)
+
+        for edge in edges:
+            from_topic = edge["from_topic"]
+            to_topic = edge["to_topic"]
+            nodes.update((from_topic, to_topic))
+            edge_type = edge.get("relation_type", "related")
+            edge_counts[edge_type] = edge_counts.get(edge_type, 0) + 1
+            if edge_type == "prerequisite":
+                graph[from_topic].append(to_topic)
+
+        color = {}
+
+        def has_cycle(topic: str) -> bool:
+            color[topic] = 1
+            for neighbor in graph.get(topic, []):
+                if color.get(neighbor) == 1:
+                    return True
+                if color.get(neighbor, 0) == 0 and has_cycle(neighbor):
+                    return True
+            color[topic] = 2
+            return False
+
+        cycle_found = any(
+            color.get(topic, 0) == 0 and has_cycle(topic) for topic in nodes
+        )
+        return {
+            "total_nodes": len(nodes),
+            "total_edges": len(edges),
+            "prerequisites": edge_counts.get("prerequisite", 0),
+            "related": edge_counts.get("related", 0),
+            "subtopics": edge_counts.get("subtopic", 0),
+            "has_cycle": cycle_found,
+        }
+
+    @staticmethod
+    def _build_full_graph(
+        edges: List[Dict[str, Any]], topic_doc_map: Dict[str, str]
+    ) -> Dict[str, Any]:
+        nodes = set(topic_doc_map)
+        vis_edges = []
+        for edge in edges:
+            nodes.update((edge["from_topic"], edge["to_topic"]))
+            vis_edges.append(
+                {
+                    "source": edge["from_topic"],
+                    "target": edge["to_topic"],
+                    "type": edge["relation_type"],
+                    "weight": edge["weight"],
+                }
+            )
+        return {
+            "nodes": [
+                {"id": node, "label": node, "document": topic_doc_map.get(node, "Unknown")}
+                for node in nodes
+            ],
+            "edges": vis_edges,
+        }
+
+    async def get_visualization(
+        self,
+        project_id: str,
+        documents: Optional[List[Dict[str, Any]]] = None,
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        """Build graph and stats while reading each backing table at most once."""
+        if documents is None:
+            documents = await self._get_completed_documents(project_id)
+        edges = await self._get_edges(project_id)
+        topic_doc_map = self._topic_document_mapping(documents)
+        return (
+            self._build_full_graph(edges, topic_doc_map),
+            self._build_graph_stats(edges),
+        )
 
     async def get_full_graph(self, project_id: str) -> Dict[str, Any]:
         """Get full graph data for visualization.
@@ -473,42 +528,8 @@ class KnowledgeGraph:
         Always includes ALL topics from documents, even if no relations exist yet.
         """
         try:
-            result = await async_db(lambda: 
-                self.client.table("topic_relations")
-                .select("*")
-                .eq("project_id", project_id)
-                .execute()
-            )
-
-            edges = result.data or []
-            topic_doc_map = await self._get_topic_document_mapping(project_id)
-
-            nodes = set()
-            vis_edges = []
-
-            for edge in edges:
-                nodes.add(edge["from_topic"])
-                nodes.add(edge["to_topic"])
-                vis_edges.append(
-                    {
-                        "source": edge["from_topic"],
-                        "target": edge["to_topic"],
-                        "type": edge["relation_type"],
-                        "weight": edge["weight"],
-                    }
-                )
-
-            # Always include ALL topics from documents even without relations
-            for topic in topic_doc_map:
-                nodes.add(topic)
-
-            return {
-                "nodes": [
-                    {"id": n, "label": n, "document": topic_doc_map.get(n, "Unknown")}
-                    for n in nodes
-                ],
-                "edges": vis_edges,
-            }
+            graph, _ = await self.get_visualization(project_id)
+            return graph
 
         except Exception as e:
             logger.error(f"Error getting full graph: {e}")

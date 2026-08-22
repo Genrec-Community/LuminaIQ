@@ -34,7 +34,7 @@ async def require_project_owner(
     database = client or get_supabase_client()
     response = await async_db(
         lambda: database.table("projects")
-        .select("id, user_id")
+        .select("id, user_id, name")
         .eq("id", project_id)
         .execute()
     )

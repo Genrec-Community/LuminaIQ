@@ -11,7 +11,8 @@ Provides:
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
-from api.deps import get_current_user
+from api.deps import get_current_user, require_project_owner
+from db.client import async_db, get_supabase_client
 from services.knowledge_graph_service import knowledge_graph
 from services.graph_analytics_service import graph_analytics
 from utils.logger import logger
@@ -67,28 +68,21 @@ async def get_knowledge_graph(
     Get knowledge graph data for visualization.
     Returns nodes (topics) and edges (relationships) with book as center node.
     """
+    project = await require_project_owner(project_id, current_user)
     try:
-        # Get graph data
-        graph_data = await knowledge_graph.get_full_graph(project_id)
-        
-        # Get project info for center node
-        from db.client import get_supabase_client
         client = get_supabase_client()
-        project = (
-            client.table("projects")
-            .select("name")
-            .eq("id", project_id)
-            .execute()
-        )
-        project_name = project.data[0]["name"] if project.data else "Project"
+        project_name = project.get("name") or "Project"
         
         # Get document names for book nodes
-        documents = (
-            client.table("documents")
+        documents = await async_db(
+            lambda: client.table("documents")
             .select("id, filename, topics")
             .eq("project_id", project_id)
             .eq("upload_status", "completed")
             .execute()
+        )
+        graph_data, stats = await knowledge_graph.get_visualization(
+            project_id, documents=documents.data or []
         )
         
         # Build enhanced graph with books
@@ -139,9 +133,6 @@ async def get_knowledge_graph(
                 "type": edge.get("type", "related"),
                 "weight": edge.get("weight", 0.5)
             })
-        
-        # Get graph stats
-        stats = await knowledge_graph.get_graph_stats(project_id)
         
         return {
             "project_name": project_name,

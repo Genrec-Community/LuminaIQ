@@ -369,6 +369,7 @@ async def get_learning_dashboard(
     - Spaced repetition statistics
     - Recent topic performance
     """
+    await require_project_owner(project_id, current_user)
     try:
         user_id = current_user["id"]
 
@@ -511,9 +512,9 @@ async def get_knowledge_graph(
 
     Returns nodes and edges in a format suitable for graph libraries.
     """
+    await require_project_owner(project_id, current_user)
     try:
-        graph = await knowledge_graph.get_full_graph(project_id)
-        stats = await knowledge_graph.get_graph_stats(project_id)
+        graph, stats = await knowledge_graph.get_visualization(project_id)
 
         return {"graph": graph, "stats": stats}
 

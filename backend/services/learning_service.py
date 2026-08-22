@@ -14,13 +14,20 @@ DSA Used:
 """
 
 import heapq
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional, Tuple
 from collections import defaultdict
-from db.client import get_supabase_client
+from db.client import async_db, get_supabase_client
 from utils.logger import logger
 from uuid import uuid4
 import math
+
+
+def _parse_datetime_utc(value: str) -> datetime:
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
 class PerformanceTracker:
@@ -131,7 +138,9 @@ class PerformanceTracker:
             if topic:
                 query = query.eq("topic", topic)
 
-            result = query.order("last_attempt", desc=True).execute()
+            result = await async_db(
+                lambda: query.order("last_attempt", desc=True).execute()
+            )
             return result.data or []
 
         except Exception as e:
@@ -229,7 +238,12 @@ class WeaknessDetector:
         return min(1.0, weakness_score)
 
     async def get_weak_topics(
-        self, user_id: str, project_id: str, top_k: int = 5, threshold: float = 0.3
+        self,
+        user_id: str,
+        project_id: str,
+        top_k: int = 5,
+        threshold: float = 0.3,
+        records: Optional[List[Dict[str, Any]]] = None,
     ) -> List[Dict[str, Any]]:
         """
         Get top-K weakest topics using Min-Heap.
@@ -241,16 +255,15 @@ class WeaknessDetector:
         Time Complexity: O(n log k) where n = topics, k = top_k
         """
         try:
-            # Get all performance records
-            result = (
-                self.client.table("user_performance")
-                .select("*")
-                .eq("user_id", user_id)
-                .eq("project_id", project_id)
-                .execute()
-            )
-
-            records = result.data or []
+            if records is None:
+                result = await async_db(
+                    lambda: self.client.table("user_performance")
+                    .select("*")
+                    .eq("user_id", user_id)
+                    .eq("project_id", project_id)
+                    .execute()
+                )
+                records = result.data or []
 
             if not records:
                 return []
@@ -528,7 +541,10 @@ class SpacedRepetition:
             raise
 
     async def get_due_cards(
-        self, user_id: str, project_id: Optional[str] = None, limit: int = 20
+        self,
+        user_id: str,
+        project_id: Optional[str] = None,
+        limit: int = 20,
     ) -> List[Dict[str, Any]]:
         """
         Get cards due for review using Priority Queue concept.
@@ -537,30 +553,29 @@ class SpacedRepetition:
         This is effectively a min-heap where priority = next_review timestamp.
         """
         try:
-            now = datetime.utcnow().isoformat()
+            now_dt = datetime.now(timezone.utc)
+            now = now_dt.isoformat()
 
             query = (
                 self.client.table("review_cards")
                 .select("*")
                 .eq("user_id", user_id)
                 .lte("next_review", now)
-            )  # Due now or overdue
-
+            )
             if project_id:
                 query = query.eq("project_id", project_id)
-
-            # Order by next_review (priority queue behavior)
-            result = query.order("next_review", desc=False).limit(limit).execute()
-
+            result = await async_db(
+                lambda: query.order("next_review", desc=False)
+                .limit(limit)
+                .execute()
+            )
             cards = result.data or []
 
             # Add overdue info
             for card in cards:
                 try:
-                    next_review = datetime.fromisoformat(
-                        card["next_review"].replace("Z", "+00:00")
-                    )
-                    overdue_days = (datetime.now(next_review.tzinfo) - next_review).days
+                    next_review = _parse_datetime_utc(card["next_review"])
+                    overdue_days = (now_dt - next_review).days
                     card["overdue_days"] = max(0, overdue_days)
                 except:
                     card["overdue_days"] = 0
@@ -572,22 +587,23 @@ class SpacedRepetition:
             return []
 
     async def get_review_stats(
-        self, user_id: str, project_id: Optional[str] = None
+        self,
+        user_id: str,
+        project_id: Optional[str] = None,
+        cards: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
         """Get spaced repetition statistics."""
         try:
-            now = datetime.utcnow().isoformat()
-
-            # Base query
-            base_query = (
-                self.client.table("review_cards").select("*").eq("user_id", user_id)
-            )
-
-            if project_id:
-                base_query = base_query.eq("project_id", project_id)
-
-            result = base_query.execute()
-            cards = result.data or []
+            if cards is None:
+                base_query = (
+                    self.client.table("review_cards")
+                    .select("*")
+                    .eq("user_id", user_id)
+                )
+                if project_id:
+                    base_query = base_query.eq("project_id", project_id)
+                result = await async_db(lambda: base_query.execute())
+                cards = result.data or []
 
             if not cards:
                 return {
@@ -605,13 +621,11 @@ class SpacedRepetition:
             learning = 0  # 0 < repetition < 5
             new = 0  # repetition = 0
 
-            now_dt = datetime.utcnow()
+            now_dt = datetime.now(timezone.utc)
 
             for card in cards:
                 try:
-                    next_review = datetime.fromisoformat(
-                        card["next_review"].replace("Z", "+00:00")
-                    ).replace(tzinfo=None)
+                    next_review = _parse_datetime_utc(card["next_review"])
 
                     if next_review.date() == now_dt.date():
                         due_today += 1
@@ -676,13 +690,24 @@ class LearningService:
         - Review statistics
         """
         try:
-            # Get all data in parallel would be ideal, but sync client
             performance = await self.performance.get_performance(user_id, project_id)
-            weak_topics = await self.weakness.get_weak_topics(user_id, project_id)
+            weak_topics = await self.weakness.get_weak_topics(
+                user_id, project_id, records=performance
+            )
+            review_cards_result = await async_db(
+                lambda: self.spaced_rep.client.table("review_cards")
+                .select("*")
+                .eq("user_id", user_id)
+                .eq("project_id", project_id)
+                .execute()
+            )
+            review_cards = review_cards_result.data or []
             due_cards = await self.spaced_rep.get_due_cards(
                 user_id, project_id, limit=10
             )
-            review_stats = await self.spaced_rep.get_review_stats(user_id, project_id)
+            review_stats = await self.spaced_rep.get_review_stats(
+                user_id, project_id, cards=review_cards
+            )
 
             # Calculate overall stats
             total_correct = sum(p.get("correct_count", 0) for p in performance)
