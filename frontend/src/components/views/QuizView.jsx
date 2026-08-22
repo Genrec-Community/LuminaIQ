@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useEffectEvent, useRef } from 'react';
 import { HelpCircle, FileText, LogOut, CheckSquare, X, ChevronDown, Loader2, BookMarked, Brain, Zap, Sparkles, ArrowLeft, Target, Trophy, AlertTriangle, Clock, Trash2, Eye, Plus } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -72,6 +72,13 @@ const QuizView = ({
     const [bothMcqScore, setBothMcqScore] = useState(null);
     const [bothSubjectiveScore, setBothSubjectiveScore] = useState(null);
     const [bothCombinedScore, setBothCombinedScore] = useState(null);
+
+    const computeInitialDifficulty = useEffectEvent(() => computeAdaptiveDifficulty());
+    const consumePreGeneratedQuiz = useEffectEvent(() => onConsumePreGenerated?.());
+    const loadInitialQuizData = useEffectEvent(() => {
+        loadSuggestedTopic();
+        fetchSavedQuizzes();
+    });
     
     // ==================== ADAPTIVE DIFFICULTY ENGINE ====================
     
@@ -79,7 +86,7 @@ const QuizView = ({
     useEffect(() => {
         if (settings.quizDifficulty === 'adaptive') {
             setIsAdaptiveMode(true);
-            computeAdaptiveDifficulty();
+            computeInitialDifficulty();
         } else {
             setIsAdaptiveMode(false);
             setAdaptiveComputed(null);
@@ -195,15 +202,14 @@ const QuizView = ({
             setPerformanceSaved(false);
             setCardsCreated(null);
             setShowSavedList(false);
-            if (onConsumePreGenerated) onConsumePreGenerated();
+            consumePreGeneratedQuiz();
         }
     }, [preGeneratedData]);
     
     // Load suggested topic on mount (only if not coming from path)
     useEffect(() => {
         if (!cameFromPath) {
-            loadSuggestedTopic();
-            fetchSavedQuizzes();
+            loadInitialQuizData();
         }
     }, [projectId, cameFromPath]);
     

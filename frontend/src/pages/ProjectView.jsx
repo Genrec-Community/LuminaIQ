@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useEffectEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
     MessageSquare,
@@ -321,6 +321,9 @@ const ProjectView = () => {
         }
     };
 
+    const loadDocuments = useEffectEvent(() => fetchDocuments());
+    const loadTopics = useEffectEvent(() => fetchTopics());
+
     useEffect(() => {
         let intervalId;
         
@@ -355,7 +358,7 @@ const ProjectView = () => {
             try {
                 // No local race-timeout — rely on the axios 60s timeout so Azure
                 // cold starts (30-50s) don't prematurely trigger the error screen.
-                docData = await fetchDocuments();
+                docData = await loadDocuments();
             } catch (err) {
                 console.warn('Initial document load failed:', err.message);
                 setFetchError(true);
@@ -397,7 +400,7 @@ const ProjectView = () => {
             setProjectViewLoading(false);
 
             if (!docsProcessing) {
-                fetchTopics();
+                loadTopics();
                 topicsFetchedRef.current = true;
                 return;
             }
@@ -419,7 +422,7 @@ const ProjectView = () => {
                         if (stage === 'completed' || stage === 'failed') {
                             // Refresh this document's status from DB to get error_message etc.
                             try {
-                                const refreshed = await fetchDocuments();
+                                const refreshed = await loadDocuments();
                                 const remaining = (refreshed?.documents || []).filter(d =>
                                     d.upload_status === 'pending' ||
                                     d.upload_status === 'processing' ||
@@ -429,7 +432,7 @@ const ProjectView = () => {
                                 if (remaining.length === 0) {
                                     setIsProcessingDocs(false);
                                     if (!topicsFetchedRef.current) {
-                                        fetchTopics();
+                                        loadTopics();
                                         topicsFetchedRef.current = true;
                                     }
                                 }
@@ -460,7 +463,7 @@ const ProjectView = () => {
         };
     }, [projectId]);
 
-    const fetchDocuments = async () => {
+    async function fetchDocuments() {
         const data = await getDocuments(projectId);
         const nextDocuments = data.documents || [];
         const hasProcessingDocuments = nextDocuments.some(document =>
@@ -470,9 +473,9 @@ const ProjectView = () => {
         setIsProcessingDocs(hasProcessingDocuments);
         if (hasProcessingDocuments) topicsFetchedRef.current = false;
         return data;
-    };
+    }
 
-    const fetchTopics = async () => {
+    async function fetchTopics() {
         try {
             const data = await getTopics(projectId);
             if (data.all && data.by_doc) {
@@ -489,7 +492,7 @@ const ProjectView = () => {
         } catch (error) {
             console.error('Failed to fetch topics', error);
         }
-    };
+    }
 
     useEffect(() => {
         if (!isProcessingDocs) return;
@@ -508,7 +511,7 @@ const ProjectView = () => {
                 if (stillProcessing) topicsFetchedRef.current = false;
                 if (!stillProcessing && !topicsFetchedRef.current) {
                     topicsFetchedRef.current = true;
-                    fetchTopics();
+                    loadTopics();
                 }
             } catch (error) {
                 if (!cancelled) console.warn('Document status poll failed', error);
@@ -526,7 +529,7 @@ const ProjectView = () => {
     useEffect(() => {
         if (!isProcessingDocs && !topicsFetchedRef.current) {
             if (activeTab === 'chat' || activeTab === 'quiz' || activeTab === 'qa' || activeTab === 'notes' || activeTab === 'path') {
-                fetchTopics();
+                loadTopics();
                 topicsFetchedRef.current = true;
             }
         }
@@ -557,48 +560,41 @@ const ProjectView = () => {
     }, [selectedDocuments, documentTopics, allProjectTopics]);
 
     // Default Selection: If only 1 document, select it.
-    useEffect(() => {
+    const ensureDefaultDocument = useEffectEvent(() => {
         if (documents.length === 1 && selectedDocuments.length === 0) {
-            // Need to pass array to setSelectedDocuments?
-            // Wait, setSelectedDocuments is passed from context or protected route?
-            // No, it's not defined in ProjectView props usually.
-            // Let's check where selectedDocuments comes from.
-            // It's likely state in ProjectView.
-            // Lines 70-80 usually define it.
-            if (typeof setSelectedDocuments === 'function') {
-                setSelectedDocuments([documents[0].id]);
-            }
+            setSelectedDocuments([documents[0].id]);
         }
+    });
+
+    useEffect(() => {
+        ensureDefaultDocument();
     }, [documents]);
 
     // Keyboard shortcuts
-    useEffect(() => {
-        const handleKeyDown = (e) => {
-            // Ctrl+K or Cmd+K for search
-            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-                e.preventDefault();
-                setShowSearch(true);
-            }
-            // Ctrl+Shift+Z or Cmd+Shift+Z for zen mode toggle
-            if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
-                e.preventDefault();
-                setZenMode(prev => !prev);
-            }
-            // Escape to close modals or exit zen mode
-            if (e.key === 'Escape') {
-                if (zenMode) { setZenMode(false); return; }
-                if (showSearch) setShowSearch(false);
-                if (showPomodoro) setShowPomodoro(false);
-                if (showAITutor) setShowAITutor(false);
-                if (showBookmarks) setShowBookmarks(false);
-                if (showGamification) setShowGamification(false);
-                if (showProfileMenu) setShowProfileMenu(false);
-            }
-        };
+    const onGlobalKeyDown = useEffectEvent((e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+            e.preventDefault();
+            setShowSearch(true);
+        }
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
+            e.preventDefault();
+            setZenMode(prev => !prev);
+        }
+        if (e.key === 'Escape') {
+            if (zenMode) { setZenMode(false); return; }
+            if (showSearch) setShowSearch(false);
+            if (showPomodoro) setShowPomodoro(false);
+            if (showAITutor) setShowAITutor(false);
+            if (showBookmarks) setShowBookmarks(false);
+            if (showGamification) setShowGamification(false);
+            if (showProfileMenu) setShowProfileMenu(false);
+        }
+    });
 
-        document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [showSearch, showPomodoro, showAITutor, showBookmarks, zenMode]);
+    useEffect(() => {
+        document.addEventListener('keydown', onGlobalKeyDown);
+        return () => document.removeEventListener('keydown', onGlobalKeyDown);
+    }, []);
 
     // Close profile menu when clicking outside
     useEffect(() => {
@@ -898,9 +894,19 @@ const ProjectView = () => {
         if (!files || files.length === 0) return;
         setUploading(true);
         try {
-            // Upload files in parallel for better performance
+            const pendingFiles = Array.from(files);
+            let nextFileIndex = 0;
+            const uploadNext = async () => {
+                while (nextFileIndex < pendingFiles.length) {
+                    const file = pendingFiles[nextFileIndex++];
+                    await uploadDocument(projectId, file, null, bookOptions);
+                }
+            };
             await Promise.all(
-                Array.from(files).map(file => uploadDocument(projectId, file, null, bookOptions))
+                Array.from(
+                    { length: Math.min(3, pendingFiles.length) },
+                    () => uploadNext()
+                )
             );
             await fetchDocuments();
             setShowAddDocModal(false);

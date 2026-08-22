@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useEffectEvent } from 'react';
 import { 
     Target, BookOpen, ChevronRight, Loader2, RefreshCw, 
     CheckCircle, Circle, Brain, Sparkles,
@@ -79,8 +79,11 @@ const LearningPathView = ({
     const [expandedTopic, setExpandedTopic] = useState(null);
     const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
     
+    const loadCurrentPath = useEffectEvent(() => loadData());
+    const autoBuildPath = useEffectEvent(() => handleBuildGraph());
+
     useEffect(() => {
-        loadData();
+        loadCurrentPath();
     }, [projectId]);
 
     // Handle rotating loading messages
@@ -101,7 +104,7 @@ const LearningPathView = ({
                 const autoGenerateKey = `lumina_path_autoun_${projectId}`;
                 if (!sessionStorage.getItem(autoGenerateKey)) {
                     sessionStorage.setItem(autoGenerateKey, 'true');
-                    handleBuildGraph();
+                    autoBuildPath();
                 }
             }
         }

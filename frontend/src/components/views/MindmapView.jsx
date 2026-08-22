@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useEffectEvent, useRef } from 'react';
 import { Zap, Plus, Trash2, Eye, Loader2, Download, X, ZoomIn, ZoomOut, Maximize2, RefreshCw } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 import { getMindmaps, generateMindmap as generateMindmapAPI, deleteMindmap as deleteMindmapAPI } from '../../api';
@@ -301,8 +301,10 @@ const MindmapView = ({ projectId, availableTopics, selectedDocuments }) => {
         customTopic: ''
     });
 
+    const loadMindmaps = useEffectEvent(() => fetchMindmaps());
+
     useEffect(() => {
-        fetchMindmaps();
+        loadMindmaps();
     }, [projectId]);
 
     const fetchMindmaps = async () => {

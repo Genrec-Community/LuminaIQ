@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useEffectEvent } from 'react';
 import {
     Search, Globe, BookOpen, Download, X, Loader2, Tag, Check, ChevronLeft, ChevronRight
 } from 'lucide-react';
@@ -26,23 +26,24 @@ const BookStoreModal = ({ projectId, onClose, onImported }) => {
     const [importedIds, setImportedIds] = useState(new Set());
     const toast = useToast();
 
-    const fetchBooks = useCallback(async () => {
-        setLoading(true);
-        try {
-            const data = await getPublicBooks(page, search);
-            setBooks(data.books || []);
-            setTotalPages(data.total_pages || 1);
-            setTotal(data.total || 0);
-        } catch {
-            toast.error('Failed to load books');
-        } finally {
-            setLoading(false);
-        }
-    }, [page, search]);
+    const showLoadError = useEffectEvent(() => toast.error('Failed to load books'));
 
     useEffect(() => {
+        const fetchBooks = async () => {
+            setLoading(true);
+            try {
+                const data = await getPublicBooks(page, search);
+                setBooks(data.books || []);
+                setTotalPages(data.total_pages || 1);
+                setTotal(data.total || 0);
+            } catch {
+                showLoadError();
+            } finally {
+                setLoading(false);
+            }
+        };
         fetchBooks();
-    }, [fetchBooks]);
+    }, [page, search]);
 
     const handleSearch = (e) => {
         e.preventDefault();

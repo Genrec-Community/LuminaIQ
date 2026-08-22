@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useEffectEvent } from 'react';
 import {
     Layers, RefreshCw, ArrowLeft, ArrowRight,
     RotateCcw, Check, X, Shuffle, Eye, EyeOff
@@ -112,21 +112,22 @@ const TopicFlashcards = ({ projectId, topic, selectedDocuments = EMPTY_DOCUMENTS
         loadFlashcards();
     }, [loadFlashcards]);
 
+    const onKeyDown = useEffectEvent((e) => {
+        if (e.key === 'ArrowRight' || e.key === 'd') {
+            goNext();
+        } else if (e.key === 'ArrowLeft' || e.key === 'a') {
+            goPrev();
+        } else if (e.key === ' ' || e.key === 'Enter') {
+            e.preventDefault();
+            setFlipped(f => !f);
+        }
+    });
+
     // Keyboard navigation
     useEffect(() => {
-        const handleKey = (e) => {
-            if (e.key === 'ArrowRight' || e.key === 'd') {
-                goNext();
-            } else if (e.key === 'ArrowLeft' || e.key === 'a') {
-                goPrev();
-            } else if (e.key === ' ' || e.key === 'Enter') {
-                e.preventDefault();
-                setFlipped(f => !f);
-            }
-        };
-        window.addEventListener('keydown', handleKey);
-        return () => window.removeEventListener('keydown', handleKey);
-    }, [currentIndex, flashcards.length]);
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, []);
 
     const goNext = () => {
         if (currentIndex < flashcards.length - 1) {

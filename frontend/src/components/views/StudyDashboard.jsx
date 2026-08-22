@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useEffectEvent } from 'react';
 import { 
     Brain, BookOpen, Clock, CheckCircle, AlertTriangle, 
     Loader2, RefreshCw, Star, TrendingUp, Calendar,
@@ -30,8 +30,10 @@ const StudyDashboard = ({ projectId, availableTopics }) => {
     const [reviewIndex, setReviewIndex] = useState(0);
     const [submittingReview, setSubmittingReview] = useState(false);
 
+    const loadCurrentDashboard = useEffectEvent(() => loadDashboard());
+
     useEffect(() => {
-        loadDashboard();
+        loadCurrentDashboard();
     }, [projectId]);
 
     const loadDashboard = async () => {

@@ -10,6 +10,37 @@ import { recordActivity } from '../utils/studyActivity';
 import { useSettings } from '../context/SettingsContext';
 import { API_URL } from '../api';
 
+const TUTOR_STYLES = {
+    simple: {
+        icon: Baby,
+        name: 'Simple',
+        description: 'Explain like I\'m 5',
+        color: 'bg-green-500',
+        prompt: 'Explain this concept in the simplest possible way, as if explaining to a young child. Use analogies, simple words, and avoid jargon.',
+    },
+    balanced: {
+        icon: GraduationCap,
+        name: 'Balanced',
+        description: 'Clear with examples',
+        color: 'bg-blue-500',
+        prompt: 'Explain this concept clearly with practical examples. Use a balanced approach that is accessible but thorough.',
+    },
+    detailed: {
+        icon: Microscope,
+        name: 'Detailed',
+        description: 'In-depth analysis',
+        color: 'bg-purple-500',
+        prompt: 'Provide a comprehensive, detailed explanation with technical depth. Include nuances, edge cases, and advanced concepts.',
+    },
+    socratic: {
+        icon: Lightbulb,
+        name: 'Socratic',
+        description: 'Learn through questions',
+        color: 'bg-amber-500',
+        prompt: 'Use the Socratic method. Instead of giving direct answers, guide understanding through thoughtful questions that help discover the answer.',
+    },
+};
+
 const AITutorChat = ({
     projectId,
     documentId = null,
@@ -20,10 +51,19 @@ const AITutorChat = ({
 }) => {
     const { settings } = useSettings();
 
-    const [messages, setMessages] = useState([]);
+    const initialTutorStyle = settings.tutorStyle || 'balanced';
+    const [messages, setMessages] = useState(() => {
+        const style = TUTOR_STYLES[initialTutorStyle];
+        return [{
+            role: 'assistant',
+            content: `Hello! I'm your AI tutor in **${style.name}** mode. ${
+                topic ? `I see you're studying **${topic}**.` : `I'm here to help you learn from **${documentName}**.`
+            }\n\nHow can I help you understand the material better?`,
+        }];
+    });
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
-    const [tutorStyle, setTutorStyle] = useState(settings.tutorStyle || 'balanced');
+    const [tutorStyle, setTutorStyle] = useState(initialTutorStyle);
     const [showStylePicker, setShowStylePicker] = useState(false);
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
@@ -129,36 +169,7 @@ const AITutorChat = ({
         };
     }, [isDragging, handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd]);
 
-    const tutorStyles = {
-        simple: {
-            icon: Baby,
-            name: 'Simple',
-            description: 'Explain like I\'m 5',
-            color: 'bg-green-500',
-            prompt: 'Explain this concept in the simplest possible way, as if explaining to a young child. Use analogies, simple words, and avoid jargon.',
-        },
-        balanced: {
-            icon: GraduationCap,
-            name: 'Balanced',
-            description: 'Clear with examples',
-            color: 'bg-blue-500',
-            prompt: 'Explain this concept clearly with practical examples. Use a balanced approach that is accessible but thorough.',
-        },
-        detailed: {
-            icon: Microscope,
-            name: 'Detailed',
-            description: 'In-depth analysis',
-            color: 'bg-purple-500',
-            prompt: 'Provide a comprehensive, detailed explanation with technical depth. Include nuances, edge cases, and advanced concepts.',
-        },
-        socratic: {
-            icon: Lightbulb,
-            name: 'Socratic',
-            description: 'Learn through questions',
-            color: 'bg-amber-500',
-            prompt: 'Use the Socratic method. Instead of giving direct answers, guide understanding through thoughtful questions that help discover the answer.',
-        },
-    };
+    const tutorStyles = TUTOR_STYLES;
 
     const quickPrompts = [
         { icon: HelpCircle, text: 'Explain this concept', prompt: 'Can you explain this concept in detail?' },
@@ -166,17 +177,6 @@ const AITutorChat = ({
         { icon: BookOpen, text: 'Summarize key points', prompt: 'What are the key points I should remember?' },
         { icon: Brain, text: 'Test my understanding', prompt: 'Can you ask me some questions to test my understanding?' },
     ];
-
-    useEffect(() => {
-        // Initial greeting
-        const style = tutorStyles[tutorStyle];
-        setMessages([{
-            role: 'assistant',
-            content: `Hello! I'm your AI tutor in **${style.name}** mode. ${
-                topic ? `I see you're studying **${topic}**.` : `I'm here to help you learn from **${documentName}**.`
-            }\n\nHow can I help you understand the material better?`,
-        }]);
-    }, []);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

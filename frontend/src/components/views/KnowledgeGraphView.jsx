@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useEffectEvent, useRef, useCallback } from 'react';
 import cytoscape from 'cytoscape';
 import {
     Book,
@@ -353,7 +353,30 @@ const KnowledgeGraphView = ({ projectId, zenMode }) => {
                 containerRef.current.style.background = P.canvas;
             }
         }
-    }, [isDark]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [P, buildCyStyle]);
+
+    const fetchTopicSummary = useCallback(async (topic, forceRegenerate = false) => {
+        try {
+            setSummaryLoading(true);
+            const data = await getTopicSummary(projectId, topic, forceRegenerate);
+            setTopicSummary(data);
+        } catch (err) {
+            console.error('Error fetching summary:', err);
+            setTopicSummary({ topic, summary: 'Failed to load summary. Please try again.', sources: [], cached: false });
+        } finally {
+            setSummaryLoading(false);
+        }
+    }, [projectId]);
+
+    const fetchSuggestions = useCallback(async (currentTopic = null) => {
+        try {
+            const data = await getLearningSuggestions(projectId, currentTopic, 3);
+            setSuggestions(data);
+            setAnalytics(data.analytics);
+        } catch (err) {
+            console.warn('Suggestions unavailable:', err.message);
+        }
+    }, [projectId]);
 
     // ── Cytoscape init ────────────────────────────────────────────────────────
     const initCytoscape = useCallback((data) => {
@@ -551,10 +574,10 @@ const KnowledgeGraphView = ({ projectId, zenMode }) => {
             cyRef.current.nodes('[type="book"]').forEach(n => pulseSun(n));
         });
 
-    }, [projectId, isDark, buildCyStyle]);
+    }, [projectId, isDark, buildCyStyle, fetchSuggestions, fetchTopicSummary]);
 
     // ── Data fetching ─────────────────────────────────────────────────────────
-    const fetchGraphData = async () => {
+    async function fetchGraphData() {
         try {
             setLoading(true);
             setError(null);
@@ -613,30 +636,7 @@ const KnowledgeGraphView = ({ projectId, zenMode }) => {
             setError(err.message || 'Failed to load knowledge graph');
             setLoading(false);
         }
-    };
-
-    const fetchTopicSummary = async (topic, forceRegenerate = false) => {
-        try {
-            setSummaryLoading(true);
-            const data = await getTopicSummary(projectId, topic, forceRegenerate);
-            setTopicSummary(data);
-        } catch (err) {
-            console.error('Error fetching summary:', err);
-            setTopicSummary({ topic, summary: 'Failed to load summary. Please try again.', sources: [], cached: false });
-        } finally {
-            setSummaryLoading(false);
-        }
-    };
-
-    const fetchSuggestions = async (currentTopic = null) => {
-        try {
-            const data = await getLearningSuggestions(projectId, currentTopic, 3);
-            setSuggestions(data);
-            setAnalytics(data.analytics);
-        } catch (err) {
-            console.warn('Suggestions unavailable:', err.message);
-        }
-    };
+    }
 
     const closeTopic = async () => {
         if (topicStartTime && selectedTopic) {
@@ -665,8 +665,11 @@ const KnowledgeGraphView = ({ projectId, zenMode }) => {
     };
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
+    const loadGraph = useEffectEvent(() => fetchGraphData());
+    const initializeGraph = useEffectEvent((data) => initCytoscape(data));
+
     useEffect(() => {
-        fetchGraphData();
+        loadGraph();
 
         const resizeObserver = new ResizeObserver(() => {
             if (cyRef.current) {
@@ -691,14 +694,13 @@ const KnowledgeGraphView = ({ projectId, zenMode }) => {
         if (graphData) {
             let innerRaf = null;
             const outerRaf = requestAnimationFrame(() => {
-                innerRaf = requestAnimationFrame(() => initCytoscape(graphData));
+                innerRaf = requestAnimationFrame(() => initializeGraph(graphData));
             });
             return () => {
                 cancelAnimationFrame(outerRaf);
                 if (innerRaf !== null) cancelAnimationFrame(innerRaf);
             };
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [graphData]);
 
     const navigateToTopic = async (topic) => {

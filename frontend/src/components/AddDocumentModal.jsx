@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useEffectEvent } from 'react';
 import {
     X, Globe, Upload, BookOpen, ArrowLeft, File, Check,
     Lock, ChevronDown, ChevronUp, Tag, Loader2, Search,
@@ -6,6 +6,8 @@ import {
 } from 'lucide-react';
 import { getPublicBooks, importBook } from '../api';
 import { useToast } from '../context/ToastContext';
+
+const ACCEPTED_EXTENSIONS = ['.pdf', '.docx', '.txt'];
 
 /* ─────────────────────────────────────────────────────────────
    Step 1 — Source Picker
@@ -76,21 +78,24 @@ const BookStoreStep = ({ projectId, onImported, onBack }) => {
     const [importedIds, setImportedIds] = useState(new Set());
     const toast = useToast();
 
-    const fetchBooks = useCallback(async () => {
-        setLoading(true);
-        try {
-            const data = await getPublicBooks(page, search);
-            setBooks(data.books || []);
-            setTotalPages(data.total_pages || 1);
-            setTotal(data.total || 0);
-        } catch {
-            toast.error('Failed to load books');
-        } finally {
-            setLoading(false);
-        }
-    }, [page, search]);
+    const showLoadError = useEffectEvent(() => toast.error('Failed to load books'));
 
-    useEffect(() => { fetchBooks(); }, [fetchBooks]);
+    useEffect(() => {
+        const fetchBooks = async () => {
+            setLoading(true);
+            try {
+                const data = await getPublicBooks(page, search);
+                setBooks(data.books || []);
+                setTotalPages(data.total_pages || 1);
+                setTotal(data.total || 0);
+            } catch {
+                showLoadError();
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchBooks();
+    }, [page, search]);
 
     const handleSearch = (e) => {
         e.preventDefault();
@@ -277,13 +282,11 @@ const UploadStep = ({ onUpload, uploading, onBack }) => {
     const [bookDescription, setBookDescription] = useState('');
     const [bookTags, setBookTags] = useState('');
 
-    const accept = ['.pdf', '.docx', '.txt'];
-
     const handleDrop = useCallback((e) => {
         e.preventDefault();
         setIsDragging(false);
         const files = Array.from(e.dataTransfer.files).filter(f =>
-            accept.some(ext => f.name.toLowerCase().endsWith(ext))
+            ACCEPTED_EXTENSIONS.some(ext => f.name.toLowerCase().endsWith(ext))
         );
         if (files.length) {
             setSelectedFiles(files);

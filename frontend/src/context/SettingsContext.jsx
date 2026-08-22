@@ -48,6 +48,7 @@ const freshDefaults = () => ({
 
 export const SettingsProvider = ({ children }) => {
     const { user } = useAuth();
+    const userId = user?.id;
     const [settings, setSettings] = useState(freshDefaults);
     const [loaded, setLoaded] = useState(false);
     const settingsRef = useRef(settings);
@@ -65,7 +66,7 @@ export const SettingsProvider = ({ children }) => {
         settingsRef.current = initial;
         setSettings(initial);
 
-        if (!user) {
+        if (!userId) {
             setLoaded(true);
             return () => {
                 cancelled = true;
@@ -97,7 +98,7 @@ export const SettingsProvider = ({ children }) => {
         return () => {
             cancelled = true;
         };
-    }, [user?.id]);
+    }, [userId]);
 
     // Apply dark mode — toggle html.dark for CSS cascade.
     // Also persist to localStorage so index.html blocking script can read it

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useEffectEvent } from 'react';
 import { Layers, Plus, Trash2, Edit2, Save, X, ChevronDown, Loader2, BookOpen, Sparkles, Shuffle, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 import { getFlashcardSets, createFlashcardSet, deleteFlashcardSet, generateFlashcardsWithAI } from '../../api';
@@ -33,8 +33,10 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
         numCards: 10
     });
 
+    const loadFlashcardSets = useEffectEvent(() => fetchFlashcardSets());
+
     useEffect(() => {
-        fetchFlashcardSets();
+        loadFlashcardSets();
     }, [projectId]);
 
     const fetchFlashcardSets = async () => {
@@ -212,17 +214,18 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
         setStudyCards([...selectedSet.cards]);
     };
 
+    const onStudyKeyDown = useEffectEvent((e) => {
+        if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); setIsFlipped(f => !f); }
+        if (e.key === 'ArrowRight') { e.preventDefault(); nextCard(); }
+        if (e.key === 'ArrowLeft') { e.preventDefault(); previousCard(); }
+    });
+
     // Keyboard shortcuts for study mode
     useEffect(() => {
         if (!selectedSet) return;
-        const handleKeyDown = (e) => {
-            if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); setIsFlipped(f => !f); }
-            if (e.key === 'ArrowRight') { e.preventDefault(); nextCard(); }
-            if (e.key === 'ArrowLeft') { e.preventDefault(); previousCard(); }
-        };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedSet, currentCardIndex, studyCards]);
+        window.addEventListener('keydown', onStudyKeyDown);
+        return () => window.removeEventListener('keydown', onStudyKeyDown);
+    }, [selectedSet]);
 
     if (loading) {
         return (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useEffectEvent } from 'react';
 import {
     BarChart3, TrendingUp, Clock, Target, Brain,
     BookOpen, Calendar, Award, Flame, ChevronDown,
@@ -18,8 +18,10 @@ const AdvancedAnalytics = ({ projectId, documents = [], bookIsolation = true }) 
     const [expandedSection, setExpandedSection] = useState('overview');
     const [activityData, setActivityData] = useState({});
 
+    const loadAnalyticsForSelection = useEffectEvent(() => loadAnalytics());
+
     useEffect(() => {
-        loadAnalytics();
+        loadAnalyticsForSelection();
     }, [projectId, selectedBook]);
 
     const loadAnalytics = async () => {
@@ -106,9 +108,9 @@ const AdvancedAnalytics = ({ projectId, documents = [], bookIsolation = true }) 
 
     const stats = getStats();
 
-    const formatTime = (seconds) => {
-        const hours = Math.floor(seconds / 3600);
-        const mins = Math.floor((seconds % 3600) / 60);
+    const formatTime = (minutes) => {
+        const hours = Math.floor(minutes / 60);
+        const mins = Math.floor(minutes % 60);
         if (hours > 0) return `${hours}h ${mins}m`;
         return `${mins}m`;
     };

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useEffectEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Plus, Search, BookOpen, Calendar, ArrowRight, LogOut, Upload, FileText,
@@ -26,7 +26,7 @@ const Dashboard = () => {
     const [isCreating, setIsCreating] = useState(false);
     const [dragActive, setDragActive] = useState(false);
     const [uploadStatus, setUploadStatus] = useState({}); // { fileName: 'pending' | 'uploading' | 'success' | 'error' }
-    const [projects, setProjects] = useState(() => getCachedProjects() || []);
+    const [projects, setProjects] = useState(() => getCachedProjects(user?.id) || []);
     const [isLoadingProjects, setIsLoadingProjects] = useState(true);
     const [fetchError, setFetchError] = useState(false);
     const [isSlowLoad, setIsSlowLoad] = useState(false);
@@ -37,7 +37,6 @@ const Dashboard = () => {
 
     const fileInputRef = useRef(null);
     const slowLoadTimerRef = useRef(null);
-    const fetchTimeoutRef = useRef(null);
 
     // New project modal step: 'pick' | 'store' | 'upload'
     const [modalStep, setModalStep] = useState('pick');
@@ -122,12 +121,12 @@ const Dashboard = () => {
         return () => clearInterval(interval);
     }, [isCreating]);
 
+    const loadProjects = useEffectEvent(() => fetchProjects());
+    const cancelProjectLoad = useEffectEvent(() => clearTimeout(slowLoadTimerRef.current));
+
     useEffect(() => {
-        fetchProjects();
-        return () => {
-            clearTimeout(slowLoadTimerRef.current);
-            clearTimeout(fetchTimeoutRef.current);
-        };
+        loadProjects();
+        return cancelProjectLoad;
     }, []);
 
     const fetchBsBooks = useCallback(async (page = bsPage, search = bsSearch) => {
@@ -144,14 +143,14 @@ const Dashboard = () => {
 
     useEffect(() => {
         if (modalStep === 'store') fetchBsBooks(bsPage, bsSearch);
-    }, [modalStep, bsPage, bsSearch]);
+    }, [modalStep, bsPage, bsSearch, fetchBsBooks]);
 
-    const fetchProjects = async () => {
+    async function fetchProjects() {
         setFetchError(false);
         setIsLoadingProjects(true);
 
         // If no cache, show a 'waking up' banner after 3s
-        const hasCached = (getCachedProjects() || []).length > 0;
+        const hasCached = (getCachedProjects(user?.id) || []).length > 0;
         if (!hasCached) {
             slowLoadTimerRef.current = setTimeout(() => setIsSlowLoad(true), 3000);
         }
@@ -161,12 +160,12 @@ const Dashboard = () => {
             // cold starts (30-50s) don't prematurely trigger the error screen.
             const data = await getProjects();
             setProjects(data);
-            setCachedProjects(data);
+            setCachedProjects(user?.id, data);
             setFetchError(false);
         } catch (error) {
             console.error("Failed to fetch projects:", error);
             // Show cached data if available, otherwise show error
-            const cached = getCachedProjects();
+            const cached = getCachedProjects(user?.id);
             if (cached && cached.length > 0) {
                 setProjects(cached);
             } else {
@@ -177,7 +176,7 @@ const Dashboard = () => {
             setIsSlowLoad(false);
             setIsLoadingProjects(false);
         }
-    };
+    }
 
     // ... handlers ...
 
@@ -241,7 +240,7 @@ const Dashboard = () => {
     };
 
     const handleLogout = () => {
-        clearProjectsCache();
+        clearProjectsCache(user?.id);
         logout();
         navigate('/login');
     };

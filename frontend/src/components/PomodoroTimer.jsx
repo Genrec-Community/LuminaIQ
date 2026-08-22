@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useEffectEvent, useRef } from 'react';
 import { 
     Play, Pause, RotateCcw, Coffee, BookOpen, 
     Volume2, VolumeX, Settings, X, Check,
@@ -32,7 +32,6 @@ const PomodoroTimer = ({
     const [longBreakDuration, setLongBreakDuration] = useState(settings.pomodoroLongBreak || 15);
     
     const audioRef = useRef(null);
-    const intervalRef = useRef(null);
     const loadedRef = useRef(false);
     const latestSessionRef = useRef({ sessionsCompleted: 0, totalFocusTime: 0 });
 
@@ -80,16 +79,22 @@ const PomodoroTimer = ({
 
     useEffect(() => () => saveSession(), [saveSession]);
 
+    const onTimerComplete = useEffectEvent(() => {
+        handleTimerComplete();
+    });
+
+    useEffect(() => {
+        if (isRunning && timeLeft === 0) onTimerComplete();
+    }, [isRunning, timeLeft]);
+
     // Timer logic
     useEffect(() => {
-        if (isRunning && timeLeft > 0) {
-            intervalRef.current = setInterval(() => {
+        let interval;
+        if (isRunning) {
+            interval = setInterval(() => {
                 setTimeLeft(prev => {
-                    if (prev <= 1) {
-                        handleTimerComplete();
-                        return 0;
-                    }
-                    return prev - 1;
+                    if (prev <= 0) return 0;
+                    return Math.max(0, prev - 1);
                 });
                 
                 // Track focus time
@@ -100,9 +105,7 @@ const PomodoroTimer = ({
         }
 
         return () => {
-            if (intervalRef.current) {
-                clearInterval(intervalRef.current);
-            }
+            clearInterval(interval);
         };
     }, [isRunning, mode]);
 
