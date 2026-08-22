@@ -7,41 +7,43 @@ from services.topic_graph_builder import (
     LLMRelationshipGenerator,
     SupabaseTopicGraphStore,
     TopicGraphBuilder,
+    topic_source_fingerprint,
 )
 
 
 class _InMemoryStore:
-    def __init__(self, existing=False, events=None):
+    def __init__(self, existing=False, events=None, published_topics=None):
         self.relationships = (
             [{"from_topic": "Old A", "to_topic": "Old B"}] if existing else []
         )
         self.events = events
         self.cleared_projects = []
         self.upserted_edges = []
-        self.latest_build_started_at = None
+        self.requested_fingerprint = None
+        self.published_fingerprint = (
+            topic_source_fingerprint(published_topics or ["A", "B"])
+            if existing
+            else None
+        )
+        self.request_id = None
 
-    async def has_relationships(self, project_id):
-        return bool(self.relationships)
+    async def request_build(
+        self, project_id, source_fingerprint, request_id, requested_at, force_rebuild
+    ):
+        already_published = self.published_fingerprint == source_fingerprint
+        self.requested_fingerprint = source_fingerprint
+        self.request_id = request_id
+        return force_rebuild or not already_published
 
-    async def clear_relationships(self, project_id):
-        if self.events is not None:
-            self.events.append("clear")
-        self.cleared_projects.append(project_id)
-        self.relationships = []
-
-    async def upsert_relationships(self, edges):
-        if self.events is not None:
-            self.events.append("upsert")
-        self.upserted_edges.extend(edges)
-        self.relationships.extend(edges)
-
-    async def replace_relationships(self, project_id, edges, build_started_at):
+    async def replace_relationships(
+        self, project_id, edges, source_fingerprint, request_id
+    ):
         if (
-            self.latest_build_started_at is not None
-            and build_started_at < self.latest_build_started_at
+            request_id != self.request_id
+            or source_fingerprint != self.requested_fingerprint
         ):
             return False
-        self.latest_build_started_at = build_started_at
+        self.published_fingerprint = source_fingerprint
         if self.events is not None:
             self.events.append("replace")
         self.cleared_projects.append(project_id)
@@ -64,8 +66,10 @@ class _BlockingGenerator:
     def __init__(self):
         self.started = asyncio.Event()
         self.release = asyncio.Event()
+        self.calls = []
 
     async def generate(self, project_id, batch_topics, all_topics):
+        self.calls.append((project_id, batch_topics, all_topics))
         self.started.set()
         await self.release.wait()
         return []
@@ -123,17 +127,63 @@ class _LLM:
 
 
 class TopicGraphBuilderTests(unittest.IsolatedAsyncioTestCase):
-    async def test_existing_graph_skips_generation(self):
+    def test_fingerprint_uses_sorted_unique_normalized_topics(self):
+        self.assertEqual(
+            topic_source_fingerprint(["A", "é", "A"]),
+            topic_source_fingerprint(["A", "é"]),
+        )
+        self.assertEqual(
+            topic_source_fingerprint(["A", "é"]),
+            topic_source_fingerprint(["é", "A"]),
+        )
+        self.assertEqual(
+            topic_source_fingerprint(["é"]),
+            topic_source_fingerprint(["e\u0301"]),
+        )
+
+    async def test_unchanged_source_skips_generation(self):
         store = _InMemoryStore(existing=True)
         generator = _RelationshipGenerator()
         builder = TopicGraphBuilder(store, generator)
 
-        result = await builder.build("project-1", ["A", "B"])
+        result = await builder.build("project-1", ["A", "B", "A"])
 
         self.assertEqual(0, result["edges_created"])
-        self.assertIn("already exists", result["message"])
+        self.assertIn("unchanged", result["message"])
         self.assertEqual([], generator.calls)
         self.assertEqual([], store.cleared_projects)
+
+    async def test_force_rebuild_regenerates_unchanged_source(self):
+        store = _InMemoryStore(existing=True)
+        generator = _RelationshipGenerator()
+        builder = TopicGraphBuilder(store, generator)
+
+        result = await builder.build("project-1", ["B", "A"], True)
+
+        self.assertEqual(0, result["edges_created"])
+        self.assertEqual(1, len(generator.calls))
+        self.assertEqual(["project-1"], store.cleared_projects)
+
+    async def test_changed_source_rebuilds_without_force(self):
+        edge = {
+            "project_id": "project-1",
+            "from_topic": "A",
+            "to_topic": "C",
+            "relation_type": "related",
+            "weight": 0.5,
+        }
+        store = _InMemoryStore(existing=True)
+        generator = _RelationshipGenerator([edge])
+        builder = TopicGraphBuilder(store, generator)
+
+        result = await builder.build("project-1", ["A", "C"])
+
+        self.assertEqual(1, result["edges_created"])
+        self.assertEqual(1, len(generator.calls))
+        self.assertEqual([edge], store.relationships)
+        self.assertEqual(
+            topic_source_fingerprint(["A", "C"]), store.published_fingerprint
+        )
 
     async def test_force_build_hides_batching_deduplication_and_replacement(self):
         duplicate_edge = {
@@ -164,23 +214,51 @@ class TopicGraphBuilderTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([duplicate_edge], store.upserted_edges)
         self.assertEqual(2, len(generator.calls))
 
-    async def test_concurrent_build_for_same_project_returns_without_waiting(self):
+    async def test_concurrent_same_source_coalesces_after_first_publication(self):
         generator = _BlockingGenerator()
         builder = TopicGraphBuilder(_InMemoryStore(), generator)
 
-        first = asyncio.create_task(builder.build("project-1", ["A", "B"], True))
+        first = asyncio.create_task(builder.build("project-1", ["A", "B"]))
         await generator.started.wait()
-        second = await builder.build("project-1", ["A", "B"], True)
+        second_task = asyncio.create_task(
+            builder.build("project-1", ["A", "B"])
+        )
         generator.release.set()
         await first
+        second = await second_task
 
         self.assertEqual(
-            {"edges_created": 0, "message": "Build already in progress"}, second
+            {"edges_created": 0, "message": "Topic Graph source is unchanged"},
+            second,
+        )
+        self.assertEqual(1, len(generator.calls))
+
+    async def test_concurrent_later_changed_source_is_not_lost(self):
+        store = _InMemoryStore()
+        generator = _BlockingGenerator()
+        builder = TopicGraphBuilder(store, generator)
+
+        first = asyncio.create_task(builder.build("project-1", ["A", "B"], True))
+        await generator.started.wait()
+        second = asyncio.create_task(builder.build("project-1", ["C", "D"], True))
+        generator.release.set()
+        await asyncio.gather(first, second)
+
+        self.assertEqual(2, len(generator.calls))
+        self.assertEqual(
+            topic_source_fingerprint(["C", "D"]), store.published_fingerprint
         )
 
     async def test_operational_failure_is_raised_at_the_interface(self):
         class BrokenStore(_InMemoryStore):
-            async def has_relationships(self, project_id):
+            async def request_build(
+                self,
+                project_id,
+                source_fingerprint,
+                request_id,
+                requested_at,
+                force_rebuild,
+            ):
                 raise RuntimeError("database unavailable")
 
         builder = TopicGraphBuilder(BrokenStore(), _RelationshipGenerator())
@@ -289,9 +367,11 @@ class TopicGraphBuilderTests(unittest.IsolatedAsyncioTestCase):
             ),
         )
 
-        old_task = asyncio.create_task(old_builder.build("project-1", ["A", "B"], True))
+        old_task = asyncio.create_task(
+            old_builder.build("project-1", ["Old", "Source"], True)
+        )
         await asyncio.sleep(0.005)
-        new_result = await new_builder.build("project-1", ["A", "B"], True)
+        new_result = await new_builder.build("project-1", ["New", "Source"], True)
         old_result = await old_task
 
         self.assertEqual(1, new_result["edges_created"])
@@ -368,6 +448,25 @@ class LLMRelationshipGeneratorTests(unittest.IsolatedAsyncioTestCase):
 
 
 class SupabaseTopicGraphStoreTests(unittest.IsolatedAsyncioTestCase):
+    async def test_missing_request_rpc_fails_before_generation_can_start(self):
+        class Request:
+            def execute(self):
+                raise RuntimeError(
+                    "PGRST202 Could not find function request_topic_graph_build"
+                )
+
+        class Client:
+            def rpc(self, name, payload):
+                return Request()
+
+        store = SupabaseTopicGraphStore(Client())
+        generator = _RelationshipGenerator()
+        builder = TopicGraphBuilder(store, generator)
+
+        with self.assertRaisesRegex(RuntimeError, "migration 007"):
+            await builder.build("project-1", ["A", "B"])
+        self.assertEqual([], generator.calls)
+
     async def test_missing_atomic_rpc_fails_without_destructive_fallback(self):
         class Request:
             def execute(self):
@@ -381,9 +480,9 @@ class SupabaseTopicGraphStoreTests(unittest.IsolatedAsyncioTestCase):
 
         store = SupabaseTopicGraphStore(Client())
 
-        with self.assertRaisesRegex(RuntimeError, "migrations 004/006"):
+        with self.assertRaisesRegex(RuntimeError, "migration 007"):
             await store.replace_relationships(
-                "project-1", [], "2026-08-22T00:00:00+00:00"
+                "project-1", [], "a" * 64, "00000000-0000-0000-0000-000000000001"
             )
 
 

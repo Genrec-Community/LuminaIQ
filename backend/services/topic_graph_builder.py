@@ -1,7 +1,9 @@
 """Build and persist Topic Graph relationships behind one interface."""
 
 import asyncio
+import hashlib
 import json
+import unicodedata
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Protocol, TypedDict
 from uuid import uuid4
@@ -16,17 +18,21 @@ class GraphBuildResult(TypedDict):
 
 
 class TopicGraphStore(Protocol):
-    async def has_relationships(self, project_id: str) -> bool: ...
-
-    async def clear_relationships(self, project_id: str) -> None: ...
-
-    async def upsert_relationships(self, edges: List[Dict[str, Any]]) -> None: ...
+    async def request_build(
+        self,
+        project_id: str,
+        source_fingerprint: str,
+        request_id: str,
+        requested_at: str,
+        force_rebuild: bool,
+    ) -> bool: ...
 
     async def replace_relationships(
         self,
         project_id: str,
         edges: List[Dict[str, Any]],
-        build_started_at: str,
+        source_fingerprint: str,
+        request_id: str,
     ) -> bool: ...
 
 
@@ -34,6 +40,25 @@ class RelationshipGenerator(Protocol):
     async def generate(
         self, project_id: str, batch_topics: List[str], all_topics: List[str]
     ) -> List[Dict[str, Any]]: ...
+
+
+def canonical_topics(topics: List[str]) -> List[str]:
+    """Normalize, deduplicate, and sort the Topic source deterministically."""
+    normalized = {
+        unicodedata.normalize("NFC", topic.strip())
+        for topic in topics
+        if isinstance(topic, str) and topic.strip()
+    }
+    return sorted(normalized, key=lambda topic: (topic.casefold(), topic))
+
+
+def topic_source_fingerprint(topics: List[str]) -> str:
+    """Hash the compact UTF-8 JSON encoding of canonical Topics."""
+    unique_topics = canonical_topics(topics)
+    encoded_topics = json.dumps(
+        unique_topics, ensure_ascii=False, separators=(",", ":")
+    ).encode("utf-8")
+    return hashlib.sha256(encoded_topics).hexdigest()
 
 
 class TopicGraphBuilder:
@@ -65,14 +90,8 @@ class TopicGraphBuilder:
     async def build(
         self, project_id: str, topics: List[str], force_rebuild: bool = False
     ) -> GraphBuildResult:
-        """Build once per project, raising operational errors to the caller."""
+        """Build serially per project, raising operational errors to the caller."""
         project_lock = await self._get_project_lock(project_id)
-        if project_lock.locked():
-            logger.info(
-                f"[TopicGraphBuilder] Build already in progress for {project_id}, skipping."
-            )
-            return {"edges_created": 0, "message": "Build already in progress"}
-
         async with project_lock:
             return await self._build_locked(project_id, topics, force_rebuild)
 
@@ -87,18 +106,35 @@ class TopicGraphBuilder:
     async def _build_locked(
         self, project_id: str, topics: List[str], force_rebuild: bool
     ) -> GraphBuildResult:
-        unique_topics = list(dict.fromkeys(topics))
-        if len(unique_topics) < 2:
-            return {"edges_created": 0, "message": "Need at least 2 topics"}
-
-        if not force_rebuild and await self._store.has_relationships(project_id):
+        unique_topics = canonical_topics(topics)
+        source_fingerprint = topic_source_fingerprint(unique_topics)
+        request_id = str(uuid4())
+        requested_at = datetime.now(timezone.utc).isoformat()
+        should_build = await self._store.request_build(
+            project_id,
+            source_fingerprint,
+            request_id,
+            requested_at,
+            force_rebuild,
+        )
+        if not should_build:
             return {
                 "edges_created": 0,
-                "message": "Graph already exists. Use force_rebuild=True to rebuild.",
+                "message": "Topic Graph source is unchanged",
             }
 
+        if len(unique_topics) < 2:
+            published = await self._store.replace_relationships(
+                project_id, [], source_fingerprint, request_id
+            )
+            if not published:
+                return {
+                    "edges_created": 0,
+                    "message": "Build superseded by a newer Topic Graph build",
+                }
+            return {"edges_created": 0, "message": "Need at least 2 topics"}
+
         logger.info(f"Building Topic Graph for {len(unique_topics)} topics")
-        build_started_at = datetime.now(timezone.utc).isoformat()
         batches = self._create_batches(unique_topics)
         async def generate_batch(index: int, batch: List[str]):
             async with self._batch_semaphore:
@@ -125,21 +161,18 @@ class TopicGraphBuilder:
         )
 
         # Publish only after every provider batch has completed successfully.
-        if force_rebuild:
-            published = await self._store.replace_relationships(
-                project_id, unique_edges, build_started_at
-            )
-            if not published:
-                return {
-                    "edges_created": 0,
-                    "message": "Build superseded by a newer Topic Graph build",
-                }
-        elif unique_edges:
-            await self._store.upsert_relationships(unique_edges)
+        published = await self._store.replace_relationships(
+            project_id, unique_edges, source_fingerprint, request_id
+        )
+        if not published:
+            return {
+                "edges_created": 0,
+                "message": "Build superseded by a newer Topic Graph build",
+            }
 
         if unique_edges:
             logger.info(
-                f"Upserted {len(unique_edges)} topic relationships for {project_id}"
+                f"Published {len(unique_edges)} topic relationships for {project_id}"
             )
 
         return {
@@ -180,44 +213,40 @@ class SupabaseTopicGraphStore:
             client = get_supabase_client()
         self._client = client
 
-    async def has_relationships(self, project_id: str) -> bool:
+    async def request_build(
+        self,
+        project_id: str,
+        source_fingerprint: str,
+        request_id: str,
+        requested_at: str,
+        force_rebuild: bool,
+    ) -> bool:
         from db.client import async_db
 
-        result = await async_db(
-            lambda: self._client.table("topic_relations")
-            .select("id")
-            .eq("project_id", project_id)
-            .limit(1)
-            .execute()
-        )
-        return bool(result.data)
-
-    async def clear_relationships(self, project_id: str) -> None:
-        from db.client import async_db
-
-        await async_db(
-            lambda: self._client.table("topic_relations")
-            .delete()
-            .eq("project_id", project_id)
-            .execute()
-        )
-
-    async def upsert_relationships(self, edges: List[Dict[str, Any]]) -> None:
-        from db.client import async_db
-
-        for index in range(0, len(edges), 100):
-            chunk = edges[index : index + 100]
-            await async_db(
-                lambda rows=chunk: self._client.table("topic_relations")
-                .upsert(rows, on_conflict="project_id,from_topic,to_topic")
-                .execute()
+        try:
+            result = await async_db(
+                lambda: self._client.rpc(
+                    "request_topic_graph_build",
+                    {
+                        "p_project_id": project_id,
+                        "p_source_fingerprint": source_fingerprint,
+                        "p_request_id": request_id,
+                        "p_requested_at": requested_at,
+                        "p_force_rebuild": force_rebuild,
+                    },
+                ).execute()
             )
+            return self._read_boolean_rpc(result.data, "Topic Graph request RPC")
+        except Exception as error:
+            self._raise_missing_migration(error, "request_topic_graph_build")
+            raise
 
     async def replace_relationships(
         self,
         project_id: str,
         edges: List[Dict[str, Any]],
-        build_started_at: str,
+        source_fingerprint: str,
+        request_id: str,
     ) -> bool:
         from db.client import async_db
 
@@ -228,27 +257,34 @@ class SupabaseTopicGraphStore:
                     {
                         "p_project_id": project_id,
                         "p_edges": edges,
-                        "p_build_started_at": build_started_at,
+                        "p_source_fingerprint": source_fingerprint,
+                        "p_request_id": request_id,
                     },
                 ).execute()
             )
-            data = result.data
-            if isinstance(data, bool):
-                return data
-            if isinstance(data, list) and len(data) == 1 and isinstance(data[0], bool):
-                return data[0]
-            raise RuntimeError("Atomic Topic Graph RPC returned an invalid result")
+            return self._read_boolean_rpc(result.data, "Topic Graph publication RPC")
         except Exception as error:
-            message = str(error)
-            missing_rpc = "PGRST202" in message or (
-                "replace_topic_graph_relationships" in message
-                and ("not find" in message.lower() or "404" in message)
-            )
-            if not missing_rpc:
-                raise
+            self._raise_missing_migration(error, "replace_topic_graph_relationships")
+            raise
+
+    @staticmethod
+    def _read_boolean_rpc(data: Any, operation: str) -> bool:
+        if isinstance(data, bool):
+            return data
+        if isinstance(data, list) and len(data) == 1 and isinstance(data[0], bool):
+            return data[0]
+        raise RuntimeError(f"{operation} returned an invalid result")
+
+    @staticmethod
+    def _raise_missing_migration(error: Exception, rpc_name: str) -> None:
+        message = str(error)
+        missing_rpc = "PGRST202" in message or (
+            rpc_name in message
+            and ("not find" in message.lower() or "404" in message)
+        )
+        if missing_rpc:
             raise RuntimeError(
-                "Atomic Topic Graph migrations 004/006 are not installed; "
-                "refusing destructive replacement"
+                "Topic Graph migration 007 is not installed; refusing to build"
             ) from error
 
 

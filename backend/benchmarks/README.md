@@ -14,14 +14,23 @@ in-memory database and a deterministic 20 ms fake LLM. It measures:
 
 - Three isolated 100-topic builds, including p95 wall time and orchestration
   overhead above the bounded-concurrent provider latency floor.
-- Five cumulative builds at 20, 40, 60, 80, and 100 topics, matching repeated
-  document ingestion.
+- Five changed cumulative builds at 20, 40, 60, 80, and 100 topics, followed
+  by an unchanged 100-topic request that must add zero LLM calls.
 - LLM call count and peak concurrency, which must match the configured bound
   when a build contains enough batches (two by default).
 
 The call-count checks are upper bounds. Provider latency is calculated as the
 sum of `ceil(build_calls / batch_concurrency) * fake_latency` for each build;
 overlapping calls are not incorrectly subtracted as serial latency.
+
+Topic sources are NFC-normalized, deduplicated, deterministically sorted, then
+fingerprinted as SHA-256 over compact UTF-8 JSON. Persisted request IDs make
+publication conditional on the build still being the latest request, so an
+older cross-process completion cannot replace a newer graph. Migration `007`
+must be installed after `004` and `006`; the builder fails closed before calling
+the provider when its request/publication RPCs are unavailable.
+Explicit forced rebuilds still regenerate unchanged sources; the benchmark's
+unchanged zero-call check uses the normal non-forced path.
 
 The default CI limits are 3 seconds for the isolated-build p95 and 7 seconds
 for the cumulative build. They are intentionally above the current baseline
