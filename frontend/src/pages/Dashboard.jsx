@@ -87,6 +87,7 @@ const Dashboard = () => {
             const hasSeenDashboardTutorial = localStorage.getItem(`hasSeenDashboardTutorial_${user.id}`);
             if (!hasSeenDashboardTutorial) {
                 setTimeout(() => {
+                    localStorage.setItem(`hasSeenDashboardTutorial_${user.id}`, 'true');
                     setTourState(prev => ({ ...prev, run: true }));
                 }, 500);
             }
@@ -378,6 +379,8 @@ const Dashboard = () => {
                 run={run}
                 steps={steps}
                 showSkipButton
+                disableScrolling={true}
+                disableScrollParentFix={true}
                 styles={{
                     options: {
                         primaryColor: '#C8A288',

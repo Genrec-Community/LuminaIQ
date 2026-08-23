@@ -20,3 +20,34 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         return {"id": user_id, "email": payload.get("email")}
     except JWTError:
         raise credentials_exception
+
+async def get_current_user_with_role(current_user: dict = Depends(get_current_user)):
+    from db.client import get_supabase_client
+    client = get_supabase_client()
+    try:
+        response = client.table('user_roles').select('role').eq('user_id', current_user['id']).execute()
+        if response.data and len(response.data) > 0:
+            current_user['role'] = response.data[0]['role']
+        else:
+            current_user['role'] = 'handler' # Default role if not found
+        return current_user
+    except Exception as e:
+        # If the table doesn't exist yet or other DB error, fallback gracefully
+        current_user['role'] = 'handler'
+        return current_user
+
+async def require_owner(current_user: dict = Depends(get_current_user_with_role)):
+    if current_user.get('role') != 'owner':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to perform this action. Owner role required."
+        )
+    return current_user
+
+async def require_admin(current_user: dict = Depends(get_current_user_with_role)):
+    if current_user.get('role') not in ['owner', 'admin']:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to perform this action. Admin or Owner role required."
+        )
+    return current_user

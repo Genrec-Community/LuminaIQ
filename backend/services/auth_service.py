@@ -202,4 +202,43 @@ class AuthService:
             logger.error(f"Token Exchange Error: {e}")
             raise
 
+    async def create_handler(self, email: str, password: str, full_name: str) -> Dict[str, Any]:
+        """Create a new handler user directly (Admin function)"""
+        try:
+            # Validate password strength
+            if len(password) < 8:
+                raise ValueError("Password must be at least 8 characters long")
+            
+            logger.info(f"Admin creating handler: {email}")
+            
+            # Use Supabase Admin API to create user (requires SERVICE_ROLE key which is default in client)
+            # This bypasses email confirmation requirements
+            response = self.client.auth.admin.create_user({
+                "email": email,
+                "password": password,
+                "user_metadata": {"full_name": full_name},
+                "email_confirm": True
+            })
+            
+            if response.user:
+                # Add to user_roles table
+                self.client.table('user_roles').insert({
+                    'user_id': response.user.id,
+                    'role': 'handler'
+                }).execute()
+                
+                logger.info(f"Handler created successfully: {email}")
+                return {
+                    "id": response.user.id,
+                    "email": response.user.email,
+                    "full_name": full_name,
+                    "role": "handler"
+                }
+            else:
+                raise Exception("Failed to create user - no user returned")
+                
+        except Exception as e:
+            logger.error(f"Create handler error: {str(e)}")
+            raise
+
 auth_service = AuthService()

@@ -362,3 +362,12 @@ backend/container_logs.txt
 frontend/migrate.py
 update_qdrant.py
 fix_yaml.py
+
+# Deployments and Logs
+deploy_extracted/
+deployments/
+*_logs/
+logs_extracted*/
+*.zip
+*.bat
+*.ps1

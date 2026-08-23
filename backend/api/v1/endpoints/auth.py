@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from models.schemas import UserSignup, UserLogin
 from services.auth_service import auth_service
+from api.deps import require_owner
 from pydantic import BaseModel
 from typing import Any
 
@@ -77,5 +78,33 @@ async def exchange_token(request: TokenExchangeRequest):
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e),
+        )
+
+@router.post("/create-handler", response_model=Any)
+async def create_handler(
+    user_in: UserSignup, 
+    current_user: dict = Depends(require_owner)
+):
+    """
+    Create a new handler user. Only accessible by users with the 'owner' role.
+    """
+    try:
+        result = await auth_service.create_handler(user_in.email, user_in.password, user_in.full_name)
+        return result
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        error_msg = str(e).lower()
+        if 'already registered' in error_msg or 'already exists' in error_msg or 'duplicate' in error_msg:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="An account with this email already exists.",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )

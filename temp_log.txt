@@ -1,0 +1,67 @@
+2026-07-22T04:18:33.4903966Z    _____                               
+2026-07-22T04:18:33.4914940Z   /  _  \ __________ _________   ____  
+2026-07-22T04:18:33.4915022Z  /  /_\  \\___   /  |  \_  __ \_/ __ \ 
+2026-07-22T04:18:33.4915060Z /    |    \/    /|  |  /|  | \/\  ___/ 
+2026-07-22T04:18:33.4915139Z \____|__  /_____ \____/ |__|    \___  >
+2026-07-22T04:18:33.4915187Z         \/      \/                  \/ 
+2026-07-22T04:18:33.4915232Z A P P   S E R V I C E   O N   L I N U X
+2026-07-22T04:18:33.4915262Z 
+2026-07-22T04:18:33.4915305Z Documentation     : https://aka.ms/webapp-linux
+2026-07-22T04:18:33.4915343Z Python quickstart : https://aka.ms/python-qs
+2026-07-22T04:18:33.4915416Z Python version    : 3.11.15
+2026-07-22T04:18:33.4915465Z Instance name     : 10-30-0-179
+2026-07-22T04:18:33.4915507Z Instance id       : 9e4b270e0584eeea114b1e7e9ec5063bca2c49bc15c589347c17d8de66ae034c
+2026-07-22T04:18:33.4915537Z 
+2026-07-22T04:18:33.4915571Z App port          : 8000
+2026-07-22T04:18:33.4915604Z Port selected by  : Default for this image
+2026-07-22T04:18:33.4915666Z (Learn more about the PORT appsetting https://aka.ms/webapp-python-settings)
+2026-07-22T04:18:33.4915700Z 
+2026-07-22T04:18:33.4915742Z Note: Any data outside '/home' is not persisted
+2026-07-22T04:18:33.4915772Z 
+2026-07-22T04:18:33.4915821Z ────────────────────────────────────────────────────────────────
+2026-07-22T04:18:33.4915858Z  Run 'apphelp' for available commands and aliases.
+2026-07-22T04:18:33.4915892Z  Run 'install-nettools' to install networking utilities.
+2026-07-22T04:18:33.4915936Z ────────────────────────────────────────────────────────────────
+2026-07-22T04:18:33.8746952Z Starting OpenBSD Secure Shell server: sshd.
+2026-07-22T04:18:33.8968332Z WEBSITES_INCLUDE_CLOUD_CERTS is not set to true.
+2026-07-22T04:18:33.9385716Z Updating certificates in /etc/ssl/certs...
+2026-07-22T04:18:39.2647485Z rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL
+2026-07-22T04:18:39.3117239Z rehash: warning: skipping duplicate certificate in azl_SSL.com_TLS_ECC_Root_CA_2022.pem
+2026-07-22T04:18:39.3145052Z rehash: warning: skipping duplicate certificate in azl_SSL.com_TLS_RSA_Root_CA_2022.pem
+2026-07-22T04:18:39.5853475Z 4 added, 0 removed; done.
+2026-07-22T04:18:39.9301712Z Running hooks in /etc/ca-certificates/update.d...
+2026-07-22T04:18:39.9333817Z done.
+2026-07-22T04:18:39.9634639Z CA certificates copied and updated successfully.
+2026-07-22T04:18:40.2310108Z Site's appCommandLine: python -m uvicorn main:app --host 0.0.0.0 --port 8000
+2026-07-22T04:18:43.2354566Z Starting periodic command scheduler: cron.
+2026-07-22T04:18:43.2358265Z Launching oryx with: create-script -appPath /home/site/wwwroot -output /opt/startup/startup.sh -virtualEnvName antenv -defaultApp /opt/defaultsite -userStartupCommand 'python -m uvicorn main:app --host 0.0.0.0 --port 8000'
+2026-07-22T04:18:44.1190948Z Found build manifest file at '/home/site/wwwroot/oryx-manifest.toml'. Deserializing it...
+2026-07-22T04:18:44.1256267Z Build Operation ID: 8a6bd6b5ac9a45a5
+2026-07-22T04:18:44.1274553Z Output is compressed. Extracting it...
+2026-07-22T04:18:44.1274946Z Oryx Version: 0.2.20260504.2, Commit: a776ec9f2fd225b305599e35443ecb3533bcdb26, ReleaseTagName: 20260504.2
+2026-07-22T04:18:44.1304801Z Found zstd-compressed tarball.
+2026-07-22T04:18:44.1304902Z Extracting '/home/site/wwwroot/output.tar.zst' to directory '/tmp/8dee7a810b53375'...
+2026-07-22T04:18:44.1304934Z Using zstd for decompression of file: /home/site/wwwroot/output.tar.zst
+2026-07-22T04:19:03.6419213Z zstd tar Successfully extracted '/home/site/wwwroot/output.tar.zst' to '/tmp/8dee7a810b53375'
+2026-07-22T04:19:03.6419643Z App path is set to '/tmp/8dee7a810b53375'
+2026-07-22T04:19:03.6489699Z Writing output script to '/opt/startup/startup.sh'
+2026-07-22T04:19:04.2507411Z Using packages from virtual environment antenv located at /tmp/8dee7a810b53375/antenv.
+2026-07-22T04:19:04.2507941Z Updated PYTHONPATH to '/opt/startup/app_logs:/tmp/8dee7a810b53375/antenv/lib/python3.11/site-packages'
+2026-07-22T04:19:08.5426382Z 04:19:08 | [32mINFO[0m | Supabase client connected successfully
+2026-07-22T04:19:09.9939069Z 04:19:09 | [32mINFO[0m | [EmbeddingService] Initialized with AzureOpenAIEmbeddings | model=text-embedding-3-small | deployment=text-embedding-3-small
+2026-07-22T04:19:11.2736903Z 04:19:11 | [32mINFO[0m | [QdrantService] Initialized with AsyncQdrantClient | async_timeout=120s, sync_timeout=30s
+2026-07-22T04:19:11.2830352Z 04:19:11 | [32mINFO[0m | [LLMService] Initialized with Azure OpenAI | deployment=gpt-5-mini
+2026-07-22T04:19:11.7504102Z INFO:     Started server process [1885]
+2026-07-22T04:19:11.7509117Z INFO:     Waiting for application startup.
+2026-07-22T04:19:11.7516431Z INFO:     Application startup complete.
+2026-07-22T04:19:11.7521085Z INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-07-22T04:19:12.4310229Z INCOMING → GET http://169.254.129.4:8000/robots933456.txt
+2026-07-22T04:19:12.4310711Z INFO:     169.254.129.1:54003 - "GET /robots933456.txt HTTP/1.1" 405 Method Not Allowed
+2026-07-22T04:27:38.5189943Z INCOMING → GET http://luminaiq-backend-api.azurewebsites.net/
+2026-07-22T04:27:38.5190674Z INCOMING → GET http://luminaiq-backend-api.azurewebsites.net/
+2026-07-22T04:27:38.5190715Z INCOMING → HEAD http://luminaiq-backend-api.azurewebsites.net/docs
+2026-07-22T04:27:38.5190742Z INFO:     169.254.129.1:15321 - "HEAD /docs HTTP/1.1" 200 OK
+2026-07-22T04:29:05.4900378Z INCOMING → HEAD http://luminaiq-backend-api.azurewebsites.net/docs
+2026-07-22T04:29:05.4900769Z INFO:     169.254.129.1:57115 - "HEAD /docs HTTP/1.1" 200 OK
+2026-07-22T04:29:21.8094344Z INCOMING → POST http://luminaiq-backend-api.azurewebsites.net/api/v1/auth/google
+2026-07-22T04:29:21.8094773Z INFO:     169.254.129.1:10095 - "POST /api/v1/auth/google HTTP/1.1" 422 Unprocessable Entity

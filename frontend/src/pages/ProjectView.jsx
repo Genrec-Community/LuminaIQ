@@ -155,6 +155,7 @@ const ProjectView = () => {
             const hasSeenProjectTutorial = localStorage.getItem(`hasSeenProjectTutorial_${user.id}`);
             if (!hasSeenProjectTutorial) {
                 setTimeout(() => {
+                    localStorage.setItem(`hasSeenProjectTutorial_${user.id}`, 'true');
                     setTourState(prev => ({ ...prev, run: true }));
                 }, 500);
             }
@@ -992,6 +993,8 @@ const ProjectView = () => {
                 run={run}
                 steps={steps}
                 showSkipButton
+                disableScrolling={true}
+                disableScrollParentFix={true}
                 styles={{
                     options: {
                         primaryColor: '#C8A288',
