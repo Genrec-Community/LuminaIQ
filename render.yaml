@@ -3,5 +3,6 @@ services:
     name: luminaiq-backend
     runtime: docker
     rootDir: backend
+    plan: free
     envVars:
       - fromGroup: luminaiq-env
