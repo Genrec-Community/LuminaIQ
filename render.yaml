@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: luminaiq-backend
+    runtime: docker
+    rootDir: backend
+    envVars:
+      - fromGroup: luminaiq-env
