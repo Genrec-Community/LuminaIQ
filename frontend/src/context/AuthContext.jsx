@@ -20,7 +20,13 @@ export const AuthProvider = ({ children }) => {
             if (token && storedUser) {
                 // Check if the JWT is expired before using it
                 try {
-                    const payload = JSON.parse(atob(token.split('.')[1]));
+                    const base64Url = token.split('.')[1];
+                    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                    }).join(''));
+                    const payload = JSON.parse(jsonPayload);
+                    
                     const nowSec = Math.floor(Date.now() / 1000);
                     if (payload.exp && payload.exp < nowSec) {
                         // Token is expired — clear it; Supabase session below will refresh
@@ -91,8 +97,15 @@ export const AuthProvider = ({ children }) => {
                             api.defaults.headers.common['Authorization'] = `Bearer ${data.access_token}`;
                             setUser(data.user);
                             
-                            // Redirect to dashboard after successful token exchange
-                            window.location.href = '/dashboard';
+                            // Clean up URL if it has the Supabase hash
+                            if (window.location.hash.includes('access_token')) {
+                                window.history.replaceState(null, '', window.location.pathname);
+                            }
+                            
+                            // Redirect to dashboard only if we are on login or landing page
+                            if (window.location.pathname === '/login' || window.location.pathname === '/') {
+                                window.location.href = '/dashboard';
+                            }
                         }
                     } catch (e) {
                         console.error("Token Exchange Failed:", e);

@@ -114,6 +114,7 @@ class Settings(BaseSettings):
         "http://localhost:3000",
         "https://lumina-iq-livid.vercel.app",
         "https://luminaiq.fun",
+        "https://www.luminaiq.fun",
     ]
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")

@@ -371,3 +371,4 @@ logs_extracted*/
 *.zip
 *.bat
 *.ps1
+.vercel
