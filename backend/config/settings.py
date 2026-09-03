@@ -149,12 +149,12 @@ class Settings(BaseSettings):
     MAX_CONCURRENT_GENERAL: int = 40
 
     # Document upload + embedding pipeline
-    MAX_CONCURRENT_DOCUMENT_UPLOADS: int = 10
+    MAX_CONCURRENT_DOCUMENT_UPLOADS: int = 2
 
     # Global limits inside the embedding pipeline (shared across all docs)
-    MAX_GLOBAL_DB_OPERATIONS: int = 20      # Qdrant write concurrency
-    MAX_GLOBAL_EMBEDDINGS: int = 15         # Concurrent embedding API calls
-    MAX_CONCURRENT_LLM: int = 5             # Concurrent LLM calls (topic/graph gen)
+    MAX_GLOBAL_DB_OPERATIONS: int = 10      # Qdrant write concurrency
+    MAX_GLOBAL_EMBEDDINGS: int = 5         # Concurrent embedding API calls
+    MAX_CONCURRENT_LLM: int = 3             # Concurrent LLM calls (topic/graph gen)
 
     # Batch size for embedding API calls
     EMBEDDING_BATCH_SIZE: int = 50

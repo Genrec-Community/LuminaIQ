@@ -1001,6 +1001,7 @@ const ProjectView = () => {
                 showSkipButton
                 disableScrolling={true}
                 disableScrollParentFix={true}
+                disableOverlayClose={true}
                 styles={{
                     options: {
                         primaryColor: '#C8A288',

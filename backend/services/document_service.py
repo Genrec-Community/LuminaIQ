@@ -43,7 +43,7 @@ class DocumentService:
         # Dedicated thread pool for CPU-heavy file extraction
         # Prevents PDF parsing from competing with embedding API calls for threads
         self._extraction_executor = ThreadPoolExecutor(
-            max_workers=8, thread_name_prefix="file_extract"
+            max_workers=2, thread_name_prefix="file_extract"
         )
 
     async def process_document(
