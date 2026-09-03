@@ -150,17 +150,10 @@ const ProjectView = () => {
         ],
     });
 
-    useEffect(() => {
-        if (!loading && !error && user?.id) {
-            const hasSeenProjectTutorial = localStorage.getItem(`hasSeenProjectTutorial_${user.id}`);
-            if (!hasSeenProjectTutorial) {
-                setTimeout(() => {
-                    localStorage.setItem(`hasSeenProjectTutorial_${user.id}`, 'true');
-                    setTourState(prev => ({ ...prev, run: true }));
-                }, 500);
-            }
-        }
-    }, [loading, error, user?.id]);
+    // Tutorial scrolling fix: we will pass disableScrolling to Joyride component later
+    // but we can also set it in tour options if needed.
+
+    // useEffect for tutorial has been moved below state declarations
 
     const handleJoyrideCallback = (data) => {
         const { status } = data;
@@ -301,6 +294,19 @@ const ProjectView = () => {
 
     // Ref to ensure fetchTopics is only called once per mount, not on every tab change
     const topicsFetchedRef = useRef(false);
+
+    // Tutorial visibility effect (moved from top to fix TDZ ReferenceError)
+    useEffect(() => {
+        if (!projectViewLoading && !fetchError && user?.id) {
+            const hasSeenProjectTutorial = localStorage.getItem(`hasSeenProjectTutorial_${user?.id}`);
+            if (!hasSeenProjectTutorial) {
+                setTimeout(() => {
+                    localStorage.setItem(`hasSeenProjectTutorial_${user?.id}`, 'true');
+                    setTourState(prev => ({ ...prev, run: true }));
+                }, 500);
+            }
+        }
+    }, [projectViewLoading, fetchError, user?.id]);
 
     useEffect(() => {
         let intervalId;
