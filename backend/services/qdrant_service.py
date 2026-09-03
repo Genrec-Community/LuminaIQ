@@ -42,25 +42,39 @@ class QdrantService:
     }
 
     def __init__(self):
-        # Async client for all direct operations — does NOT block the event loop
-        # Initialize async client using default REST or whatever qdrant_client defaults to
+        self._async_client_instance = None
+        self._sync_client_instance = None
+
+    @property
+    def async_client(self):
+        if self._async_client_instance is not None:
+            return self._async_client_instance
+            
         kwargs = {
             "url": settings.QDRANT_URL,
             "api_key": settings.QDRANT_API_KEY,
             "timeout": self.ASYNC_TIMEOUT,
         }
 
-        self.async_client = AsyncQdrantClient(**kwargs)
-        # Sync client kept ONLY for LangChain QdrantVectorStore compatibility
-        self._sync_client = QdrantClient(
+        self._async_client_instance = AsyncQdrantClient(**kwargs)
+        logger.info(
+            f"[QdrantService] Initialized with AsyncQdrantClient | "
+            f"async_timeout={self.ASYNC_TIMEOUT}s"
+        )
+        return self._async_client_instance
+        
+    @property
+    def _sync_client(self):
+        if self._sync_client_instance is not None:
+            return self._sync_client_instance
+            
+        self._sync_client_instance = QdrantClient(
             url=settings.QDRANT_URL,
             api_key=settings.QDRANT_API_KEY,
             timeout=self.SYNC_TIMEOUT,
         )
-        logger.info(
-            f"[QdrantService] Initialized with AsyncQdrantClient | "
-            f"async_timeout={self.ASYNC_TIMEOUT}s, sync_timeout={self.SYNC_TIMEOUT}s"
-        )
+        logger.info(f"[QdrantService] Initialized Sync QdrantClient | sync_timeout={self.SYNC_TIMEOUT}s")
+        return self._sync_client_instance
 
     async def create_collection(self, collection_name: str, vector_size: int = settings.EMBEDDING_DIMENSION):
         """Create a new collection and ensure indexes exist (fully async)"""

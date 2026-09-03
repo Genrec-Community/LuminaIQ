@@ -24,11 +24,26 @@ class EmbeddingService:
     MAX_WORKERS_SEARCH = 2
 
     def __init__(self):
+        self._embeddings_instance = None
+        # Dedicated thread pool for batch embedding calls (document processing)
+        self._batch_executor = ThreadPoolExecutor(
+            max_workers=self.MAX_WORKERS_BATCH, thread_name_prefix="embed_batch"
+        )
+        # Dedicated thread pool for search queries (user-facing, prevents starvation)
+        self._search_executor = ThreadPoolExecutor(
+            max_workers=self.MAX_WORKERS_SEARCH, thread_name_prefix="embed_search"
+        )
+    
+    @property
+    def embeddings(self):
+        if self._embeddings_instance is not None:
+            return self._embeddings_instance
+            
         azure_key = settings.AZURE_OPENAI_API_KEY or settings.MODEL_API_KEY
         if settings.AZURE_OPENAI_ENDPOINT and azure_key:
             from langchain_openai import AzureOpenAIEmbeddings
 
-            self.embeddings = AzureOpenAIEmbeddings(
+            self._embeddings_instance = AzureOpenAIEmbeddings(
                 model=settings.EMBEDDING_MODEL,
                 azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
                 api_key=azure_key,
@@ -51,7 +66,7 @@ class EmbeddingService:
             )
             fallback_base = settings.EMBEDDING_BASE_URL or settings.LLM_BASE_URL or None
 
-            self.embeddings = OpenAIEmbeddings(
+            self._embeddings_instance = OpenAIEmbeddings(
                 model=settings.EMBEDDING_MODEL or "text-embedding-3-small",
                 openai_api_key=fallback_key,
                 openai_api_base=fallback_base,
@@ -60,15 +75,7 @@ class EmbeddingService:
                 f"[EmbeddingService] Initialized with fallback OpenAIEmbeddings "
                 f"| model={settings.EMBEDDING_MODEL}"
             )
-
-        # Dedicated thread pool for batch embedding calls (document processing)
-        self._batch_executor = ThreadPoolExecutor(
-            max_workers=self.MAX_WORKERS_BATCH, thread_name_prefix="embed_batch"
-        )
-        # Dedicated thread pool for search queries (user-facing, prevents starvation)
-        self._search_executor = ThreadPoolExecutor(
-            max_workers=self.MAX_WORKERS_SEARCH, thread_name_prefix="embed_search"
-        )
+        return self._embeddings_instance
 
     async def generate_embeddings(self, texts: List[str]) -> List[List[float]]:
         """
