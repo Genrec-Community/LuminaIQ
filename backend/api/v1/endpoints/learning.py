@@ -749,18 +749,15 @@ async def generate_mindmap(
         from services.qdrant_service import qdrant_service
         from services.embedding_service import embedding_service
 
-        # Get embeddings for the topic query
+        # Search for relevant chunks (Cloud Inference embeddings)
         query_text = f"{request.topic}: key concepts, subtopics, and important details"
-        query_vector = await embedding_service.generate_embedding(query_text)
-
-        # Search for relevant chunks
         filter_conditions = None
         if request.selected_documents:
             filter_conditions = {"document_ids": request.selected_documents}
 
-        results = await qdrant_service.search(
+        results = await qdrant_service.search_auto(
             collection_name=collection_name,
-            query_vector=query_vector,
+            query_text=query_text,
             limit=8,
             filter_conditions=filter_conditions,
         )
@@ -914,15 +911,13 @@ async def generate_flashcards(
         from services.embedding_service import embedding_service
 
         query_text = f"{request.topic}: important facts, definitions, and key concepts"
-        query_vector = await embedding_service.generate_embedding(query_text)
-
         filter_conditions = None
         if request.selected_documents:
             filter_conditions = {"document_ids": request.selected_documents}
 
-        results = await qdrant_service.search(
+        results = await qdrant_service.search_auto(
             collection_name=collection_name,
-            query_vector=query_vector,
+            query_text=query_text,
             limit=8,
             filter_conditions=filter_conditions,
         )

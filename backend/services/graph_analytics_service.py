@@ -143,13 +143,11 @@ class GraphAnalyticsService:
                     project_id, user_id, topic, "summary_generate"
                 )
             
-            # Search for relevant content
+            # Search for relevant content (provider-aware)
             collection_name = f"project_{project_id}"
-            query_embedding = await embedding_service.generate_embedding(topic)
-            
-            results = await qdrant_service.search(
+            results = await qdrant_service.search_auto(
                 collection_name=collection_name,
-                query_vector=query_embedding,
+                query_text=topic,
                 limit=8
             )
             

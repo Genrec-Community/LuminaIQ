@@ -65,6 +65,9 @@ export const AuthProvider = ({ children }) => {
                     } catch (e) {
                         console.error("Token Exchange Failed:", e);
                         tokenExchanged.current = false; // Reset on failure
+                        // Surface to login page instead of failing silently
+                        sessionStorage.setItem('auth_error',
+                            e?.response?.data?.detail || e?.message || 'Session exchange failed');
                     }
                 }
             }
@@ -110,6 +113,9 @@ export const AuthProvider = ({ children }) => {
                     } catch (e) {
                         console.error("Token Exchange Failed:", e);
                         tokenExchanged.current = false; // Reset on failure to allow retry
+                        // Surface to login page instead of failing silently
+                        sessionStorage.setItem('auth_error',
+                            e?.response?.data?.detail || e?.message || 'Session exchange failed');
                         await supabase.auth.signOut(); // Clear invalid supabase session
                     }
                 }

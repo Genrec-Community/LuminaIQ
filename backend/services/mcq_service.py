@@ -336,10 +336,9 @@ Respond ONLY with the valid JSON array. Do not add any markdown formatting (like
 
             # Run ALL embedding + qdrant searches in parallel
             async def _search_one(q: str):
-                emb = await embedding_service.generate_embedding(q)
-                return await qdrant_service.search(
+                return await qdrant_service.search_auto(
                     collection_name=collection_name,
-                    query_vector=emb,
+                    query_text=q,
                     limit=limit_per_query,
                     filter_conditions=filter_conds,
                 )

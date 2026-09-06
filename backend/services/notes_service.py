@@ -407,10 +407,9 @@ Respond ONLY with the Markdown content."""
             filter_conds = {"document_ids": selected_documents} if selected_documents else None
 
             async def _search_one(q: str):
-                emb = await embedding_service.generate_embedding(q)
-                return await qdrant_service.search(
+                return await qdrant_service.search_auto(
                     collection_name=collection_name,
-                    query_vector=emb,
+                    query_text=q,
                     limit=10,
                     filter_conditions=filter_conds,
                 )

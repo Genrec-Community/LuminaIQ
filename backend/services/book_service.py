@@ -620,6 +620,12 @@ class BookService:
             update = {"upload_status": status}
             if message:
                 update["error_message"] = message
+            elif status == "failed":
+                # Never leave a stale stage message as the failure reason.
+                update["error_message"] = (
+                    "Processing failed unexpectedly (no error detail captured). "
+                    "Please retry the upload."
+                )
             await async_db(
                 lambda: self.client.table("documents")
                 .update(update)

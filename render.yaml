@@ -1,8 +1,52 @@
+# LuminaIQ backend on Render — Azure-free stack
+# (Qdrant Cloud Inference embeddings + Together/Groq LLM + Supabase)
+#
+# Deploy: Render Dashboard → New → Blueprint → select repo/branch.
+# All values below are sync:false, so Render prompts for them in the
+# dashboard (secrets are never committed). Copy values from backend/.env.
+
 services:
   - type: web
     name: luminaiq-backend
     runtime: docker
     rootDir: backend
     plan: free
+    healthCheckPath: /health
     envVars:
       - fromGroup: luminaiq-env
+      # — LLM (Together AI, OpenAI-compatible) —
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_BASE_URL
+        value: https://api.together.ai/v1
+      - key: LLM_MODEL
+        value: Prism-ML/Ternary-Bonsai-27B
+      # — Embeddings: Qdrant Cloud Inference only (no local model, no Azure) —
+      - key: EMBEDDING_PROVIDER
+        value: cloud
+      - key: EMBEDDING_DIMENSION
+        value: 384
+      - key: QDRANT_CLOUD_INFERENCE
+        value: true
+      - key: QDRANT_EMBED_MODEL
+        value: sentence-transformers/all-minilm-l6-v2
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+      # — Supabase —
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      # — App —
+      - key: ENVIRONMENT
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: BACKEND_CORS_ORIGINS
+        sync: false
+      - key: ENABLE_OCR
+        value: false

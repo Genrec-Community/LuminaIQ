@@ -346,18 +346,15 @@ async def search_documents(
     try:
         collection_name = f"project_{project_id}"
 
-        # Generate embedding for the search query
-        query_embedding = await embedding_service.generate_embedding(request.query)
-
         # Build filter conditions
         filter_conditions = None
         if request.document_ids and len(request.document_ids) > 0:
             filter_conditions = {"document_ids": request.document_ids}
 
-        # Search in Qdrant
-        results = await qdrant_service.search(
+        # Search in Qdrant (Cloud Inference embeddings)
+        results = await qdrant_service.search_auto(
             collection_name=collection_name,
-            query_vector=query_embedding,
+            query_text=request.query,
             limit=request.limit,
             filter_conditions=filter_conditions,
         )

@@ -1,22 +1,23 @@
 from config.settings import settings
 from typing import List
 from utils.logger import logger
-import os
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
 
 class EmbeddingService:
     """
-    High-performance embedding service with dedicated thread pool.
+    Client-side embedding service (Azure / OpenAI-compatible).
 
-    Uses AzureOpenAIEmbeddings via langchain_openai, backed by the Azure
-    OpenAI resource endpoint and API key from settings.
+    NOTE: The primary embedding path is Qdrant Cloud Inference
+    (settings.QDRANT_CLOUD_INFERENCE=true) — vectors are generated
+    server-side via qdrant_service.upsert_texts / search_by_text, so this
+    service is NOT used for uploads or search in that mode. No local
+    embedding model is required.
 
-    Optimizations:
-    - Dedicated thread pool (not shared default executor)
-    - Configurable worker count for parallel API calls
-    - Connection reuse via persistent client
+    This service remains for:
+    - "azure": AzureOpenAIEmbeddings (legacy production path, 1536-dim).
+    - "openai": OpenAI-compatible API fallback (OpenRouter etc.).
     """
 
     # Optimal workers for I/O-bound embedding API calls
@@ -33,12 +34,12 @@ class EmbeddingService:
         self._search_executor = ThreadPoolExecutor(
             max_workers=self.MAX_WORKERS_SEARCH, thread_name_prefix="embed_search"
         )
-    
+
     @property
     def embeddings(self):
         if self._embeddings_instance is not None:
             return self._embeddings_instance
-            
+
         azure_key = settings.AZURE_OPENAI_API_KEY or settings.MODEL_API_KEY
         if settings.AZURE_OPENAI_ENDPOINT and azure_key:
             from langchain_openai import AzureOpenAIEmbeddings
@@ -65,6 +66,15 @@ class EmbeddingService:
                 or settings.AZURE_OPENAI_API_KEY
             )
             fallback_base = settings.EMBEDDING_BASE_URL or settings.LLM_BASE_URL or None
+
+            if not fallback_key:
+                raise RuntimeError(
+                    "No client-side embedding provider configured, and "
+                    "QDRANT_CLOUD_INFERENCE is disabled. Either enable "
+                    "QDRANT_CLOUD_INFERENCE=true (recommended — server-side "
+                    "embeddings, no local model) or set EMBEDDING_API_KEY / "
+                    "AZURE_OPENAI_* credentials."
+                )
 
             self._embeddings_instance = OpenAIEmbeddings(
                 model=settings.EMBEDDING_MODEL or "text-embedding-3-small",

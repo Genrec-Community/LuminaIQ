@@ -1,6 +1,7 @@
 import asyncio
 import os
 from typing import Optional
+from config.settings import settings
 from utils.logger import logger
 
 
@@ -99,6 +100,12 @@ class FileParser:
 
         # Stage 1 yielded nothing or too little — scanned PDF
         char_count = len(text.strip()) if text else 0
+        if not settings.ENABLE_OCR:
+            raise ValueError(
+                f"PDF has no readable text layer ({char_count} chars extracted) "
+                "and OCR is disabled (ENABLE_OCR=false). "
+                "Use a digital/text-based PDF or enable OCR."
+            )
         logger.warning(
             f"[FileParser] Primary extraction yielded only {char_count} chars "
             f"(< {FileParser.MIN_TEXT_CHARS}). PDF appears scanned → Azure OCR..."

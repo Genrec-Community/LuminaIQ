@@ -84,6 +84,23 @@ class DocumentService:
                     user_id=user_id, book_meta=book_meta
                 )
 
+        except asyncio.CancelledError:
+            # Server restart / code reload kills in-flight background tasks.
+            # CancelledError has an EMPTY message and is NOT caught by
+            # `except Exception` — without this handler the document is left
+            # stuck and nothing is logged.
+            logger.warning(
+                f"[{filename}] Processing INTERRUPTED (server restart/reload?). "
+                f"Re-upload to retry."
+            )
+            await self._update_document_status(
+                document_id, "failed",
+                "Processing was interrupted (server restarted or code reloaded). "
+                "Please re-upload the document.",
+            )
+            await progress.emit(document_id, "failed", 0, "Processing interrupted")
+            raise
+
         except Exception as e:
             logger.error(f"Error processing document {filename}: {str(e)}")
             await self._update_document_status(document_id, "failed", str(e))
@@ -388,11 +405,6 @@ class DocumentService:
             retries = 6
             for attempt in range(retries):
                 try:
-                    async with embed_semaphore:
-                        batch_embeddings = await embedding_service.generate_embeddings(
-                            batch_data
-                        )
-
                     batch_metadata = [
                         {
                             "document_id": document_id,
@@ -402,13 +414,28 @@ class DocumentService:
                         for k in range(len(batch_data))
                     ]
 
-                    async with db_semaphore:
-                        await qdrant_service.upsert_chunks(
-                            collection_name=collection_name,
-                            chunks=batch_data,
-                            embeddings=batch_embeddings,
-                            metadata=batch_metadata,
-                        )
+                    if settings.QDRANT_CLOUD_INFERENCE:
+                        # Server-side embeddings inside Qdrant Cloud — no local
+                        # model, no embedding API calls (Render-friendly).
+                        async with db_semaphore:
+                            await qdrant_service.upsert_texts(
+                                collection_name=collection_name,
+                                chunks=batch_data,
+                                metadata=batch_metadata,
+                            )
+                    else:
+                        async with embed_semaphore:
+                            batch_embeddings = await embedding_service.generate_embeddings(
+                                batch_data
+                            )
+
+                        async with db_semaphore:
+                            await qdrant_service.upsert_chunks(
+                                collection_name=collection_name,
+                                chunks=batch_data,
+                                embeddings=batch_embeddings,
+                                metadata=batch_metadata,
+                            )
 
                     completed[0] += 1
                     pct = int((completed[0] / total_batches) * 100)
@@ -477,6 +504,13 @@ class DocumentService:
                 update_data["error_message"] = None
             elif message:
                 update_data["error_message"] = message
+            elif status == "failed":
+                # Never leave a stale stage message (e.g. "Chunking text...")
+                # as the failure reason — it hides the real cause.
+                update_data["error_message"] = (
+                    "Processing failed unexpectedly (no error detail captured). "
+                    "Please retry the upload."
+                )
 
             await async_db(
                 lambda: self.client.table("documents")

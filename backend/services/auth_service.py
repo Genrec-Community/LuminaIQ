@@ -175,7 +175,21 @@ class AuthService:
     async def exchange_supabase_token(self, supabase_token: str) -> Dict[str, Any]:
         """Exchange Supabase OAuth or OTP token for App JWT"""
         try:
-            user = self.client.auth.get_user(supabase_token)
+            # Shape-check before hitting Supabase: a valid JWT has 3 segments.
+            # Logs shape only (never token content) to diagnose client bugs.
+            token_str = supabase_token or ""
+            segments = token_str.count(".") + 1 if token_str else 0
+            if segments != 3:
+                logger.warning(
+                    f"Token exchange rejected: malformed token "
+                    f"(len={len(token_str)}, segments={segments}, "
+                    f"head={token_str[:15]!r})"
+                )
+                raise Exception(
+                    "Malformed session token received (expected a Supabase JWT). "
+                    "Please sign out and sign in again."
+                )
+            user = self.client.auth.get_user(token_str)
             if not user or not user.user:
                 raise Exception("Invalid Supabase Token")
             

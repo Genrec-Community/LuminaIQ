@@ -1,8 +1,9 @@
 import axios from 'axios';
 
-// Fallback to localhost so a missing VITE_MAIN_API_URL env var doesn't silently
-// send every request to '/undefined/...' on deployed builds.
-export const API_URL = import.meta.env.VITE_MAIN_API_URL || 'https://luminaiq-backend.onrender.com/api/v1';
+// Local-only: every request goes to the local backend. The fallback is
+// localhost (never Render) so a missing env var can't silently point
+// the app at production.
+export const API_URL = import.meta.env.VITE_MAIN_API_URL || 'http://localhost:8000/api/v1';
 
 export const api = axios.create({
     baseURL: API_URL,

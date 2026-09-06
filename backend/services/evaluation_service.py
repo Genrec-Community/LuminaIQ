@@ -370,10 +370,9 @@ Be constructive and specific in your feedback. Respond ONLY with the JSON object
             limit_per_query = max(2, num_chunks // len(queries))
 
             async def _search_one(q: str):
-                emb = await embedding_service.generate_embedding(q)
-                return await qdrant_service.search(
+                return await qdrant_service.search_auto(
                     collection_name=collection_name,
-                    query_vector=emb,
+                    query_text=q,
                     limit=limit_per_query,
                     filter_conditions=filter_conds,
                 )

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BookOpen, Loader2, ArrowRight, Mail, Lock, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -15,6 +15,15 @@ const Login = () => {
     const [fullName, setFullName] = useState('');
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState(null); // { type: 'success' | 'error', text: '' }
+
+    // Show async auth failures (e.g. OAuth token exchange) instead of failing silently
+    useEffect(() => {
+        const err = sessionStorage.getItem('auth_error');
+        if (err) {
+            setMessage({ type: 'error', text: err });
+            sessionStorage.removeItem('auth_error');
+        }
+    }, []);
 
     const handleSubmit = async (e) => {
         e.preventDefault();

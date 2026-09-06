@@ -15,6 +15,53 @@ from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.runnables import RunnableConfig
+from langchain_core.documents import Document as LCDocument
+from langchain_core.retrievers import BaseRetriever
+from langchain_core.callbacks import CallbackManagerForRetrieverRun, AsyncCallbackManagerForRetrieverRun
+
+
+class QdrantInferenceRetriever(BaseRetriever):
+    """
+    LangChain retriever backed by Qdrant Cloud Inference (server-side
+    embeddings). Used when settings.QDRANT_CLOUD_INFERENCE is true —
+    no local embedding model needed, Render-friendly.
+
+    Returns the same LCDocument shape (page_content + metadata) as the
+    QdrantVectorStore retriever so chains/consumers work unchanged.
+    """
+
+    collection_name: str
+    selected_documents: Optional[List[str]] = None
+    k: int = 5
+
+    def _get_relevant_documents(
+        self, query: str, *, run_manager: CallbackManagerForRetrieverRun
+    ) -> List[LCDocument]:
+        raise NotImplementedError("Use the async path (ainvoke/astream)")
+
+    async def _aget_relevant_documents(
+        self, query: str, *, run_manager: AsyncCallbackManagerForRetrieverRun
+    ) -> List[LCDocument]:
+        filter_conditions = None
+        if self.selected_documents:
+            filter_conditions = {"document_ids": self.selected_documents}
+        hits = await qdrant_service.search_auto(
+            collection_name=self.collection_name,
+            query_text=query,
+            limit=self.k,
+            filter_conditions=filter_conditions,
+        )
+        return [
+            LCDocument(
+                page_content=h.get("text", ""),
+                metadata={
+                    "document_id": h.get("document_id", ""),
+                    "document_name": h.get("document_name", "Unknown"),
+                    "chunk_id": h.get("chunk_id"),
+                },
+            )
+            for h in hits
+        ]
 
 
 # Retry decorator for handling 503 and transient errors
@@ -66,22 +113,30 @@ class RAGService:
         """Create a RAG chain for a specific collection"""
 
         # 1. Vector Store & Retriever
-        vector_store = qdrant_service.get_vector_store(collection_name)
+        # Cloud Inference mode: server-side embeddings, no local model.
+        if settings.QDRANT_CLOUD_INFERENCE:
+            retriever = QdrantInferenceRetriever(
+                collection_name=collection_name,
+                selected_documents=selected_documents,
+                k=5,
+            )
+        else:
+            vector_store = qdrant_service.get_vector_store(collection_name)
 
-        # Define search arguments (filters)
-        search_kwargs = {"k": 5}
-        if selected_documents:
-            from qdrant_client.models import Filter, FieldCondition, MatchValue
+            # Define search arguments (filters)
+            search_kwargs = {"k": 5}
+            if selected_documents:
+                from qdrant_client.models import Filter, FieldCondition, MatchValue
 
-            # Use 'should' for OR logic - match ANY of the selected documents
-            should_conditions = [
-                FieldCondition(key="document_id", match=MatchValue(value=doc_id))
-                for doc_id in selected_documents
-            ]
-            qdrant_filter = Filter(should=should_conditions)
-            search_kwargs["filter"] = qdrant_filter
+                # Use 'should' for OR logic - match ANY of the selected documents
+                should_conditions = [
+                    FieldCondition(key="document_id", match=MatchValue(value=doc_id))
+                    for doc_id in selected_documents
+                ]
+                qdrant_filter = Filter(should=should_conditions)
+                search_kwargs["filter"] = qdrant_filter
 
-        retriever = vector_store.as_retriever(search_kwargs=search_kwargs)
+            retriever = vector_store.as_retriever(search_kwargs=search_kwargs)
 
         # 2. Prompt
         # Build identity preamble from user profile

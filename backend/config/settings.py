@@ -74,12 +74,25 @@ class Settings(BaseSettings):
     MAIN_API_WEBHOOK_URL: str = Field(default="http://localhost:8000/api/v1/webhook/document-ready")
 
     # ─────────────────────────────────────────────────────────
-    # Embeddings — Azure OpenAI / OpenAI-compatible
+    # Embeddings — Qdrant Cloud Inference is the ONLY embedding path.
+    # Vectors are generated server-side (minilm 384-dim): no local model,
+    # no Azure/OpenAI key, no extra RAM. Requires a Qdrant Cloud cluster.
+    # The settings below exist only for the legacy Azure/OpenAI fallback
+    # (embedding_service) and are unused when inference is enabled.
     # ─────────────────────────────────────────────────────────
+    EMBEDDING_PROVIDER: str = Field(default="cloud")
     EMBEDDING_API_KEY: str = Field(default="")
     EMBEDDING_BASE_URL: str = Field(default="")
     EMBEDDING_MODEL: str = Field(default="text-embedding-3-small")
-    EMBEDDING_DIMENSION: int = 1536
+    # Must match QDRANT_EMBED_MODEL output (384). Collections with a
+    # different dim raise a clear error — recreate when switching models.
+    EMBEDDING_DIMENSION: int = 384
+
+    # ─────────────────────────────────────────────────────────
+    # Qdrant Cloud Inference (default ON)
+    # ─────────────────────────────────────────────────────────
+    QDRANT_CLOUD_INFERENCE: bool = True
+    QDRANT_EMBED_MODEL: str = "sentence-transformers/all-minilm-l6-v2"
 
     # ─────────────────────────────────────────────────────────
     # Qdrant Vector Store
@@ -94,6 +107,10 @@ class Settings(BaseSettings):
     # Format: https://<region>.api.cognitive.microsoft.com/
     AZURE_CV_ENDPOINT: str = ""
     AZURE_CV_KEY: str = ""
+    # Master OCR switch. False = digital/text-layer PDFs only:
+    # skips Azure OCR entirely; scanned/image PDFs fail fast with a
+    # clear message instead of attempting OCR.
+    ENABLE_OCR: bool = True
 
     # Together AI (optional - for some services)
     TOGETHER_API_KEY: str = Field(default="")

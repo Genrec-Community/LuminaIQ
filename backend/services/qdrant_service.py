@@ -44,6 +44,31 @@ class QdrantService:
     def __init__(self):
         self._async_client_instance = None
         self._sync_client_instance = None
+        self._inference_client_instance = None
+
+    @property
+    def inference_client(self):
+        """
+        Qdrant Cloud Inference client (server-side embeddings).
+
+        Opt-in via settings.QDRANT_CLOUD_INFERENCE. Embeddings are generated
+        inside Qdrant Cloud using settings.QDRANT_EMBED_MODEL — no local
+        model, no Azure/OpenAI key. Per Qdrant docs, collection vector size
+        must match the model output (384 for all-minilm-l6-v2).
+        """
+        if self._inference_client_instance is not None:
+            return self._inference_client_instance
+        self._inference_client_instance = AsyncQdrantClient(
+            url=settings.QDRANT_URL,
+            api_key=settings.QDRANT_API_KEY,
+            timeout=self.ASYNC_TIMEOUT,
+            cloud_inference=True,
+        )
+        logger.info(
+            "[QdrantService] Initialized Cloud Inference client "
+            f"| model={settings.QDRANT_EMBED_MODEL}"
+        )
+        return self._inference_client_instance
 
     @property
     def async_client(self):
@@ -89,8 +114,25 @@ class QdrantService:
                         size=vector_size, distance=Distance.COSINE
                     ),
                 )
-                logger.info(f"Created collection: {collection_name}")
+                logger.info(f"Created collection: {collection_name} (dim={vector_size})")
             else:
+                # Guard: refuse to mix embedding dimensions in one collection.
+                # Happens when switching models (e.g. Azure 1536-dim ->
+                # Inference 384-dim). Recreate the collection to re-embed.
+                try:
+                    info = await self.async_client.get_collection(collection_name)
+                    params = info.config.params.vectors
+                    existing_size = getattr(params, "size", None)
+                    if existing_size is not None and existing_size != vector_size:
+                        raise RuntimeError(
+                            f"Collection '{collection_name}' has dim={existing_size} "
+                            f"but current embedding model produces dim={vector_size}. "
+                            f"Delete/recreate the collection to re-embed with the new model."
+                        )
+                except RuntimeError:
+                    raise
+                except Exception:
+                    pass  # best-effort check; upsert will surface real errors
                 logger.info(f"Collection already exists: {collection_name}")
 
             # Always ensure indexes exist
@@ -189,6 +231,145 @@ class QdrantService:
 
         if last_error:
             raise last_error
+
+    async def upsert_texts(
+        self,
+        collection_name: str,
+        chunks: List[str],
+        metadata: List[Dict[str, Any]],
+    ):
+        """
+        Upsert raw texts using Qdrant Cloud Inference (server-side embeddings).
+
+        No client-side vectors needed — Qdrant generates them with
+        settings.QDRANT_EMBED_MODEL. Requires QDRANT_CLOUD_INFERENCE=true
+        and a reachable Qdrant Cloud cluster. Collection dim must match the
+        model output (384 for all-minilm-l6-v2).
+        """
+        from qdrant_client.models import Document
+
+        # Payload indexes are collection-level: ensure filtered search
+        # (document_id/chunk_id) works on inference-written collections too.
+        await self._ensure_indexes(collection_name)
+
+        model = settings.QDRANT_EMBED_MODEL
+        points = []
+        for chunk, meta in zip(chunks, metadata):
+            point = PointStruct(
+                id=str(uuid4()),
+                vector=Document(text=chunk, model=model),
+                payload={
+                    "text": chunk,
+                    "metadata": {
+                        "document_id": meta.get("document_id"),
+                        "document_name": meta.get("document_name"),
+                        "chunk_id": meta.get("chunk_id"),
+                    },
+                    "document_id": meta.get("document_id"),
+                    "document_name": meta.get("document_name"),
+                    "chunk_id": meta.get("chunk_id"),
+                },
+            )
+            points.append(point)
+
+        await self.inference_client.upsert(
+            collection_name=collection_name, points=points
+        )
+        logger.info(
+            f"[CloudInference] Upserted {len(points)} chunks to {collection_name}"
+        )
+
+    async def search_by_text(
+        self,
+        collection_name: str,
+        query_text: str,
+        limit: int = 5,
+        filter_conditions: Optional[Dict[str, Any]] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Search using Qdrant Cloud Inference (raw query text, server-side
+        embedding). Same payload shape as search().
+        """
+        from qdrant_client.models import Document
+
+        query_filter = None
+        if filter_conditions and "document_ids" in filter_conditions:
+            should_conditions = [
+                FieldCondition(key="document_id", match=MatchValue(value=doc_id))
+                for doc_id in filter_conditions["document_ids"]
+            ]
+            if should_conditions:
+                query_filter = Filter(should=should_conditions)
+
+        try:
+            results = (
+                await self.inference_client.query_points(
+                    collection_name=collection_name,
+                    query=Document(
+                        text=query_text, model=settings.QDRANT_EMBED_MODEL
+                    ),
+                    limit=limit,
+                    query_filter=query_filter,
+                )
+            ).points
+        except Exception as e:
+            if "Not found: Collection" in str(e) or "doesn't exist" in str(e):
+                logger.warning(
+                    f"Collection {collection_name} not found during search. Returning empty."
+                )
+                return []
+            logger.error(f"Error searching (cloud inference): {str(e)}")
+            raise
+
+        hits = []
+        for result in results:
+            hits.append(
+                {
+                    "id": result.id,
+                    "score": result.score,
+                    "text": result.payload.get("text", ""),
+                    "document_id": result.payload.get("document_id"),
+                    "document_name": result.payload.get("document_name"),
+                    "chunk_id": result.payload.get("chunk_id"),
+                }
+            )
+        logger.info(f"[CloudInference] Found {len(hits)} results in {collection_name}")
+        return hits
+
+    async def search_auto(
+        self,
+        collection_name: str,
+        query_text: str,
+        limit: int = 5,
+        filter_conditions: Optional[Dict[str, Any]] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Provider-aware search (single entry point for all callers).
+
+        - QDRANT_CLOUD_INFERENCE=true → server-side embeddings
+          (search_by_text, no local model — Render-friendly).
+        - Otherwise → client-side embedding API (Azure/OpenAI fallback).
+
+        IMPORTANT: a collection must be written and read with the SAME
+        model — different models may share 384 dims but live in different
+        vector spaces. Recreate collections when switching providers.
+        """
+        if settings.QDRANT_CLOUD_INFERENCE:
+            return await self.search_by_text(
+                collection_name=collection_name,
+                query_text=query_text,
+                limit=limit,
+                filter_conditions=filter_conditions,
+            )
+        from services.embedding_service import embedding_service
+
+        query_vector = await embedding_service.generate_embedding(query_text)
+        return await self.search(
+            collection_name=collection_name,
+            query_vector=query_vector,
+            limit=limit,
+            filter_conditions=filter_conditions,
+        )
 
     def get_vector_store(self, collection_name: str):
         """Get LangChain VectorStore instance (uses sync client for LangChain compat)"""
