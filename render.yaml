@@ -13,7 +13,6 @@ services:
     plan: free
     healthCheckPath: /health
     envVars:
-      - fromGroup: luminaiq-env
       # — LLM (Together AI, OpenAI-compatible) —
       - key: LLM_API_KEY
         sync: false
