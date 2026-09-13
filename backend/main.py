@@ -27,8 +27,15 @@ app = FastAPI(
 )
 
 # CORS Configuration
-# Security Fix: Use explicit origins from settings
+# Security Fix: Use explicit origins from settings.
+# NOTE: Do NOT add a catch-all @app.options() handler — CORSMiddleware
+# already answers preflights. A bare `Response(status_code=200)` would
+# swallow the Access-Control-Allow-Origin header and break browsers.
 origins = settings.BACKEND_CORS_ORIGINS
+if isinstance(origins, str):
+    origins = [o.strip().rstrip("/") for o in origins.split(",") if o.strip()]
+else:
+    origins = [str(o).strip().rstrip("/") for o in origins]
 
 app.add_middleware(
     CORSMiddleware,
@@ -86,12 +93,6 @@ app.add_middleware(RequestTimeoutMiddleware)
 async def log_all_requests(request: Request, call_next):
     print(f"INCOMING → {request.method} {request.url}")
     return await call_next(request)
-
-
-# Handle CORS preflight requests to prevent hanging
-@app.options("/{full_path:path}")
-async def options_handler(full_path: str):
-    return Response(status_code=200)
 
 
 app.include_router(api_router, prefix="/api/v1")

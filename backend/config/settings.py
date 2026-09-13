@@ -132,6 +132,7 @@ class Settings(BaseSettings):
         "https://lumina-iq-livid.vercel.app",
         "https://luminaiq.fun",
         "https://www.luminaiq.fun",
+        "https://luminaapp.genrecai.com",
     ]
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
@@ -141,11 +142,12 @@ class Settings(BaseSettings):
             if v.startswith("["):
                 import json
                 try:
-                    return json.loads(v)
+                    parsed = json.loads(v)
+                    return [str(o).strip().rstrip("/") for o in parsed if str(o).strip()]
                 except Exception:
                     pass
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v
+            return [origin.strip().rstrip("/") for origin in v.split(",") if origin.strip()]
+        return [str(o).strip().rstrip("/") for o in v if str(o).strip()]
 
     UPLOAD_DIR: str = "./uploads"
     MAX_FILE_SIZE: int = 104857600  # 100MB
