@@ -91,7 +91,7 @@ class QdrantService:
                 )
                 logger.info(f"Created collection: {collection_name}")
             else:
-                logger.info(f"Collection already exists: {collection_name}")
+                await self._check_vector_size(collection_name, vector_size)
 
             # Always ensure indexes exist
             await self._ensure_indexes(collection_name)
@@ -99,6 +99,37 @@ class QdrantService:
         except Exception as e:
             logger.error(f"Error creating collection: {str(e)}")
             raise
+
+    async def _check_vector_size(self, collection_name: str, vector_size: int):
+        """
+        Guard against a collection created for a different embedding model
+        (e.g. 1024-dim vs 1536-dim). An EMPTY mismatched collection is
+        recreated with the right size; one holding data is never deleted —
+        we log a clear error instead.
+        """
+        info = await self.async_client.get_collection(collection_name)
+        vectors = info.config.params.vectors
+        existing = getattr(vectors, "size", None)
+        if existing is None or existing == vector_size:
+            logger.info(f"Collection already exists: {collection_name}")
+            return
+        points = info.points_count or 0
+        if points == 0:
+            logger.warning(
+                f"Collection {collection_name} has vector size {existing} but the "
+                f"embedding model produces {vector_size}; it is empty, recreating it"
+            )
+            await self.async_client.delete_collection(collection_name)
+            await self.async_client.create_collection(
+                collection_name=collection_name,
+                vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
+            )
+        else:
+            logger.error(
+                f"Collection {collection_name} holds {points} vectors of size {existing}, "
+                f"but EMBEDDING_DIMENSION is {vector_size}. Check EMBEDDING_MODEL / "
+                f"EMBEDDING_DIMENSION match the model that built this collection."
+            )
 
     async def _ensure_indexes(self, collection_name: str):
         """Create payload indexes if they don't exist (async)"""
