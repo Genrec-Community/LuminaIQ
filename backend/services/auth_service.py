@@ -4,7 +4,7 @@ import time
 from typing import Optional, Dict, Any
 from jose import jwt, JWTError
 from passlib.context import CryptContext
-from db.client import get_supabase_client
+from db.client import get_supabase_client, async_db
 from config.settings import settings
 from utils.logger import logger
 
@@ -222,10 +222,10 @@ class AuthService:
             
             if response.user:
                 # Add to user_roles table
-                self.client.table('user_roles').insert({
+                (await async_db(lambda: self.client.table('user_roles').insert({
                     'user_id': response.user.id,
                     'role': 'handler'
-                }).execute()
+                }).execute()))
                 
                 logger.info(f"Handler created successfully: {email}")
                 return {

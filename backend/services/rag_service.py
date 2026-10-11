@@ -1,3 +1,4 @@
+from db.client import async_db
 from typing import List, Dict, Any, Optional
 import asyncio
 from services.embedding_service import embedding_service
@@ -268,13 +269,8 @@ Your job is to make the user understand.
             # Process sources from 'context' in response
             sources = []
             if "context" in response:
-                # DIAGNOSTIC: Log retrieved chunks
-                print("\n====== RETRIEVED CHUNKS ======")
-                for i, doc in enumerate(response["context"]):
-                    print(f"\n--- Chunk {i+1} ---")
-                    print(doc.page_content[:300])
-                print("\n===========================\n")
-                
+                logger.debug(f"Retrieved {len(response['context'])} chunks")
+
                 for i, doc in enumerate(response["context"]):
                     # Resolve filename from doc.metadata if available
                     doc_name = doc.metadata.get("document_name", "Unknown")
@@ -284,10 +280,10 @@ Your job is to make the user understand.
                     if doc_name == "Unknown" and doc_id:
                         try:
                             res = (
-                                self.client.table("documents")
+                                (await async_db(lambda: self.client.table("documents")
                                 .select("filename")
                                 .eq("id", doc_id)
-                                .execute()
+                                .execute()))
                             )
                             if res.data:
                                 doc_name = res.data[0]["filename"]
@@ -337,10 +333,10 @@ Your job is to make the user understand.
         if selected_documents:
             try:
                 res = (
-                    self.client.table("documents")
+                    (await async_db(lambda: self.client.table("documents")
                     .select("id, filename")
                     .in_("id", selected_documents)
-                    .execute()
+                    .execute()))
                 )
                 for doc in res.data:
                     doc_name_cache[doc["id"]] = doc["filename"]
@@ -380,10 +376,10 @@ Your job is to make the user understand.
                             elif doc_name == "Unknown" and doc_id:
                                 try:
                                     res = (
-                                        self.client.table("documents")
+                                        (await async_db(lambda: self.client.table("documents")
                                         .select("filename")
                                         .eq("id", doc_id)
-                                        .execute()
+                                        .execute()))
                                     )
                                     if res.data:
                                         doc_name = res.data[0]["filename"]
@@ -477,10 +473,10 @@ Your job is to make the user understand.
             if not selected_documents:
                 try:
                     cached_res = (
-                        self.client.table("project_summaries")
+                        (await async_db(lambda: self.client.table("project_summaries")
                         .select("summary")
                         .eq("project_id", project_id)
-                        .execute()
+                        .execute()))
                     )
                     if cached_res.data:
                         logger.info(
@@ -502,7 +498,7 @@ Your job is to make the user understand.
             )
             if selected_documents:
                 query = query.in_("id", selected_documents)
-            response = query.execute()
+            response = (await async_db(lambda: query.execute()))
             documents = response.data
             if not documents:
                 return {"answer": "No documents available.", "sources": []}
@@ -555,10 +551,10 @@ IMPORTANT: Format the output using standard Markdown. Do NOT use any HTML tags l
             # 3. Store in DB only for full project summaries
             if not selected_documents:
                 try:
-                    self.client.table("project_summaries").upsert(
+                    (await async_db(lambda: self.client.table("project_summaries").upsert(
                         {"project_id": project_id, "summary": summary_text},
                         on_conflict="project_id",
-                    ).execute()
+                    ).execute()))
                 except Exception as store_err:
                     logger.error(f"Failed to store summary: {store_err}")
 

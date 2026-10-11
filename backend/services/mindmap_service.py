@@ -1,5 +1,5 @@
 from typing import List, Dict, Any, Optional
-from db.client import get_supabase_client
+from db.client import get_supabase_client, async_db
 from services.llm_service import LLMService
 from services.rag_service import RAGService
 from utils.logger import logger
@@ -14,12 +14,12 @@ class MindmapService:
     async def get_mindmaps(self, user_id: str, project_id: str) -> List[Dict[str, Any]]:
         """Get all mindmaps for a project"""
         try:
-            response = self.supabase.table('mindmaps') \
+            response = (await async_db(lambda: self.supabase.table('mindmaps') \
                 .select('*') \
                 .eq('user_id', user_id) \
                 .eq('project_id', project_id) \
                 .order('created_at', desc=True) \
-                .execute()
+                .execute()))
             
             results = response.data or []
             # Parse data from JSON string to dict for each mindmap
@@ -147,9 +147,9 @@ Generate a comprehensive mindmap with at least 15-25 nodes total. Return ONLY th
                 'edge_count': edge_count,
             }
             
-            response = self.supabase.table('mindmaps') \
+            response = (await async_db(lambda: self.supabase.table('mindmaps') \
                 .insert(mindmap_record) \
-                .execute()
+                .execute()))
             
             if not response.data:
                 raise Exception("Failed to save mindmap")
@@ -192,11 +192,11 @@ Generate a comprehensive mindmap with at least 15-25 nodes total. Return ONLY th
     async def get_mindmap(self, user_id: str, mindmap_id: str) -> Dict[str, Any]:
         """Get a specific mindmap"""
         try:
-            response = self.supabase.table('mindmaps') \
+            response = (await async_db(lambda: self.supabase.table('mindmaps') \
                 .select('*') \
                 .eq('id', mindmap_id) \
                 .eq('user_id', user_id) \
-                .execute()
+                .execute()))
             
             if not response.data:
                 raise Exception("Mindmap not found or unauthorized")
@@ -224,11 +224,11 @@ Generate a comprehensive mindmap with at least 15-25 nodes total. Return ONLY th
             if 'data' in updates and isinstance(updates['data'], dict):
                 updates['data'] = json.dumps(updates['data'])
             
-            response = self.supabase.table('mindmaps') \
+            response = (await async_db(lambda: self.supabase.table('mindmaps') \
                 .update(updates) \
                 .eq('id', mindmap_id) \
                 .eq('user_id', user_id) \
-                .execute()
+                .execute()))
             
             if not response.data:
                 raise Exception("Mindmap not found or unauthorized")
@@ -247,11 +247,11 @@ Generate a comprehensive mindmap with at least 15-25 nodes total. Return ONLY th
     async def delete_mindmap(self, user_id: str, mindmap_id: str):
         """Delete a mindmap"""
         try:
-            response = self.supabase.table('mindmaps') \
+            response = (await async_db(lambda: self.supabase.table('mindmaps') \
                 .delete() \
                 .eq('id', mindmap_id) \
                 .eq('user_id', user_id) \
-                .execute()
+                .execute()))
             
             if not response.data:
                 raise Exception("Mindmap not found or unauthorized")

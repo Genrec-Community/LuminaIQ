@@ -13,7 +13,7 @@ Tables managed:
 
 from typing import List, Dict, Any, Optional
 from datetime import date, datetime, timedelta
-from db.client import get_supabase_client
+from db.client import get_supabase_client, async_db
 from utils.logger import logger
 from uuid import uuid4
 
@@ -28,10 +28,10 @@ class UserDataService:
         """Get user settings, returning defaults if none exist."""
         try:
             result = (
-                self.client.table("user_settings")
+                (await async_db(lambda: self.client.table("user_settings")
                 .select("settings, updated_at")
                 .eq("user_id", user_id)
-                .execute()
+                .execute()))
             )
             if result.data:
                 return result.data[0]["settings"]
@@ -43,14 +43,14 @@ class UserDataService:
     async def save_settings(self, user_id: str, settings: Dict[str, Any]) -> Dict[str, Any]:
         """Upsert user settings."""
         try:
-            result = self.client.table("user_settings").upsert(
+            result = (await async_db(lambda: self.client.table("user_settings").upsert(
                 {
                     "user_id": user_id,
                     "settings": settings,
                     "updated_at": datetime.utcnow().isoformat(),
                 },
                 on_conflict="user_id",
-            ).execute()
+            ).execute()))
             return result.data[0]["settings"] if result.data else settings
         except Exception as e:
             logger.error(f"Error saving settings: {e}")
@@ -78,12 +78,12 @@ class UserDataService:
     async def get_bookmarks(self, user_id: str, project_id: str) -> List[Dict[str, Any]]:
         try:
             result = (
-                self.client.table("bookmarks")
+                (await async_db(lambda: self.client.table("bookmarks")
                 .select("*")
                 .eq("user_id", user_id)
                 .eq("project_id", project_id)
                 .order("created_at", desc=True)
-                .execute()
+                .execute()))
             )
             return result.data or []
         except Exception as e:
@@ -109,7 +109,7 @@ class UserDataService:
                 record["highlight_text"] = highlight_text
             if color is not None:
                 record["color"] = color
-            result = self.client.table("bookmarks").insert(record).execute()
+            result = (await async_db(lambda: self.client.table("bookmarks").insert(record).execute()))
             return result.data[0] if result.data else record
         except Exception as e:
             logger.error(f"Error adding bookmark: {e}")
@@ -120,11 +120,11 @@ class UserDataService:
             allowed = {"title", "note", "type", "highlight_text", "color"}
             filtered = {k: v for k, v in updates.items() if k in allowed}
             result = (
-                self.client.table("bookmarks")
+                (await async_db(lambda: self.client.table("bookmarks")
                 .update(filtered)
                 .eq("id", bookmark_id)
                 .eq("user_id", user_id)
-                .execute()
+                .execute()))
             )
             return result.data[0] if result.data else {}
         except Exception as e:
@@ -133,7 +133,7 @@ class UserDataService:
 
     async def delete_bookmark(self, user_id: str, bookmark_id: str) -> bool:
         try:
-            self.client.table("bookmarks").delete().eq("id", bookmark_id).eq("user_id", user_id).execute()
+            (await async_db(lambda: self.client.table("bookmarks").delete().eq("id", bookmark_id).eq("user_id", user_id).execute()))
             return True
         except Exception as e:
             logger.error(f"Error deleting bookmark: {e}")
@@ -147,13 +147,13 @@ class UserDataService:
         """Return activity keyed by date string (same shape as old localStorage)."""
         try:
             result = (
-                self.client.table("study_activity")
+                (await async_db(lambda: self.client.table("study_activity")
                 .select("*")
                 .eq("user_id", user_id)
                 .eq("project_id", project_id)
                 .order("activity_date", desc=True)
                 .limit(days)
-                .execute()
+                .execute()))
             )
             activity = {}
             for row in result.data or []:
@@ -184,12 +184,12 @@ class UserDataService:
 
             # Get existing row for today
             existing = (
-                self.client.table("study_activity")
+                (await async_db(lambda: self.client.table("study_activity")
                 .select("*")
                 .eq("user_id", user_id)
                 .eq("project_id", project_id)
                 .eq("activity_date", today)
-                .execute()
+                .execute()))
             )
 
             if existing.data:
@@ -212,10 +212,10 @@ class UserDataService:
                 }
 
                 result = (
-                    self.client.table("study_activity")
+                    (await async_db(lambda: self.client.table("study_activity")
                     .update(update)
                     .eq("id", row["id"])
-                    .execute()
+                    .execute()))
                 )
                 return result.data[0] if result.data else {}
             else:
@@ -237,7 +237,7 @@ class UserDataService:
                     new_row["quiz_scores"] = [meta["score"]]
                 new_row["total"] = 1
 
-                result = self.client.table("study_activity").insert(new_row).execute()
+                result = (await async_db(lambda: self.client.table("study_activity").insert(new_row).execute()))
                 return result.data[0] if result.data else {}
 
         except Exception as e:
@@ -250,11 +250,11 @@ class UserDataService:
         """Return list of completed topic strings."""
         try:
             result = (
-                self.client.table("learning_progress")
+                (await async_db(lambda: self.client.table("learning_progress")
                 .select("completed_topics")
                 .eq("user_id", user_id)
                 .eq("project_id", project_id)
-                .execute()
+                .execute()))
             )
             if result.data:
                 return result.data[0].get("completed_topics") or []
@@ -267,7 +267,7 @@ class UserDataService:
         self, user_id: str, project_id: str, completed_topics: List[str]
     ) -> List[str]:
         try:
-            result = self.client.table("learning_progress").upsert(
+            result = (await async_db(lambda: self.client.table("learning_progress").upsert(
                 {
                     "user_id": user_id,
                     "project_id": project_id,
@@ -275,7 +275,7 @@ class UserDataService:
                     "updated_at": datetime.utcnow().isoformat(),
                 },
                 on_conflict="user_id,project_id",
-            ).execute()
+            ).execute()))
             if result.data:
                 return result.data[0].get("completed_topics", [])
             return completed_topics
@@ -305,7 +305,7 @@ class UserDataService:
             if project_id:
                 query = query.eq("project_id", project_id)
 
-            result = query.execute()
+            result = (await async_db(lambda: query.execute()))
             if result.data:
                 row = result.data[0]
                 return {
@@ -337,21 +337,21 @@ class UserDataService:
             else:
                 query = query.is_("document_id", "null")
 
-            existing = query.execute()
+            existing = (await async_db(lambda: query.execute()))
 
             if existing.data:
                 result = (
-                    self.client.table("pomodoro_sessions")
+                    (await async_db(lambda: self.client.table("pomodoro_sessions")
                     .update({
                         "sessions": sessions,
                         "focus_time_minutes": focus_time_minutes,
                         "updated_at": datetime.utcnow().isoformat(),
                     })
                     .eq("id", existing.data[0]["id"])
-                    .execute()
+                    .execute()))
                 )
             else:
-                result = self.client.table("pomodoro_sessions").insert({
+                result = (await async_db(lambda: self.client.table("pomodoro_sessions").insert({
                     "id": str(uuid4()),
                     "user_id": user_id,
                     "project_id": project_id,
@@ -359,7 +359,7 @@ class UserDataService:
                     "session_date": today,
                     "sessions": sessions,
                     "focus_time_minutes": focus_time_minutes,
-                }).execute()
+                }).execute()))
 
             return result.data[0] if result.data else {}
         except Exception as e:
@@ -371,13 +371,13 @@ class UserDataService:
     async def get_recent_searches(self, user_id: str, project_id: str, limit: int = 5) -> List[str]:
         try:
             result = (
-                self.client.table("recent_searches")
+                (await async_db(lambda: self.client.table("recent_searches")
                 .select("query")
                 .eq("user_id", user_id)
                 .eq("project_id", project_id)
                 .order("created_at", desc=True)
                 .limit(limit)
-                .execute()
+                .execute()))
             )
             return [row["query"] for row in (result.data or [])]
         except Exception as e:
@@ -387,31 +387,31 @@ class UserDataService:
     async def save_recent_search(self, user_id: str, project_id: str, query: str) -> bool:
         try:
             # Delete existing duplicate
-            self.client.table("recent_searches").delete().eq(
+            (await async_db(lambda: self.client.table("recent_searches").delete().eq(
                 "user_id", user_id
-            ).eq("project_id", project_id).eq("query", query).execute()
+            ).eq("project_id", project_id).eq("query", query).execute()))
 
             # Insert new
-            self.client.table("recent_searches").insert({
+            (await async_db(lambda: self.client.table("recent_searches").insert({
                 "id": str(uuid4()),
                 "user_id": user_id,
                 "project_id": project_id,
                 "query": query,
-            }).execute()
+            }).execute()))
 
             # Prune to 5 most recent
             all_searches = (
-                self.client.table("recent_searches")
+                (await async_db(lambda: self.client.table("recent_searches")
                 .select("id")
                 .eq("user_id", user_id)
                 .eq("project_id", project_id)
                 .order("created_at", desc=True)
-                .execute()
+                .execute()))
             )
             if all_searches.data and len(all_searches.data) > 5:
                 ids_to_delete = [r["id"] for r in all_searches.data[5:]]
                 for old_id in ids_to_delete:
-                    self.client.table("recent_searches").delete().eq("id", old_id).execute()
+                    (await async_db(lambda: self.client.table("recent_searches").delete().eq("id", old_id).execute()))
 
             return True
         except Exception as e:
@@ -420,9 +420,9 @@ class UserDataService:
 
     async def clear_recent_searches(self, user_id: str, project_id: str) -> bool:
         try:
-            self.client.table("recent_searches").delete().eq(
+            (await async_db(lambda: self.client.table("recent_searches").delete().eq(
                 "user_id", user_id
-            ).eq("project_id", project_id).execute()
+            ).eq("project_id", project_id).execute()))
             return True
         except Exception as e:
             logger.error(f"Error clearing recent searches: {e}")
@@ -433,11 +433,11 @@ class UserDataService:
     async def get_streak(self, user_id: str, project_id: str) -> Dict[str, Any]:
         try:
             result = (
-                self.client.table("study_streaks")
+                (await async_db(lambda: self.client.table("study_streaks")
                 .select("*")
                 .eq("user_id", user_id)
                 .eq("project_id", project_id)
-                .execute()
+                .execute()))
             )
             if result.data:
                 row = result.data[0]
@@ -456,11 +456,11 @@ class UserDataService:
         try:
             today = date.today().isoformat()
             existing = (
-                self.client.table("study_streaks")
+                (await async_db(lambda: self.client.table("study_streaks")
                 .select("*")
                 .eq("user_id", user_id)
                 .eq("project_id", project_id)
-                .execute()
+                .execute()))
             )
 
             if existing.data:
@@ -481,23 +481,23 @@ class UserDataService:
 
                 longest = max(longest, current)
 
-                self.client.table("study_streaks").update({
+                (await async_db(lambda: self.client.table("study_streaks").update({
                     "current_streak": current,
                     "longest_streak": longest,
                     "last_study_date": today,
                     "updated_at": datetime.utcnow().isoformat(),
-                }).eq("id", row["id"]).execute()
+                }).eq("id", row["id"]).execute()))
 
                 return {"current": current, "longest": longest, "lastStudyDate": today}
             else:
-                self.client.table("study_streaks").insert({
+                (await async_db(lambda: self.client.table("study_streaks").insert({
                     "id": str(uuid4()),
                     "user_id": user_id,
                     "project_id": project_id,
                     "current_streak": 1,
                     "longest_streak": 1,
                     "last_study_date": today,
-                }).execute()
+                }).execute()))
                 return {"current": 1, "longest": 1, "lastStudyDate": today}
 
         except Exception as e:

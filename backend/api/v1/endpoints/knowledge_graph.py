@@ -1,3 +1,4 @@
+from db.client import async_db
 """
 Knowledge Graph API Endpoints
 
@@ -72,23 +73,23 @@ async def get_knowledge_graph(
         graph_data = await knowledge_graph.get_full_graph(project_id)
         
         # Get project info for center node
-        from db.client import get_supabase_client
+        from db.client import get_supabase_client, async_db
         client = get_supabase_client()
         project = (
-            client.table("projects")
+            (await async_db(lambda: client.table("projects")
             .select("name")
             .eq("id", project_id)
-            .execute()
+            .execute()))
         )
         project_name = project.data[0]["name"] if project.data else "Project"
         
         # Get document names for book nodes
         documents = (
-            client.table("documents")
+            (await async_db(lambda: client.table("documents")
             .select("id, filename, topics")
             .eq("project_id", project_id)
             .eq("upload_status", "completed")
-            .execute()
+            .execute()))
         )
         
         # Build enhanced graph with books

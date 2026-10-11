@@ -11,7 +11,7 @@ Features:
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from collections import Counter, defaultdict
-from db.client import get_supabase_client
+from db.client import get_supabase_client, async_db
 from services.llm_service import llm_service
 from services.embedding_service import embedding_service
 from services.qdrant_service import qdrant_service
@@ -62,7 +62,7 @@ class GraphAnalyticsService:
                 "metadata": metadata or {}
             }
             
-            result = self.client.table("graph_analytics").insert(record).execute()
+            result = (await async_db(lambda: self.client.table("graph_analytics").insert(record).execute()))
             logger.info(f"Recorded {event_type} event for topic '{topic}'")
             
             return result.data[0] if result.data else {}
@@ -85,7 +85,7 @@ class GraphAnalyticsService:
                 if "id" not in interaction:
                     interaction["id"] = str(uuid4())
             
-            self.client.table("graph_analytics").insert(interactions).execute()
+            (await async_db(lambda: self.client.table("graph_analytics").insert(interactions).execute()))
             logger.info(f"Recorded {len(interactions)} batch interactions")
             return len(interactions)
             
@@ -111,11 +111,11 @@ class GraphAnalyticsService:
             # Check cache first
             if not force_regenerate:
                 cached = (
-                    self.client.table("topic_summaries")
+                    (await async_db(lambda: self.client.table("topic_summaries")
                     .select("*")
                     .eq("project_id", project_id)
                     .eq("topic", topic)
-                    .execute()
+                    .execute()))
                 )
                 
                 if cached.data:
@@ -195,10 +195,10 @@ class GraphAnalyticsService:
                     # Get document name
                     try:
                         doc_res = (
-                            self.client.table("documents")
+                            (await async_db(lambda: self.client.table("documents")
                             .select("filename")
                             .eq("id", doc_id)
-                            .execute()
+                            .execute()))
                         )
                         if doc_res.data:
                             sources.append({
@@ -244,7 +244,7 @@ Generate the summary now:"""
 
             # Cache the summary
             try:
-                self.client.table("topic_summaries").upsert(
+                (await async_db(lambda: self.client.table("topic_summaries").upsert(
                     {
                         "project_id": project_id,
                         "topic": topic,
@@ -253,7 +253,7 @@ Generate the summary now:"""
                         "updated_at": datetime.utcnow().isoformat()
                     },
                     on_conflict="project_id,topic"
-                ).execute()
+                ).execute()))
             except Exception as cache_err:
                 logger.warning(f"Failed to cache summary: {cache_err}")
             
@@ -303,11 +303,11 @@ Generate the summary now:"""
 
         try:
             docs = (
-                self.client.table("documents")
+                (await async_db(lambda: self.client.table("documents")
                 .select("id, project_id, filename, text_storage_path")
                 .eq("project_id", project_id)
                 .in_("upload_status", ["completed", "processing"])
-                .execute()
+                .execute()))
             )
         except Exception as e:
             logger.warning(f"Keyword fallback: failed to list documents: {e}")
@@ -367,13 +367,13 @@ Generate the summary now:"""
         try:
             # Get user's interaction history
             history = (
-                self.client.table("graph_analytics")
+                (await async_db(lambda: self.client.table("graph_analytics")
                 .select("topic, event_type, duration_ms, created_at")
                 .eq("project_id", project_id)
                 .eq("user_id", user_id)
                 .order("created_at", desc=True)
                 .limit(100)
-                .execute()
+                .execute()))
             )
             
             interactions = history.data or []
@@ -481,7 +481,7 @@ Generate the summary now:"""
                 "started_at": datetime.utcnow().isoformat()
             }
             
-            result = self.client.table("learning_sessions").insert(session).execute()
+            result = (await async_db(lambda: self.client.table("learning_sessions").insert(session).execute()))
             session_id = result.data[0]["id"] if result.data else session["id"]
             
             logger.info(f"Started learning session {session_id}")
@@ -506,10 +506,10 @@ Generate the summary now:"""
             }
             
             result = (
-                self.client.table("learning_sessions")
+                (await async_db(lambda: self.client.table("learning_sessions")
                 .update(update)
                 .eq("id", session_id)
-                .execute()
+                .execute()))
             )
             
             logger.info(f"Ended learning session {session_id}")
@@ -533,23 +533,23 @@ Generate the summary now:"""
             
             # Get all interactions
             interactions = (
-                self.client.table("graph_analytics")
+                (await async_db(lambda: self.client.table("graph_analytics")
                 .select("*")
                 .eq("project_id", project_id)
                 .eq("user_id", user_id)
                 .gte("created_at", cutoff)
                 .order("created_at", desc=True)
-                .execute()
+                .execute()))
             ).data or []
             
             # Get sessions
             sessions = (
-                self.client.table("learning_sessions")
+                (await async_db(lambda: self.client.table("learning_sessions")
                 .select("*")
                 .eq("project_id", project_id)
                 .eq("user_id", user_id)
                 .gte("started_at", cutoff)
-                .execute()
+                .execute()))
             ).data or []
             
             # Analyze

@@ -201,30 +201,23 @@ class DocumentService:
             try:
                 from services.knowledge_graph_service import knowledge_graph
 
+                from services.topic_ordering import topics_in_book_order
+
+                # Includes the current doc: it is marked completed only after this step
                 docs = await async_db(
                     lambda: get_supabase_client()
                     .table("documents")
-                    .select("topics")
+                    .select("id, topics, upload_status")
                     .eq("project_id", project_id)
-                    .eq("upload_status", "completed")
+                    .in_("upload_status", ["completed", "processing"])
+                    .order("created_at")
                     .execute()
                 )
-                all_topics = []
-                for d in docs.data or []:
-                    all_topics.extend(d.get("topics") or [])
-
-                # Also include topics from the current doc (not yet marked completed)
-                current_doc = await async_db(
-                    lambda: get_supabase_client()
-                    .table("documents")
-                    .select("topics")
-                    .eq("id", document_id)
-                    .execute()
+                # Book order keeps related topics in the same LLM batch
+                all_topics = topics_in_book_order(
+                    [d for d in (docs.data or [])
+                     if d["upload_status"] == "completed" or d["id"] == document_id]
                 )
-                if current_doc.data:
-                    all_topics.extend(current_doc.data[0].get("topics") or [])
-
-                all_topics = list(set(all_topics))
                 if len(all_topics) >= 2:
                     logger.info(
                         f"Auto-building knowledge graph with {len(all_topics)} topics"

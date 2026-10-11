@@ -17,7 +17,7 @@ import heapq
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Tuple
 from collections import defaultdict
-from db.client import get_supabase_client
+from db.client import get_supabase_client, async_db
 from utils.logger import logger
 from uuid import uuid4
 import math
@@ -49,12 +49,12 @@ class PerformanceTracker:
         try:
             # Check if record exists
             existing = (
-                self.client.table("user_performance")
+                (await async_db(lambda: self.client.table("user_performance")
                 .select("*")
                 .eq("user_id", user_id)
                 .eq("project_id", project_id)
                 .eq("topic", topic)
-                .execute()
+                .execute()))
             )
 
             now = datetime.utcnow().isoformat()
@@ -71,7 +71,7 @@ class PerformanceTracker:
                 history = history[-20:]  # Sliding window of last 20
 
                 result = (
-                    self.client.table("user_performance")
+                    (await async_db(lambda: self.client.table("user_performance")
                     .update(
                         {
                             "correct_count": new_correct,
@@ -81,7 +81,7 @@ class PerformanceTracker:
                         }
                     )
                     .eq("id", record["id"])
-                    .execute()
+                    .execute()))
                 )
 
                 logger.info(
@@ -93,7 +93,7 @@ class PerformanceTracker:
                 history = [{"correct": correct, "wrong": wrong, "timestamp": now}]
 
                 result = (
-                    self.client.table("user_performance")
+                    (await async_db(lambda: self.client.table("user_performance")
                     .insert(
                         {
                             "id": str(uuid4()),
@@ -106,7 +106,7 @@ class PerformanceTracker:
                             "history": history,
                         }
                     )
-                    .execute()
+                    .execute()))
                 )
 
                 logger.info(f"Created performance record for topic '{topic}'")
@@ -131,7 +131,7 @@ class PerformanceTracker:
             if topic:
                 query = query.eq("topic", topic)
 
-            result = query.order("last_attempt", desc=True).execute()
+            result = (await async_db(lambda: query.order("last_attempt", desc=True).execute()))
             return result.data or []
 
         except Exception as e:
@@ -142,11 +142,11 @@ class PerformanceTracker:
         """Get all performance records across all projects for a user."""
         try:
             result = (
-                self.client.table("user_performance")
+                (await async_db(lambda: self.client.table("user_performance")
                 .select("*")
                 .eq("user_id", user_id)
                 .order("last_attempt", desc=True)
-                .execute()
+                .execute()))
             )
             return result.data or []
         except Exception as e:
@@ -243,11 +243,11 @@ class WeaknessDetector:
         try:
             # Get all performance records
             result = (
-                self.client.table("user_performance")
+                (await async_db(lambda: self.client.table("user_performance")
                 .select("*")
                 .eq("user_id", user_id)
                 .eq("project_id", project_id)
-                .execute()
+                .execute()))
             )
 
             records = result.data or []
@@ -356,7 +356,7 @@ class SpacedRepetition:
                 "created_at": now,
             }
 
-            result = self.client.table("review_cards").insert(card).execute()
+            result = (await async_db(lambda: self.client.table("review_cards").insert(card).execute()))
             logger.info(f"Created review card for topic '{topic}'")
             return result.data[0] if result.data else {}
 
@@ -407,7 +407,7 @@ class SpacedRepetition:
                 cards.append(card)
 
             if cards:
-                result = self.client.table("review_cards").insert(cards).execute()
+                result = (await async_db(lambda: self.client.table("review_cards").insert(cards).execute()))
                 logger.info(f"Created {len(cards)} review cards for topic '{topic}'")
                 return result.data or []
 
@@ -471,10 +471,10 @@ class SpacedRepetition:
         try:
             # Get current card
             result = (
-                self.client.table("review_cards")
+                (await async_db(lambda: self.client.table("review_cards")
                 .select("*")
                 .eq("id", card_id)
-                .execute()
+                .execute()))
             )
 
             if not result.data:
@@ -495,7 +495,7 @@ class SpacedRepetition:
 
             # Update card
             updated = (
-                self.client.table("review_cards")
+                (await async_db(lambda: self.client.table("review_cards")
                 .update(
                     {
                         "easiness_factor": new_ef,
@@ -506,7 +506,7 @@ class SpacedRepetition:
                     }
                 )
                 .eq("id", card_id)
-                .execute()
+                .execute()))
             )
 
             logger.info(
@@ -550,7 +550,7 @@ class SpacedRepetition:
                 query = query.eq("project_id", project_id)
 
             # Order by next_review (priority queue behavior)
-            result = query.order("next_review", desc=False).limit(limit).execute()
+            result = (await async_db(lambda: query.order("next_review", desc=False).limit(limit).execute()))
 
             cards = result.data or []
 
@@ -586,7 +586,7 @@ class SpacedRepetition:
             if project_id:
                 base_query = base_query.eq("project_id", project_id)
 
-            result = base_query.execute()
+            result = (await async_db(lambda: base_query.execute()))
             cards = result.data or []
 
             if not cards:
@@ -646,7 +646,7 @@ class SpacedRepetition:
     async def delete_card(self, card_id: str) -> bool:
         """Delete a review card."""
         try:
-            self.client.table("review_cards").delete().eq("id", card_id).execute()
+            (await async_db(lambda: self.client.table("review_cards").delete().eq("id", card_id).execute()))
             return True
         except Exception as e:
             logger.error(f"Error deleting card: {e}")
