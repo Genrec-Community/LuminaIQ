@@ -76,6 +76,7 @@ class EmbeddingService:
                 openai_api_base=fallback_base,
                 # Non-OpenAI providers expect plain strings, not tiktoken token arrays
                 check_embedding_ctx_length=not bool(fallback_base),
+                dimensions=settings.EMBEDDING_DIMENSION if settings.EMBEDDING_SEND_DIMENSIONS else None,
             )
             logger.info(
                 f"[EmbeddingService] Initialized with OpenAI-compatible embeddings "

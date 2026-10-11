@@ -91,6 +91,10 @@ class Settings(BaseSettings):
     # "auto" → Azure if configured, else OpenAI-compatible EMBEDDING_BASE_URL/EMBEDDING_API_KEY;
     # "azure" or "openai" to force one. EMBEDDING_DIMENSION must match the chosen model.
     EMBEDDING_PROVIDER: str = Field(default="auto")
+    # Ask the provider to return EMBEDDING_DIMENSION-sized vectors (the OpenAI
+    # "dimensions" parameter). Use with models that support shortening, e.g.
+    # Gemini gemini-embedding-001 (768/1536/3072) or OpenAI text-embedding-3-*.
+    EMBEDDING_SEND_DIMENSIONS: bool = Field(default=False)
 
     # ─────────────────────────────────────────────────────────
     # Qdrant Vector Store

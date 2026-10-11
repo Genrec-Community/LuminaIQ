@@ -61,6 +61,20 @@ Mercury has no embeddings API, so embeddings still need Azure (`AZURE_OPENAI_*` 
 `EMBEDDING_MODEL=text-embedding-3-small`, `EMBEDDING_DIMENSION=1536`) or another
 OpenAI-compatible embeddings provider with `EMBEDDING_PROVIDER=openai`.
 
+#### Free embeddings with Google Gemini (no Azure needed)
+1. Get a free key at https://aistudio.google.com → **Get API key**.
+2. Set on the Render service:
+   ```
+   EMBEDDING_PROVIDER=openai
+   EMBEDDING_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
+   EMBEDDING_API_KEY=<gemini key>
+   EMBEDDING_MODEL=gemini-embedding-001
+   EMBEDDING_DIMENSION=768
+   EMBEDDING_SEND_DIMENSIONS=true
+   ```
+3. Save → redeploy. An empty collection with the old vector size is recreated automatically and
+   books re-embed from their stored text (failed attempts retry every 10 minutes).
+
 ### Vercel deployment protection
 Turned **off** for `luminaiq-test` (Vercel Authentication was redirecting `test.luminaiq.fun`
 assets such as `site.webmanifest` to `vercel.com/sso-api`, which blocks every visitor not logged in
