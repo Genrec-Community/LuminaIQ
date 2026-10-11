@@ -308,7 +308,7 @@ const PowerHourView = ({ projectId, availableTopics = [], selectedDocuments = []
                                 <RotateCcw className="h-4 w-4 text-[#C8A288]" /> Fix weak spots ({weak.filter((t) => availableTopics.includes(t)).length})
                             </button>
                         </div>
-                        <p className="relative mt-4 text-xs text-[#8a6a5c]">Tip: use keys <b>1–4</b> to answer and <b>Enter</b> to continue.</p>
+                        <p className="relative mt-4 hidden md:block text-xs text-[#8a6a5c]">Tip: use keys <b>1–4</b> to answer and <b>Enter</b> to continue.</p>
                     </motion.div>
 
                     <div className="mt-4 flex items-start gap-3 rounded-2xl border border-[#E6D5CC] bg-white p-4">

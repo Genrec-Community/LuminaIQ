@@ -306,7 +306,7 @@ Generate the summary now:"""
                 (await async_db(lambda: self.client.table("documents")
                 .select("id, project_id, filename, text_storage_path")
                 .eq("project_id", project_id)
-                .in_("upload_status", ["completed", "processing"])
+                .eq("upload_status", "completed")
                 .execute()))
             )
         except Exception as e:

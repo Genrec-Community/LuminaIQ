@@ -529,7 +529,14 @@ class DocumentService:
         return reindexing
 
     async def _reindex_from_storage(self, document: Dict[str, Any]):
-        """Re-chunk and re-embed a document from its stored text."""
+        """
+        Re-chunk and re-embed a document from its stored text.
+
+        Deliberately does NOT change upload_status: the document stays usable
+        (search falls back to its stored text meanwhile), and environments that
+        share one database but use separate vector stores (e.g. a test
+        deployment) never flip production documents to processing/failed.
+        """
         document_id = document["id"]
         project_id = document["project_id"]
         filename = document["filename"]
@@ -538,25 +545,19 @@ class DocumentService:
         try:
             text = await self.load_stored_text(document)
             if not text:
-                await self._update_document_status(
-                    document_id, "failed",
-                    "Search index was lost and no stored text is available. "
-                    "Please re-upload this document.",
+                logger.error(
+                    f"[Reindex] {filename} ({document_id}) has no vectors and no stored "
+                    "text — it must be re-uploaded to be searchable here"
                 )
                 return
 
             async with EmbeddingQueue.get_doc_semaphore():
-                await self._update_document_status(
-                    document_id, "processing", "Re-indexing document..."
-                )
                 loop = asyncio.get_running_loop()
                 chunks = await loop.run_in_executor(
                     None, lambda: self.text_chunker.chunk_text(text)
                 )
                 if not chunks:
-                    await self._update_document_status(
-                        document_id, "failed", "No chunks generated"
-                    )
+                    logger.error(f"[Reindex] No chunks generated for {filename}")
                     return
 
                 collection_name = f"project_{project_id}"
@@ -571,14 +572,11 @@ class DocumentService:
                     chunks, document_id, filename, collection_name
                 )
 
-            await self._update_document_status(document_id, "completed")
             await progress.emit(document_id, "completed", 100, "Document re-indexed")
             logger.info(f"[Reindex] {filename} re-indexed ({len(chunks)} chunks)")
 
         except Exception as e:
             logger.error(f"[Reindex] Failed for {filename}: {e}")
-            await self._update_document_status(document_id, "failed", str(e))
-            await progress.emit(document_id, "failed", 0, str(e))
         finally:
             self._reindexing.discard(document_id)
 

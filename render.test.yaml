@@ -1,0 +1,14 @@
+# Render Blueprint for the TEST backend (test.luminaiq.fun).
+# In Render: New + → Blueprint → this repo → Blueprint path: render.test.yaml
+# It deploys branch jaisamyukth-changes and never touches the production service.
+services:
+  - type: web
+    name: luminaiq-backend-test
+    runtime: docker
+    rootDir: backend
+    branch: jaisamyukth-changes
+    plan: free
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - fromGroup: luminaiq-test-env

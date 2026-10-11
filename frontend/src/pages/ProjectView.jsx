@@ -124,8 +124,11 @@ const ProjectView = () => {
     const isDark = settings?.darkMode ?? false;
     const { data: gamificationData } = useGamification();
     const [showGamification, setShowGamification] = useState(false);
+    const [toolsOpen, setToolsOpen] = useState(true);
     const [activeTab, setActiveTab] = useState(() => {
-        return sessionStorage.getItem(`lumina_tab_${projectId}`) || 'power';
+        const saved = sessionStorage.getItem(`lumina_tab_${projectId}`);
+        // 'general' was a menu toggle, not a real view
+        return saved && saved !== 'general' ? saved : 'power';
     });
     useFocusTimer(user?.id);
     useEffect(() => {
@@ -162,7 +165,7 @@ const ProjectView = () => {
                 title: 'Knowledge Graph',
             },
             {
-                content: 'Access automatically generated Notes, Quizzes, Flashcards and more here.',
+                content: 'Study Tools: Notes, Quizzes, Flashcards, Mindmaps and Q&A for any topic.',
                 placement: 'right',
                 target: '#tour-nav-general',
                 title: 'Study Tools',
@@ -1093,24 +1096,30 @@ const ProjectView = () => {
                             <div className={leftCollapsed ? '' : ''}>
                                 <button
                                     id="tour-nav-general"
-                                    onClick={() => setActiveTab(activeTab === 'general' ? 'chat' : 'general')}
-                                    className={`w-full flex items-center ${leftCollapsed ? 'justify-center px-3 py-4' : 'gap-4 px-5 py-4'} rounded-xl transition-colors ${activeTab === 'general' || activeTab === 'qa' || activeTab === 'quiz' || activeTab === 'notes' || activeTab === 'flashcards' || activeTab === 'mindmap'
+                                    onClick={() => {
+                                        // Toggle the tools list (no empty "general" view). When the
+                                        // sidebar is collapsed, expand it so the tools are visible.
+                                        if (leftCollapsed) { setIsLeftCollapsed(false); setToolsOpen(true); }
+                                        else setToolsOpen(o => !o);
+                                    }}
+                                    className={`w-full flex items-center ${leftCollapsed ? 'justify-center px-3 py-4' : 'gap-4 px-5 py-4'} rounded-xl transition-colors ${leftCollapsed && (activeTab === 'general' || activeTab === 'qa' || activeTab === 'quiz' || activeTab === 'notes' || activeTab === 'flashcards' || activeTab === 'mindmap')
                                         ? 'bg-[#C8A288] text-white font-semibold shadow-md shadow-[#C8A288]/20'
                                         : 'text-[#4A3B32] hover:bg-[#E6D5CC] hover:shadow-sm'
                                         }`}
-                                    title={leftCollapsed ? 'General' : undefined}
+                                    title={leftCollapsed ? 'Study Tools' : undefined}
+                                    aria-expanded={toolsOpen}
                                 >
                                     <FileText className="h-6 w-6 shrink-0" />
                                     {!leftCollapsed && (
                                         <>
-                                            <span className="flex-1 text-left text-base">General</span>
-                                            <ChevronDown className={`h-5 w-5 transition-transform ${activeTab === 'general' || activeTab === 'qa' || activeTab === 'quiz' || activeTab === 'notes' || activeTab === 'flashcards' || activeTab === 'mindmap' ? 'rotate-180' : ''}`} />
+                                            <span className="flex-1 text-left text-base">Study Tools</span>
+                                            <ChevronDown className={`h-5 w-5 transition-transform ${toolsOpen ? 'rotate-180' : ''}`} />
                                         </>
                                     )}
                                 </button>
 
                                 {/* General Sub-items */}
-                                {!leftCollapsed && (activeTab === 'general' || activeTab === 'qa' || activeTab === 'quiz' || activeTab === 'notes' || activeTab === 'flashcards' || activeTab === 'mindmap') && (
+                                {!leftCollapsed && toolsOpen && (
                                     <div className={`ml-6 mt-2 space-y-2 border-l-2 pl-4 ${isDark ? 'border-[#5a3a20]' : 'border-[#E6D5CC]'}`}>
                                         <button
                                             onClick={() => {
@@ -1164,7 +1173,7 @@ const ProjectView = () => {
                                             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-base transition-colors ${activeTab === 'mindmap' ? isDark ? 'text-[#e8b870] font-semibold bg-[#2e2010]/80' : 'text-[#C8A288] font-semibold bg-[#FDF6F0]' : isDark ? 'text-[#a08060] hover:text-[#e8c898] hover:bg-[#2e2318]/60' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/50'
                                                 }`}
                                         >
-                                            <Zap className="h-5 w-5" />
+                                            <Brain className="h-5 w-5" />
                                             <span>Mindmap</span>
                                         </button>
                                     </div>
