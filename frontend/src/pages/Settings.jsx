@@ -34,6 +34,7 @@ import { useGamification } from '../context/GamificationContext';
 import { useAuth } from '../context/AuthContext';
 import { AI_CHARACTERS, USER_AVATARS, AI_AVATARS, AGE_GROUPS, getCharacter, displayName } from '../utils/persona';
 import { onboardedKey } from '../components/Onboarding';
+import { THEMES, FONT_STYLES, ACCENT_PRESETS, resolveThemeId } from '../utils/themes';
 
 /**
  * TextInput — MUST be defined at module level (outside Settings component).
@@ -103,7 +104,7 @@ const TextInput = ({ value, onChange, label, description, icon: Icon, placeholde
 
 const Settings = () => {
     const navigate = useNavigate();
-    const { settings, updateSetting, resetSettings } = useSettings();
+    const { settings, updateSetting, updateSettings, resetSettings } = useSettings();
     const { data: gamificationData } = useGamification();
     const { user } = useAuth();
     const [activeSection, setActiveSection] = useState('profile');
@@ -111,12 +112,13 @@ const Settings = () => {
     const isDark = settings?.darkMode ?? false;
 
     // Shorthand theme tokens used throughout this page
-    const bg     = isDark ? '#1c1814' : '#FDF6F0';
-    const paper  = isDark ? '#252018' : '#FFFFFF';
-    const border  = isDark ? '#3d3028' : '#E6D5CC';
-    const muted   = isDark ? '#8a7060' : '#8a6a5c';
-    const heading = isDark ? '#e8e2dc' : '#4A3B32';
-    const inputBg = isDark ? '#1e1a16' : '#FDF6F0';
+    // Theme-aware (see utils/themes.js); fallbacks are the classic palette
+    const bg     = isDark ? 'var(--dm-bg, #1c1814)' : 'var(--th-bg, #FDF6F0)';
+    const paper  = isDark ? 'var(--dm-surface, #252018)' : 'var(--th-surface, #FFFFFF)';
+    const border  = isDark ? 'var(--dm-border-strong, #3d3028)' : 'var(--th-border, #E6D5CC)';
+    const muted   = isDark ? 'var(--dm-text-secondary, #8a7060)' : 'var(--th-muted, #8a6a5c)';
+    const heading = isDark ? 'var(--dm-text-primary, #e8e2dc)' : 'var(--th-text, #4A3B32)';
+    const inputBg = isDark ? 'var(--dm-surface-elevated, #1e1a16)' : 'var(--th-alt, #FDF6F0)';
 
 
     const sections = [
@@ -735,46 +737,105 @@ const Settings = () => {
         </div>
     );
 
+    const activeTheme = resolveThemeId(settings);
+
     const renderAppearance = () => (
         <div className="space-y-5">
             <SectionHeader icon={Sun} title="Appearance" subtitle="Customize the look and feel" />
             <div className="space-y-3">
-                {/* Dark Mode — fully functional */}
-                <div className={`p-5 rounded-2xl border-2 transition-all ${
-                    settings.darkMode
-                        ? 'bg-[#2a2927] border-[#C8A288]/60'
-                        : 'bg-white border-[#E6D5CC]'
-                }`}>
-                    <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3.5">
-                            <div className={`h-11 w-11 rounded-xl flex items-center justify-center shrink-0 ${
-                                settings.darkMode ? 'bg-[#4A3B32]' : 'bg-[#FDF6F0]'
-                            }`}>
-                                {settings.darkMode
-                                    ? <Moon className="h-5 w-5 text-[#C8A288]" />
-                                    : <Sun className="h-5 w-5 text-[#C8A288]" />}
-                            </div>
-                            <div>
-                                <p className="font-bold text-[#4A3B32]">
-                                    {settings.darkMode ? 'Dark Mode — On' : 'Dark Mode — Off'}
-                                </p>
-                                <p className="text-xs text-[#8a6a5c] mt-0.5">
-                                    {settings.darkMode ? 'Warm near-black theme, easy on the eyes' : 'Switch to a rich dark theme'}
-                                </p>
-                            </div>
+                {/* Theme gallery */}
+                <div className="p-4 bg-white rounded-2xl border border-[#E6D5CC]/80">
+                    <div className="flex items-center justify-between mb-3">
+                        <div>
+                            <p className="font-semibold text-[#4A3B32] text-sm">Theme</p>
+                            <p className="text-xs text-[#8a6a5c] mt-0.5">Pick a vibe — applies instantly everywhere</p>
                         </div>
-                        <button
-                            onClick={() => updateSetting('darkMode', !settings.darkMode)}
-                            className={`relative w-12 h-7 rounded-full transition-all shrink-0 ${
-                                settings.darkMode ? 'bg-[#C8A288]' : 'bg-[#E6D5CC]'
-                            }`}
-                        >
-                            <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-transform ${
-                                settings.darkMode ? 'translate-x-[22px]' : 'translate-x-0.5'
-                            }`}>
-                                {settings.darkMode && <Check className="h-3.5 w-3.5 text-[#C8A288] m-[5px]" />}
-                            </div>
-                        </button>
+                        <span className="text-xs font-semibold text-[#C8A288]">{THEMES[activeTheme].name}</span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                        {Object.entries(THEMES).map(([id, t]) => {
+                            const active = activeTheme === id;
+                            return (
+                                <button
+                                    key={id}
+                                    onClick={() => updateSettings({ theme: id, darkMode: t.mode === 'dark' })}
+                                    className={`text-left rounded-xl border-2 overflow-hidden transition-all active:scale-[0.98] ${active ? 'border-[#C8A288] shadow-md shadow-[#C8A288]/20' : 'border-[#E6D5CC] hover:border-[#C8A288]/60'}`}
+                                    aria-pressed={active}
+                                >
+                                    {/* Mini preview */}
+                                    <div className="h-16 p-2 flex gap-1.5" style={{ background: t.swatch[0] }}>
+                                        <div className="w-5 rounded-md" style={{ background: t.swatch[1] }} />
+                                        <div className="flex-1 rounded-md p-1.5 flex flex-col justify-between" style={{ background: t.swatch[1] }}>
+                                            <div className="h-1.5 w-3/4 rounded-full" style={{ background: t.swatch[3], opacity: 0.8 }} />
+                                            <div className="h-3 w-1/2 rounded-md" style={{ background: t.swatch[2] }} />
+                                        </div>
+                                    </div>
+                                    <div className="px-2.5 py-2">
+                                        <p className="text-xs font-bold text-[#4A3B32] flex items-center gap-1">
+                                            {t.name} {active && <Check className="h-3.5 w-3.5 text-[#C8A288]" />}
+                                        </p>
+                                        <p className="text-[10.5px] leading-snug text-[#8a6a5c]">{t.blurb}</p>
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Accent colour */}
+                <div className="p-4 bg-white rounded-2xl border border-[#E6D5CC]/80">
+                    <div className="flex items-center justify-between mb-3">
+                        <div>
+                            <p className="font-semibold text-[#4A3B32] text-sm">Accent colour</p>
+                            <p className="text-xs text-[#8a6a5c] mt-0.5">Buttons, highlights and progress bars</p>
+                        </div>
+                        {settings.customAccent && (
+                            <button onClick={() => updateSetting('customAccent', '')} className="text-xs font-semibold text-[#8a6a5c] hover:text-[#4A3B32]">
+                                Use theme default
+                            </button>
+                        )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        {ACCENT_PRESETS.map(c => (
+                            <button
+                                key={c}
+                                onClick={() => updateSetting('customAccent', c)}
+                                className={`h-8 w-8 rounded-full border-2 transition-transform active:scale-90 ${settings.customAccent?.toLowerCase() === c.toLowerCase() ? 'border-[#4A3B32] scale-110' : 'border-white shadow'}`}
+                                style={{ background: c }}
+                                title={c}
+                                aria-label={`Accent ${c}`}
+                            />
+                        ))}
+                        <label className="h-8 px-3 rounded-full border border-[#E6D5CC] flex items-center gap-2 text-xs font-semibold text-[#4A3B32] cursor-pointer hover:border-[#C8A288]">
+                            <input
+                                type="color"
+                                value={settings.customAccent || '#C8A288'}
+                                onChange={(e) => updateSetting('customAccent', e.target.value)}
+                                className="h-5 w-5 cursor-pointer rounded border-0 bg-transparent p-0"
+                            />
+                            Custom
+                        </label>
+                    </div>
+                </div>
+
+                {/* Font style */}
+                <div className="p-4 bg-white rounded-2xl border border-[#E6D5CC]/80">
+                    <p className="font-semibold text-[#4A3B32] text-sm">Font style</p>
+                    <p className="text-xs text-[#8a6a5c] mt-0.5 mb-3">How text looks across the app</p>
+                    <div className="grid grid-cols-5 gap-2">
+                        {[['auto', { name: 'Theme', stack: 'inherit' }], ...Object.entries(FONT_STYLES)].map(([key, f]) => {
+                            const active = (settings.fontStyle || 'auto') === key;
+                            return (
+                                <button
+                                    key={key}
+                                    onClick={() => updateSetting('fontStyle', key)}
+                                    className={`rounded-xl border-2 py-2 text-center transition-all ${active ? 'border-[#C8A288] bg-[#C8A288]/10' : 'border-[#E6D5CC] hover:border-[#C8A288]/60'}`}
+                                >
+                                    <span className="block text-lg text-[#4A3B32]" style={{ fontFamily: f.stack }}>Aa</span>
+                                    <span className="block text-[10.5px] font-semibold text-[#8a6a5c]">{f.name}</span>
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
 

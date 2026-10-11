@@ -1080,9 +1080,9 @@ const ProjectView = () => {
     return (
         <div className="h-[100dvh] flex overflow-hidden font-sans transition-colors duration-300"
             style={isDark ? {
-                background: 'radial-gradient(ellipse at 20% 0%, #2a1e12 0%, #1c1814 45%, #181410 100%)',
+                background: 'radial-gradient(ellipse at 20% 0%, color-mix(in srgb, var(--dm-accent) 10%, var(--dm-bg)) 0%, var(--dm-bg) 45%, var(--dm-bg) 100%)',
                 color: '#e8e2dc'
-            } : { background: '#FDF6F0', color: '#4A3B32' }}>
+            } : { background: 'var(--th-bg, #FDF6F0)', color: 'var(--th-text, #4A3B32)' }}>
 
             <Joyride
                 onEvent={handleJoyrideCallback}
@@ -1106,9 +1106,9 @@ const ProjectView = () => {
                 fixed inset-y-0 left-0 z-50 ${leftCollapsed ? 'w-20' : 'w-80'} backdrop-blur-xl border-r flex flex-col transition-all duration-300 ease-in-out md:translate-x-0 md:static md:shrink-0 shadow-2xl md:shadow-none
                 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}
                 style={isDark ? {
-                    background: 'linear-gradient(180deg, #251d14 0%, #1e1710 60%, #1a1410 100%)',
+                    background: 'linear-gradient(180deg, var(--dm-sidebar) 0%, var(--dm-bg) 100%)',
                     borderColor: 'rgba(90,60,30,0.35)'
-                } : { background: 'rgba(253,246,240,0.95)', borderColor: 'rgba(255,255,255,0.20)'
+                } : { background: 'color-mix(in srgb, var(--th-alt, #FDF6F0) 95%, transparent)', borderColor: 'rgba(255,255,255,0.20)'
                 }}>
                     <div className={`flex-1 flex flex-col min-h-0 ${leftCollapsed ? 'p-3' : 'p-6'}`}>
                         <div className={`flex items-center ${leftCollapsed ? 'justify-center' : 'justify-between'} mb-8`}>
@@ -1240,7 +1240,7 @@ const ProjectView = () => {
 
                         {/* Profile Section - Fixed at Bottom of Sidebar */}
                         <div className={`shrink-0 ${leftCollapsed ? 'p-3' : 'p-4'} border-t backdrop-blur-sm`}
-                            style={isDark ? { borderColor: 'rgba(90,60,30,0.35)', background: 'linear-gradient(to top, #1a1208 0%, rgba(26,18,8,0.85) 100%)' } : { borderColor: 'rgba(230,213,204,0.5)', background: 'rgba(253,246,240,0.95)' }}>
+                            style={isDark ? { borderColor: 'var(--dm-border)', background: 'linear-gradient(to top, var(--dm-sidebar) 0%, color-mix(in srgb, var(--dm-sidebar) 85%, transparent) 100%)' } : { borderColor: 'var(--th-border, rgba(230,213,204,0.5))', background: 'color-mix(in srgb, var(--th-alt, #FDF6F0) 95%, transparent)' }}>
                             <div className={`w-full flex items-center ${leftCollapsed ? 'justify-center' : 'gap-1'}`}>
                                 <button
                                     onClick={() => setShowProfileMenu(!showProfileMenu)}
@@ -1280,17 +1280,17 @@ const ProjectView = () => {
             {/* Main Content Area */}
             <div className={`flex-1 flex flex-col min-w-0 overflow-hidden backdrop-blur-sm transition-colors duration-300`}
                 style={zenMode
-                    ? { background: isDark ? '#1c1814' : '#fff' }
+                    ? { background: isDark ? 'var(--dm-bg)' : 'var(--th-surface, #fff)' }
                     : isDark
-                        ? { background: 'rgba(28,20,14,0.85)', margin: '1rem', borderRadius: '1.5rem', border: '1px solid rgba(90,58,28,0.30)', boxShadow: '0 0 0 1px rgba(90,58,28,0.10), inset 0 1px 0 rgba(200,162,136,0.06)' }
-                        : { background: 'rgba(255,255,255,0.5)' }
+                        ? { background: 'color-mix(in srgb, var(--dm-surface) 85%, transparent)', margin: '1rem', borderRadius: '1.5rem', border: '1px solid var(--dm-border-strong)', boxShadow: '0 0 0 1px var(--dm-border), inset 0 1px 0 color-mix(in srgb, var(--dm-accent) 6%, transparent)' }
+                        : { background: 'color-mix(in srgb, var(--th-surface, #ffffff) 50%, transparent)' }
                 }
             >
 
                 {/* Header (Context) - Hidden in Zen Mode */}
                 {!zenMode && (
                     <div className="px-3 md:px-5 py-2.5 border-b backdrop-blur-md sticky top-0 z-30"
-                        style={isDark ? { borderColor: 'rgba(90,58,28,0.30)', background: 'rgba(26,18,10,0.80)' } : { borderColor: 'rgba(230,213,204,0.5)', background: 'rgba(255,255,255,0.5)' }}>
+                        style={isDark ? { borderColor: 'var(--dm-border-strong)', background: 'color-mix(in srgb, var(--dm-sidebar) 80%, transparent)' } : { borderColor: 'var(--th-border, rgba(230,213,204,0.5))', background: 'color-mix(in srgb, var(--th-surface, #ffffff) 50%, transparent)' }}>
                         {/* Single-row header with proper spacing */}
                         <div className="flex items-center gap-2 h-11">
                             {/* Mobile Menu Button */}

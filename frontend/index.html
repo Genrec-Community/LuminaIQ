@@ -8,8 +8,15 @@
   <script>
     (function() {
       try {
-        if (localStorage.getItem('lumina_dark_mode') === '1') {
-          document.documentElement.classList.add('dark');
+        var el = document.documentElement;
+        var cached = JSON.parse(localStorage.getItem('lumina_theme_vars') || 'null');
+        if (cached && cached.vars) {
+          // Replay the last theme (see src/utils/themes.js) before React mounts
+          if (cached.dark) el.classList.add('dark');
+          for (var a in cached.attrs) { if (cached.attrs[a] != null) el.setAttribute(a, cached.attrs[a]); }
+          for (var v in cached.vars) { el.style.setProperty(v, cached.vars[v]); }
+        } else if (localStorage.getItem('lumina_dark_mode') === '1') {
+          el.classList.add('dark');
         }
       } catch (e) {}
     })();

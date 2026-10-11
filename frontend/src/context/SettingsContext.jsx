@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { getUserSettings, saveUserSettings } from '../api';
 import { useAuth } from './AuthContext';
+import { buildThemeState, applyThemeState } from '../utils/themes';
 
 const SettingsContext = createContext();
 
@@ -37,6 +38,9 @@ const defaultSettings = {
     // Learning Mode
     bookIsolation: true,
     darkMode: false,
+    theme: 'latte',      // key of THEMES in utils/themes.js
+    customAccent: '',    // '#rrggbb' overrides the theme accent
+    fontStyle: 'auto',   // 'auto' (theme default) | key of FONT_STYLES
     fontSize: 'md', // 'sm' | 'md' | 'lg' | 'xl'
     pomodoroWork: 25,
     pomodoroBreak: 5,
@@ -86,18 +90,11 @@ export const SettingsProvider = ({ children }) => {
         load();
     }, [user]);
 
-    // Apply dark mode — toggle html.dark for CSS cascade.
-    // Also persist to localStorage so index.html blocking script can read it
-    // before React mounts and prevent the flash of light mode on reload.
+    // Apply theme (palette, dark mode, accent, font) to <html>. Also caches
+    // the result so index.html can apply it before React mounts (no flash).
     useEffect(() => {
-        if (settings.darkMode) {
-            document.documentElement.classList.add('dark');
-            localStorage.setItem('lumina_dark_mode', '1');
-        } else {
-            document.documentElement.classList.remove('dark');
-            localStorage.setItem('lumina_dark_mode', '0');
-        }
-    }, [settings.darkMode]);
+        applyThemeState(buildThemeState(settings));
+    }, [settings.theme, settings.darkMode, settings.customAccent, settings.fontStyle]);
 
     // Apply font size class to html element
     useEffect(() => {
@@ -120,6 +117,8 @@ export const SettingsProvider = ({ children }) => {
     const updateSetting = useCallback((key, value) => {
         setSettings(prev => {
             const next = { ...prev, [key]: value };
+            // The quick dark-mode switch toggles between the two classic themes
+            if (key === 'darkMode') next.theme = value ? 'espresso' : 'latte';
             // Fire-and-forget save to API
             saveUserSettings(next).catch(err =>
                 console.warn('Failed to save settings:', err)
