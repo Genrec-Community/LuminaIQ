@@ -45,6 +45,22 @@ service `luminaiq-backend`. Neither was modified.
   (`luminaiq-backend`, workspace *My Workspace*), with its own `QDRANT_URL` / `QDRANT_API_KEY`.
 - Health check: `GET /health` → `{"status":"healthy","service":"lumina-backend"}`.
 
+### AI providers (all OpenAI-compatible)
+The backend picks providers from env vars — any OpenAI-compatible API works:
+
+| Purpose | Switch | Settings |
+|---|---|---|
+| Chat / topics / quizzes | `LLM_PROVIDER` = `auto` \| `azure` \| `openai` | `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, optional `LLM_REASONING_EFFORT` |
+| Book search (embeddings) | `EMBEDDING_PROVIDER` = `auto` \| `azure` \| `openai` | `EMBEDDING_BASE_URL`, `EMBEDDING_API_KEY`, `EMBEDDING_MODEL`, `EMBEDDING_DIMENSION` |
+
+`auto` = Azure OpenAI when `AZURE_OPENAI_*` is set, otherwise the OpenAI-compatible settings.
+
+Test service currently: `LLM_PROVIDER=openai`, `LLM_BASE_URL=https://api.inceptionlabs.ai/v1`,
+`LLM_MODEL=mercury-2.5`, `LLM_REASONING_EFFORT=low` (key stored only in Render).
+Mercury has no embeddings API, so embeddings still need Azure (`AZURE_OPENAI_*` with
+`EMBEDDING_MODEL=text-embedding-3-small`, `EMBEDDING_DIMENSION=1536`) or another
+OpenAI-compatible embeddings provider with `EMBEDDING_PROVIDER=openai`.
+
 ### Vercel deployment protection
 Turned **off** for `luminaiq-test` (Vercel Authentication was redirecting `test.luminaiq.fun`
 assets such as `site.webmanifest` to `vercel.com/sso-api`, which blocks every visitor not logged in
