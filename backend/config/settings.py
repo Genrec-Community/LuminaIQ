@@ -88,6 +88,9 @@ class Settings(BaseSettings):
     EMBEDDING_BASE_URL: str = Field(default="")
     EMBEDDING_MODEL: str = Field(default="text-embedding-3-small")
     EMBEDDING_DIMENSION: int = 1536
+    # "auto" → Azure if configured, else OpenAI-compatible EMBEDDING_BASE_URL/EMBEDDING_API_KEY;
+    # "azure" or "openai" to force one. EMBEDDING_DIMENSION must match the chosen model.
+    EMBEDDING_PROVIDER: str = Field(default="auto")
 
     # ─────────────────────────────────────────────────────────
     # Qdrant Vector Store

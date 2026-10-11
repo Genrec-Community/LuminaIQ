@@ -40,7 +40,11 @@ class EmbeddingService:
             return self._embeddings_instance
             
         azure_key = settings.AZURE_OPENAI_API_KEY or settings.MODEL_API_KEY
-        if settings.AZURE_OPENAI_ENDPOINT and azure_key:
+        provider = (settings.EMBEDDING_PROVIDER or "auto").strip().lower()
+        use_azure = provider == "azure" or (
+            provider == "auto" and bool(settings.AZURE_OPENAI_ENDPOINT and azure_key)
+        )
+        if use_azure:
             from langchain_openai import AzureOpenAIEmbeddings
 
             self._embeddings_instance = AzureOpenAIEmbeddings(
@@ -70,9 +74,11 @@ class EmbeddingService:
                 model=settings.EMBEDDING_MODEL or "text-embedding-3-small",
                 openai_api_key=fallback_key,
                 openai_api_base=fallback_base,
+                # Non-OpenAI providers expect plain strings, not tiktoken token arrays
+                check_embedding_ctx_length=not bool(fallback_base),
             )
             logger.info(
-                f"[EmbeddingService] Initialized with fallback OpenAIEmbeddings "
+                f"[EmbeddingService] Initialized with OpenAI-compatible embeddings "
                 f"| model={settings.EMBEDDING_MODEL}"
             )
         return self._embeddings_instance
