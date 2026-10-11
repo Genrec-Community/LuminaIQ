@@ -68,6 +68,14 @@ class Settings(BaseSettings):
     LLM_API_KEY: str = Field(default="")
     LLM_BASE_URL: str = Field(default="")
     LLM_MODEL: str = Field(default="gpt-4.1-mini")
+    # Which chat model provider to use:
+    #   "auto"   → Azure OpenAI if configured, otherwise the OpenAI-compatible LLM_* provider
+    #   "azure"  → always Azure OpenAI
+    #   "openai" → always the OpenAI-compatible provider (LLM_BASE_URL / LLM_API_KEY / LLM_MODEL),
+    #              e.g. Inception Mercury, while embeddings can still use Azure
+    LLM_PROVIDER: str = Field(default="auto")
+    # Optional reasoning effort for providers that support it (e.g. Mercury: "low" | "medium" | "high")
+    LLM_REASONING_EFFORT: str = Field(default="")
 
     # Webhook
     MAIN_API_WEBHOOK_SECRET: str = Field(default="supersecretwebhook")

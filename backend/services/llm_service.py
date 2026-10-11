@@ -7,13 +7,29 @@ Uses langchain_openai.AzureChatOpenAI, driven by:
     AZURE_OPENAI_DEPLOYMENT    (from .env, e.g. "gpt4o")
     AZURE_OPENAI_API_VERSION   (from .env, e.g. "2024-12-01-preview")
 
-Falls back to legacy OpenAI-compatible client if Azure vars are not set.
+Falls back to an OpenAI-compatible client (LLM_BASE_URL / LLM_API_KEY /
+LLM_MODEL, e.g. Inception Mercury) if Azure vars are not set, or always when
+LLM_PROVIDER=openai.
 """
 
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from config.settings import settings
 from typing import List, Dict
 from utils.logger import logger
+
+
+def _use_azure() -> bool:
+    """Decide the chat provider from LLM_PROVIDER (auto | azure | openai)."""
+    provider = (settings.LLM_PROVIDER or "auto").strip().lower()
+    azure_ready = bool(
+        settings.AZURE_OPENAI_ENDPOINT
+        and (settings.AZURE_OPENAI_API_KEY or settings.MODEL_API_KEY)
+    )
+    if provider == "openai":
+        return False
+    if provider == "azure":
+        return True
+    return azure_ready
 
 
 def _build_client(
@@ -30,10 +46,7 @@ def _build_client(
     azure_api_key = settings.AZURE_OPENAI_API_KEY or settings.MODEL_API_KEY
 
     # Azure OpenAI
-    if (
-        settings.AZURE_OPENAI_ENDPOINT
-        and azure_api_key
-    ):
+    if _use_azure():
         from langchain_openai import AzureChatOpenAI
 
         logger.debug(
@@ -60,8 +73,9 @@ def _build_client(
     # Fallback OpenAI-compatible providers
     from langchain_openai import ChatOpenAI
 
-    logger.warning(
-        "[LLMService] Azure OpenAI not configured — using fallback ChatOpenAI"
+    logger.debug(
+        f"[LLMService] Using OpenAI-compatible provider | model={settings.LLM_MODEL} "
+        f"| base={settings.LLM_BASE_URL or 'api.openai.com'}"
     )
 
     fallback_api_key = (
@@ -70,13 +84,17 @@ def _build_client(
         or settings.AZURE_OPENAI_API_KEY
     )
 
-    return ChatOpenAI(
-        model=settings.LLM_MODEL or "gpt-4.1-mini",
-        openai_api_key=fallback_api_key,
-        openai_api_base=settings.LLM_BASE_URL or None,
-        temperature=temperature,
-        max_tokens=max_tokens,
-    )
+    kwargs = {
+        "model": settings.LLM_MODEL or "gpt-4.1-mini",
+        "openai_api_key": fallback_api_key,
+        "openai_api_base": settings.LLM_BASE_URL or None,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+    }
+    if settings.LLM_REASONING_EFFORT:
+        # Sent as a raw body field so it works with any OpenAI-compatible provider
+        kwargs["extra_body"] = {"reasoning_effort": settings.LLM_REASONING_EFFORT}
+    return ChatOpenAI(**kwargs)
 
 def _convert_messages(messages: List[Dict[str, str]]):
     """Convert dict messages to LangChain message objects."""
@@ -103,17 +121,17 @@ class LLMService:
     RETRY_TOKEN_MULTIPLIER = 3
 
     def __init__(self):
-        using_azure = bool(
-            settings.AZURE_OPENAI_ENDPOINT
-            and (settings.AZURE_OPENAI_API_KEY or settings.MODEL_API_KEY)
-        )
-        if using_azure:
+        if _use_azure():
             logger.info(
                 f"[LLMService] Initialized with Azure OpenAI | "
                 f"deployment={settings.AZURE_OPENAI_DEPLOYMENT}"
             )
         else:
-            logger.warning("[LLMService] Azure OpenAI not configured | using fallback LLM.")
+            logger.info(
+                f"[LLMService] Initialized with OpenAI-compatible provider | "
+                f"model={settings.LLM_MODEL} | base={settings.LLM_BASE_URL or 'api.openai.com'}"
+                + (f" | reasoning_effort={settings.LLM_REASONING_EFFORT}" if settings.LLM_REASONING_EFFORT else "")
+            )
 
     def _get_client(self, temperature: float = 0.7, max_tokens: int = 4000):
         return _build_client(temperature=temperature, max_tokens=max_tokens)
@@ -143,12 +161,13 @@ class LLMService:
             answer = response.content if getattr(response, "content", None) else ""
 
             # Detect token starvation: finish_reason='length' + empty content
-            metadata = getattr(response, "response_metadata", {})
+            metadata = getattr(response, "response_metadata", None) or {}
             finish_reason = metadata.get("finish_reason", "")
+            # Non-OpenAI providers often send null for these nested fields
             reasoning_tokens = (
-                metadata.get("token_usage", {})
-                .get("completion_tokens_details", {})
-                .get("reasoning_tokens", 0)
+                ((metadata.get("token_usage") or {})
+                 .get("completion_tokens_details") or {})
+                .get("reasoning_tokens") or 0
             )
 
             if not answer or len(answer) < self.EMPTY_RESPONSE_MIN_CHARS:
