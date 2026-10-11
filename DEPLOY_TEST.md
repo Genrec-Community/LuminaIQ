@@ -1,51 +1,90 @@
-# Deploying the test environment (test.luminaiq.fun)
+# Test environment — test.luminaiq.fun
 
-Branch: `jaisamyukth-changes` · Production (`main`, luminaiq.fun) is not touched.
+Branch: **`jaisamyukth-changes`** · Production (`main`, luminaiq.fun) is not touched.
 
-| Piece | Test | Production |
+## Status
+
+| Piece | Resource | Status |
 |---|---|---|
-| Frontend | new Vercel project → `test.luminaiq.fun` | existing |
-| Backend | new Render service `luminaiq-backend-test` | existing |
-| Vector DB | **new** Qdrant Cloud cluster | existing |
-| Database / auth | **shared** Supabase project | same |
+| Database / auth | Supabase project **Lumina IQ** (`bcosfvilvwyxtrctsmez`, ap-south-1) — **shared with production** | ✅ migration `004_topic_outline` applied |
+| Frontend | Vercel project **`luminaiq-test`** (`prj_QdOOgYdPFsppjAWfn5AFcqTDQQWL`) | ✅ created, deployed, domain attached |
+| Domain | `test.luminaiq.fun` → Vercel | ⏳ needs a DNS record in Cloudflare (step 1) |
+| Supabase auth redirect | `https://test.luminaiq.fun/**` | ⏳ dashboard-only setting (step 2) |
+| Vector DB | new Qdrant Cloud cluster | ⏳ step 3 |
+| Backend | Render service **`luminaiq-backend-test`** (`render.test.yaml`) | ⏳ step 4 |
 
-Sharing Supabase means the same accounts, projects and books work on both.
-The test backend rebuilds its own (empty) Qdrant automatically from the stored
-book text the first time each project is opened — no re-uploads needed.
+Production for comparison: Vercel project `lumina-iq` (luminaiq.fun, www.luminaiq.fun) and Render
+service `luminaiq-backend`. Neither was modified.
 
-## 1. Qdrant (≈3 min)
-1. https://cloud.qdrant.io → **Create cluster** → Free tier, any region close to your Render region.
-2. Copy the **cluster URL** (`https://xxxx.cloud.qdrant.io:6333`) and create an **API key**.
+## What is already configured
 
-## 2. Supabase (≈2 min)
-1. SQL editor → run `backend/migrations/004_topic_outline.sql` (additive, safe for production).
-2. Authentication → URL Configuration → **Redirect URLs** → add `https://test.luminaiq.fun/**`.
+### Vercel — `luminaiq-test`
+- Git: `Genrec-Community/LuminaIQ`, root directory `frontend`, framework Vite.
+- Domain `test.luminaiq.fun` is bound to branch `jaisamyukth-changes`
+  (every push to that branch redeploys the test site).
+- Ignored build step: builds **only** run for `jaisamyukth-changes`; pushes to `main` are skipped
+  so the test project never mirrors production.
+- Environment variables (all environments):
 
-## 3. Render backend (≈10 min, mostly build time)
-1. Environment Groups → open `luminaiq-env` → copy every variable into a new group named **`luminaiq-test-env`**, then change:
-   - `QDRANT_URL` → new cluster URL
-   - `QDRANT_API_KEY` → new key
+  | Key | Value |
+  |---|---|
+  | `VITE_MAIN_API_URL` | `https://luminaiq-backend-test.onrender.com/api/v1` |
+  | `VITE_SUPABASE_URL` | `https://bcosfvilvwyxtrctsmez.supabase.co` |
+  | `VITE_SUPABASE_ANON_KEY` | Supabase legacy anon key (public, same as production) |
+
+  If Render gives the backend a different URL in step 4, update `VITE_MAIN_API_URL` in
+  Vercel → luminaiq-test → Settings → Environment Variables, then redeploy.
+- Deployment URL (Vercel login required because of deployment protection):
+  `luminaiq-test.vercel.app`. The custom domain is public.
+
+### Supabase — `Lumina IQ`
+Applied `backend/migrations/004_topic_outline.sql` as migration `004_topic_outline`:
+- `documents.topic_outline JSONB DEFAULT '[]'` (+ column comment)
+- `idx_documents_project_status_created (project_id, upload_status, created_at)`
+- `idx_topic_relations_project_type (project_id, relation_type)`
+
+Additive only — production keeps working and simply ignores the new column.
+
+## Remaining steps (need your logins)
+
+### 1. Cloudflare DNS (≈2 min)
+`luminaiq.fun` uses Cloudflare nameservers. In Cloudflare → luminaiq.fun → DNS → **Add record**:
+
+| Type | Name | Target | Proxy status |
+|---|---|---|---|
+| CNAME | `test` | `cname.vercel-dns.com` | **DNS only** (grey cloud) |
+
+Vercel issues the HTTPS certificate automatically once the record resolves (usually minutes).
+
+### 2. Supabase auth redirect (≈1 min)
+Supabase → Lumina IQ → Authentication → URL Configuration → **Redirect URLs** → add
+`https://test.luminaiq.fun/**`. Without this, Google sign-in on the test site redirects to production.
+
+### 3. Qdrant (≈3 min)
+https://cloud.qdrant.io → **Create cluster** (free tier, region near Render). Copy the cluster URL
+(`https://xxxx.cloud.qdrant.io:6333`) and create an API key.
+
+### 4. Render backend (≈10 min, mostly build time)
+1. Environment Groups → open `luminaiq-env` → copy every variable into a new group
+   **`luminaiq-test-env`**, then change:
+   - `QDRANT_URL` / `QDRANT_API_KEY` → the new cluster
    - `BACKEND_CORS_ORIGINS` (only if the group defines it) → add `https://test.luminaiq.fun`
-2. **New + → Blueprint** → select this repo → Blueprint path **`render.test.yaml`** → Apply.
-3. When it's live, open `https://luminaiq-backend-test.onrender.com/health` → should return `{"status":"healthy"}`.
+2. **New + → Blueprint** → this repo → Blueprint path **`render.test.yaml`** → Apply.
+3. Check `https://luminaiq-backend-test.onrender.com/health` returns `{"status":"healthy"}`.
 
-## 4. Vercel frontend (≈5 min)
-1. **Add New → Project** → import this repo.
-   - Root directory: `frontend` · Framework: Vite
-   - Production branch (Settings → Git): `jaisamyukth-changes`
-2. Environment variables (see `frontend/.env.example`):
-   - `VITE_MAIN_API_URL` = `https://luminaiq-backend-test.onrender.com/api/v1`
-   - `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` = same as production
-3. Deploy, then Settings → Domains → add **`test.luminaiq.fun`**.
+The new Qdrant starts empty: the first time a project is opened on the test site the backend
+re-embeds its books from the stored text automatically (no re-uploads).
 
-## 5. DNS (≈2 min + propagation)
-At your domain registrar / DNS host for `luminaiq.fun`, add the record Vercel shows, normally:
-
-| Type | Name | Value |
-|---|---|---|
-| CNAME | `test` | `cname.vercel-dns.com` |
-
-## Notes
+## Things to know (shared database)
+- Accounts, projects and books are the same on test and production.
+- **Deleting a document on test deletes it in production too.**
+- Re-embedding into the new Qdrant uses Azure embedding quota once per book.
+- The test backend never changes a document's processing status, so production users never see
+  their books flip to "processing"/"failed" because of the test environment.
 - Render free tier sleeps after inactivity; the first request can take ~1 minute.
-- Deleting a document on test removes it from the shared database (and so from production too).
-- Re-embedding books into the new Qdrant uses your Azure embedding quota once per book.
+
+## Supabase advisor notes (pre-existing, not caused by these changes)
+- Security: `increment_xp` has a mutable `search_path`; `vector` extension lives in `public`;
+  leaked-password protection is off (Authentication → Policies).
+- Performance: many RLS policies re-evaluate `auth.uid()` per row (`auth_rls_initplan`), multiple
+  permissive policies per table, and 19 duplicate indexes. Worth a cleanup pass later.
