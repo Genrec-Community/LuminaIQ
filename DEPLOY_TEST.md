@@ -8,10 +8,10 @@ Branch: **`jaisamyukth-changes`** · Production (`main`, luminaiq.fun) is not to
 |---|---|---|
 | Database / auth | Supabase project **Lumina IQ** (`bcosfvilvwyxtrctsmez`, ap-south-1) — **shared with production** | ✅ migration `004_topic_outline` applied |
 | Frontend | Vercel project **`luminaiq-test`** (`prj_QdOOgYdPFsppjAWfn5AFcqTDQQWL`) | ✅ created, deployed, domain attached |
-| Domain | `test.luminaiq.fun` → Vercel | ⏳ needs a DNS record in Cloudflare (step 1) |
+| Domain | `test.luminaiq.fun` → Vercel | ✅ resolving (Cloudflare CNAME) |
 | Supabase auth redirect | `https://test.luminaiq.fun/**` | ⏳ dashboard-only setting (step 2) |
-| Vector DB | new Qdrant Cloud cluster | ⏳ step 3 |
-| Backend | Render service **`luminaiq-backend-test`** (`render.test.yaml`) | ⏳ step 4 |
+| Vector DB | new Qdrant Cloud cluster | ✅ created by you; URL/key set on the Render service |
+| Backend | Render service **`luminaiq-backend-test`** (`srv-db5p2k2jnfac73b8hpcg`), workspace *Jai Samyukth*, project *Luminaiq-test*, Singapore, free plan, Docker, root `backend/`, branch `jaisamyukth-changes` | ✅ live at https://luminaiq-backend-test.onrender.com |
 
 Production for comparison: Vercel project `lumina-iq` (luminaiq.fun, www.luminaiq.fun) and Render
 service `luminaiq-backend`. Neither was modified.
@@ -36,6 +36,19 @@ service `luminaiq-backend`. Neither was modified.
   Vercel → luminaiq-test → Settings → Environment Variables, then redeploy.
 - Deployment URL (Vercel login required because of deployment protection):
   `luminaiq-test.vercel.app`. The custom domain is public.
+
+### Render — `luminaiq-backend-test`
+- Created manually in the dashboard (equivalent to `render.test.yaml`), auto-deploys on every push
+  to `jaisamyukth-changes`.
+- `BACKEND_CORS_ORIGINS` = `https://test.luminaiq.fun,https://luminaiq-test.vercel.app,http://localhost:5173`
+- Must carry the same Supabase / Azure OpenAI / `SECRET_KEY` variables as production
+  (`luminaiq-backend`, workspace *My Workspace*), with its own `QDRANT_URL` / `QDRANT_API_KEY`.
+- Health check: `GET /health` → `{"status":"healthy","service":"lumina-backend"}`.
+
+### Vercel deployment protection
+Turned **off** for `luminaiq-test` (Vercel Authentication was redirecting `test.luminaiq.fun`
+assets such as `site.webmanifest` to `vercel.com/sso-api`, which blocks every visitor not logged in
+to Vercel). The preview toolbar is disabled too. Production project settings are unchanged.
 
 ### Supabase — `Lumina IQ`
 Applied `backend/migrations/004_topic_outline.sql` as migration `004_topic_outline`:
