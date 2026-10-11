@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
     MessageSquare,
@@ -75,39 +75,45 @@ import UploadZone from '../components/UploadZone';
 import { getRotatingLoadingMessage, getRandomLoadingMessage } from '../utils/LoadingMessages';
 
 // View Components
-import QuizView from '../components/views/QuizView';
-import QAView from '../components/views/QAView';
-import NotesView from '../components/views/NotesView';
-import StudyDashboard from '../components/views/StudyDashboard';
-import LearningPathView from '../components/views/LearningPathView';
-import AdvancedAnalytics from '../components/views/AdvancedAnalytics';
-import KnowledgeGraphView from '../components/views/KnowledgeGraphView';
-import TopicMindmap from '../components/views/TopicMindmap';
-import TopicFlashcards from '../components/views/TopicFlashcards';
-import FlashcardsView from '../components/views/FlashcardsView';
-import MindmapView from '../components/views/MindmapView';
-import PowerHourView from '../components/views/PowerHourView';
+const QuizView = lazy(() => import('../components/views/QuizView'));
+const QAView = lazy(() => import('../components/views/QAView'));
+const NotesView = lazy(() => import('../components/views/NotesView'));
+const StudyDashboard = lazy(() => import('../components/views/StudyDashboard'));
+const LearningPathView = lazy(() => import('../components/views/LearningPathView'));
+const AdvancedAnalytics = lazy(() => import('../components/views/AdvancedAnalytics'));
+const KnowledgeGraphView = lazy(() => import('../components/views/KnowledgeGraphView'));
+const TopicMindmap = lazy(() => import('../components/views/TopicMindmap'));
+const TopicFlashcards = lazy(() => import('../components/views/TopicFlashcards'));
+const FlashcardsView = lazy(() => import('../components/views/FlashcardsView'));
+const MindmapView = lazy(() => import('../components/views/MindmapView'));
+const PowerHourView = lazy(() => import('../components/views/PowerHourView'));
 import useFocusTimer from '../hooks/useFocusTimer';
 import { LAST_PROJECT_KEY } from '../utils/dailyProgress';
 import { aiName } from '../utils/persona';
 
 
 // Utility Components
-import PomodoroTimer from '../components/PomodoroTimer';
-import AITutorChat from '../components/AITutorChat';
-import BookmarksPanel from '../components/BookmarksPanel';
-import GlobalSearch from '../components/GlobalSearch';
-import GamificationPanel from '../components/GamificationPanel';
+const PomodoroTimer = lazy(() => import('../components/PomodoroTimer'));
+const AITutorChat = lazy(() => import('../components/AITutorChat'));
+const BookmarksPanel = lazy(() => import('../components/BookmarksPanel'));
+const GlobalSearch = lazy(() => import('../components/GlobalSearch'));
+const GamificationPanel = lazy(() => import('../components/GamificationPanel'));
 import { ProjectViewSkeleton } from '../components/Skeleton';
-import AddDocumentModal from '../components/AddDocumentModal';
+const AddDocumentModal = lazy(() => import('../components/AddDocumentModal'));
 
 
 // Chat Agentic Components
 import { CommandPicker, CommandParamForm } from '../components/chat/ChatCommands';
 import { ToolLoadingCard, ToolResultCard, ToolErrorCard } from '../components/chat/ToolResultCard';
-import PDFViewer from '../components/chat/PDFViewer';
+const PDFViewer = lazy(() => import('../components/chat/PDFViewer'));
 import ErrorBoundary from '../components/ErrorBoundary';
 
+
+const ViewLoader = () => (
+    <div className="h-full flex items-center justify-center">
+        <div className="h-10 w-10 rounded-2xl bg-[#C8A288]/70 animate-pulse" />
+    </div>
+);
 
 const ProjectView = () => {
     const { projectId } = useParams();
@@ -242,6 +248,7 @@ const ProjectView = () => {
     // Topics State
     const [availableTopics, setAvailableTopics] = useState([]);
     const [allProjectTopics, setAllProjectTopics] = useState([]);
+    const [topicMeta, setTopicMeta] = useState({}); // topic -> { order, level, chapter, prerequisites }
     const [documentTopics, setDocumentTopics] = useState({});
 
     // Learning Path Integration State
@@ -472,13 +479,15 @@ const ProjectView = () => {
         try {
             const data = await getTopics(projectId);
             if (data.all && data.by_doc) {
-                // Deduplicate topics and sort for a stable ordering
-                const uniqueAll = [...new Set(data.all)].sort();
+                // Keep the server's learning order (prerequisites first) — the
+                // same order the Learning Path uses. Never re-sort here.
+                const uniqueAll = [...new Set(data.all)];
                 setAllProjectTopics(uniqueAll);
                 setAvailableTopics(uniqueAll);
                 setDocumentTopics(data.by_doc);
+                setTopicMeta(data.meta || {});
             } else if (Array.isArray(data)) {
-                const unique = [...new Set(data)].sort();
+                const unique = [...new Set(data)];
                 setAvailableTopics(unique);
                 setAllProjectTopics(unique);
             }
@@ -514,7 +523,8 @@ const ProjectView = () => {
             // If we have selected docs but no topics found for them yet, 
             // filtered set is empty. 
             // Logic: "Only show topics of selected". So show empty (or maybe show all if empty? No, empty is correct for strict filtering).
-            setAvailableTopics(Array.from(filtered).sort());
+            // Preserve learning order while filtering to the selected documents
+            setAvailableTopics(allProjectTopics.filter(t => filtered.has(t)));
         } else {
             // If nothing selected (Global) OR we don't have mappings, show ALL.
             setAvailableTopics(allProjectTopics);
@@ -1427,6 +1437,7 @@ const ProjectView = () => {
 
                 {/* Content Body */}
                 <div className="flex-1 overflow-hidden relative">
+                <Suspense fallback={<ViewLoader />}>
 
                     {/* Chat View */}
                     {activeTab === 'chat' && (
@@ -1635,6 +1646,7 @@ const ProjectView = () => {
                             availableTopics={availableTopics.length ? availableTopics : allProjectTopics}
                             selectedDocuments={selectedDocuments}
                             completedTopics={learningProgress}
+                            topicMeta={topicMeta}
                             onTopicMastered={(topic) => {
                                 setLearningProgress(prev => {
                                     if (prev.has(topic)) return prev;
@@ -1863,6 +1875,7 @@ const ProjectView = () => {
                             />
                         </div>
                     )}
+                </Suspense>
                 </div>
             </div>
 
@@ -2128,6 +2141,7 @@ const ProjectView = () => {
                 )
             }
 
+            <Suspense fallback={null}>
             {/* Floating Pomodoro Timer */}
             {showPomodoro && (
                 <div className="fixed bottom-4 right-4 left-4 md:left-auto md:w-auto z-50 animate-in slide-in-from-bottom-4">
@@ -2180,6 +2194,8 @@ const ProjectView = () => {
                     <GamificationPanel onClose={() => setShowGamification(false)} />
                 </div>
             )}
+
+            </Suspense>
 
             {/* Profile Dropdown - Floating Popup */}
             {showProfileMenu && (
@@ -2253,8 +2269,9 @@ const ProjectView = () => {
                 </>
             )}
 
-            {/* Global Search Modal */}
-            <GlobalSearch
+            <Suspense fallback={null}>
+            {/* Global Search Modal — mounted only when opened so its code loads on demand */}
+            {showSearch && <GlobalSearch
                 isOpen={showSearch}
                 onClose={() => setShowSearch(false)}
                 projectId={projectId}
@@ -2269,7 +2286,7 @@ const ProjectView = () => {
                     setShowAITutor(true);
                     setShowSearch(false);
                 }}
-            />
+            />}
 
             {/* Add Document Modal — unified source picker (Book Store + Upload) */}
             {showAddDocModal && (
@@ -2286,6 +2303,7 @@ const ProjectView = () => {
                     onClose={() => setShowAddDocModal(false)}
                 />
             )}
+            </Suspense>
         </div >
 
     );

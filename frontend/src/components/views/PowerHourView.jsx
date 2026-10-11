@@ -57,7 +57,7 @@ const Confetti = () => {
  * feedback, combos, XP and a companion cheering you on. The next card is
  * prefetched while you work so there is no waiting between topics.
  */
-const PowerHourView = ({ projectId, availableTopics = [], selectedDocuments = [], completedTopics, onTopicMastered, onOpenChat }) => {
+const PowerHourView = ({ projectId, availableTopics = [], selectedDocuments = [], completedTopics, topicMeta = {}, onTopicMastered, onOpenChat }) => {
     const { user } = useAuth();
     const { settings } = useSettings();
     const { earnXP } = useGamification();
@@ -87,6 +87,27 @@ const PowerHourView = ({ projectId, availableTopics = [], selectedDocuments = []
 
     const mastered = completedTopics instanceof Set ? completedTopics : new Set(completedTopics || []);
     const remainingTopics = availableTopics.filter((t) => !mastered.has(t));
+
+    // Topics arrive in learning order (prerequisites first). Group them into
+    // chapters in order of first appearance so students see a clear path.
+    const chapters = useMemo(() => {
+        const groups = [];
+        const byTitle = new Map();
+        for (const t of availableTopics) {
+            const title = topicMeta[t]?.chapter || 'Topics';
+            if (!byTitle.has(title)) {
+                const g = { title, topics: [] };
+                byTitle.set(title, g);
+                groups.push(g);
+            }
+            byTitle.get(title).topics.push(t);
+        }
+        return groups;
+    }, [availableTopics, topicMeta]);
+
+    // A topic is "ready" once every prerequisite it has here is mastered
+    const isReady = (t) => (topicMeta[t]?.prerequisites || []).every((p) => mastered.has(p) || !availableTopics.includes(p));
+    const nextUp = remainingTopics.find(isReady) || remainingTopics[0];
 
     const prefetch = useCallback((topic) => {
         if (!topic || inflight.current[topic]) return;
@@ -124,9 +145,12 @@ const PowerHourView = ({ projectId, availableTopics = [], selectedDocuments = []
         return () => clearInterval(t);
     }, [mode, phase]);
 
-    const start = (m) => {
+    const start = (m, only) => {
         let list;
-        if (m === 'review') list = weak.filter((t) => availableTopics.includes(t));
+        if (only) {
+            const left = only.filter((t) => !mastered.has(t));
+            list = left.length ? left : only;
+        } else if (m === 'review') list = weak.filter((t) => availableTopics.includes(t));
         else list = remainingTopics.length ? remainingTopics : availableTopics;
         if (m === 'quick') list = list.slice(0, 5);
         if (!list.length) return;
@@ -292,7 +316,60 @@ const PowerHourView = ({ projectId, availableTopics = [], selectedDocuments = []
                         <div className="text-[#4A3B32]">
                             <span className="text-xs font-semibold text-[#C8A288] block">{companion}</span>
                             {character.greet(name)} Each card takes about 3 minutes — {remainingTopics.length ? `${remainingTopics.length} topics left to master.` : 'you have mastered everything — time for a review lap!'}
+                            {nextUp && <span className="block mt-1 text-sm">Next up: <b>{nextUp}</b>{topicMeta[nextUp]?.prerequisites?.length ? ` (builds on ${topicMeta[nextUp].prerequisites.slice(0, 2).join(', ')})` : ' — a great starting point'}.</span>}
                         </div>
+                    </div>
+
+                    {/* Chapter path */}
+                    <div className="mt-4 rounded-3xl border border-[#E6D5CC] bg-white p-4 md:p-6">
+                        <div className="flex items-center justify-between mb-1">
+                            <h3 className="text-lg font-bold text-[#4A3B32]">Your path</h3>
+                            <span className="text-xs text-[#8a6a5c]">Basics first, then what builds on them</span>
+                        </div>
+                        <div className="divide-y divide-[#E6D5CC]">
+                            {chapters.map((ch, ci) => {
+                                const done = ch.topics.filter((t) => mastered.has(t)).length;
+                                const complete = done === ch.topics.length;
+                                return (
+                                    <div key={ch.title} className="py-3">
+                                        <div className="flex items-center gap-3">
+                                            <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${complete ? 'bg-emerald-500 text-white' : 'bg-[#FDF6F0] text-[#C8A288]'}`}>
+                                                {complete ? <CheckCircle2 className="h-4 w-4" /> : ci + 1}
+                                            </span>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="font-semibold text-[#4A3B32] truncate">{ch.title}</div>
+                                                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[#E6D5CC]/60">
+                                                    <div className="h-full rounded-full bg-[#C8A288]" style={{ width: `${(done / ch.topics.length) * 100}%` }} />
+                                                </div>
+                                            </div>
+                                            <span className="text-xs tabular-nums text-[#8a6a5c]">{done}/{ch.topics.length}</span>
+                                            <button onClick={() => start('sprint', ch.topics)}
+                                                className="rounded-xl border border-[#E6D5CC] px-3 py-1.5 text-xs font-semibold text-[#4A3B32] hover:border-[#C8A288] hover:bg-[#FDF6F0]">
+                                                {complete ? 'Review' : done ? 'Continue' : 'Start'}
+                                            </button>
+                                        </div>
+                                        <div className="mt-2 ml-11 flex flex-wrap gap-1.5">
+                                            {ch.topics.map((t) => {
+                                                const m = mastered.has(t);
+                                                const next = t === nextUp;
+                                                const ready = isReady(t);
+                                                return (
+                                                    <button key={t} onClick={() => start('sprint', [t])}
+                                                        title={topicMeta[t]?.prerequisites?.length ? `Builds on: ${topicMeta[t].prerequisites.join(', ')}` : 'No prerequisites'}
+                                                        className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${m ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                                                            : next ? 'border-[#C8A288] bg-[#C8A288] text-white'
+                                                                : ready ? 'border-[#E6D5CC] bg-white text-[#4A3B32] hover:border-[#C8A288]'
+                                                                    : 'border-dashed border-[#E6D5CC] bg-white text-[#8a6a5c] hover:border-[#C8A288]'}`}>
+                                                        {m ? '✓ ' : next ? '▶ ' : ''}{t}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <p className="mt-2 text-xs text-[#8a6a5c]">Solid chips are ready to learn; dashed ones build on topics you haven&apos;t mastered yet.</p>
                     </div>
                 </div>
             </div>
@@ -377,6 +454,18 @@ const PowerHourView = ({ projectId, availableTopics = [], selectedDocuments = []
                                 {phase === 'learn' ? <><BookOpen className="h-4 w-4" /> Learn</> : <><Target className="h-4 w-4" /> Quick check {qIndex + 1}/{card.questions?.length || QUESTIONS_PER_TOPIC}</>}
                             </div>
                             <h2 className="mt-2 text-2xl md:text-3xl font-bold text-[#4A3B32]">{topic}</h2>
+                            {(topicMeta[topic]?.chapter || topicMeta[topic]?.prerequisites?.length > 0) && (
+                                <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
+                                    {topicMeta[topic]?.chapter && (
+                                        <span className="rounded-full bg-[#FDF6F0] border border-[#E6D5CC] px-2.5 py-1 text-[#8a6a5c]">📖 {topicMeta[topic].chapter}</span>
+                                    )}
+                                    {topicMeta[topic]?.prerequisites?.length > 0 && (
+                                        <span className="rounded-full bg-[#FDF6F0] border border-[#E6D5CC] px-2.5 py-1 text-[#8a6a5c]">
+                                            🧩 Builds on: {topicMeta[topic].prerequisites.join(', ')}
+                                        </span>
+                                    )}
+                                </div>
+                            )}
 
                             {phase === 'learn' && (
                                 card.summary === undefined && !card.error ? (
