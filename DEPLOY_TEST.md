@@ -10,7 +10,7 @@ Branch: **`jaisamyukth-changes`** · Production (`main`, luminaiq.fun) is not to
 | Frontend | Vercel project **`luminaiq-test`** (`prj_QdOOgYdPFsppjAWfn5AFcqTDQQWL`) | ✅ created, deployed, domain attached |
 | Domain | `test.luminaiq.fun` → Vercel | ✅ resolving (Cloudflare CNAME) |
 | Supabase auth redirect | `https://test.luminaiq.fun/**` | ⏳ dashboard-only setting (step 2) |
-| Vector DB | new Qdrant Cloud cluster | ✅ created by you; URL/key set on the Render service |
+| Vector DB | new Qdrant Cloud cluster | ⚠️ should be set on the Render service (`QDRANT_URL`, `QDRANT_API_KEY`) — not verified by Claude |
 | Backend | Render service **`luminaiq-backend-test`** (`srv-db5p2k2jnfac73b8hpcg`), workspace *Jai Samyukth*, project *Luminaiq-test*, Singapore, free plan, Docker, root `backend/`, branch `jaisamyukth-changes` | ✅ live at https://luminaiq-backend-test.onrender.com |
 
 Production for comparison: Vercel project `lumina-iq` (luminaiq.fun, www.luminaiq.fun) and Render
