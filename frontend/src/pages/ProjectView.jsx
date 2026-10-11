@@ -221,16 +221,33 @@ const ProjectView = () => {
         }
     };
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Chat scrolling: follow new messages only while the reader is at the
+    // bottom; scroll the chat container itself (scrollIntoView also scrolled
+    // parent layouts and fought the reader on every streamed chunk).
+    const chatScrollRef = useRef(null);
+    const stickToBottomRef = useRef(true);
+    const [showJumpToLatest, setShowJumpToLatest] = useState(false);
+
+    const scrollToBottom = (smooth = false) => {
+        const el = chatScrollRef.current;
+        if (!el) return;
+        el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+        stickToBottomRef.current = true;
+        setShowJumpToLatest(false);
+    };
+
+    const handleChatScroll = () => {
+        const el = chatScrollRef.current;
+        if (!el) return;
+        const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+        stickToBottomRef.current = atBottom;
+        setShowJumpToLatest(!atBottom);
     };
 
     useEffect(() => {
-        if (activeTab === 'chat') {
-            // Use a slight delay to ensure DOM has updated before scrolling
-            setTimeout(() => {
-                scrollToBottom();
-            }, 50);
+        if (activeTab === 'chat' && stickToBottomRef.current) {
+            // Wait for the DOM to paint the new content, then follow it
+            requestAnimationFrame(() => scrollToBottom(false));
         }
     }, [messages, activeTab]);
 
@@ -842,6 +859,7 @@ const ProjectView = () => {
         const userMsg = inputMessage;
         // Add user message immediately
         const newMessages = [...messages, { role: 'user', content: userMsg }];
+        stickToBottomRef.current = true; // sending always jumps to the latest message
         setMessages(newMessages);
         setInputMessage('');
         setLoading(true);
@@ -1505,7 +1523,12 @@ const ProjectView = () => {
                                     />
                                 </ErrorBoundary>
                             )}
-                            <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-4 md:p-6 space-y-6">
+                            <div className="relative flex-1 min-h-0 flex flex-col">
+                            <div
+                                ref={chatScrollRef}
+                                onScroll={handleChatScroll}
+                                className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-2 py-4 md:p-6 space-y-6"
+                            >
                                 {messages.map((msg, idx) => (
                                     <React.Fragment key={idx}>
                                     {/* Day separator whenever the date changes */}
@@ -1622,7 +1645,7 @@ const ProjectView = () => {
                                                 title={new Date(msg.timestamp).toLocaleString()}
                                             >
                                                 {formatChatTime(msg.timestamp)}
-                                                {msg.role === 'assistant' && msg.completedAt && (
+                                                {msg.role === 'assistant' && msg.completedAt && !String(msg.content || '').startsWith('Error:') && (
                                                     <> · answered in {Math.max(0.1, (new Date(msg.completedAt) - new Date(msg.timestamp)) / 1000).toFixed(1)}s</>
                                                 )}
                                             </div>
@@ -1673,6 +1696,15 @@ const ProjectView = () => {
                                     </div>
                                 )}
 
+                            </div>
+                            {showJumpToLatest && (
+                                <button
+                                    onClick={() => scrollToBottom(true)}
+                                    className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 rounded-full bg-[#C8A288] px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-[#C8A288]/30 hover:bg-[#B08B72]"
+                                >
+                                    <ChevronDown className="h-4 w-4" /> Latest
+                                </button>
+                            )}
                             </div>
 
                             <div className="p-4 border-t border-[#E6D5CC] bg-white">

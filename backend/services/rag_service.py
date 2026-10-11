@@ -220,6 +220,21 @@ Your job is to make the user understand.
 
         return rag_chain
 
+    @staticmethod
+    def _friendly_error(e: Exception) -> str:
+        """Plain-language message for chat errors (raw details go to the logs)."""
+        text = str(e)
+        lower = text.lower()
+        if "not found: collection" in lower or "doesn't exist" in lower:
+            return "Your documents' search index is being rebuilt. Please try again in a few minutes."
+        if "402" in text or "credit limit" in lower or "insufficient_quota" in lower:
+            return "The AI service has run out of credit, so I can't answer right now. Please let the site admin know."
+        if "401" in text or "invalid api key" in lower or "invalid_api_key" in lower:
+            return "The AI service rejected its API key, so I can't answer right now. Please let the site admin know."
+        if "connection error" in lower or "apiconnectionerror" in lower or "timed out" in lower:
+            return "I couldn't reach the AI service. Please try again in a moment."
+        return "Something went wrong while answering. Please try again."
+
     def _trigger_reindex(self, project_id: str):
         """Rebuild missing vectors for this project's documents in the background."""
         from services.document_service import document_service
@@ -357,22 +372,19 @@ Your job is to make the user understand.
         except Exception as e:
             logger.error(f"Error in RAG pipeline: {str(e)}")
             
-            friendly_message = str(e)
             if "Not found: Collection" in str(e) or "doesn't exist" in str(e):
                 self._trigger_reindex(project_id)
-                try:
-                    fallback = await self._answer_from_stored_text(
-                        project_id, question, selected_documents, chat_history, user_context
-                    )
-                    if fallback:
-                        return fallback
-                except Exception as fb_err:
-                    logger.error(f"Stored-text fallback failed: {fb_err}")
-                friendly_message = "Your documents' search index is being rebuilt. Please try again in a few minutes."
-            elif "Connection error" in str(e) or "APIConnectionError" in str(e):
-                friendly_message = "Failed to connect to the AI service. Please check your backend configuration or try again later."
-                
-            raise Exception(friendly_message)
+            # Search/embeddings/index failed: answer from the stored text instead
+            try:
+                fallback = await self._answer_from_stored_text(
+                    project_id, question, selected_documents, chat_history, user_context
+                )
+                if fallback:
+                    return fallback
+            except Exception as fb_err:
+                logger.error(f"Stored-text fallback failed: {fb_err}")
+
+            raise Exception(self._friendly_error(e))
 
     async def get_answer_stream(
         self,
@@ -412,10 +424,10 @@ Your job is to make the user understand.
                 history_messages.append(AIMessage(content=msg["content"]))
 
         for attempt in range(max_retries):
+            has_yielded = False
             try:
                 chain = self._get_retrieval_chain(collection_name, selected_documents, system_prompt, user_context)
                 sources_data = []
-                has_yielded = False
 
                 empty_context = False
                 async for chunk in chain.astream(
@@ -537,10 +549,12 @@ Your job is to make the user understand.
                         return
 
                 logger.error(f"Error in RAG stream: {str(e)}")
-                
-                friendly_message = str(e)
+
                 if "Not found: Collection" in str(e) or "doesn't exist" in str(e):
                     self._trigger_reindex(project_id)
+                # Failed before any answer text (search, embeddings or index):
+                # answer from the documents' stored text instead.
+                if not has_yielded:
                     try:
                         fallback = await self._answer_from_stored_text(
                             project_id, question, selected_documents, chat_history, user_context
@@ -553,11 +567,8 @@ Your job is to make the user understand.
                             return
                     except Exception as fb_err:
                         logger.error(f"Stored-text fallback failed: {fb_err}")
-                    friendly_message = "Your documents' search index is being rebuilt. Please try again in a few minutes."
-                elif "Connection error" in str(e) or "APIConnectionError" in str(e):
-                    friendly_message = "Failed to connect to the AI service. Please check your backend configuration or try again later."
-                
-                yield f"Error: {friendly_message}"
+
+                yield f"Error: {self._friendly_error(e)}"
                 return
 
     async def generate_summary(
