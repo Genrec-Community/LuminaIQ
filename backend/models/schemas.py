@@ -69,6 +69,7 @@ class DocumentStatus(BaseModel):
 class ChatMessage(BaseModel):
     role: str
     content: str
+    created_at: Optional[str] = None
 
 
 class ChatRequest(BaseModel):

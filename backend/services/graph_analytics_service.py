@@ -169,7 +169,7 @@ class GraphAnalyticsService:
                 except Exception as reindex_err:
                     logger.error(f"Failed to check/rebuild index for {project_id}: {reindex_err}")
 
-                context_parts, sources = await self._keyword_context_from_stored_text(
+                context_parts, sources = await self.keyword_context_from_stored_text(
                     project_id, topic
                 )
 
@@ -275,17 +275,21 @@ Generate the summary now:"""
                 "cached": False
             }
 
-    async def _keyword_context_from_stored_text(
+    async def keyword_context_from_stored_text(
         self,
         project_id: str,
         topic: str,
         max_passages: int = 8,
         window: int = 1200,
+        document_ids: Optional[List[str]] = None,
+        per_passage_sources: bool = False,
+        overview_if_empty: bool = False,
     ) -> tuple:
         """
         Fallback retrieval when the vector index is unavailable: scan each
         document's stored text for passages that mention the topic's keywords.
-        Returns (context_parts, sources).
+        Returns (context_parts, sources). With per_passage_sources, sources[i]
+        describes context_parts[i] (so inline citations [n] line up).
         """
         import re
         from services.document_service import document_service
@@ -293,56 +297,77 @@ Generate the summary now:"""
         stopwords = {
             "a", "an", "and", "the", "of", "in", "on", "by", "to", "for", "with",
             "its", "their", "is", "are", "as", "at", "from", "or", "e", "g", "eg",
+            # question words that would otherwise match every page
+            "what", "which", "who", "whom", "why", "how", "when", "where", "does",
+            "did", "can", "could", "would", "should", "this", "that", "these",
+            "those", "about", "tell", "explain", "describe", "give", "me", "you",
+            "your", "book", "document", "chapter", "text", "please", "main", "mean",
         }
         keywords = [
             w for w in re.findall(r"[a-z0-9]+", topic.lower())
             if len(w) > 2 and w not in stopwords
         ]
-        if not keywords:
+        if not keywords and not overview_if_empty:
             return [], []
 
         try:
-            docs = (
-                (await async_db(lambda: self.client.table("documents")
+            query = (
+                self.client.table("documents")
                 .select("id, project_id, filename, text_storage_path")
                 .eq("project_id", project_id)
                 .eq("upload_status", "completed")
-                .execute()))
             )
+            if document_ids:
+                query = query.in_("id", document_ids)
+            docs = await async_db(lambda: query.execute())
         except Exception as e:
             logger.warning(f"Keyword fallback: failed to list documents: {e}")
             return [], []
 
-        candidates = []  # (score, passage, doc)
+        texts = []  # (doc, text)
         for doc in docs.data or []:
             text = await document_service.load_stored_text(doc)
-            if not text:
-                continue
-            lower = text.lower()
-            for start in range(0, len(lower), window // 2):
-                segment = lower[start:start + window]
-                score = sum(segment.count(k) for k in keywords)
-                # Require most keywords to appear so passages are actually on-topic
-                distinct = sum(1 for k in keywords if k in segment)
-                if distinct >= max(1, (len(keywords) + 1) // 2):
-                    candidates.append((distinct * 10 + score, text[start:start + window], doc))
+            if text:
+                texts.append((doc, text))
 
-        candidates.sort(key=lambda c: c[0], reverse=True)
+        candidates = []  # (score, passage, doc)
+        if keywords:
+            for doc, text in texts:
+                lower = text.lower()
+                for start in range(0, len(lower), window // 2):
+                    segment = lower[start:start + window]
+                    # Require most keywords to appear so passages are actually on-topic
+                    distinct = sum(1 for k in keywords if k in segment)
+                    if distinct >= max(1, (len(keywords) + 1) // 2):
+                        score = sum(segment.count(k) for k in keywords)
+                        candidates.append((distinct * 10 + score, text[start:start + window], doc))
+            candidates.sort(key=lambda c: c[0], reverse=True)
+
+        if not candidates and overview_if_empty:
+            # Broad question ("what is this book about?"): opening pages plus
+            # evenly spaced samples give the model a view of the whole book.
+            per_doc = max(2, max_passages // max(1, len(texts)))
+            for doc, text in texts:
+                step = max(window, len(text) // per_doc)
+                for i, start in enumerate(range(0, len(text), step)):
+                    if i >= per_doc:
+                        break
+                    candidates.append((0, text[start:start + window], doc))
 
         context_parts, sources, seen_docs = [], [], set()
         for _, passage, doc in candidates[:max_passages]:
             context_parts.append(passage)
-            if doc["id"] not in seen_docs:
+            if per_passage_sources or doc["id"] not in seen_docs:
                 seen_docs.add(doc["id"])
                 sources.append({
                     "doc_id": doc["id"],
                     "doc_name": doc["filename"],
-                    "chunk_text": passage[:100] + "...",
+                    "chunk_text": passage if per_passage_sources else passage[:100] + "...",
                 })
 
         logger.info(
             f"Keyword fallback for '{topic}': {len(context_parts)} passages "
-            f"from {len(sources)} document(s)"
+            f"from {len(seen_docs)} document(s)"
         )
         return context_parts, sources
 

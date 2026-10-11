@@ -109,6 +109,26 @@ const PDFViewer = lazy(() => import('../components/chat/PDFViewer'));
 import ErrorBoundary from '../components/ErrorBoundary';
 
 
+// ── Chat time log helpers ───────────────────────────────────────────
+const formatChatTime = (iso) => {
+    const d = new Date(iso);
+    return isNaN(d) ? '' : d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+};
+const chatDayLabel = (iso) => {
+    const d = new Date(iso);
+    if (isNaN(d)) return '';
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+    if (d.toDateString() === today.toDateString()) return 'Today';
+    if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+    return d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short', year: d.getFullYear() === today.getFullYear() ? undefined : 'numeric' });
+};
+const welcomeMessage = (settings) => ({
+    role: 'system',
+    content: `Hi! I'm ${aiName(settings)} ${settings.aiAvatar || '✨'} Ask me anything about your documents — or try "explain like I'm 12", "quiz me", or "give me a memory trick".`,
+});
+
 const ViewLoader = () => (
     <div className="h-full flex items-center justify-center">
         <div className="h-10 w-10 rounded-2xl bg-[#C8A288]/70 animate-pulse" />
@@ -136,6 +156,21 @@ const ProjectView = () => {
     }, [projectId]);
     const [messages, setMessages] = useState([]);
     const messagesEndRef = useRef(null);
+
+    // Time log: stamp every newly added message with the time it appeared
+    const stampedCountRef = useRef(0);
+    useEffect(() => {
+        const from = stampedCountRef.current;
+        if (messages.length < from) {
+            stampedCountRef.current = messages.length; // chat was cleared
+            return;
+        }
+        stampedCountRef.current = messages.length;
+        if (messages.slice(from).some(m => !m.timestamp)) {
+            const now = new Date().toISOString();
+            setMessages(prev => prev.map((m, i) => (i >= from && !m.timestamp ? { ...m, timestamp: now } : m)));
+        }
+    }, [messages]);
 
     const [{ run, steps }, setTourState] = useState({
         run: false,
@@ -380,21 +415,29 @@ const ProjectView = () => {
             }
 
             // Restore chat messages from session cache, or start fresh
-            const cachedMessages = sessionStorage.getItem(`lumina_chat_${projectId}`);
-            if (cachedMessages) {
+            // Restore chat: this tab's cache first, then saved server history
+            // (with real timestamps), otherwise a fresh welcome.
+            let restored = null;
+            try {
+                const parsed = JSON.parse(sessionStorage.getItem(`lumina_chat_${projectId}`) || 'null');
+                if (Array.isArray(parsed) && parsed.length > 0) restored = parsed;
+            } catch { /* ignore */ }
+            if (!restored) {
                 try {
-                    const parsed = JSON.parse(cachedMessages);
-                    if (Array.isArray(parsed) && parsed.length > 0) {
-                        setMessages(parsed);
-                    } else {
-                        setMessages([{ role: 'system', content: `Hi! I'm ${aiName(settings)} ${settings.aiAvatar || '✨'} Ask me anything about your documents — or try "explain like I'm 12", "quiz me", or "give me a memory trick".` }]);
+                    const history = await getChatHistory(projectId);
+                    if (Array.isArray(history) && history.length > 0) {
+                        restored = [
+                            welcomeMessage(settings),
+                            ...history.map(m => ({ role: m.role, content: m.content, timestamp: m.created_at || undefined })),
+                        ];
                     }
-                } catch {
-                    setMessages([{ role: 'system', content: `Hi! I'm ${aiName(settings)} ${settings.aiAvatar || '✨'} Ask me anything about your documents — or try "explain like I'm 12", "quiz me", or "give me a memory trick".` }]);
+                } catch (histErr) {
+                    console.warn('Failed to load chat history:', histErr);
                 }
-            } else {
-                setMessages([{ role: 'system', content: `Hi! I'm ${aiName(settings)} ${settings.aiAvatar || '✨'} Ask me anything about your documents — or try "explain like I'm 12", "quiz me", or "give me a memory trick".` }]);
             }
+            const initialMessages = restored || [welcomeMessage(settings)];
+            stampedCountRef.current = initialMessages.length; // don't re-stamp restored messages
+            setMessages(initialMessages);
 
             const docs = docData?.documents || [];
             const processingDocs = docs.filter(d =>
@@ -623,7 +666,7 @@ const ProjectView = () => {
     };
 
     const handleNewSession = () => {
-        setMessages([{ role: 'system', content: `Hi! I'm ${aiName(settings)} ${settings.aiAvatar || '✨'} Ask me anything about your documents — or try "explain like I'm 12", "quiz me", or "give me a memory trick".` }]);
+        setMessages([welcomeMessage(settings)]);
         setInputMessage('');
         setActiveCommand(null);
         setShowCommandPicker(false);
@@ -849,6 +892,7 @@ const ProjectView = () => {
                         if (lastMsg.role === 'assistant') {
                             lastMsg.content = finalResult.answer;
                             lastMsg.sources = finalResult.sources;
+                            lastMsg.completedAt = new Date().toISOString();
                         }
                         return updated;
                     });
@@ -1463,7 +1507,20 @@ const ProjectView = () => {
                             )}
                             <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-4 md:p-6 space-y-6">
                                 {messages.map((msg, idx) => (
-                                    <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                                    <React.Fragment key={idx}>
+                                    {/* Day separator whenever the date changes */}
+                                    {msg.timestamp && (() => {
+                                        const prevStamp = messages.slice(0, idx).reverse().find(m => m.timestamp)?.timestamp;
+                                        const label = chatDayLabel(msg.timestamp);
+                                        return (!prevStamp || chatDayLabel(prevStamp) !== label) ? (
+                                            <div className="flex items-center gap-3 my-2 text-[11px] font-semibold uppercase tracking-wide text-[#8a6a5c]">
+                                                <span className="h-px flex-1 bg-[#E6D5CC]" />
+                                                {label}
+                                                <span className="h-px flex-1 bg-[#E6D5CC]" />
+                                            </div>
+                                        ) : null;
+                                    })()}
+                                    <div className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                                         {/* Tool Loading Card */}
                                         {msg.type === 'tool_loading' && (
                                             <ToolLoadingCard toolType={msg.toolType} toolParams={msg.toolParams} />
@@ -1557,7 +1614,21 @@ const ProjectView = () => {
                                                 {/* Citations are now rendered inline within ReactMarkdown */}
                                             </div>
                                         )}
+
+                                        {/* Time log */}
+                                        {msg.timestamp && msg.role !== 'system' && (
+                                            <div
+                                                className={`mt-1 px-1 text-[11px] text-[#8a6a5c] ${msg.role === 'user' ? 'text-right' : ''}`}
+                                                title={new Date(msg.timestamp).toLocaleString()}
+                                            >
+                                                {formatChatTime(msg.timestamp)}
+                                                {msg.role === 'assistant' && msg.completedAt && (
+                                                    <> · answered in {Math.max(0.1, (new Date(msg.completedAt) - new Date(msg.timestamp)) / 1000).toFixed(1)}s</>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
+                                    </React.Fragment>
                                 ))}
                                 <div ref={messagesEndRef} />
                                 {isProcessingDocs && selectedDocuments.some(id => {

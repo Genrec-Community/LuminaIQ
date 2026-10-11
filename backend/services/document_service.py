@@ -464,6 +464,9 @@ class DocumentService:
     _reindexing: set = set()
     # Strong refs to background tasks so they aren't garbage-collected mid-run
     _background_tasks: set = set()
+    # document_id -> time of last failed re-index (avoid retrying on every request)
+    _reindex_failed_at: dict = {}
+    REINDEX_RETRY_SECONDS = 600
 
     async def load_stored_text(self, document: Dict[str, Any]) -> Optional[str]:
         """Download a document's extracted text from the texts/ bucket."""
@@ -501,10 +504,15 @@ class DocumentService:
             .execute()
         )
 
+        import time
+
         reindexing = []
         for doc in docs.data or []:
             if doc["id"] in self._reindexing:
                 reindexing.append(doc["id"])
+                continue
+            failed_at = self._reindex_failed_at.get(doc["id"])
+            if failed_at and time.time() - failed_at < self.REINDEX_RETRY_SECONDS:
                 continue
             try:
                 count = await qdrant_service.count_document_vectors(
@@ -574,9 +582,16 @@ class DocumentService:
 
             await progress.emit(document_id, "completed", 100, "Document re-indexed")
             logger.info(f"[Reindex] {filename} re-indexed ({len(chunks)} chunks)")
+            self._reindex_failed_at.pop(document_id, None)
 
         except Exception as e:
-            logger.error(f"[Reindex] Failed for {filename}: {e}")
+            import time
+
+            self._reindex_failed_at[document_id] = time.time()
+            logger.error(
+                f"[Reindex] Failed for {filename}: {e} — will retry after "
+                f"{self.REINDEX_RETRY_SECONDS // 60} minutes"
+            )
         finally:
             self._reindexing.discard(document_id)
 

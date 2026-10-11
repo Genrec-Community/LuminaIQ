@@ -133,7 +133,7 @@ async def get_chat_history(
         )
 
         return [
-            ChatMessage(role=msg["role"], content=msg["content"])
+            ChatMessage(role=msg["role"], content=msg["content"], created_at=msg.get("created_at"))
             for msg in response.data
         ]
     except Exception as e:

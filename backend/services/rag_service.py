@@ -234,6 +234,50 @@ Your job is to make the user understand.
         self._background_tasks.add(task)
         task.add_done_callback(self._background_tasks.discard)
 
+    async def _answer_from_stored_text(
+        self,
+        project_id: str,
+        question: str,
+        selected_documents: Optional[List[str]],
+        chat_history: List[Dict[str, str]],
+        user_context: Optional[str],
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Answer without the vector index (missing, rebuilding, or the embedding
+        provider is down) using passages found in the documents' stored text.
+        Returns None when no text is available.
+        """
+        from services.graph_analytics_service import graph_analytics
+
+        passages, sources = await graph_analytics.keyword_context_from_stored_text(
+            project_id,
+            question,
+            max_passages=6,
+            document_ids=selected_documents or None,
+            per_passage_sources=True,
+            overview_if_empty=True,
+        )
+        if not passages:
+            return None
+
+        context = "\n\n".join(f"[Source {i + 1}]\n{p}" for i, p in enumerate(passages))
+        system = (
+            (f"=== STUDENT PROFILE ===\n{user_context}\n\n" if user_context else "")
+            + "You are a helpful study companion. Answer the student's question using the "
+            "excerpts from their documents below. Cite facts inline as [1](1), [2](2) matching "
+            "the source numbers. Use clear Markdown. If the excerpts don't cover the question, "
+            "say so briefly and give the best answer you can from them.\n\n"
+            f"EXCERPTS:\n{context[:9000]}"
+        )
+        messages = [{"role": "system", "content": system}]
+        for m in chat_history[-6:]:
+            if m.get("role") in ("user", "assistant") and m.get("content"):
+                messages.append({"role": m["role"], "content": m["content"]})
+        messages.append({"role": "user", "content": question})
+
+        answer = await llm_service.chat_completion(messages, temperature=0.3, max_tokens=1500)
+        return {"answer": answer, "sources": sources}
+
     async def get_answer(
         self,
         project_id: str,
@@ -307,6 +351,14 @@ Your job is to make the user understand.
             friendly_message = str(e)
             if "Not found: Collection" in str(e) or "doesn't exist" in str(e):
                 self._trigger_reindex(project_id)
+                try:
+                    fallback = await self._answer_from_stored_text(
+                        project_id, question, selected_documents, chat_history, user_context
+                    )
+                    if fallback:
+                        return fallback
+                except Exception as fb_err:
+                    logger.error(f"Stored-text fallback failed: {fb_err}")
                 friendly_message = "Your documents' search index is being rebuilt. Please try again in a few minutes."
             elif "Connection error" in str(e) or "APIConnectionError" in str(e):
                 friendly_message = "Failed to connect to the AI service. Please check your backend configuration or try again later."
@@ -457,6 +509,18 @@ Your job is to make the user understand.
                 friendly_message = str(e)
                 if "Not found: Collection" in str(e) or "doesn't exist" in str(e):
                     self._trigger_reindex(project_id)
+                    try:
+                        fallback = await self._answer_from_stored_text(
+                            project_id, question, selected_documents, chat_history, user_context
+                        )
+                        if fallback:
+                            import json
+
+                            yield fallback["answer"]
+                            yield f"\n\n__SOURCES__:{json.dumps(fallback['sources'])}"
+                            return
+                    except Exception as fb_err:
+                        logger.error(f"Stored-text fallback failed: {fb_err}")
                     friendly_message = "Your documents' search index is being rebuilt. Please try again in a few minutes."
                 elif "Connection error" in str(e) or "APIConnectionError" in str(e):
                     friendly_message = "Failed to connect to the AI service. Please check your backend configuration or try again later."
