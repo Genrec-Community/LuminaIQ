@@ -153,19 +153,40 @@ class GraphAnalyticsService:
                 limit=8
             )
             
-            if not results:
-                return {
-                    "topic": topic,
-                    "summary": f"No content found for '{topic}' in the uploaded documents.",
-                    "sources": [],
-                    "cached": False
-                }
-            
-            # Build context from search results
             context_parts = []
             sources = []
             seen_docs = set()
-            
+            reindexing = []
+
+            if not results:
+                # Vector search found nothing even though the project has documents:
+                # the search index is missing. Rebuild it in the background and
+                # answer from the stored document text in the meantime.
+                from services.document_service import document_service
+
+                try:
+                    reindexing = await document_service.ensure_project_indexed(project_id)
+                except Exception as reindex_err:
+                    logger.error(f"Failed to check/rebuild index for {project_id}: {reindex_err}")
+
+                context_parts, sources = await self._keyword_context_from_stored_text(
+                    project_id, topic
+                )
+
+                if not context_parts:
+                    msg = f"No content found for '{topic}' in the uploaded documents."
+                    if reindexing:
+                        msg = (
+                            f"Your documents are being re-indexed ({len(reindexing)} "
+                            f"document(s)). Please try '{topic}' again in a few minutes."
+                        )
+                    return {
+                        "topic": topic,
+                        "summary": msg,
+                        "sources": [],
+                        "cached": False
+                    }
+
             for hit in results:
                 context_parts.append(hit["text"])
                 doc_id = hit.get("document_id", "")
@@ -211,6 +232,16 @@ Generate the summary now:"""
                 messages, temperature=0.3, max_tokens=1000
             )
             
+            # Don't cache summaries built from the keyword fallback — once the
+            # index is rebuilt, vector search gives better context.
+            if not results:
+                return {
+                    "topic": topic,
+                    "summary": summary,
+                    "sources": sources,
+                    "cached": False
+                }
+
             # Cache the summary
             try:
                 self.client.table("topic_summaries").upsert(
@@ -243,6 +274,77 @@ Generate the summary now:"""
                 "sources": [],
                 "cached": False
             }
+
+    async def _keyword_context_from_stored_text(
+        self,
+        project_id: str,
+        topic: str,
+        max_passages: int = 8,
+        window: int = 1200,
+    ) -> tuple:
+        """
+        Fallback retrieval when the vector index is unavailable: scan each
+        document's stored text for passages that mention the topic's keywords.
+        Returns (context_parts, sources).
+        """
+        import re
+        from services.document_service import document_service
+
+        stopwords = {
+            "a", "an", "and", "the", "of", "in", "on", "by", "to", "for", "with",
+            "its", "their", "is", "are", "as", "at", "from", "or", "e", "g", "eg",
+        }
+        keywords = [
+            w for w in re.findall(r"[a-z0-9]+", topic.lower())
+            if len(w) > 2 and w not in stopwords
+        ]
+        if not keywords:
+            return [], []
+
+        try:
+            docs = (
+                self.client.table("documents")
+                .select("id, project_id, filename, text_storage_path")
+                .eq("project_id", project_id)
+                .in_("upload_status", ["completed", "processing"])
+                .execute()
+            )
+        except Exception as e:
+            logger.warning(f"Keyword fallback: failed to list documents: {e}")
+            return [], []
+
+        candidates = []  # (score, passage, doc)
+        for doc in docs.data or []:
+            text = await document_service.load_stored_text(doc)
+            if not text:
+                continue
+            lower = text.lower()
+            for start in range(0, len(lower), window // 2):
+                segment = lower[start:start + window]
+                score = sum(segment.count(k) for k in keywords)
+                # Require most keywords to appear so passages are actually on-topic
+                distinct = sum(1 for k in keywords if k in segment)
+                if distinct >= max(1, (len(keywords) + 1) // 2):
+                    candidates.append((distinct * 10 + score, text[start:start + window], doc))
+
+        candidates.sort(key=lambda c: c[0], reverse=True)
+
+        context_parts, sources, seen_docs = [], [], set()
+        for _, passage, doc in candidates[:max_passages]:
+            context_parts.append(passage)
+            if doc["id"] not in seen_docs:
+                seen_docs.add(doc["id"])
+                sources.append({
+                    "doc_id": doc["id"],
+                    "doc_name": doc["filename"],
+                    "chunk_text": passage[:100] + "...",
+                })
+
+        logger.info(
+            f"Keyword fallback for '{topic}': {len(context_parts)} passages "
+            f"from {len(sources)} document(s)"
+        )
+        return context_parts, sources
 
     # ============== Learning Suggestions ==============
 

@@ -312,6 +312,26 @@ class QdrantService:
             logger.error(f"Error getting initial chunks: {str(e)}")
             return []
 
+    async def count_document_vectors(self, collection_name: str, document_id: str) -> int:
+        """Count vectors stored for a document. Returns 0 if the collection is missing."""
+        try:
+            result = await self.async_client.count(
+                collection_name=collection_name,
+                count_filter=Filter(
+                    must=[
+                        FieldCondition(
+                            key="document_id", match=MatchValue(value=document_id)
+                        )
+                    ]
+                ),
+                exact=True,
+            )
+            return result.count
+        except Exception as e:
+            if "Not found: Collection" in str(e) or "doesn't exist" in str(e):
+                return 0
+            raise
+
     async def delete_vectors(self, collection_name: str, document_id: str):
         """Delete vectors for a specific document (fully async)"""
         try:

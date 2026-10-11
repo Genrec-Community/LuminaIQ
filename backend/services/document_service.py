@@ -464,6 +464,132 @@ class DocumentService:
             logger.info(f"[{filename}] Embedding completed: {total_batches} batches")
 
     # ──────────────────────────────────────────────────────────────────────────
+    # Index self-healing
+    # ──────────────────────────────────────────────────────────────────────────
+
+    # Document IDs currently being re-indexed (prevents duplicate background jobs)
+    _reindexing: set = set()
+    # Strong refs to background tasks so they aren't garbage-collected mid-run
+    _background_tasks: set = set()
+
+    async def load_stored_text(self, document: Dict[str, Any]) -> Optional[str]:
+        """Download a document's extracted text from the texts/ bucket."""
+        path = document.get("text_storage_path") or (
+            f"{document['project_id']}/{document['id']}.txt"
+            if document.get("project_id") else None
+        )
+        if not path:
+            return None
+        try:
+            text_bytes = await async_db(
+                lambda: self.client.storage.from_(
+                    settings.BOOK_IMPORT_TEXTS_BUCKET
+                ).download(path)
+            )
+            return text_bytes.decode("utf-8") if text_bytes else None
+        except Exception as e:
+            logger.warning(f"Could not load stored text for {document.get('id')}: {e}")
+            return None
+
+    async def ensure_project_indexed(self, project_id: str) -> List[str]:
+        """
+        Find "completed" documents that have no vectors in Qdrant (e.g. the
+        collection was wiped or the vector DB was replaced) and re-embed them
+        in the background from their stored text.
+
+        Returns the IDs of documents being re-indexed.
+        """
+        collection_name = f"project_{project_id}"
+        docs = await async_db(
+            lambda: self.client.table("documents")
+            .select("id, project_id, filename, text_storage_path")
+            .eq("project_id", project_id)
+            .eq("upload_status", "completed")
+            .execute()
+        )
+
+        reindexing = []
+        for doc in docs.data or []:
+            if doc["id"] in self._reindexing:
+                reindexing.append(doc["id"])
+                continue
+            try:
+                count = await qdrant_service.count_document_vectors(
+                    collection_name, doc["id"]
+                )
+            except Exception as e:
+                logger.warning(f"Vector count failed for {doc['id']}: {e}")
+                continue
+            if count > 0:
+                continue
+
+            logger.warning(
+                f"[Reindex] Document {doc['filename']} ({doc['id']}) is marked "
+                f"completed but has no vectors in {collection_name} — re-indexing"
+            )
+            self._reindexing.add(doc["id"])
+            reindexing.append(doc["id"])
+            task = asyncio.create_task(self._reindex_from_storage(doc))
+            self._background_tasks.add(task)
+            task.add_done_callback(self._background_tasks.discard)
+
+        return reindexing
+
+    async def _reindex_from_storage(self, document: Dict[str, Any]):
+        """Re-chunk and re-embed a document from its stored text."""
+        document_id = document["id"]
+        project_id = document["project_id"]
+        filename = document["filename"]
+        progress = get_progress_manager()
+
+        try:
+            text = await self.load_stored_text(document)
+            if not text:
+                await self._update_document_status(
+                    document_id, "failed",
+                    "Search index was lost and no stored text is available. "
+                    "Please re-upload this document.",
+                )
+                return
+
+            async with EmbeddingQueue.get_doc_semaphore():
+                await self._update_document_status(
+                    document_id, "processing", "Re-indexing document..."
+                )
+                loop = asyncio.get_running_loop()
+                chunks = await loop.run_in_executor(
+                    None, lambda: self.text_chunker.chunk_text(text)
+                )
+                if not chunks:
+                    await self._update_document_status(
+                        document_id, "failed", "No chunks generated"
+                    )
+                    return
+
+                collection_name = f"project_{project_id}"
+                await qdrant_service.create_collection(collection_name)
+                # Drop any partial vectors so we don't duplicate chunks
+                await qdrant_service.delete_vectors(collection_name, document_id)
+                await progress.emit(
+                    document_id, "embedding", 0,
+                    f"Re-indexing {len(chunks)} chunks..."
+                )
+                await self._process_embeddings_direct(
+                    chunks, document_id, filename, collection_name
+                )
+
+            await self._update_document_status(document_id, "completed")
+            await progress.emit(document_id, "completed", 100, "Document re-indexed")
+            logger.info(f"[Reindex] {filename} re-indexed ({len(chunks)} chunks)")
+
+        except Exception as e:
+            logger.error(f"[Reindex] Failed for {filename}: {e}")
+            await self._update_document_status(document_id, "failed", str(e))
+            await progress.emit(document_id, "failed", 0, str(e))
+        finally:
+            self._reindexing.discard(document_id)
+
+    # ──────────────────────────────────────────────────────────────────────────
     # Database helpers
     # ──────────────────────────────────────────────────────────────────────────
 

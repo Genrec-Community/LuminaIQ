@@ -52,6 +52,9 @@ async def retry_with_backoff(func, max_retries=3, base_delay=1.0, max_delay=10.0
 
 
 class RAGService:
+    # Strong refs to background tasks so they aren't garbage-collected mid-run
+    _background_tasks: set = set()
+
     def __init__(self):
         self.client: Client = create_client(
             settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY
@@ -215,6 +218,20 @@ Your job is to make the user understand.
 
         return rag_chain
 
+    def _trigger_reindex(self, project_id: str):
+        """Rebuild missing vectors for this project's documents in the background."""
+        from services.document_service import document_service
+
+        async def _run():
+            try:
+                await document_service.ensure_project_indexed(project_id)
+            except Exception as e:
+                logger.error(f"Index check failed for project {project_id}: {e}")
+
+        task = asyncio.create_task(_run())
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+
     async def get_answer(
         self,
         project_id: str,
@@ -292,7 +309,8 @@ Your job is to make the user understand.
             
             friendly_message = str(e)
             if "Not found: Collection" in str(e) or "doesn't exist" in str(e):
-                friendly_message = "Document chunks are still processing or failed to upload. Please try re-uploading the document if this persists."
+                self._trigger_reindex(project_id)
+                friendly_message = "Your documents' search index is being rebuilt. Please try again in a few minutes."
             elif "Connection error" in str(e) or "APIConnectionError" in str(e):
                 friendly_message = "Failed to connect to the AI service. Please check your backend configuration or try again later."
                 
@@ -381,6 +399,9 @@ Your job is to make the user understand.
                                 }
                             )
 
+                if not sources_data:
+                    self._trigger_reindex(project_id)
+
                 # Send sources at the end
                 import json
 
@@ -438,7 +459,8 @@ Your job is to make the user understand.
                 
                 friendly_message = str(e)
                 if "Not found: Collection" in str(e) or "doesn't exist" in str(e):
-                    friendly_message = "Document chunks are still processing or failed to upload. Please try re-uploading the document if this persists."
+                    self._trigger_reindex(project_id)
+                    friendly_message = "Your documents' search index is being rebuilt. Please try again in a few minutes."
                 elif "Connection error" in str(e) or "APIConnectionError" in str(e):
                     friendly_message = "Failed to connect to the AI service. Please check your backend configuration or try again later."
                 
