@@ -64,6 +64,7 @@ import {
 } from '../api';
 import { useToast } from '../context/ToastContext';
 import { Joyride, STATUS } from 'react-joyride';
+import { TOUR_OPTIONS } from '../utils/tourConfig';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { useGamification } from '../context/GamificationContext';
@@ -376,10 +377,8 @@ const ProjectView = () => {
         if (!projectViewLoading && !fetchError && user?.id && settings.onboardingComplete) {
             const hasSeenProjectTutorial = localStorage.getItem(`hasSeenProjectTutorial_${user?.id}`);
             if (!hasSeenProjectTutorial) {
-                setTimeout(() => {
-                    localStorage.setItem(`hasSeenProjectTutorial_${user?.id}`, 'true');
-                    setTourState(prev => ({ ...prev, run: true }));
-                }, 500);
+                // Marked as seen only when finished or skipped (see handleJoyrideCallback)
+                setTimeout(() => setTourState(prev => ({ ...prev, run: true })), 500);
             }
         }
     }, [projectViewLoading, fetchError, user?.id, settings.onboardingComplete]);
@@ -984,6 +983,9 @@ const ProjectView = () => {
 
 
     // Sidebar Navigation Item
+    // Called as a plain function, not <NavItem/>: defined inside this component,
+    // it would be a new component type every render and remount the buttons,
+    // which made the guided-tour tooltips jump around.
     const NavItem = ({ id, icon: Icon, label }) => (
         <button
             id={`tour-nav-${id}`}
@@ -1083,20 +1085,11 @@ const ProjectView = () => {
             } : { background: '#FDF6F0', color: '#4A3B32' }}>
 
             <Joyride
-                callback={handleJoyrideCallback}
+                onEvent={handleJoyrideCallback}
                 continuous
                 run={run}
                 steps={steps}
-                showSkipButton
-                disableScrolling={true}
-                disableScrollParentFix={true}
-                disableOverlayClose={true}
-                styles={{
-                    options: {
-                        primaryColor: '#C8A288',
-                        zIndex: 10000,
-                    }
-                }}
+                options={TOUR_OPTIONS}
             />
 
             {/* Mobile Sidebar Overlay */}
@@ -1148,11 +1141,11 @@ const ProjectView = () => {
 
                         <nav className={`flex-1 overflow-y-auto min-h-0 custom-scrollbar ${leftCollapsed ? 'space-y-2' : 'space-y-4'}`}>
                             {/* Main Navigation Items */}
-                            <NavItem id="power" icon={Zap} label="Power Hour" />
-                            <NavItem id="chat" icon={MessageSquare} label={`Chat with ${aiName(settings)}`} />
-                            <NavItem id="path" icon={Target} label="Learning Path" />
+                            {NavItem({ id: "power", icon: Zap, label: "Power Hour" })}
+                            {NavItem({ id: "chat", icon: MessageSquare, label: `Chat with ${aiName(settings)}` })}
+                            {NavItem({ id: "path", icon: Target, label: "Learning Path" })}
 
-                            <NavItem id="knowledge" icon={Network} label="Knowledge Graph" />
+                            {NavItem({ id: "knowledge", icon: Network, label: "Knowledge Graph" })}
 
                             {/* General Section - Expandable */}
                             <div className={leftCollapsed ? '' : ''}>

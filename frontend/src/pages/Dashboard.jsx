@@ -13,6 +13,7 @@ import { getRotatingLoadingMessage } from '../utils/LoadingMessages';
 import { DashboardSkeleton } from '../components/Skeleton';
 import { getCachedProjects, setCachedProjects, clearProjectsCache } from '../utils/projectCache';
 import { Joyride, STATUS } from 'react-joyride';
+import { TOUR_OPTIONS } from '../utils/tourConfig';
 import { useSettings } from '../context/SettingsContext';
 import TodayHero from '../components/TodayHero';
 import { displayName } from '../utils/persona';
@@ -92,10 +93,8 @@ const Dashboard = () => {
         if (!isLoadingProjects && !fetchError && user?.id && settings.onboardingComplete) {
             const hasSeenDashboardTutorial = localStorage.getItem(`hasSeenDashboardTutorial_${user.id}`);
             if (!hasSeenDashboardTutorial) {
-                setTimeout(() => {
-                    localStorage.setItem(`hasSeenDashboardTutorial_${user.id}`, 'true');
-                    setTourState(prev => ({ ...prev, run: true }));
-                }, 500);
+                // Marked as seen only when finished or skipped (see handleJoyrideCallback)
+                setTimeout(() => setTourState(prev => ({ ...prev, run: true })), 500);
             }
         }
     }, [isLoadingProjects, fetchError, user?.id, settings.onboardingComplete]);
@@ -386,19 +385,11 @@ const Dashboard = () => {
     return (
         <div className="min-h-screen bg-[#FDF6F0] font-sans text-[#4A3B32]">
             <Joyride
-                callback={handleJoyrideCallback}
+                onEvent={handleJoyrideCallback}
                 continuous
                 run={run}
                 steps={steps}
-                showSkipButton
-                disableScrolling={true}
-                disableScrollParentFix={true}
-                styles={{
-                    options: {
-                        primaryColor: '#C8A288',
-                        zIndex: 10000,
-                    }
-                }}
+                options={TOUR_OPTIONS}
             />
             {/* Header */}
             <header className="bg-white border-b border-[#E6D5CC] sticky top-0 z-10">
