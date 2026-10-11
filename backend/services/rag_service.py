@@ -310,6 +310,15 @@ Your job is to make the user understand.
                 invoke_chain, max_retries=3, base_delay=1.5
             )
 
+            # Nothing retrieved (index empty / rebuilding): use stored text instead
+            if "context" in response and not response["context"]:
+                self._trigger_reindex(project_id)
+                fallback = await self._answer_from_stored_text(
+                    project_id, question, selected_documents, chat_history, user_context
+                )
+                if fallback:
+                    return fallback
+
             # Process sources from 'context' in response
             sources = []
             if "context" in response:
@@ -408,9 +417,17 @@ Your job is to make the user understand.
                 sources_data = []
                 has_yielded = False
 
+                empty_context = False
                 async for chunk in chain.astream(
                     {"input": question, "chat_history": history_messages}
                 ):
+                    # Retrieval comes before generation: if it found nothing
+                    # (index empty or still rebuilding), stop before the LLM call
+                    # and answer from the documents' stored text instead.
+                    if "context" in chunk and not chunk["context"] and not has_yielded:
+                        empty_context = True
+                        break
+
                     # Check for answer chunks
                     if "answer" in chunk:
                         has_yielded = True
@@ -447,6 +464,21 @@ Your job is to make the user understand.
                                     "page": doc.metadata.get("page"),
                                 }
                             )
+
+                if empty_context:
+                    self._trigger_reindex(project_id)
+                    fallback = await self._answer_from_stored_text(
+                        project_id, question, selected_documents, chat_history, user_context
+                    )
+                    import json
+
+                    if fallback:
+                        yield fallback["answer"]
+                        yield f"\n\n__SOURCES__:{json.dumps(fallback['sources'])}"
+                    else:
+                        yield "I couldn't find any readable text in the selected documents yet. Try again once they finish processing."
+                        yield "\n\n__SOURCES__:[]"
+                    return
 
                 if not sources_data:
                     self._trigger_reindex(project_id)
