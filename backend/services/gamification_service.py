@@ -66,6 +66,7 @@ XP_REWARDS = {
     "pomodoro": 25,         # Completing a pomodoro session
     "quiz": 30,             # Base quiz XP (bonuses added for scores)
     "exam": 35,             # Exam prep practice
+    "sprint": 12,           # Power Hour: per topic card completed
 }
 
 XP_BONUS_PERFECT_QUIZ = 50   # 100% score bonus
@@ -367,6 +368,7 @@ class GamificationService:
                 "path": "paths_completed",
                 "exam": "exams_taken",
                 "knowledge_graph": "graphs_explored",
+                "sprint": "topics_mastered",
             }
 
             stat_key = stat_mapping.get(activity_type)

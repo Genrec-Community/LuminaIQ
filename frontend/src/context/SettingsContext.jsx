@@ -20,6 +20,19 @@ const defaultSettings = {
     learningStyle: 'balanced',
     subjectsOfInterest: [],
     dailyStudyGoal: 30, // minutes
+    nickname: '',
+    userAvatar: '🦊',
+    ageGroup: '',
+    examName: '',
+    examDate: '', // YYYY-MM-DD
+
+    // AI Companion
+    aiName: 'Lumi',
+    aiAvatar: '✨',
+    aiCharacter: 'buddy', // key of AI_CHARACTERS in utils/persona.js
+    aiHumor: 'some', // 'none' | 'some' | 'lots'
+    aiEmoji: true,
+    onboardingComplete: false,
 
     // Learning Mode
     bookIsolation: true,
@@ -49,6 +62,9 @@ export const SettingsProvider = ({ children }) => {
             setLoaded(true);
             return;
         }
+        // Mark as not loaded until this user's settings arrive, so UI that
+        // depends on them (e.g. onboarding) doesn't act on defaults.
+        setLoaded(false);
         const load = async () => {
             try {
                 const data = await getUserSettings();
@@ -112,6 +128,17 @@ export const SettingsProvider = ({ children }) => {
         });
     }, []);
 
+    // Update several settings at once with a single save
+    const updateSettings = useCallback((partial) => {
+        setSettings(prev => {
+            const next = { ...prev, ...partial };
+            saveUserSettings(next).catch(err =>
+                console.warn('Failed to save settings:', err)
+            );
+            return next;
+        });
+    }, []);
+
     const resetSettings = useCallback(async () => {
         try {
             await saveUserSettings(defaultSettings);
@@ -122,7 +149,7 @@ export const SettingsProvider = ({ children }) => {
     }, []);
 
     return (
-        <SettingsContext.Provider value={{ settings, updateSetting, resetSettings, loaded }}>
+        <SettingsContext.Provider value={{ settings, updateSetting, updateSettings, resetSettings, loaded }}>
             {children}
         </SettingsContext.Provider>
     );

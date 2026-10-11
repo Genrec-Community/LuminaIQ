@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
     Plus, Search, BookOpen, Calendar, ArrowRight, LogOut, Upload, FileText,
     Loader2, X, Trash2, RefreshCw, WifiOff, Globe, Lock, ArrowLeft,
-    Tag, ChevronDown, ChevronUp, Check, Download
+    Tag, ChevronDown, ChevronUp, Check, Download, Settings as SettingsIcon
 } from 'lucide-react';
 import { createProject, uploadDocument, getProjects, deleteProject, getPublicBooks, importBook } from '../api';
 
@@ -13,11 +13,17 @@ import { getRotatingLoadingMessage } from '../utils/LoadingMessages';
 import { DashboardSkeleton } from '../components/Skeleton';
 import { getCachedProjects, setCachedProjects, clearProjectsCache } from '../utils/projectCache';
 import { Joyride, STATUS } from 'react-joyride';
+import { useSettings } from '../context/SettingsContext';
+import TodayHero from '../components/TodayHero';
+import { displayName } from '../utils/persona';
+import { LAST_PROJECT_KEY } from '../utils/dailyProgress';
 
 const Dashboard = () => {
     const navigate = useNavigate();
     const { user, logout } = useAuth();
     const toast = useToast();
+    const { settings } = useSettings();
+    const [projectSearch, setProjectSearch] = useState('');
     const [showNewProjectModal, setShowNewProjectModal] = useState(false);
     const [newProjectName, setNewProjectName] = useState('');
     const [selectedFiles, setSelectedFiles] = useState([]);
@@ -83,7 +89,7 @@ const Dashboard = () => {
     });
 
     useEffect(() => {
-        if (!isLoadingProjects && !fetchError && user?.id) {
+        if (!isLoadingProjects && !fetchError && user?.id && settings.onboardingComplete) {
             const hasSeenDashboardTutorial = localStorage.getItem(`hasSeenDashboardTutorial_${user.id}`);
             if (!hasSeenDashboardTutorial) {
                 setTimeout(() => {
@@ -92,7 +98,7 @@ const Dashboard = () => {
                 }, 500);
             }
         }
-    }, [isLoadingProjects, fetchError, user?.id]);
+    }, [isLoadingProjects, fetchError, user?.id, settings.onboardingComplete]);
 
     const handleJoyrideCallback = (data) => {
         const { status } = data;
@@ -371,6 +377,12 @@ const Dashboard = () => {
         }
     };
 
+    const filteredProjects = projectSearch.trim()
+        ? projects.filter(p => p.name?.toLowerCase().includes(projectSearch.trim().toLowerCase()))
+        : projects;
+    const lastProjectId = (() => { try { return localStorage.getItem(LAST_PROJECT_KEY); } catch { return null; } })();
+    const continueProject = projects.find(p => p.id === lastProjectId) || projects[0] || null;
+
     return (
         <div className="min-h-screen bg-[#FDF6F0] font-sans text-[#4A3B32]">
             <Joyride
@@ -399,12 +411,17 @@ const Dashboard = () => {
                     </div>
 
                     <div className="flex items-center gap-4">
-                        <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-[#FDF6F0] rounded-full border border-[#E6D5CC]">
-                            <div className="h-8 w-8 bg-[#C8A288] rounded-full flex items-center justify-center text-white text-sm font-bold">
-                                {user?.full_name ? user.full_name.charAt(0).toUpperCase() : user?.email?.charAt(0).toUpperCase()}
+                        <button
+                            onClick={() => navigate('/settings')}
+                            className="flex items-center gap-2 pl-1.5 pr-4 py-1.5 bg-[#FDF6F0] rounded-full border border-[#E6D5CC] hover:border-[#C8A288] transition-colors"
+                            title="Profile & settings"
+                        >
+                            <div className="h-8 w-8 bg-white rounded-full flex items-center justify-center text-lg border border-[#E6D5CC]">
+                                {settings.userAvatar || '🦊'}
                             </div>
-                            <span className="font-medium text-sm">{user?.full_name || user?.email}</span>
-                        </div>
+                            <span className="hidden sm:inline font-medium text-sm">{displayName(settings, user)}</span>
+                            <SettingsIcon className="h-4 w-4 text-[#8a6a5c]" />
+                        </button>
                         <button
                             onClick={handleLogout}
                             className="p-2 text-[#8a6a5c] hover:bg-[#FDF6F0] rounded-full transition-colors"
@@ -415,11 +432,16 @@ const Dashboard = () => {
                 </div>
             </header>
 
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10">
+                <TodayHero
+                    onContinue={continueProject ? () => navigate(`/project/${continueProject.id}`) : openNewProjectModal}
+                    continueLabel={continueProject ? `Continue: ${continueProject.name}` : 'Add your first book'}
+                />
+
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
                     <div>
-                        <h2 className="text-3xl font-bold mb-2">Your Projects</h2>
-                        <p className="text-[#8a6a5c]">Manage and organize your learning materials</p>
+                        <h2 className="text-2xl md:text-3xl font-bold mb-1">Your Study Spaces</h2>
+                        <p className="text-[#8a6a5c]">One space per subject — drop in textbooks, notes or slides</p>
                     </div>
 
                     <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
@@ -428,6 +450,8 @@ const Dashboard = () => {
                             <input
                                 type="text"
                                 placeholder="Search projects..."
+                                value={projectSearch}
+                                onChange={e => setProjectSearch(e.target.value)}
                                 className="pl-12 pr-4 py-3 bg-white border border-[#E6D5CC] rounded-xl focus:ring-2 focus:ring-[#C8A288] outline-none w-full md:w-64"
                             />
                         </div>
@@ -451,7 +475,7 @@ const Dashboard = () => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {projects.map((project) => (
+                    {filteredProjects.map((project) => (
                         <div
                             key={project.id}
                             onClick={() => navigate(`/project/${project.id}`)}

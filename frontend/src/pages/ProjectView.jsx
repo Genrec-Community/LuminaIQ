@@ -86,6 +86,10 @@ import TopicMindmap from '../components/views/TopicMindmap';
 import TopicFlashcards from '../components/views/TopicFlashcards';
 import FlashcardsView from '../components/views/FlashcardsView';
 import MindmapView from '../components/views/MindmapView';
+import PowerHourView from '../components/views/PowerHourView';
+import useFocusTimer from '../hooks/useFocusTimer';
+import { LAST_PROJECT_KEY } from '../utils/dailyProgress';
+import { aiName } from '../utils/persona';
 
 
 // Utility Components
@@ -115,8 +119,12 @@ const ProjectView = () => {
     const { data: gamificationData } = useGamification();
     const [showGamification, setShowGamification] = useState(false);
     const [activeTab, setActiveTab] = useState(() => {
-        return sessionStorage.getItem(`lumina_tab_${projectId}`) || 'path';
+        return sessionStorage.getItem(`lumina_tab_${projectId}`) || 'power';
     });
+    useFocusTimer(user?.id);
+    useEffect(() => {
+        try { localStorage.setItem(LAST_PROJECT_KEY, projectId); } catch { /* ignore */ }
+    }, [projectId]);
     const [messages, setMessages] = useState([]);
     const messagesEndRef = useRef(null);
 
@@ -128,6 +136,12 @@ const ProjectView = () => {
                 locale: { skip: 'Skip tutorial' },
                 placement: 'center',
                 target: 'body',
+            },
+            {
+                content: 'Power Hour: bite-sized lessons with instant quizzes. The fastest way through your whole book.',
+                placement: 'right',
+                target: '#tour-nav-power',
+                title: 'Power Hour ⚡',
             },
             {
                 content: 'This is your Learning Path, which guides you through topics.',
@@ -297,7 +311,7 @@ const ProjectView = () => {
 
     // Tutorial visibility effect (moved from top to fix TDZ ReferenceError)
     useEffect(() => {
-        if (!projectViewLoading && !fetchError && user?.id) {
+        if (!projectViewLoading && !fetchError && user?.id && settings.onboardingComplete) {
             const hasSeenProjectTutorial = localStorage.getItem(`hasSeenProjectTutorial_${user?.id}`);
             if (!hasSeenProjectTutorial) {
                 setTimeout(() => {
@@ -306,7 +320,7 @@ const ProjectView = () => {
                 }, 500);
             }
         }
-    }, [projectViewLoading, fetchError, user?.id]);
+    }, [projectViewLoading, fetchError, user?.id, settings.onboardingComplete]);
 
     useEffect(() => {
         let intervalId;
@@ -363,13 +377,13 @@ const ProjectView = () => {
                     if (Array.isArray(parsed) && parsed.length > 0) {
                         setMessages(parsed);
                     } else {
-                        setMessages([{ role: 'system', content: 'Ready to chat! Ask me anything about your documents.' }]);
+                        setMessages([{ role: 'system', content: `Hi! I'm ${aiName(settings)} ${settings.aiAvatar || '✨'} Ask me anything about your documents — or try "explain like I'm 12", "quiz me", or "give me a memory trick".` }]);
                     }
                 } catch {
-                    setMessages([{ role: 'system', content: 'Ready to chat! Ask me anything about your documents.' }]);
+                    setMessages([{ role: 'system', content: `Hi! I'm ${aiName(settings)} ${settings.aiAvatar || '✨'} Ask me anything about your documents — or try "explain like I'm 12", "quiz me", or "give me a memory trick".` }]);
                 }
             } else {
-                setMessages([{ role: 'system', content: 'Ready to chat! Ask me anything about your documents.' }]);
+                setMessages([{ role: 'system', content: `Hi! I'm ${aiName(settings)} ${settings.aiAvatar || '✨'} Ask me anything about your documents — or try "explain like I'm 12", "quiz me", or "give me a memory trick".` }]);
             }
 
             const docs = docData?.documents || [];
@@ -476,7 +490,7 @@ const ProjectView = () => {
     // fetchTopics on tab change — only if topics haven't been loaded yet
     useEffect(() => {
         if (!isProcessingDocs && !topicsFetchedRef.current) {
-            if (activeTab === 'chat' || activeTab === 'quiz' || activeTab === 'qa' || activeTab === 'notes' || activeTab === 'path') {
+            if (activeTab === 'power' || activeTab === 'chat' || activeTab === 'quiz' || activeTab === 'qa' || activeTab === 'notes' || activeTab === 'path') {
                 fetchTopics();
                 topicsFetchedRef.current = true;
             }
@@ -596,7 +610,7 @@ const ProjectView = () => {
     };
 
     const handleNewSession = () => {
-        setMessages([{ role: 'system', content: 'Ready to chat! Ask me anything about your documents.' }]);
+        setMessages([{ role: 'system', content: `Hi! I'm ${aiName(settings)} ${settings.aiAvatar || '✨'} Ask me anything about your documents — or try "explain like I'm 12", "quiz me", or "give me a memory trick".` }]);
         setInputMessage('');
         setActiveCommand(null);
         setShowCommandPicker(false);
@@ -1059,7 +1073,8 @@ const ProjectView = () => {
 
                         <nav className={`flex-1 overflow-y-auto min-h-0 custom-scrollbar ${leftCollapsed ? 'space-y-2' : 'space-y-4'}`}>
                             {/* Main Navigation Items */}
-                            <NavItem id="chat" icon={MessageSquare} label="Chat" />
+                            <NavItem id="power" icon={Zap} label="Power Hour" />
+                            <NavItem id="chat" icon={MessageSquare} label={`Chat with ${aiName(settings)}`} />
                             <NavItem id="path" icon={Target} label="Learning Path" />
 
                             <NavItem id="knowledge" icon={Network} label="Knowledge Graph" />
@@ -1159,12 +1174,12 @@ const ProjectView = () => {
                                     title={leftCollapsed ? 'Profile' : undefined}
                                 >
                                     <div className="h-10 w-10 bg-gradient-to-br from-[#C8A288] to-[#A08072] rounded-full flex items-center justify-center text-white shadow-md group-hover:shadow-lg transition-shadow shrink-0">
-                                        <User className="h-5 w-5" />
+                                        <span className="text-lg leading-none">{settings?.userAvatar || '🦊'}</span>
                                     </div>
                                     {!leftCollapsed && (
                                         <div className="flex-1 text-left min-w-0">
                                             <p className={`text-sm font-bold truncate ${isDark ? 'text-[#e8d8c0]' : 'text-[#4A3B32]'}`}>
-                                                {settings?.studentName || 'Profile'}
+                                                {settings?.nickname || settings?.studentName || 'Profile'}
                                             </p>
                                             <p className={`text-xs ${isDark ? 'text-[#9a7858]' : 'text-[#8a6a5c]'}`}>Menu</p>
                                         </div>
@@ -1215,7 +1230,8 @@ const ProjectView = () => {
                             {/* Left: Tab name + Summary */}
                             <div className="flex items-center gap-2 min-w-0 shrink-0">
                                 <h2 className={`text-base font-bold whitespace-nowrap ${isDark ? 'text-[#e8d8c0]' : 'text-[#4A3B32]'}`}>
-                                    {activeTab === 'chat' && 'Chat'}
+                                    {activeTab === 'power' && 'Power Hour'}
+                                    {activeTab === 'chat' && `Chat with ${aiName(settings)}`}
                                     {activeTab === 'qa' && 'Q&A'}
                                     {activeTab === 'quiz' && 'Quiz'}
                                     {activeTab === 'notes' && 'Notes'}
@@ -1452,6 +1468,14 @@ const ProjectView = () => {
                                             />
                                         )}
 
+                                        {/* Companion label on assistant replies */}
+                                        {msg.role === 'assistant' && (!msg.type || msg.type === 'tool_command') && (
+                                            <div className="flex items-center gap-1.5 mb-1 ml-1 text-xs font-semibold text-[#C8A288]">
+                                                <span className="text-base leading-none">{settings.aiAvatar || '✨'}</span>
+                                                {aiName(settings)}
+                                            </div>
+                                        )}
+
                                         {/* Regular message (no type or tool_command) */}
                                         {(!msg.type || msg.type === 'tool_command') && (
                                             <div className={`max-w-[95%] md:max-w-[85%] break-words rounded-2xl px-4 py-3 md:px-6 md:py-4 ${msg.role === 'user'
@@ -1603,6 +1627,30 @@ const ProjectView = () => {
                                 </div>
                             </div>
                         </div>
+                    )}
+
+                    {activeTab === 'power' && (
+                        <PowerHourView
+                            projectId={projectId}
+                            availableTopics={availableTopics.length ? availableTopics : allProjectTopics}
+                            selectedDocuments={selectedDocuments}
+                            completedTopics={learningProgress}
+                            onTopicMastered={(topic) => {
+                                setLearningProgress(prev => {
+                                    if (prev.has(topic)) return prev;
+                                    const next = new Set(prev);
+                                    next.add(topic);
+                                    saveLearningProgress(projectId, [...next]).catch(err =>
+                                        console.warn('Failed to save progress:', err)
+                                    );
+                                    return next;
+                                });
+                            }}
+                            onOpenChat={(prompt) => {
+                                setInputMessage(prompt);
+                                setActiveTab('chat');
+                            }}
+                        />
                     )}
 
                     {activeTab === 'quiz' && (
@@ -2149,10 +2197,10 @@ const ProjectView = () => {
                                 <div className="flex items-center justify-between md:justify-start gap-3">
                                     <div className="flex items-center gap-3">
                                         <div className="h-12 w-12 md:h-10 md:w-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-md">
-                                            <User className="h-6 w-6 md:h-5 md:w-5" />
+                                            <span className="text-lg leading-none">{settings?.userAvatar || '🦊'}</span>
                                         </div>
                                         <div>
-                                            <p className="font-bold text-base md:text-sm">{settings?.studentName || 'User'}</p>
+                                            <p className="font-bold text-base md:text-sm">{settings?.nickname || settings?.studentName || 'User'}</p>
                                             <p className="text-xs opacity-80">Free Plan</p>
                                         </div>
                                     </div>

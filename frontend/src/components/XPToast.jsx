@@ -13,6 +13,7 @@ const ACTIVITY_LABELS = {
     path: 'Path Progress',
     exam: 'Exam Practice',
     knowledge_graph: 'Graph Explored',
+    sprint: 'Power Hour Card',
 };
 
 const XPToast = () => {

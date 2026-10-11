@@ -32,6 +32,8 @@ import {
 import { useSettings } from '../context/SettingsContext';
 import { useGamification } from '../context/GamificationContext';
 import { useAuth } from '../context/AuthContext';
+import { AI_CHARACTERS, USER_AVATARS, AI_AVATARS, AGE_GROUPS, getCharacter, displayName } from '../utils/persona';
+import { onboardedKey } from '../components/Onboarding';
 
 /**
  * TextInput — MUST be defined at module level (outside Settings component).
@@ -119,6 +121,7 @@ const Settings = () => {
 
     const sections = [
         { id: 'profile', label: 'Profile', icon: User },
+        { id: 'companion', label: 'AI Buddy', icon: Sparkles },
         { id: 'study', label: 'Study', icon: Layers },
         { id: 'focus', label: 'Focus', icon: Maximize2 },
         { id: 'ai', label: 'AI & Quiz', icon: Brain },
@@ -246,15 +249,11 @@ const Settings = () => {
                 <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
                 <div className="relative z-10 flex items-center gap-4">
                     <div className="h-14 w-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/30 shadow-lg shrink-0">
-                        {settings.studentName ? (
-                            <span className="text-xl font-black">{settings.studentName.charAt(0).toUpperCase()}</span>
-                        ) : (
-                            <User className="h-6 w-6" />
-                        )}
+                        <span className="text-3xl">{settings.userAvatar || '🦊'}</span>
                     </div>
                     <div className="flex-1 min-w-0">
                         <p className="text-base font-bold truncate">
-                            {settings.studentName || 'Set your name below'}
+                            {settings.studentName || 'Set your name below'}{settings.nickname ? ` · "${settings.nickname}"` : ''}
                         </p>
                         <p className="text-white/70 text-xs font-medium mt-0.5">
                             {gamificationData ? `Level ${gamificationData.level} — ${gamificationData.level_title}` : 'Getting started...'}
@@ -281,6 +280,48 @@ const Settings = () => {
                     icon={Pencil}
                     placeholder="Enter your name..."
                 />
+                <TextInput
+                    value={settings.nickname}
+                    onChange={(v) => updateSetting('nickname', v)}
+                    label="Nickname"
+                    description="What your AI buddy calls you"
+                    icon={Sparkles}
+                    placeholder="e.g. Captain, Doc, Pri..."
+                />
+                <ChoiceGrid label="Your Avatar" value={settings.userAvatar || '🦊'} options={USER_AVATARS} onPick={(v) => updateSetting('userAvatar', v)} />
+                <SelectOption
+                    value={settings.ageGroup || ''}
+                    onChange={(v) => updateSetting('ageGroup', v)}
+                    label="About You"
+                    description="Your AI adapts its language to you"
+                    icon={User}
+                    options={[{ value: '', label: 'Prefer not to say' }, ...Object.entries(AGE_GROUPS).map(([value, g]) => ({ value, label: g.label }))]}
+                />
+                <TextInput
+                    value={settings.examName}
+                    onChange={(v) => updateSetting('examName', v)}
+                    label="Upcoming Exam"
+                    description="Shown in your countdown and used to focus answers"
+                    icon={Trophy}
+                    placeholder="e.g. Class 12 Boards, NEET, AWS cert"
+                />
+                <div className="flex items-center justify-between gap-4 p-4 bg-white rounded-2xl border border-[#E6D5CC]/80">
+                    <div className="flex items-center gap-3.5">
+                        <div className="h-10 w-10 bg-[#FDF6F0] rounded-xl flex items-center justify-center shrink-0">
+                            <Clock className="h-5 w-5 text-[#C8A288]" />
+                        </div>
+                        <div>
+                            <p className="font-semibold text-[#4A3B32] text-sm">Exam Date</p>
+                            <p className="text-xs text-[#8a6a5c] mt-0.5">We'll count down the days</p>
+                        </div>
+                    </div>
+                    <input
+                        type="date"
+                        value={settings.examDate || ''}
+                        onChange={(e) => updateSetting('examDate', e.target.value)}
+                        className="px-3 py-2 bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl text-sm text-[#4A3B32] outline-none focus:ring-2 focus:ring-[#C8A288]"
+                    />
+                </div>
                 <TextInput
                     value={settings.learningGoal}
                     onChange={(v) => updateSetting('learningGoal', v)}
@@ -365,6 +406,102 @@ const Settings = () => {
             </div>
         </div>
     );
+
+    const ChoiceGrid = ({ label, value, options, onPick }) => (
+        <div className="p-4 bg-white rounded-2xl border border-[#E6D5CC]/80">
+            <p className="font-semibold text-[#4A3B32] text-sm mb-3">{label}</p>
+            <div className="flex flex-wrap gap-2">
+                {options.map(o => (
+                    <button
+                        key={o}
+                        onClick={() => onPick(o)}
+                        className={`h-10 w-10 text-xl rounded-xl border-2 transition-all active:scale-90 ${value === o ? 'border-[#C8A288] bg-[#C8A288]/10' : 'border-[#E6D5CC] hover:border-[#C8A288]/60'}`}
+                    >
+                        {o}
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+
+    const renderCompanion = () => {
+        const character = getCharacter(settings.aiCharacter);
+        const aiDisplay = settings.aiName?.trim() || 'Lumi';
+        return (
+            <div className="space-y-5">
+                <SectionHeader icon={Sparkles} title="Your AI Study Buddy" subtitle="Name it, pick a personality, make it yours" />
+
+                <div className="flex items-start gap-4 p-5 rounded-2xl bg-gradient-to-br from-[#C8A288] via-[#B08B72] to-[#8a6a5c] text-white">
+                    <div className="h-14 w-14 shrink-0 rounded-2xl bg-white/20 border border-white/30 flex items-center justify-center text-3xl">{settings.aiAvatar || '✨'}</div>
+                    <div>
+                        <p className="font-bold">{aiDisplay} <span className="text-white/70 font-medium text-xs">· {character.label}</span></p>
+                        <p className="text-sm text-white/90 mt-1">{character.greet(displayName(settings, user))}</p>
+                    </div>
+                </div>
+
+                <div className="space-y-3">
+                    <TextInput
+                        value={settings.aiName}
+                        onChange={(v) => updateSetting('aiName', v.slice(0, 24))}
+                        label="Buddy's Name"
+                        description="Shown in chat, Power Hour and your dashboard"
+                        icon={Pencil}
+                        placeholder="Lumi"
+                    />
+                    <ChoiceGrid label="Buddy's Avatar" value={settings.aiAvatar || '✨'} options={AI_AVATARS} onPick={(v) => updateSetting('aiAvatar', v)} />
+
+                    <div className="p-4 bg-white rounded-2xl border border-[#E6D5CC]/80">
+                        <p className="font-semibold text-[#4A3B32] text-sm mb-3">Personality</p>
+                        <div className="grid sm:grid-cols-2 gap-2">
+                            {Object.entries(AI_CHARACTERS).map(([k, c]) => (
+                                <button
+                                    key={k}
+                                    onClick={() => updateSetting('aiCharacter', k)}
+                                    className={`flex items-start gap-3 p-3 rounded-xl border-2 text-left transition-all ${settings.aiCharacter === k ? 'border-[#C8A288] bg-[#C8A288]/10' : 'border-[#E6D5CC] hover:border-[#C8A288]/60'}`}
+                                >
+                                    <span className="text-2xl">{c.emoji}</span>
+                                    <span>
+                                        <span className="block text-sm font-semibold text-[#4A3B32]">{c.label}</span>
+                                        <span className="block text-xs text-[#8a6a5c]">{c.tagline}</span>
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <SelectOption
+                        value={settings.aiHumor || 'some'}
+                        onChange={(v) => updateSetting('aiHumor', v)}
+                        label="Humour"
+                        description="How playful should your buddy be?"
+                        icon={Sparkles}
+                        options={[
+                            { value: 'none', label: 'Strictly serious' },
+                            { value: 'some', label: 'A little fun' },
+                            { value: 'lots', label: 'Lots of jokes & mnemonics' },
+                        ]}
+                    />
+                    <ToggleSwitch
+                        enabled={settings.aiEmoji !== false}
+                        onChange={(v) => updateSetting('aiEmoji', v)}
+                        label="Use Emojis"
+                        description="Let your buddy sprinkle emojis in replies"
+                        icon={Sparkles}
+                    />
+                    <button
+                        onClick={() => {
+                            try { localStorage.removeItem(onboardedKey(user?.id)); } catch { /* ignore */ }
+                            updateSetting('onboardingComplete', false);
+                            navigate('/dashboard');
+                        }}
+                        className="w-full p-3 rounded-2xl border-2 border-dashed border-[#E6D5CC] text-sm font-semibold text-[#8a6a5c] hover:border-[#C8A288] hover:text-[#4A3B32] transition-colors"
+                    >
+                        ✨ Replay the welcome setup
+                    </button>
+                </div>
+            </div>
+        );
+    };
 
     const renderStudy = () => (
         <div className="space-y-5">
@@ -745,6 +882,7 @@ const Settings = () => {
     const renderSection = () => {
         switch (activeSection) {
             case 'profile': return renderProfile();
+            case 'companion': return renderCompanion();
             case 'study': return renderStudy();
             case 'focus': return renderFocus();
             case 'ai': return renderAI();
