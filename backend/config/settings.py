@@ -80,6 +80,12 @@ class Settings(BaseSettings):
     # work: quiz questions, flashcards, mindmaps, topic summaries and knowledge-graph
     # links. Empty = everything uses LLM_MODEL. Not used with Azure.
     LLM_LIGHT_MODEL: str = Field(default="")
+    # Optional stronger "Deep" model: Topper chat answers in Deep mode, Topper cram
+    # cards and Visual Lab builds. Empty = LLM_MODEL. Base URL / key default to the
+    # main provider's, so a different OpenAI-compatible provider can be used here.
+    LLM_DEEP_MODEL: str = Field(default="")
+    LLM_DEEP_BASE_URL: str = Field(default="")
+    LLM_DEEP_API_KEY: str = Field(default="")
     # Day boundary for daily plan limits
     PLAN_TIMEZONE: str = Field(default="Asia/Kolkata")
 

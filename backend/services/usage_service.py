@@ -26,7 +26,7 @@ from fastapi import HTTPException
 
 from config.settings import settings
 from db.client import async_db, get_supabase_client
-from services.plans import FEATURE_LABELS, FEATURE_PERIOD, PLANS, plan_limits
+from services.plans import FEATURE_LABELS, FEATURE_NAMES, FEATURE_PERIOD, PLANS, plan_limits
 from utils.logger import logger
 
 # Who the current request is for; read by the LLM token recorder
@@ -78,6 +78,9 @@ class LimitReached(HTTPException):
             "used": used,
             "resets_at": resets_at(feature),
             "message": (
+                f"{FEATURE_NAMES.get(feature, feature)} aren't included in the "
+                f"{PLANS.get(plan, PLANS['free'])['name']} plan."
+                if limit == 0 else
                 f"You've used all {limit} {FEATURE_LABELS.get(feature, feature)} on the "
                 f"{PLANS.get(plan, PLANS['free'])['name']} plan."
             ),

@@ -254,7 +254,7 @@ export const chatMessage = async (projectId, message, history = []) => {
     return response.data;
 };
 
-export const chatMessageStream = async (projectId, message, history = [], selectedDocuments = [], onChunkRaw, onComplete) => {
+export const chatMessageStream = async (projectId, message, history = [], selectedDocuments = [], onChunkRaw, onComplete, options = {}) => {
     const maxRetries = 3;
     let lastError = null;
     // Render at most once per frame: tokens can arrive faster than React can
@@ -284,7 +284,8 @@ export const chatMessageStream = async (projectId, message, history = [], select
                     project_id: projectId,
                     message,
                     session_history: history,
-                    selected_documents: selectedDocuments
+                    selected_documents: selectedDocuments,
+                    deep: !!options.deep,
                 })
             });
 

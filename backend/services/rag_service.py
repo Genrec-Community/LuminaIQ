@@ -63,9 +63,19 @@ class RAGService:
 
         # Initialize LLM via centralized llm_service
         self.llm = llm_service._get_client(temperature=0.1)
+        self._llm_deep = None
+
+    def _llm(self, deep: bool = False):
+        """Main chat model, or the Deep model for Topper Deep answers."""
+        if not deep:
+            return self.llm
+        if self._llm_deep is None:
+            self._llm_deep = llm_service._get_client(temperature=0.1, deep=True)
+        return self._llm_deep
 
     def _get_retrieval_chain(
-        self, collection_name: str, selected_documents: Optional[List[str]] = None, system_prompt: Optional[str] = None, user_context: Optional[str] = None
+        self, collection_name: str, selected_documents: Optional[List[str]] = None, system_prompt: Optional[str] = None, user_context: Optional[str] = None,
+        deep: bool = False,
     ):
         """Create a RAG chain for a specific collection"""
 
@@ -215,7 +225,7 @@ Your job is to make the user understand.
         )
 
         # 3. Chains
-        question_answer_chain = create_stuff_documents_chain(self.llm, prompt)
+        question_answer_chain = create_stuff_documents_chain(self._llm(deep), prompt)
         rag_chain = create_retrieval_chain(retriever, question_answer_chain)
 
         return rag_chain
@@ -256,6 +266,7 @@ Your job is to make the user understand.
         selected_documents: Optional[List[str]],
         chat_history: List[Dict[str, str]],
         user_context: Optional[str],
+        deep: bool = False,
     ) -> Optional[Dict[str, Any]]:
         """
         Answer without the vector index (missing, rebuilding, or the embedding
@@ -290,7 +301,7 @@ Your job is to make the user understand.
                 messages.append({"role": m["role"], "content": m["content"]})
         messages.append({"role": "user", "content": question})
 
-        answer = await llm_service.chat_completion(messages, temperature=0.3, max_tokens=1500)
+        answer = await llm_service.chat_completion(messages, temperature=0.3, max_tokens=1500, deep=deep)
         return {"answer": answer, "sources": sources}
 
     async def get_answer(
@@ -301,11 +312,12 @@ Your job is to make the user understand.
         chat_history: List[Dict[str, str]] = [],
         system_prompt: Optional[str] = None,
         user_context: Optional[str] = None,
+        deep: bool = False,
     ) -> Dict[str, Any]:
         """Generate answer using RAG pipeline (LangChain) with retry logic"""
         try:
             collection_name = f"project_{project_id}"
-            chain = self._get_retrieval_chain(collection_name, selected_documents, system_prompt, user_context)
+            chain = self._get_retrieval_chain(collection_name, selected_documents, system_prompt, user_context, deep=deep)
 
             # Convert history to LangChain format
             history_messages = []
@@ -329,7 +341,8 @@ Your job is to make the user understand.
             if "context" in response and not response["context"]:
                 self._trigger_reindex(project_id)
                 fallback = await self._answer_from_stored_text(
-                    project_id, question, selected_documents, chat_history, user_context
+                    project_id, question, selected_documents, chat_history, user_context,
+                    deep=deep,
                 )
                 if fallback:
                     return fallback
@@ -377,7 +390,8 @@ Your job is to make the user understand.
             # Search/embeddings/index failed: answer from the stored text instead
             try:
                 fallback = await self._answer_from_stored_text(
-                    project_id, question, selected_documents, chat_history, user_context
+                    project_id, question, selected_documents, chat_history, user_context,
+                    deep=deep,
                 )
                 if fallback:
                     return fallback
@@ -394,6 +408,7 @@ Your job is to make the user understand.
         chat_history: List[Dict[str, str]] = [],
         system_prompt: Optional[str] = None,
         user_context: Optional[str] = None,
+        deep: bool = False,
     ):
         """Generate answer using RAG pipeline with streaming (LangChain) - Optimized with retry"""
         max_retries = 3
@@ -426,7 +441,7 @@ Your job is to make the user understand.
         for attempt in range(max_retries):
             has_yielded = False
             try:
-                chain = self._get_retrieval_chain(collection_name, selected_documents, system_prompt, user_context)
+                chain = self._get_retrieval_chain(collection_name, selected_documents, system_prompt, user_context, deep=deep)
                 sources_data = []
 
                 empty_context = False
@@ -480,7 +495,8 @@ Your job is to make the user understand.
                 if empty_context:
                     self._trigger_reindex(project_id)
                     fallback = await self._answer_from_stored_text(
-                        project_id, question, selected_documents, chat_history, user_context
+                        project_id, question, selected_documents, chat_history, user_context,
+                        deep=deep,
                     )
                     import json
 
@@ -557,7 +573,8 @@ Your job is to make the user understand.
                 if not has_yielded:
                     try:
                         fallback = await self._answer_from_stored_text(
-                            project_id, question, selected_documents, chat_history, user_context
+                            project_id, question, selected_documents, chat_history, user_context,
+                            deep=deep,
                         )
                         if fallback:
                             import json

@@ -68,6 +68,7 @@ def _build_client(
     temperature: float = 0.7,
     max_tokens: int = 4000,
     light: bool = False,
+    deep: bool = False,
 ):
     """
     Returns either:
@@ -119,11 +120,18 @@ def _build_client(
         or settings.AZURE_OPENAI_API_KEY
     )
 
-    model = (light and settings.LLM_LIGHT_MODEL) or settings.LLM_MODEL or "gpt-4.1-mini"
+    model = settings.LLM_MODEL or "gpt-4.1-mini"
+    base_url = settings.LLM_BASE_URL or None
+    if deep and settings.LLM_DEEP_MODEL:
+        model = settings.LLM_DEEP_MODEL
+        base_url = settings.LLM_DEEP_BASE_URL or base_url
+        fallback_api_key = settings.LLM_DEEP_API_KEY or fallback_api_key
+    elif light and settings.LLM_LIGHT_MODEL:
+        model = settings.LLM_LIGHT_MODEL
     kwargs = {
         "model": model,
         "openai_api_key": fallback_api_key,
-        "openai_api_base": settings.LLM_BASE_URL or None,
+        "openai_api_base": base_url,
         "temperature": temperature,
         "max_tokens": max_tokens,
         "callbacks": [_TokenRecorder()],
@@ -171,8 +179,9 @@ class LLMService:
                 + (f" | reasoning_effort={settings.LLM_REASONING_EFFORT}" if settings.LLM_REASONING_EFFORT else "")
             )
 
-    def _get_client(self, temperature: float = 0.7, max_tokens: int = 4000, light: bool = False):
-        return _build_client(temperature=temperature, max_tokens=max_tokens, light=light)
+    def _get_client(self, temperature: float = 0.7, max_tokens: int = 4000,
+                    light: bool = False, deep: bool = False):
+        return _build_client(temperature=temperature, max_tokens=max_tokens, light=light, deep=deep)
 
     async def chat_completion(
         self,
@@ -180,10 +189,12 @@ class LLMService:
         temperature: float = 0.7,
         max_tokens: int = 4000,
         light: bool = False,
+        deep: bool = False,
     ) -> str:
         """Generate chat completion (non-streaming).
 
-        light=True uses LLM_LIGHT_MODEL when configured (bulk structured tasks).
+        light=True uses LLM_LIGHT_MODEL when configured (bulk structured tasks);
+        deep=True uses LLM_DEEP_MODEL (Deep answers, Visual Lab).
         
         Automatically retries with a larger token budget if the model returns
         an empty or near-empty response — this handles reasoning models that
@@ -192,7 +203,7 @@ class LLMService:
         # Cap absolute minimum — never go below 2000 or things will always be empty
         max_tokens = max(max_tokens, 2000)
         try:
-            client = self._get_client(temperature=temperature, max_tokens=max_tokens, light=light)
+            client = self._get_client(temperature=temperature, max_tokens=max_tokens, light=light, deep=deep)
             lc_messages = _convert_messages(messages)
             logger.info(
                 f"[LLMService] Sending {len(lc_messages)} messages "
@@ -226,7 +237,7 @@ class LLMService:
                         f"[LLMService] Retrying with {retry_tokens} tokens "
                         f"(token starvation detected — reasoning used {reasoning_tokens} tokens)"
                     )
-                    retry_client = self._get_client(temperature=temperature, max_tokens=retry_tokens, light=light)
+                    retry_client = self._get_client(temperature=temperature, max_tokens=retry_tokens, light=light, deep=deep)
                     retry_response = await retry_client.ainvoke(lc_messages)
                     answer = retry_response.content if getattr(retry_response, "content", None) else ""
                     logger.info(f"[LLMService] Retry completion: {len(answer)} chars")

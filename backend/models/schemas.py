@@ -78,6 +78,8 @@ class ChatRequest(BaseModel):
     selected_documents: Optional[List[str]] = None
     session_history: List[ChatMessage] = []
     system_prompt: Optional[str] = None
+    # Topper "Deep" answer from the stronger model (counts against the Deep allowance)
+    deep: bool = False
 
 
 class SourceInfo(BaseModel):

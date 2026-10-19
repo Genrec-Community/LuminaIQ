@@ -95,6 +95,8 @@ const VisualLabView = lazy(() => import('../components/views/VisualLabView'));
 import useFocusTimer from '../hooks/useFocusTimer';
 import { LAST_PROJECT_KEY } from '../utils/dailyProgress';
 import { aiName } from '../utils/persona';
+import usePlan from '../hooks/usePlan';
+import { emitLimit, emitPlanChanged } from '../utils/plan';
 
 
 // One chat message's Markdown. Memoized so that while an answer streams in,
@@ -198,6 +200,21 @@ const ProjectView = () => {
         return saved && saved !== 'general' ? saved : 'power';
     });
     const [labTopic, setLabTopic] = useState('');
+    // Deep mode: Topper answers from the stronger model (monthly allowance)
+    const { plan: myPlan } = usePlan();
+    const [deepMode, setDeepMode] = useState(false);
+    const deepLeft = myPlan?.usage?.deep?.limit ? Math.max(0, myPlan.usage.deep.limit - myPlan.usage.deep.used) : 0;
+    const toggleDeep = () => {
+        if (deepMode) { setDeepMode(false); return; }
+        if (!myPlan?.usage?.deep?.limit) {
+            emitLimit({
+                code: 'limit_reached', plan: myPlan?.plan || 'free', feature: 'deep', limit: 0, used: 0,
+                message: 'Deep answers use our most capable model for tricky questions. They come with Topper.',
+            });
+            return;
+        }
+        setDeepMode(true);
+    };
     // Stable handle for memoized chat messages; always calls the latest handler
     const openSourceRef = useRef(null);
     const openSourceStable = useRef((source) => openSourceRef.current?.(source)).current;
@@ -950,6 +967,7 @@ const ProjectView = () => {
                     });
                 },
                 (finalResult) => {
+                    if (deepMode) emitPlanChanged(); // refresh the Deep counter
                     // Final update with sources
                     setMessages(prev => {
                         const last = prev[prev.length - 1];
@@ -965,7 +983,8 @@ const ProjectView = () => {
                     // Track chat activity for heatmap
                     recordActivity(projectId, 'chat');
                     setLoading(false);
-                }
+                },
+                { deep: deepMode }
             );
         } catch (error) {
             console.error("Chat error", error);
@@ -1745,7 +1764,19 @@ const ProjectView = () => {
                                         />
                                     )}
 
-                                    <form onSubmit={handleSendMessage} className="flex gap-2 md:gap-3">
+                                    <form onSubmit={handleSendMessage} className="flex gap-2 md:gap-3 items-center">
+                                        <button
+                                            type="button"
+                                            onClick={toggleDeep}
+                                            aria-pressed={deepMode}
+                                            title={deepMode ? `Deep mode on · ${deepLeft} left this month` : 'Deep mode: our most capable model for tricky questions'}
+                                            className={`shrink-0 flex items-center gap-1 rounded-full px-3 py-2.5 text-xs font-semibold transition-colors ${deepMode
+                                                ? 'bg-[#4A3B32] text-white shadow-md'
+                                                : 'bg-[#FDF6F0] text-[#8a6a5c] hover:text-[#4A3B32]'}`}
+                                        >
+                                            <Brain className="h-4 w-4" />
+                                            <span className="hidden sm:inline">Deep{deepMode ? ` · ${deepLeft}` : ''}</span>
+                                        </button>
                                         <div className="flex-1 relative">
                                             <input
                                                 type="text"

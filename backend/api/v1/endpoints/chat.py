@@ -185,8 +185,9 @@ async def chat_message(
     """
     Send a message to the RAG chat (Blocking/Non-streaming)
     """
-    metered(current_user, "chat")
-    await usage.consume(current_user["id"], "chat")
+    feature = "deep" if request.deep else "chat"
+    metered(current_user, feature)
+    await usage.consume(current_user["id"], feature)
     try:
         client = get_supabase_client()
         chat_history_dicts, user_context_str, save_task = await _prepare_chat(
@@ -200,6 +201,7 @@ async def chat_message(
             chat_history=chat_history_dicts,
             system_prompt=request.system_prompt,
             user_context=user_context_str,
+            deep=request.deep,
         )
 
         await save_task
@@ -228,8 +230,9 @@ async def chat_stream(
     """
     Send a message to the RAG chat (Streaming)
     """
-    metered(current_user, "chat")
-    await usage.consume(current_user["id"], "chat")
+    feature = "deep" if request.deep else "chat"
+    metered(current_user, feature)
+    await usage.consume(current_user["id"], feature)
     try:
         chat_history_dicts, user_context_str, save_task = await _prepare_chat(
             request, current_user["id"]
@@ -247,6 +250,7 @@ async def chat_stream(
                 chat_history=chat_history_dicts,
                 system_prompt=request.system_prompt,
                 user_context=user_context_str,
+                deep=request.deep,
             ):
                 # Check for sources marker
                 if "__SOURCES__:" in chunk:

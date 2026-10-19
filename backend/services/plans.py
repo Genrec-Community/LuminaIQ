@@ -28,6 +28,12 @@ FEATURE_PERIOD = {
     "books": "total",
 }
 
+# Short names for "not included in your plan" messages
+FEATURE_NAMES = {
+    "chat": "Chat answers", "questions": "Quiz questions", "tools": "Study tools",
+    "deep": "Deep answers", "cram": "Cram cards", "visual": "Visual Lab builds", "books": "More books",
+}
+
 FEATURE_LABELS = {
     "chat": "chat answers today",
     "questions": "quiz and Power Hour questions today",

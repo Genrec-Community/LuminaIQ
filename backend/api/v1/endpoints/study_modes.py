@@ -279,9 +279,11 @@ Return ONLY valid JSON (no markdown) with this exact shape:
 Rules: formulas may be [] if the topic has none; write formulas in plain text/Unicode (x², √, π, Σ, ·),
 not LaTeX; give exactly 2 quick_check questions; keep the whole card readable in about 3 minutes."""
 
+    # Topper cram cards come from the Deep model
+    deep = (await usage.plan(current_user["id"])) == "topper"
     try:
         raw = await llm_service.chat_completion(
-            [{"role": "user", "content": prompt}], temperature=0.3, max_tokens=2500
+            [{"role": "user", "content": prompt}], temperature=0.3, max_tokens=2500, deep=deep
         )
     except Exception as e:
         raise _llm_error(e)
@@ -411,8 +413,10 @@ async def visualize(request: VisualizeRequest, current_user: dict = Depends(get_
         )
 
     try:
+        # Simulations need real coding ability: always the Deep model (and they're
+        # shared across students with the same book, so each is paid for once)
         raw = await llm_service.chat_completion(
-            [{"role": "user", "content": prompt}], temperature=0.4, max_tokens=12000
+            [{"role": "user", "content": prompt}], temperature=0.4, max_tokens=12000, deep=True
         )
     except Exception as e:
         raise _llm_error(e)

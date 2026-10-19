@@ -24,7 +24,10 @@ const LimitModal = () => {
         return () => window.removeEventListener(LIMIT_EVENT, onLimit);
     }, []);
 
-    const next = detail ? NEXT_PLAN[detail.plan] : null;
+    // Deep answers are a Topper feature, whatever plan the student is on now
+    const next = detail
+        ? (detail.feature === 'deep' && detail.plan !== 'topper' ? NEXT_PLAN.scholar : NEXT_PLAN[detail.plan])
+        : null;
     const close = () => setDetail(null);
 
     return (
@@ -42,7 +45,9 @@ const LimitModal = () => {
                         <div className="h-12 w-12 rounded-2xl bg-[#FDF6F0] flex items-center justify-center">
                             <Sparkles className="h-6 w-6 text-[#C8A288]" />
                         </div>
-                        <h2 id="limit-title" className="mt-4 text-xl font-bold text-[#4A3B32]">You've hit today's limit</h2>
+                        <h2 id="limit-title" className="mt-4 text-xl font-bold text-[#4A3B32]">
+                            {detail.limit === 0 ? 'Unlock this with an upgrade' : "You've hit your limit"}
+                        </h2>
                         <p className="mt-1 text-[#4A3B32]">{detail.message}</p>
                         {detail.resets_at && (
                             <p className="mt-2 text-sm text-[#8a6a5c] flex items-center gap-1.5">
