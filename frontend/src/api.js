@@ -247,9 +247,22 @@ export const chatMessage = async (projectId, message, history = []) => {
     return response.data;
 };
 
-export const chatMessageStream = async (projectId, message, history = [], selectedDocuments = [], onChunk, onComplete) => {
+export const chatMessageStream = async (projectId, message, history = [], selectedDocuments = [], onChunkRaw, onComplete) => {
     const maxRetries = 3;
     let lastError = null;
+    // Render at most once per frame: tokens can arrive faster than React can
+    // re-render the conversation, which made long answers feel sluggish.
+    let pending = null;
+    let frame = 0;
+    const flush = () => {
+        frame = 0;
+        if (pending !== null) { const t = pending; pending = null; onChunkRaw(t); }
+    };
+    const onChunk = (text) => {
+        pending = text;
+        if (!frame) frame = (typeof requestAnimationFrame === 'function' ? requestAnimationFrame : (f) => setTimeout(f, 16))(flush);
+    };
+    let receivedAny = false; // never re-send a question once an answer has started
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
@@ -279,7 +292,9 @@ export const chatMessageStream = async (projectId, message, history = [], select
             // Check for other HTTP errors
             if (!response.ok) {
                 const errorText = await response.text();
-                throw new Error(errorText || `HTTP error ${response.status}`);
+                let detail = errorText;
+                try { detail = JSON.parse(errorText).detail || errorText; } catch { /* plain text */ }
+                throw new Error(detail || `HTTP error ${response.status}`);
             }
 
             // Check for null body
@@ -297,6 +312,7 @@ export const chatMessageStream = async (projectId, message, history = [], select
                 if (done) break;
 
                 const chunk = decoder.decode(value, { stream: true });
+                if (chunk) receivedAny = true;
                 fullText += chunk;
 
                 // Check for sources delimiter in accumulated text
@@ -309,7 +325,6 @@ export const chatMessageStream = async (projectId, message, history = [], select
                         // Clean and parse sources
                         const cleanSourcesJson = sourcesJson.trim();
                         sources = JSON.parse(cleanSourcesJson);
-                        console.log('Sources parsed successfully:', sources);
 
                         // Update with clean text
                         onChunk(textPart);
@@ -325,7 +340,7 @@ export const chatMessageStream = async (projectId, message, history = [], select
             }
 
             // Stream complete - use parsed sources
-            console.log('Stream finished. Sources:', sources);
+            pending = null;
             onComplete({ answer: fullText, sources: sources });
             return; // Success, exit retry loop
 
@@ -335,7 +350,7 @@ export const chatMessageStream = async (projectId, message, history = [], select
             const isRetryable = errorStr.includes('503') || errorStr.includes('service unavailable') ||
                 errorStr.includes('network') || errorStr.includes('fetch');
 
-            if (isRetryable && attempt < maxRetries - 1) {
+            if (isRetryable && !receivedAny && attempt < maxRetries - 1) {
                 const delay = Math.min(1500 * Math.pow(2, attempt), 10000);
                 console.log(`Retryable error: ${error.message}. Retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})...`);
                 await new Promise(resolve => setTimeout(resolve, delay));
@@ -343,6 +358,7 @@ export const chatMessageStream = async (projectId, message, history = [], select
             }
 
             console.error("Streaming error:", error);
+            pending = null;
             onComplete({ answer: `Error: ${error.message}. Please try again.`, sources: [] });
             return;
         }

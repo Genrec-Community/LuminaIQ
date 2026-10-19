@@ -97,6 +97,48 @@ import { LAST_PROJECT_KEY } from '../utils/dailyProgress';
 import { aiName } from '../utils/persona';
 
 
+// One chat message's Markdown. Memoized so that while an answer streams in,
+// only that message re-renders, not the whole conversation.
+const ChatMarkdown = React.memo(({ content, role, sources, onOpenSource }) => (
+    <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+            a: ({ node, ...props }) => {
+                // Inline citation links (e.g. href="1")
+                if (props.href && !isNaN(props.href) && sources) {
+                    const source = sources[parseInt(props.href) - 1];
+                    if (source) {
+                        return (
+                            <button
+                                onClick={(e) => { e.preventDefault(); onOpenSource(source); }}
+                                className="inline-flex items-center justify-center gap-0.5 min-w-[32px] h-[20px] px-1.5 mx-0.5 text-[10px] font-bold text-white bg-[#C8A288]/90 hover:bg-[#A08072] rounded shadow-sm transition-all cursor-pointer align-text-top"
+                                title={`Source ${props.href}: ${source.doc_name}`}
+                            >
+                                <FileText className="h-2.5 w-2.5 opacity-80 shrink-0" />
+                                <span>{props.href}</span>
+                            </button>
+                        );
+                    }
+                }
+                if (props.href && props.href.startsWith('http') && !props.href.includes(window.location.origin)) {
+                    return <a {...props} target="_blank" rel="noopener noreferrer" className="text-[#C8A288] hover:underline" />;
+                }
+                return (
+                    <button
+                        onClick={(e) => { e.preventDefault(); onOpenSource({ doc_name: String(props.children) }); }}
+                        className="text-[#C8A288] hover:underline hover:text-[#A08072] cursor-pointer bg-transparent border-none p-0 inline font-medium"
+                        title={`Open document: ${props.children}`}
+                    >
+                        {props.children}
+                    </button>
+                );
+            },
+        }}
+    >
+        {role === 'assistant' ? content.replace(/(?:&lt;|<|\[)?source\s+(\d+)(?:&gt;|>|\])?/gi, '[$1]($1)') : content}
+    </ReactMarkdown>
+));
+
 // Utility Components
 const PomodoroTimer = lazy(() => import('../components/PomodoroTimer'));
 const AITutorChat = lazy(() => import('../components/AITutorChat'));
@@ -156,6 +198,9 @@ const ProjectView = () => {
         return saved && saved !== 'general' ? saved : 'power';
     });
     const [labTopic, setLabTopic] = useState('');
+    // Stable handle for memoized chat messages; always calls the latest handler
+    const openSourceRef = useRef(null);
+    const openSourceStable = useRef((source) => openSourceRef.current?.(source)).current;
     useFocusTimer(user?.id);
     useEffect(() => {
         try { localStorage.setItem(LAST_PROJECT_KEY, projectId); } catch { /* ignore */ }
@@ -896,27 +941,25 @@ const ProjectView = () => {
                 history,
                 selectedDocuments,
                 (chunkText) => {
-                    // Update the last message (assistant's placeholder) with current chunk text
+                    // Replace only the assistant placeholder; earlier messages keep
+                    // their identity so they don't re-render on every token
                     setMessages(prev => {
-                        const updated = [...prev];
-                        const lastMsg = updated[updated.length - 1];
-                        if (lastMsg.role === 'assistant') {
-                            lastMsg.content = chunkText;
-                        }
-                        return updated;
+                        const last = prev[prev.length - 1];
+                        if (!last || last.role !== 'assistant') return prev;
+                        return [...prev.slice(0, -1), { ...last, content: chunkText }];
                     });
                 },
                 (finalResult) => {
                     // Final update with sources
                     setMessages(prev => {
-                        const updated = [...prev];
-                        const lastMsg = updated[updated.length - 1];
-                        if (lastMsg.role === 'assistant') {
-                            lastMsg.content = finalResult.answer;
-                            lastMsg.sources = finalResult.sources;
-                            lastMsg.completedAt = new Date().toISOString();
-                        }
-                        return updated;
+                        const last = prev[prev.length - 1];
+                        if (!last || last.role !== 'assistant') return prev;
+                        return [...prev.slice(0, -1), {
+                            ...last,
+                            content: finalResult.answer,
+                            sources: finalResult.sources,
+                            completedAt: new Date().toISOString(),
+                        }];
                     });
 
                     // Track chat activity for heatmap
@@ -926,12 +969,10 @@ const ProjectView = () => {
             );
         } catch (error) {
             console.error("Chat error", error);
-            setMessages(prev => {
-                const updated = [...prev];
-                const lastMsg = updated[updated.length - 1];
-                lastMsg.content = "Sorry, I encountered an error processing your request.";
-                return updated;
-            });
+            setMessages(prev => [
+                ...prev.slice(0, -1),
+                { ...prev[prev.length - 1], content: "Sorry, I encountered an error processing your request." },
+            ]);
             setLoading(false);
         }
     };
@@ -1055,6 +1096,7 @@ const ProjectView = () => {
             toast.error("Could not load the document. It may have been deleted or there is an issue with the server.");
         }
     };
+    openSourceRef.current = handleOpenSource;
 
     if (projectViewLoading && documents.length === 0) {
         return (
@@ -1603,51 +1645,7 @@ const ProjectView = () => {
                                                 }`}>
                                                 {msg.content ? (
                                                     <div className={`chat-text leading-relaxed ${msg.role === 'assistant' ? 'prose prose-sm max-w-none overflow-x-auto prose-p:my-2 prose-headings:text-[#4A3B32] prose-a:text-[#C8A288]' : ''}`}>
-                                                        <ReactMarkdown 
-                                                            remarkPlugins={[remarkGfm]}
-                                                            components={{
-                                                                a: ({node, ...props}) => {
-                                                                    // Check for inline citation links (e.g. href="1")
-                                                                    if (props.href && !isNaN(props.href) && msg.sources) {
-                                                                        const sourceIdx = parseInt(props.href) - 1;
-                                                                        const source = msg.sources[sourceIdx];
-                                                                        if (source) {
-                                                                            return (
-                                                                                <button 
-                                                                                    onClick={(e) => {
-                                                                                        e.preventDefault();
-                                                                                        handleOpenSource(source);
-                                                                                    }}
-                                                                                    className="inline-flex items-center justify-center gap-0.5 min-w-[32px] h-[20px] px-1.5 mx-0.5 text-[10px] font-bold text-white bg-[#C8A288]/90 hover:bg-[#A08072] rounded shadow-sm transition-all cursor-pointer align-text-top"
-                                                                                    title={`Source ${props.href}: ${source.doc_name}`}
-                                                                                >
-                                                                                    <FileText className="h-2.5 w-2.5 opacity-80 shrink-0" />
-                                                                                    <span>{props.href}</span>
-                                                                                </button>
-                                                                            );
-                                                                        }
-                                                                    }
-
-                                                                    if (props.href && props.href.startsWith('http') && !props.href.includes(window.location.origin)) {
-                                                                        return <a {...props} target="_blank" rel="noopener noreferrer" className="text-[#C8A288] hover:underline" />;
-                                                                    }
-                                                                    return (
-                                                                        <button 
-                                                                            onClick={(e) => {
-                                                                                e.preventDefault();
-                                                                                handleOpenSource({ doc_name: String(props.children) });
-                                                                            }}
-                                                                            className="text-[#C8A288] hover:underline hover:text-[#A08072] cursor-pointer bg-transparent border-none p-0 inline font-medium"
-                                                                            title={`Open document: ${props.children}`}
-                                                                        >
-                                                                            {props.children}
-                                                                        </button>
-                                                                    );
-                                                                }
-                                                            }}
-                                                        >
-                                                            {msg.role === 'assistant' ? msg.content.replace(/(?:&lt;|<|\[)?source\s+(\d+)(?:&gt;|>|\])?/gi, '[$1]($1)') : msg.content}
-                                                        </ReactMarkdown>
+                                                        <ChatMarkdown content={msg.content} role={msg.role} sources={msg.sources} onOpenSource={openSourceStable} />
                                                     </div>
                                                 ) : (
                                                     <Loader2 className="h-5 w-5 animate-spin text-[#8a6a5c]" />

@@ -7,6 +7,7 @@ from typing import Any, List
 from api.deps import get_current_user
 from db.client import get_supabase_client, async_db
 from utils.logger import logger
+import asyncio
 
 router = APIRouter()
 
@@ -140,6 +141,42 @@ async def get_chat_history(
         raise HTTPException(500, str(e))
 
 
+# Only the most recent turns go to the model: answers stay grounded in the
+# book, and requests don't grow slower and costlier as a chat gets longer.
+CHAT_HISTORY_LIMIT = 12
+
+
+async def _prepare_chat(request: ChatRequest, user_id: str):
+    """
+    Load recent history and the student's profile in parallel, and start
+    saving the new user message in the background. Returns
+    (history, user_context, save_task); await save_task before saving the reply
+    so the two stay in order.
+    """
+    client = get_supabase_client()
+
+    async def load_history():
+        res = await async_db(
+            lambda: client.table("chat_messages")
+            .select("role, content")
+            .eq("project_id", request.project_id)
+            .order("created_at", desc=True)
+            .limit(CHAT_HISTORY_LIMIT)
+            .execute()
+        )
+        return [{"role": m["role"], "content": m["content"]} for m in reversed(res.data or [])]
+
+    history, user_context = await asyncio.gather(
+        load_history(), get_user_context_string(user_id)
+    )
+    save_task = asyncio.create_task(async_db(
+        lambda: client.table("chat_messages").insert(
+            {"project_id": request.project_id, "role": "user", "content": request.message}
+        ).execute()
+    ))
+    return history, user_context, save_task
+
+
 @router.post("/message", response_model=ChatResponse)
 async def chat_message(
     request: ChatRequest, current_user: dict = Depends(get_current_user)
@@ -149,41 +186,20 @@ async def chat_message(
     """
     try:
         client = get_supabase_client()
-        # Save User Message (non-blocking)
-        await async_db(
-            lambda: client.table("chat_messages").insert(
-                {
-                    "project_id": request.project_id,
-                    "role": "user",
-                    "content": request.message,
-                }
-            ).execute()
+        chat_history_dicts, user_context_str, save_task = await _prepare_chat(
+            request, current_user["id"]
         )
-
-        # Fetch full history for context (non-blocking)
-        history_res = await async_db(
-            lambda: client.table("chat_messages")
-            .select("*")
-            .eq("project_id", request.project_id)
-            .order("created_at", desc=False)
-            .execute()
-        )
-
-        chat_history_dicts = [
-            {"role": msg["role"], "content": msg["content"]} for msg in history_res.data
-        ]
-
-        user_context_str = await get_user_context_string(current_user["id"])
 
         result = await rag_service.get_answer(
             project_id=request.project_id,
             question=request.message,
             selected_documents=request.selected_documents,
-            chat_history=chat_history_dicts[:-1],  # Exclude current msg to avoid duplication if RAG appends it
+            chat_history=chat_history_dicts,
             system_prompt=request.system_prompt,
             user_context=user_context_str,
         )
 
+        await save_task
         # Save Assistant Message (non-blocking)
         await async_db(
             lambda: client.table("chat_messages").insert(
@@ -210,32 +226,9 @@ async def chat_stream(
     Send a message to the RAG chat (Streaming)
     """
     try:
-        client = get_supabase_client()
-        # Save User Message (non-blocking)
-        await async_db(
-            lambda: client.table("chat_messages").insert(
-                {
-                    "project_id": request.project_id,
-                    "role": "user",
-                    "content": request.message,
-                }
-            ).execute()
+        chat_history_dicts, user_context_str, save_task = await _prepare_chat(
+            request, current_user["id"]
         )
-
-        # Fetch full history (non-blocking)
-        history_res = await async_db(
-            lambda: client.table("chat_messages")
-            .select("*")
-            .eq("project_id", request.project_id)
-            .order("created_at", desc=False)
-            .execute()
-        )
-
-        chat_history_dicts = [
-            {"role": msg["role"], "content": msg["content"]} for msg in history_res.data
-        ]
-
-        user_context_str = await get_user_context_string(current_user["id"])
 
         # Wrapper generator to intercept and save the final answer
         async def stream_and_save():
@@ -246,7 +239,7 @@ async def chat_stream(
                 project_id=request.project_id,
                 question=request.message,
                 selected_documents=request.selected_documents,
-                chat_history=chat_history_dicts[:-1],
+                chat_history=chat_history_dicts,
                 system_prompt=request.system_prompt,
                 user_context=user_context_str,
             ):
@@ -271,6 +264,7 @@ async def chat_stream(
 
             # Save Assistant Message after stream ends (non-blocking)
             try:
+                await save_task
                 await async_db(
                     lambda: get_supabase_client().table("chat_messages").insert(
                         {
@@ -284,7 +278,12 @@ async def chat_stream(
             except Exception as save_err:
                 logger.error(f"Failed to save assistant message: {save_err}")
 
-        return StreamingResponse(stream_and_save(), media_type="text/event-stream")
+        return StreamingResponse(
+            stream_and_save(),
+            media_type="text/event-stream",
+            # Deliver tokens as they're generated instead of letting proxies buffer them
+            headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"},
+        )
     except Exception as e:
         raise HTTPException(500, str(e))
 

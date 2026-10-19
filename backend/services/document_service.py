@@ -1,4 +1,5 @@
 import os
+import time
 import asyncio
 from typing import Optional, List, Dict, Any
 from concurrent.futures import ThreadPoolExecutor
@@ -132,22 +133,20 @@ class DocumentService:
                 f"Extracted {len(text)} characters"
             )
 
-            # ── 2. Save extracted text to Supabase texts/ bucket ──────────────
-            text_storage_path = await self._save_text_to_storage(
-                document_id, project_id, filename, text
-            )
-            if text_storage_path:
-                await self._update_document_text_path(document_id, text_storage_path)
+            # ── 2+3. Save extracted text (texts/ bucket) and chunk it, in parallel ──
+            async def save_text():
+                path = await self._save_text_to_storage(
+                    document_id, project_id, filename, text
+                )
+                if path:
+                    await self._update_document_text_path(document_id, path)
+                return path
 
-            # ── 3. Chunk text ──────────────────────────────────────────────────
             logger.info(f"Chunking text from {filename}")
-            await self._update_document_status(
-                document_id, "processing", "Chunking text..."
-            )
             await progress.emit(document_id, "chunking", 0, "Splitting into chunks...")
-
-            chunks = await loop.run_in_executor(
-                None, lambda: self.text_chunker.chunk_text(text)
+            text_storage_path, chunks = await asyncio.gather(
+                save_text(),
+                loop.run_in_executor(None, lambda: self.text_chunker.chunk_text(text)),
             )
 
             if not chunks:
@@ -168,33 +167,56 @@ class DocumentService:
             collection_name = f"project_{project_id}"
             await qdrant_service.create_collection(collection_name)
 
-            # ── 5. Process embeddings with global limits + progress ────────────
+            # ── 5+6. Embeddings and topic extraction run in parallel ───────────
+            # Topics are extracted from the stored text, so they don't need to
+            # wait for the vectors; the slower of the two sets the pace.
+            await self._update_document_status(
+                document_id, "processing", "Indexing and finding topics..."
+            )
             await progress.emit(
                 document_id, "embedding", 0,
                 f"Embedding {len(chunks)} chunks..."
             )
-            await self._process_embeddings_direct(
-                chunks, document_id, filename, collection_name
-            )
-
-            # ── 6. Generate Topics (LLM-gated) ────────────────────────────────
-            await self._update_document_status(
-                document_id, "processing", "Generating topics..."
-            )
-            await progress.emit(
-                document_id, "topics", 0, "Generating document topics..."
-            )
             llm_semaphore = EmbeddingQueue.get_llm_semaphore()
-            try:
-                from services.mcq_service import mcq_service
 
-                async with llm_semaphore:
-                    await mcq_service.generate_document_topics(project_id, document_id)
-                logger.info(f"Topics generated for {filename}")
-                await progress.emit(document_id, "topics", 100, "Topics generated")
-            except Exception as topic_err:
-                logger.error(f"Failed to generate topics for {filename}: {topic_err}")
-                await progress.emit(document_id, "topics", 100, "Topic generation skipped")
+            async def embed():
+                try:
+                    await self._process_embeddings_direct(
+                        chunks, document_id, filename, collection_name
+                    )
+                    return None
+                except Exception as embed_err:
+                    return embed_err
+
+            async def topics():
+                try:
+                    from services.mcq_service import mcq_service
+
+                    async with llm_semaphore:
+                        await mcq_service.generate_document_topics(project_id, document_id)
+                    logger.info(f"Topics generated for {filename}")
+                except Exception as topic_err:
+                    logger.error(f"Failed to generate topics for {filename}: {topic_err}")
+
+            embed_err, _ = await asyncio.gather(embed(), topics())
+            if embed_err:
+                if not text_storage_path:
+                    raise embed_err
+                # The text is saved: the document stays usable (search falls back
+                # to the stored text) and the index is rebuilt in the background
+                # by ensure_project_indexed once the embedding provider works.
+                logger.error(
+                    f"[{filename}] Embedding failed, continuing without vectors "
+                    f"(will re-index later): {embed_err}"
+                )
+                self._reindex_failed_at[document_id] = time.time()
+                # Drop a partial index so the rebuild (which looks for documents
+                # without vectors) redoes this document completely
+                try:
+                    await qdrant_service.delete_vectors(collection_name, document_id)
+                except Exception as del_err:
+                    logger.warning(f"[{filename}] Could not clear partial vectors: {del_err}")
+            await progress.emit(document_id, "topics", 100, "Topics ready")
 
             # ── 7. Auto-build knowledge graph from all project topics ──────────
             await progress.emit(document_id, "graph", 0, "Building knowledge graph...")
@@ -376,12 +398,20 @@ class DocumentService:
 
         completed = [0]
         failed_batches = []
+        # A rejected key or bad config fails every batch: stop after the first
+        fatal = []
 
         async def process_batch(batch_idx: int, start_index: int, batch_data: List[str]):
             retries = 6
             for attempt in range(retries):
+                if fatal:
+                    failed_batches.append(batch_idx)
+                    return
                 try:
                     async with embed_semaphore:
+                        if fatal:  # another batch hit a fatal error while we waited
+                            failed_batches.append(batch_idx)
+                            return
                         batch_embeddings = await embedding_service.generate_embeddings(
                             batch_data
                         )
@@ -439,9 +469,11 @@ class DocumentService:
                         continue
 
                     logger.error(f"[{filename}] Batch {batch_idx + 1} failed: {e}")
-                    if attempt == retries - 1:
-                        failed_batches.append(batch_idx)
-                        return  # Let other batches complete
+                    if any(x in error_str for x in ["401", "403", "invalid api key", "api key not valid", "invalid_api_key", "404"]):
+                        fatal.append(e)
+                    # Non-retryable, or out of retries: give up on this batch
+                    failed_batches.append(batch_idx)
+                    return  # Let other batches complete
 
         tasks = [
             process_batch(idx, start_idx, batch)
