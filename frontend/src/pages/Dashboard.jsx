@@ -427,6 +427,10 @@ const Dashboard = () => {
                 <TodayHero
                     onContinue={continueProject ? () => navigate(`/project/${continueProject.id}`) : openNewProjectModal}
                     continueLabel={continueProject ? `Continue: ${continueProject.name}` : 'Add your first book'}
+                    onCram={continueProject ? () => {
+                        try { sessionStorage.setItem(`lumina_tab_${continueProject.id}`, 'cram'); } catch { /* ignore */ }
+                        navigate(`/project/${continueProject.id}`);
+                    } : null}
                 />
 
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">

@@ -96,7 +96,7 @@ const Login = () => {
                             {isOtpMode ? 'Passwordless Login' : isLogin ? 'Welcome Back' : 'Join Lumina IQ'}
                         </h1>
                         <p className="text-[#8a6a5c] text-sm">
-                            {isOtpMode ? 'We will send a one-time code to your email' : isLogin ? 'Enter your credentials to access your workspace' : 'Start your intelligent learning journey today'}
+                            {isOtpMode ? 'We will send a one-time code to your email' : isLogin ? 'Pick up right where your learning path left off' : 'Turn any book into the shortest path to exam-ready'}
                         </p>
                     </div>
 

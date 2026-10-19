@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Flame, Zap, Trophy, CalendarClock, Play, Check } from 'lucide-react';
+import { Flame, Zap, Trophy, CalendarClock, Play, Check, Moon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { useGamification } from '../context/GamificationContext';
@@ -40,7 +40,7 @@ const Ring = ({ value, size = 112, stroke = 10, children }) => {
  * Dashboard hero: personal greeting from the AI companion, streak, daily goal,
  * level progress, exam countdown and daily quests.
  */
-const TodayHero = ({ onContinue, continueLabel }) => {
+const TodayHero = ({ onContinue, continueLabel, onCram }) => {
     const { user } = useAuth();
     const { settings } = useSettings();
     const { data: g } = useGamification();
@@ -102,6 +102,15 @@ const TodayHero = ({ onContinue, continueLabel }) => {
                         >
                             <Play className="h-5 w-5 fill-white" />
                             {continueLabel}
+                        </button>
+                    )}
+                    {onCram && (
+                        <button
+                            onClick={onCram}
+                            className="flex items-center gap-2 rounded-2xl border-2 border-[#C8A288] px-5 py-3 font-semibold text-[#4A3B32] transition-all hover:bg-[#FDF6F0] active:scale-95"
+                        >
+                            <Moon className="h-5 w-5 text-[#C8A288]" />
+                            {examDays !== null && examDays >= 0 && examDays <= 1 ? 'Cram for it now' : 'Exam tonight?'}
                         </button>
                     )}
                     {examDays !== null && examDays >= 0 && (

@@ -31,6 +31,7 @@ import {
   BookOpen,
   Users,
   PlayCircle,
+  FlaskConical,
 } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
@@ -72,6 +73,20 @@ const benefits = [
 ];
 
 const features = [
+  {
+    icon: Moon,
+    title: "Exam Tonight mode",
+    description:
+      "Tell it how many hours you have. It weighs every topic by how much of the book it covers and how many others build on it, then gives you the plan that buys the most marks in that time, with fast cram cards and a one-page revision sheet.",
+    outcome: "Ready for the exam, even at the last minute",
+  },
+  {
+    icon: FlaskConical,
+    title: "Visual Lab",
+    description:
+      "Turn any topic into a working simulation: swing a pendulum, scatter light, watch a heart beat. Sliders, live numbers, formulas, the derivation and the why, all in one page.",
+    outcome: "See it, play with it, get it",
+  },
   {
     icon: MessageSquare,
     title: "Chat with your documents",
@@ -385,19 +400,19 @@ function Hero() {
             className="mb-6 gap-2 rounded-full border-primary/30 bg-primary/5 px-4 py-1.5 text-xs font-medium text-primary"
           >
             <Sparkles className="h-3 w-3" />
-            AI-powered study companion
+            From textbook to exam-ready, even overnight
           </Badge>
 
           <h1 className="font-display text-4xl font-800 leading-[1.05] tracking-tight sm:text-6xl lg:text-7xl">
-            Study smarter,
+            Learn the whole book,
             <br />
-            <span className="text-gradient-liq">not harder.</span>
+            <span className="text-gradient-liq">even tonight.</span>
           </h1>
 
           <p className="mx-auto mt-6 max-w-2xl text-base text-muted-foreground sm:text-lg">
-            Upload any PDF, DOCX, or textbook. LuminaIQ instantly creates quizzes,
-            notes, flashcards, and a personalized learning path — so you understand
-            more, remember longer, and actually enjoy studying.
+            Exams come faster than textbooks can be read. LuminaIQ turns any book into
+            the shortest, smartest path to exam-ready: foundations first, the biggest
+            topics next, every step something you actually understand.
           </p>
 
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
@@ -902,9 +917,8 @@ function Footer() {
               </span>
             </div>
             <p className="mt-4 max-w-md text-sm text-muted-foreground">
-              The AI-powered study companion that turns any document into a
-              personalized learning experience. Study smarter, remember longer,
-              stay motivated.
+              Exams come faster than textbooks can be read. LuminaIQ turns any
+              book into the shortest, smartest path to exam-ready, even overnight.
             </p>
             <div className="mt-4 flex gap-2">
               <Badge variant="secondary" className="rounded-md text-xs">AI-powered</Badge>
