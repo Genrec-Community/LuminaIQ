@@ -76,6 +76,10 @@ class Settings(BaseSettings):
     LLM_PROVIDER: str = Field(default="auto")
     # Optional reasoning effort for providers that support it (e.g. Mercury: "low" | "medium" | "high")
     LLM_REASONING_EFFORT: str = Field(default="")
+    # Optional cheaper model (same provider, base URL and key) for bulk structured
+    # work: quiz questions, flashcards, mindmaps, topic summaries and knowledge-graph
+    # links. Empty = everything uses LLM_MODEL. Not used with Azure.
+    LLM_LIGHT_MODEL: str = Field(default="")
 
     # Webhook
     MAIN_API_WEBHOOK_SECRET: str = Field(default="supersecretwebhook")

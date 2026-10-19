@@ -92,7 +92,8 @@ Generate a comprehensive mindmap with at least 15-25 nodes total. Return ONLY th
             llm_response = await self.llm_service.chat_completion(
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.7,
-                max_tokens=8000
+                max_tokens=8000,
+                light=True
             )
             
             # Parse the LLM response

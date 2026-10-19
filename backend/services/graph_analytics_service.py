@@ -229,7 +229,7 @@ Generate the summary now:"""
 
             messages = [{"role": "user", "content": prompt}]
             summary = await llm_service.chat_completion(
-                messages, temperature=0.3, max_tokens=1000
+                messages, temperature=0.3, max_tokens=1000, light=True
             )
             
             # Don't cache summaries built from the keyword fallback — once the

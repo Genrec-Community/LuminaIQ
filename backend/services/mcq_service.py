@@ -196,7 +196,7 @@ Respond ONLY with the valid JSON array. Do not add any markdown formatting (like
 
             messages = [{"role": "user", "content": prompt}]
             response = await llm_service.chat_completion(
-                messages, temperature=0.7, max_tokens=6000
+                messages, temperature=0.7, max_tokens=6000, light=True
             )
 
             # 3. Parse response

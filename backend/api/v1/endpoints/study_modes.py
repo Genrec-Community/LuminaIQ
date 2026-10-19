@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 
 from api.deps import get_current_user
 from db.client import async_db, get_supabase_client
+from services.book_library import book_library
 from services.cram_planner import coverage_from_text, plan_session
 from services.knowledge_graph_service import knowledge_graph
 from services.learning_service import performance_tracker
@@ -238,10 +239,17 @@ async def cram_card(request: CramCardRequest, current_user: dict = Depends(get_c
     await _require_project(request.project_id, current_user)
     topic = request.topic.strip()
 
+    books = await book_library.books_for_topic(request.project_id, topic, request.selected_documents)
     if not request.refresh:
         cached = await _cache_get(request.project_id, topic, "cram")
         if cached:
             return {"card": cached, "cached": True}
+        # Someone else already studied this topic from the same book
+        shared = await book_library.get_asset(books, topic, "cram")
+        if shared:
+            card = {**shared, "topic": topic}
+            await _cache_put(request.project_id, topic, "cram", card)
+            return {"card": card, "cached": True}
 
     context = await _topic_context(request.project_id, topic, request.selected_documents)
     prompt = f"""You are a brilliant exam coach. A student has very little time before their exam.
@@ -282,6 +290,7 @@ not LaTeX; give exactly 2 quick_check questions; keep the whole card readable in
     if not card["tldr"] and not card["key_points"]:
         raise HTTPException(502, "The AI returned an empty card. Please try again.")
     await _cache_put(request.project_id, topic, "cram", card)
+    await book_library.put_asset(books, topic, "cram", card)
     return {"card": card, "cached": False}
 
 
@@ -375,6 +384,7 @@ async def visualize(request: VisualizeRequest, current_user: dict = Depends(get_
     await _require_project(request.project_id, current_user)
     topic = request.topic.strip()
 
+    books = await book_library.books_for_topic(request.project_id, topic, request.selected_documents)
     if request.repair:
         prompt = REPAIR_PROMPT.format(topic=topic, error=request.repair.error, html=request.repair.html[:60000])
     else:
@@ -382,6 +392,11 @@ async def visualize(request: VisualizeRequest, current_user: dict = Depends(get_
             cached = await _cache_get(request.project_id, topic, "visual")
             if cached and cached.get("html"):
                 return {"html": cached["html"], "topic": topic, "cached": True}
+            # Same topic already built from the same book by another student
+            shared = await book_library.get_asset(books, topic, "visual")
+            if shared and shared.get("html"):
+                await _cache_put(request.project_id, topic, "visual", {"html": shared["html"]})
+                return {"html": shared["html"], "topic": topic, "cached": True}
         context = await _topic_context(request.project_id, topic, request.selected_documents, limit=6)
         prompt = VISUAL_PROMPT.format(
             topic=topic,
@@ -399,4 +414,6 @@ async def visualize(request: VisualizeRequest, current_user: dict = Depends(get_
     if not html:
         raise HTTPException(502, "The AI couldn't build a working simulation this time. Please try again.")
     await _cache_put(request.project_id, topic, "visual", {"html": html})
+    # Shared copy is stored as an .html file; repairs replace a broken one for everyone
+    await book_library.put_asset(books, topic, "visual", {"html": html})
     return {"html": html, "topic": topic, "cached": False}

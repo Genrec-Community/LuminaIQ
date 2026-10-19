@@ -228,7 +228,7 @@ OUTPUT FORMAT - Return ONLY valid JSON, no markdown:
 
         try:
             response = await llm_service.chat_completion(
-                messages, temperature=0.2, max_tokens=self.MAX_TOKENS
+                messages, temperature=0.2, max_tokens=self.MAX_TOKENS, light=True
             )
         except Exception as llm_err:
             logger.error(f"LLM call failed for knowledge graph batch: {llm_err}")

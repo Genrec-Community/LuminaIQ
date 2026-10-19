@@ -35,6 +35,7 @@ def _use_azure() -> bool:
 def _build_client(
     temperature: float = 0.7,
     max_tokens: int = 4000,
+    light: bool = False,
 ):
     """
     Returns either:
@@ -84,8 +85,9 @@ def _build_client(
         or settings.AZURE_OPENAI_API_KEY
     )
 
+    model = (light and settings.LLM_LIGHT_MODEL) or settings.LLM_MODEL or "gpt-4.1-mini"
     kwargs = {
-        "model": settings.LLM_MODEL or "gpt-4.1-mini",
+        "model": model,
         "openai_api_key": fallback_api_key,
         "openai_api_base": settings.LLM_BASE_URL or None,
         "temperature": temperature,
@@ -133,16 +135,19 @@ class LLMService:
                 + (f" | reasoning_effort={settings.LLM_REASONING_EFFORT}" if settings.LLM_REASONING_EFFORT else "")
             )
 
-    def _get_client(self, temperature: float = 0.7, max_tokens: int = 4000):
-        return _build_client(temperature=temperature, max_tokens=max_tokens)
+    def _get_client(self, temperature: float = 0.7, max_tokens: int = 4000, light: bool = False):
+        return _build_client(temperature=temperature, max_tokens=max_tokens, light=light)
 
     async def chat_completion(
         self,
         messages: List[Dict[str, str]],
         temperature: float = 0.7,
         max_tokens: int = 4000,
+        light: bool = False,
     ) -> str:
         """Generate chat completion (non-streaming).
+
+        light=True uses LLM_LIGHT_MODEL when configured (bulk structured tasks).
         
         Automatically retries with a larger token budget if the model returns
         an empty or near-empty response — this handles reasoning models that
@@ -151,7 +156,7 @@ class LLMService:
         # Cap absolute minimum — never go below 2000 or things will always be empty
         max_tokens = max(max_tokens, 2000)
         try:
-            client = self._get_client(temperature=temperature, max_tokens=max_tokens)
+            client = self._get_client(temperature=temperature, max_tokens=max_tokens, light=light)
             lc_messages = _convert_messages(messages)
             logger.info(
                 f"[LLMService] Sending {len(lc_messages)} messages "
@@ -185,7 +190,7 @@ class LLMService:
                         f"[LLMService] Retrying with {retry_tokens} tokens "
                         f"(token starvation detected — reasoning used {reasoning_tokens} tokens)"
                     )
-                    retry_client = self._get_client(temperature=temperature, max_tokens=retry_tokens)
+                    retry_client = self._get_client(temperature=temperature, max_tokens=retry_tokens, light=light)
                     retry_response = await retry_client.ainvoke(lc_messages)
                     answer = retry_response.content if getattr(retry_response, "content", None) else ""
                     logger.info(f"[LLMService] Retry completion: {len(answer)} chars")

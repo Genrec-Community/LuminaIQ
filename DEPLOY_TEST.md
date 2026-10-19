@@ -50,7 +50,7 @@ The backend picks providers from env vars — any OpenAI-compatible API works:
 
 | Purpose | Switch | Settings |
 |---|---|---|
-| Chat / topics / quizzes | `LLM_PROVIDER` = `auto` \| `azure` \| `openai` | `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, optional `LLM_REASONING_EFFORT` |
+| Chat / topics / quizzes | `LLM_PROVIDER` = `auto` \| `azure` \| `openai` | `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, optional `LLM_REASONING_EFFORT`, optional `LLM_LIGHT_MODEL` (cheaper model on the same provider for quiz questions, flashcards, mindmaps, topic summaries and knowledge-graph links; empty = `LLM_MODEL`) |
 | Book search (embeddings) | `EMBEDDING_PROVIDER` = `auto` \| `azure` \| `openai` | `EMBEDDING_BASE_URL`, `EMBEDDING_API_KEY`, `EMBEDDING_MODEL`, `EMBEDDING_DIMENSION` |
 
 `auto` = Azure OpenAI when `AZURE_OPENAI_*` is set, otherwise the OpenAI-compatible settings.
@@ -131,3 +131,14 @@ re-embeds its books from the stored text automatically (no re-uploads).
   leaked-password protection is off (Authentication → Policies).
 - Performance: many RLS policies re-evaluate `auth.uid()` per row (`auth_rls_initplan`), multiple
   permissive policies per table, and 19 duplicate indexes. Worth a cleanup pass later.
+
+## Shared book library (cost saving)
+
+Visual Lab simulations and cram cards are reused across students who upload the
+same book (`backend/services/book_library.py`, migration `006_shared_book_library`).
+Books are matched by a MinHash sketch of their text, topics by normalised name, so a
+different PDF of the same book with renamed topics still reuses earlier work.
+Shared simulations are stored as `.html` files in the private `shared-assets`
+bucket. Only book-derived content is shared, and only with users whose own upload
+matches the book.
+

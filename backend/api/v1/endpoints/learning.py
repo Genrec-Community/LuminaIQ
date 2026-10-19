@@ -816,7 +816,7 @@ OUTPUT FORMAT - Return ONLY valid JSON, no markdown:
 
         messages = [{"role": "user", "content": prompt}]
         response = await llm_service.chat_completion(
-            messages, temperature=0.3, max_tokens=2000
+            messages, temperature=0.3, max_tokens=2000, light=True
         )
 
         # Parse the mindmap JSON
@@ -962,7 +962,7 @@ OUTPUT FORMAT - Return ONLY valid JSON array, no markdown:
 
         messages = [{"role": "user", "content": prompt}]
         response = await llm_service.chat_completion(
-            messages, temperature=0.4, max_tokens=3000
+            messages, temperature=0.4, max_tokens=3000, light=True
         )
 
         # Parse the flashcards JSON
