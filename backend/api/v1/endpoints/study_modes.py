@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 from api.deps import get_current_user
 from db.client import async_db, get_supabase_client
 from services.book_library import book_library
+from services.usage_service import metered, usage
 from services.cram_planner import coverage_from_text, plan_session
 from services.knowledge_graph_service import knowledge_graph
 from services.learning_service import performance_tracker
@@ -251,6 +252,8 @@ async def cram_card(request: CramCardRequest, current_user: dict = Depends(get_c
             await _cache_put(request.project_id, topic, "cram", card)
             return {"card": card, "cached": True}
 
+    metered(current_user, "cram")
+    await usage.check(current_user["id"], "cram")
     context = await _topic_context(request.project_id, topic, request.selected_documents)
     prompt = f"""You are a brilliant exam coach. A student has very little time before their exam.
 Teach the topic below so they understand it AND can score marks on it, using the book passages.
@@ -291,6 +294,7 @@ not LaTeX; give exactly 2 quick_check questions; keep the whole card readable in
         raise HTTPException(502, "The AI returned an empty card. Please try again.")
     await _cache_put(request.project_id, topic, "cram", card)
     await book_library.put_asset(books, topic, "cram", card)
+    await usage.charge(current_user["id"], "cram")
     return {"card": card, "cached": False}
 
 
@@ -397,6 +401,9 @@ async def visualize(request: VisualizeRequest, current_user: dict = Depends(get_
             if shared and shared.get("html"):
                 await _cache_put(request.project_id, topic, "visual", {"html": shared["html"]})
                 return {"html": shared["html"], "topic": topic, "cached": True}
+        # New build (repairs are free); cached and shared ones cost nothing
+        metered(current_user, "visual")
+        await usage.check(current_user["id"], "visual")
         context = await _topic_context(request.project_id, topic, request.selected_documents, limit=6)
         prompt = VISUAL_PROMPT.format(
             topic=topic,
@@ -416,4 +423,6 @@ async def visualize(request: VisualizeRequest, current_user: dict = Depends(get_
     await _cache_put(request.project_id, topic, "visual", {"html": html})
     # Shared copy is stored as an .html file; repairs replace a broken one for everyone
     await book_library.put_asset(books, topic, "visual", {"html": html})
+    if not request.repair:
+        await usage.charge(current_user["id"], "visual")
     return {"html": html, "topic": topic, "cached": False}

@@ -16,6 +16,7 @@ from api.deps import get_current_user
 from services.knowledge_graph_service import knowledge_graph
 from services.graph_analytics_service import graph_analytics
 from utils.logger import logger
+from services.usage_service import usage, metered
 
 router = APIRouter()
 
@@ -167,6 +168,8 @@ async def get_topic_summary(
     Get or generate a summary for a specific topic using RAG.
     Summaries are cached for performance.
     """
+    metered(current_user, "summary")
+    await usage.check(current_user["id"], "tools")
     try:
         result = await graph_analytics.get_topic_summary(
             project_id=request.project_id,
@@ -174,6 +177,8 @@ async def get_topic_summary(
             user_id=current_user["id"],
             force_regenerate=request.force_regenerate
         )
+        if isinstance(result, dict) and not result.get("cached"):
+            await usage.charge(current_user["id"], "tools")
         return result
         
     except Exception as e:

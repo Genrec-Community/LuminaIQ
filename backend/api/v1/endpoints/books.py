@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 from services.book_service import book_service
 from api.deps import get_current_user
 from utils.logger import logger
+from services.usage_service import usage, metered
 
 router = APIRouter()
 
@@ -97,6 +98,7 @@ async def import_book(
     This creates a new document in the target project and triggers embedding.
     Returns the new document record immediately; processing continues in background.
     """
+    await usage.check_books(current_user["id"])
     try:
         document = await book_service.import_book(
             book_id=book_id,

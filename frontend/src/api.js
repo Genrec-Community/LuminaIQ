@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { emitLimit, isLimitDetail } from './utils/plan';
 
 // Fallback to localhost so a missing VITE_MAIN_API_URL env var doesn't silently
 // send every request to '/undefined/...' on deployed builds.
@@ -96,6 +97,12 @@ api.interceptors.response.use(
             } finally {
                 isRefreshing = false;
             }
+        }
+
+        // ── 402: a plan limit was reached — show the upgrade prompt ──
+        if (status === 402 && isLimitDetail(error.response?.data?.detail)) {
+            emitLimit(error.response.data.detail);
+            return Promise.reject(error);
         }
 
         // ── Skip retry for auth endpoints to surface errors immediately ──
@@ -294,7 +301,12 @@ export const chatMessageStream = async (projectId, message, history = [], select
                 const errorText = await response.text();
                 let detail = errorText;
                 try { detail = JSON.parse(errorText).detail || errorText; } catch { /* plain text */ }
-                throw new Error(detail || `HTTP error ${response.status}`);
+                if (response.status === 402 && isLimitDetail(detail)) {
+                    emitLimit(detail);
+                    onComplete({ answer: detail.message, sources: [], limited: true });
+                    return;
+                }
+                throw new Error((typeof detail === 'string' ? detail : detail?.message) || `HTTP error ${response.status}`);
             }
 
             // Check for null body
@@ -1104,3 +1116,9 @@ export const generateVisualLab = async (projectId, topic, { selectedDocuments = 
     }, { timeout: 240000 });
     return response.data;
 };
+
+// ============== Plans & billing ==============
+
+export const getPlans = async () => (await api.get('/billing/plans')).data;
+
+export const getMyPlan = async () => (await api.get('/billing/me')).data;

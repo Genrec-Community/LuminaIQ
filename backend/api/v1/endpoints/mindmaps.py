@@ -3,6 +3,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 from api.deps import get_current_user
 from services.mindmap_service import MindmapService
+from services.usage_service import usage, metered
 
 router = APIRouter()
 
@@ -31,6 +32,8 @@ async def generate_mindmap(
     current_user: dict = Depends(get_current_user)
 ):
     """Generate a new mindmap"""
+    metered(current_user, "mindmap")
+    await usage.consume(current_user["id"], "tools")
     service = MindmapService()
     return await service.generate_mindmap(
         user_id=current_user["id"],

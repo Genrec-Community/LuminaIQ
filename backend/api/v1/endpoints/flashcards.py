@@ -3,6 +3,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 from api.deps import get_current_user
 from services.flashcard_service import FlashcardService
+from services.usage_service import usage, metered
 
 router = APIRouter()
 
@@ -88,6 +89,8 @@ async def generate_flashcards(
     current_user: dict = Depends(get_current_user)
 ):
     """Generate flashcards using AI"""
+    metered(current_user, "flashcards")
+    await usage.consume(current_user["id"], "tools")
     service = FlashcardService()
     return await service.generate_flashcards_with_ai(
         user_id=current_user["id"],

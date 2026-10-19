@@ -43,6 +43,7 @@ from services.llm_service import llm_service
 from api.deps import get_current_user
 from utils.logger import logger
 import json
+from services.usage_service import usage, metered
 
 router = APIRouter()
 
@@ -463,6 +464,8 @@ async def build_knowledge_graph(
 
     DSA: Adjacency List graph representation
     """
+    metered(current_user, "graph")
+    await usage.consume(current_user["id"], "tools")
     try:
         result = await knowledge_graph.build_graph_from_topics(
             project_id=project_id,
@@ -743,6 +746,8 @@ async def generate_mindmap(
     Returns a tree structure with the topic as root, main branches as subtopics,
     and leaf nodes as key details/concepts.
     """
+    metered(current_user, "mindmap")
+    await usage.consume(current_user["id"], "tools")
     try:
         # 1. Retrieve relevant document chunks for this topic using RAG
         collection_name = f"project_{request.project_id}"
@@ -907,6 +912,8 @@ async def generate_flashcards(
 
     Returns a list of question/answer flashcard pairs focused on the topic.
     """
+    metered(current_user, "flashcards")
+    await usage.consume(current_user["id"], "tools")
     try:
         # 1. Retrieve relevant document chunks for this topic
         collection_name = f"project_{request.project_id}"

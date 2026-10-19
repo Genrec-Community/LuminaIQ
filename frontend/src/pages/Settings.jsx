@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+    Crown,
     Settings as SettingsIcon,
     BookOpen,
     Moon,
@@ -30,6 +31,7 @@ import {
     Type
 } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
+import PlanUsage from '../components/PlanUsage';
 import { useGamification } from '../context/GamificationContext';
 import { useAuth } from '../context/AuthContext';
 import { AI_CHARACTERS, USER_AVATARS, AI_AVATARS, AGE_GROUPS, getCharacter, displayName } from '../utils/persona';
@@ -129,6 +131,7 @@ const Settings = () => {
         { id: 'ai', label: 'AI & Quiz', icon: Brain },
         { id: 'appearance', label: 'Display', icon: Sun },
         { id: 'notifications', label: 'Alerts', icon: Bell },
+        { id: 'plan', label: 'Plan', icon: Crown },
     ];
 
     // --- Reusable Components ---
@@ -892,6 +895,13 @@ const Settings = () => {
     );
 
 
+    const renderPlan = () => (
+        <div className="space-y-5">
+            <SectionHeader icon={Crown} title="Plan & usage" subtitle="What your plan includes and how much you've used" />
+            <PlanUsage />
+        </div>
+    );
+
     const renderNotifications = () => (
         <div className="space-y-5">
             <SectionHeader icon={Bell} title="Notifications & Alerts" subtitle="Control what you see and hear" />
@@ -949,6 +959,7 @@ const Settings = () => {
             case 'ai': return renderAI();
             case 'appearance': return renderAppearance();
             case 'notifications': return renderNotifications();
+            case 'plan': return renderPlan();
             default: return renderProfile();
         }
     };

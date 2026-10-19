@@ -6,6 +6,7 @@ import { SettingsProvider } from './context/SettingsContext';
 import { GamificationProvider } from './context/GamificationContext';
 import PrivateRoute from './components/PrivateRoute';
 import XPToast from './components/XPToast';
+import LimitModal from './components/LimitModal';
 
 // Route-level code splitting: each page loads only when visited
 const Login = lazy(() => import('./pages/Login'));
@@ -42,6 +43,7 @@ function App() {
                                 </Route>
                             </Routes>
                             </Suspense>
+                            <LimitModal />
                         </Router>
                         <XPToast />
                     </ToastProvider>

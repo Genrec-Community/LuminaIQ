@@ -21,6 +21,7 @@ from api.deps import get_current_user
 from utils.embedding_queue import get_embedding_queue
 from utils.logger import logger
 from db.client import async_db, get_supabase_client
+from services.usage_service import usage, metered
 
 router = APIRouter()
 
@@ -64,6 +65,8 @@ async def upload_document(
     NOTE: Raw original files are NOT stored in Supabase Storage.
     Only the extracted .txt is stored (10-50x smaller than PDFs).
     """
+    metered(current_user, "upload")
+    await usage.check_books(current_user["id"])
     temp_path = None
     try:
         # 1. Validate File Type

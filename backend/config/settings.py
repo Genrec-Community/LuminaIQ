@@ -80,6 +80,8 @@ class Settings(BaseSettings):
     # work: quiz questions, flashcards, mindmaps, topic summaries and knowledge-graph
     # links. Empty = everything uses LLM_MODEL. Not used with Azure.
     LLM_LIGHT_MODEL: str = Field(default="")
+    # Day boundary for daily plan limits
+    PLAN_TIMEZONE: str = Field(default="Asia/Kolkata")
 
     # Webhook
     MAIN_API_WEBHOOK_SECRET: str = Field(default="supersecretwebhook")

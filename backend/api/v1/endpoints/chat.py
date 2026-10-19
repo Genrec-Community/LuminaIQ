@@ -8,6 +8,7 @@ from api.deps import get_current_user
 from db.client import get_supabase_client, async_db
 from utils.logger import logger
 import asyncio
+from services.usage_service import usage, metered
 
 router = APIRouter()
 
@@ -184,6 +185,8 @@ async def chat_message(
     """
     Send a message to the RAG chat (Blocking/Non-streaming)
     """
+    metered(current_user, "chat")
+    await usage.consume(current_user["id"], "chat")
     try:
         client = get_supabase_client()
         chat_history_dicts, user_context_str, save_task = await _prepare_chat(
@@ -225,6 +228,8 @@ async def chat_stream(
     """
     Send a message to the RAG chat (Streaming)
     """
+    metered(current_user, "chat")
+    await usage.consume(current_user["id"], "chat")
     try:
         chat_history_dicts, user_context_str, save_task = await _prepare_chat(
             request, current_user["id"]
@@ -295,6 +300,8 @@ async def get_project_summary(
     """
     Generate a summary for the project documents
     """
+    metered(current_user, "summary")
+    await usage.consume(current_user["id"], "tools")
     try:
         result = await rag_service.generate_summary(
             request.project_id, request.selected_documents

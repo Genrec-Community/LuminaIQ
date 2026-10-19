@@ -32,6 +32,38 @@ def _use_azure() -> bool:
     return azure_ready
 
 
+class _TokenRecorder:
+    """LangChain callback that records each call's token usage for the current user."""
+
+    def __new__(cls):
+        from langchain_core.callbacks import AsyncCallbackHandler
+
+        class Recorder(AsyncCallbackHandler):
+            async def on_llm_end(self, response, **kwargs):
+                try:
+                    from services.usage_service import usage
+
+                    usage_in = usage_out = 0
+                    model = ""
+                    for gens in response.generations or []:
+                        for g in gens:
+                            meta = getattr(getattr(g, "message", None), "usage_metadata", None) or {}
+                            usage_in += meta.get("input_tokens", 0) or 0
+                            usage_out += meta.get("output_tokens", 0) or 0
+                            rm = getattr(getattr(g, "message", None), "response_metadata", None) or {}
+                            model = model or rm.get("model_name", "")
+                    if not (usage_in or usage_out):
+                        tu = (response.llm_output or {}).get("token_usage") or {}
+                        usage_in = tu.get("prompt_tokens", 0) or 0
+                        usage_out = tu.get("completion_tokens", 0) or 0
+                        model = model or (response.llm_output or {}).get("model_name", "")
+                    await usage.record_tokens(model, usage_in, usage_out)
+                except Exception as e:
+                    logger.debug(f"Token recording failed: {e}")
+
+        return Recorder()
+
+
 def _build_client(
     temperature: float = 0.7,
     max_tokens: int = 4000,
@@ -61,6 +93,8 @@ def _build_client(
             "azure_deployment": settings.AZURE_OPENAI_DEPLOYMENT,
             "api_version": settings.AZURE_OPENAI_API_VERSION,
             "max_tokens": max_tokens,
+            "callbacks": [_TokenRecorder()],
+            "stream_usage": True,
         }
         
         # Models like gpt-5-mini and o1 do not support custom temperatures
@@ -92,6 +126,8 @@ def _build_client(
         "openai_api_base": settings.LLM_BASE_URL or None,
         "temperature": temperature,
         "max_tokens": max_tokens,
+        "callbacks": [_TokenRecorder()],
+        "stream_usage": True,  # token counts on streamed answers too
     }
     if settings.LLM_REASONING_EFFORT:
         # Sent as a raw body field so it works with any OpenAI-compatible provider

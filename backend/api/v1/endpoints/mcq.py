@@ -8,6 +8,7 @@ from models.schemas import (
 )
 from typing import Any, List, Dict
 from api.deps import get_current_user
+from services.usage_service import usage, metered
 
 router = APIRouter()
 
@@ -67,6 +68,8 @@ async def generate_mcq(
     """
     Generate MCQ questions for a chapter/topic
     """
+    metered(current_user, "questions")
+    await usage.consume(current_user["id"], "questions", max(1, request.num_questions or 1))
     try:
         result = await mcq_service.generate_mcq(
             project_id=request.project_id,
