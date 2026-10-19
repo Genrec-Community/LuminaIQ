@@ -1,0 +1,12 @@
+{
+  "appId": "fun.luminaiq.app",
+  "appName": "LuminaIQ",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#FDF6F0"
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

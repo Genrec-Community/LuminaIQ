@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { isNativeApp } from './utils/platform';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import { SettingsProvider } from './context/SettingsContext';
@@ -34,7 +35,8 @@ function App() {
                         <Router>
                             <Suspense fallback={<PageLoader />}>
                             <Routes>
-                                <Route path="/" element={<Landing />} />
+                                {/* The Android app opens straight into the product, not the marketing page */}
+                                <Route path="/" element={isNativeApp() ? <Navigate to="/dashboard" replace /> : <Landing />} />
                                 <Route path="/login" element={<Login />} />
                                 <Route path="/pricing" element={<Pricing />} />
                                 

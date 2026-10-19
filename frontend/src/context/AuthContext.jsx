@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api, login as apiLogin, signup as apiSignup, exchangeToken as apiExchangeToken } from '../api';
 import { supabase } from '../supabaseClient';
+import { isNativeApp } from '../utils/platform';
+import { nativeGoogleSignIn, initNative } from '../utils/native';
 
 const AuthContext = createContext(null);
 
@@ -73,6 +75,7 @@ export const AuthProvider = ({ children }) => {
         };
 
         initAuth();
+        initNative(supabase); // Android app: sign-in deep link + back button
 
         // Listen for Supabase auth changes (including OAuth callbacks)
         const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -155,6 +158,10 @@ export const AuthProvider = ({ children }) => {
 
     const loginWithGoogle = async () => {
         try {
+            if (isNativeApp()) {
+                await nativeGoogleSignIn(supabase);
+                return;
+            }
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {

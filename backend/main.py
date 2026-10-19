@@ -28,7 +28,11 @@ app = FastAPI(
 
 # CORS Configuration
 # Security Fix: Use explicit origins from settings
-origins = settings.BACKEND_CORS_ORIGINS
+origins = list(settings.BACKEND_CORS_ORIGINS)
+# The Android app (Capacitor) serves the web build from these origins
+for app_origin in ("https://localhost", "capacitor://localhost"):
+    if app_origin not in origins:
+        origins.append(app_origin)
 
 app.add_middleware(
     CORSMiddleware,

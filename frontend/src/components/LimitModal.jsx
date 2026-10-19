@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, X, Clock, Crown } from 'lucide-react';
 import { LIMIT_EVENT, formatReset } from '../utils/plan';
+import { isNativeApp } from '../utils/platform';
 
 const NEXT_PLAN = {
     free: { key: 'scholar', name: 'Scholar', pitch: '6× more chat, 15 books and 15 Visual Lab builds a month' },
@@ -25,7 +26,8 @@ const LimitModal = () => {
     }, []);
 
     // Deep answers are a Topper feature, whatever plan the student is on now
-    const next = detail
+    // No in-app upsell in the Android app (Google Play payments policy)
+    const next = detail && !isNativeApp()
         ? (detail.feature === 'deep' && detail.plan !== 'topper' ? NEXT_PLAN.scholar : NEXT_PLAN[detail.plan])
         : null;
     const close = () => setDetail(null);
@@ -46,7 +48,7 @@ const LimitModal = () => {
                             <Sparkles className="h-6 w-6 text-[#C8A288]" />
                         </div>
                         <h2 id="limit-title" className="mt-4 text-xl font-bold text-[#4A3B32]">
-                            {detail.limit === 0 ? 'Unlock this with an upgrade' : "You've hit your limit"}
+                            {detail.limit === 0 ? (isNativeApp() ? 'Not included in your plan' : 'Unlock this with an upgrade') : "You've hit your limit"}
                         </h2>
                         <p className="mt-1 text-[#4A3B32]">{detail.message}</p>
                         {detail.resets_at && (

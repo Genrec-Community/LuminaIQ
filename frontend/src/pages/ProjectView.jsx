@@ -97,6 +97,7 @@ import { LAST_PROJECT_KEY } from '../utils/dailyProgress';
 import { aiName } from '../utils/persona';
 import usePlan from '../hooks/usePlan';
 import { emitLimit, emitPlanChanged } from '../utils/plan';
+import { isNativeApp } from '../utils/platform';
 
 
 // One chat message's Markdown. Memoized so that while an answer streams in,
@@ -1765,7 +1766,7 @@ const ProjectView = () => {
                                     )}
 
                                     <form onSubmit={handleSendMessage} className="flex gap-2 md:gap-3 items-center">
-                                        <button
+                                        {(!isNativeApp() || deepLeft > 0) && <button
                                             type="button"
                                             onClick={toggleDeep}
                                             aria-pressed={deepMode}
@@ -1776,7 +1777,7 @@ const ProjectView = () => {
                                         >
                                             <Brain className="h-4 w-4" />
                                             <span className="hidden sm:inline">Deep{deepMode ? ` · ${deepLeft}` : ''}</span>
-                                        </button>
+                                        </button>}
                                         <div className="flex-1 relative">
                                             <input
                                                 type="text"
