@@ -1056,3 +1056,35 @@ export const waitForJob = async (jobId, options = {}) => {
         await new Promise(resolve => setTimeout(resolve, interval));
     }
 };
+
+// ============== Exam Tonight (crash mode) + Visual Lab ==============
+
+export const getCramPlan = async (projectId, minutes, selectedDocuments = []) => {
+    const response = await api.post('/learning/cram/plan', {
+        project_id: projectId,
+        minutes,
+        selected_documents: selectedDocuments,
+    });
+    return response.data;
+};
+
+export const getCramCard = async (projectId, topic, selectedDocuments = [], refresh = false) => {
+    const response = await api.post('/learning/cram/card', {
+        project_id: projectId,
+        topic,
+        selected_documents: selectedDocuments,
+        refresh,
+    });
+    return response.data;
+};
+
+export const generateVisualLab = async (projectId, topic, { selectedDocuments = [], refresh = false, repair = null } = {}) => {
+    const response = await api.post('/learning/visualize', {
+        project_id: projectId,
+        topic,
+        selected_documents: selectedDocuments,
+        refresh,
+        repair,
+    }, { timeout: 240000 });
+    return response.data;
+};

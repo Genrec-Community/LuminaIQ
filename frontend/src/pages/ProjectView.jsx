@@ -39,7 +39,9 @@ import {
     Check,
     Eye,
     EyeOff,
-    WifiOff
+    WifiOff,
+    Moon,
+    FlaskConical
 } from 'lucide-react';
 import {
     uploadDocument,
@@ -88,6 +90,8 @@ const TopicFlashcards = lazy(() => import('../components/views/TopicFlashcards')
 const FlashcardsView = lazy(() => import('../components/views/FlashcardsView'));
 const MindmapView = lazy(() => import('../components/views/MindmapView'));
 const PowerHourView = lazy(() => import('../components/views/PowerHourView'));
+const ExamTonightView = lazy(() => import('../components/views/ExamTonightView'));
+const VisualLabView = lazy(() => import('../components/views/VisualLabView'));
 import useFocusTimer from '../hooks/useFocusTimer';
 import { LAST_PROJECT_KEY } from '../utils/dailyProgress';
 import { aiName } from '../utils/persona';
@@ -151,6 +155,7 @@ const ProjectView = () => {
         // 'general' was a menu toggle, not a real view
         return saved && saved !== 'general' ? saved : 'power';
     });
+    const [labTopic, setLabTopic] = useState('');
     useFocusTimer(user?.id);
     useEffect(() => {
         try { localStorage.setItem(LAST_PROJECT_KEY, projectId); } catch { /* ignore */ }
@@ -561,7 +566,7 @@ const ProjectView = () => {
     // fetchTopics on tab change — only if topics haven't been loaded yet
     useEffect(() => {
         if (!isProcessingDocs && !topicsFetchedRef.current) {
-            if (activeTab === 'power' || activeTab === 'chat' || activeTab === 'quiz' || activeTab === 'qa' || activeTab === 'notes' || activeTab === 'path') {
+            if (activeTab === 'power' || activeTab === 'cram' || activeTab === 'lab' || activeTab === 'chat' || activeTab === 'quiz' || activeTab === 'qa' || activeTab === 'notes' || activeTab === 'path') {
                 fetchTopics();
                 topicsFetchedRef.current = true;
             }
@@ -1012,6 +1017,23 @@ const ProjectView = () => {
         </button>
     );
 
+    const markTopicMastered = (topic) => {
+        setLearningProgress(prev => {
+            if (prev.has(topic)) return prev;
+            const next = new Set(prev);
+            next.add(topic);
+            saveLearningProgress(projectId, [...next]).catch(err =>
+                console.warn('Failed to save progress:', err)
+            );
+            return next;
+        });
+    };
+
+    const openVisualLab = (topic) => {
+        setLabTopic(topic);
+        setActiveTab('lab');
+    };
+
     const handleOpenSource = async (source) => {
         if (!source.doc_id) return;
         const doc = documents.find(d => d.id === source.doc_id || d.filename === source.doc_name);
@@ -1141,9 +1163,11 @@ const ProjectView = () => {
 
                         <nav className={`flex-1 overflow-y-auto min-h-0 custom-scrollbar ${leftCollapsed ? 'space-y-2' : 'space-y-4'}`}>
                             {/* Main Navigation Items */}
+                            {NavItem({ id: "cram", icon: Moon, label: "Exam Tonight" })}
                             {NavItem({ id: "power", icon: Zap, label: "Power Hour" })}
                             {NavItem({ id: "chat", icon: MessageSquare, label: `Chat with ${aiName(settings)}` })}
                             {NavItem({ id: "path", icon: Target, label: "Learning Path" })}
+                            {NavItem({ id: "lab", icon: FlaskConical, label: "Visual Lab" })}
 
                             {NavItem({ id: "knowledge", icon: Network, label: "Knowledge Graph" })}
 
@@ -1304,6 +1328,8 @@ const ProjectView = () => {
                             {/* Left: Tab name + Summary */}
                             <div className="flex items-center gap-2 min-w-0 shrink-0">
                                 <h2 className={`text-base font-bold whitespace-nowrap ${isDark ? 'text-[#e8d8c0]' : 'text-[#4A3B32]'}`}>
+                                    {activeTab === 'cram' && 'Exam Tonight'}
+                                    {activeTab === 'lab' && 'Visual Lab'}
                                     {activeTab === 'power' && 'Power Hour'}
                                     {activeTab === 'chat' && `Chat with ${aiName(settings)}`}
                                     {activeTab === 'qa' && 'Q&A'}
@@ -1745,6 +1771,25 @@ const ProjectView = () => {
                         </div>
                     )}
 
+                    {activeTab === 'cram' && (
+                        <ExamTonightView
+                            projectId={projectId}
+                            selectedDocuments={selectedDocuments}
+                            onTopicMastered={markTopicMastered}
+                            onVisualize={openVisualLab}
+                        />
+                    )}
+
+                    {activeTab === 'lab' && (
+                        <VisualLabView
+                            projectId={projectId}
+                            availableTopics={availableTopics.length ? availableTopics : allProjectTopics}
+                            selectedDocuments={selectedDocuments}
+                            initialTopic={labTopic}
+                            onConsumeInitialTopic={() => setLabTopic('')}
+                        />
+                    )}
+
                     {activeTab === 'power' && (
                         <PowerHourView
                             projectId={projectId}
@@ -1752,17 +1797,8 @@ const ProjectView = () => {
                             selectedDocuments={selectedDocuments}
                             completedTopics={learningProgress}
                             topicMeta={topicMeta}
-                            onTopicMastered={(topic) => {
-                                setLearningProgress(prev => {
-                                    if (prev.has(topic)) return prev;
-                                    const next = new Set(prev);
-                                    next.add(topic);
-                                    saveLearningProgress(projectId, [...next]).catch(err =>
-                                        console.warn('Failed to save progress:', err)
-                                    );
-                                    return next;
-                                });
-                            }}
+                            onTopicMastered={markTopicMastered}
+                            onVisualize={openVisualLab}
                             onOpenChat={(prompt) => {
                                 setInputMessage(prompt);
                                 setActiveTab('chat');

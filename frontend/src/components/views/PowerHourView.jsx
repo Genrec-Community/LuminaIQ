@@ -4,7 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
     Zap, Timer, Flame, SkipForward, ArrowRight, RotateCcw, Trophy, Loader2,
-    BookOpen, Target, Sparkles, CheckCircle2, XCircle, Brain,
+    BookOpen, Target, Sparkles, CheckCircle2, XCircle, Brain, FlaskConical,
 } from 'lucide-react';
 import { getTopicSummary, generateMCQ } from '../../api';
 import { useAuth } from '../../context/AuthContext';
@@ -57,7 +57,7 @@ const Confetti = () => {
  * feedback, combos, XP and a companion cheering you on. The next card is
  * prefetched while you work so there is no waiting between topics.
  */
-const PowerHourView = ({ projectId, availableTopics = [], selectedDocuments = [], completedTopics, topicMeta = {}, onTopicMastered, onOpenChat }) => {
+const PowerHourView = ({ projectId, availableTopics = [], selectedDocuments = [], completedTopics, topicMeta = {}, onTopicMastered, onOpenChat, onVisualize }) => {
     const { user } = useAuth();
     const { settings } = useSettings();
     const { earnXP } = useGamification();
@@ -546,7 +546,13 @@ const PowerHourView = ({ projectId, availableTopics = [], selectedDocuments = []
                                 {onOpenChat && (
                                     <button onClick={() => onOpenChat(`Explain "${topic}" to me simply, with an example and a memory trick.`)}
                                         className="flex items-center gap-1.5 rounded-xl border border-[#E6D5CC] px-3 py-2.5 text-sm text-[#4A3B32] hover:border-[#C8A288]">
-                                        <Brain className="h-4 w-4 text-[#C8A288]" /> Ask {companion}
+                                        <Brain className="h-4 w-4 text-[#C8A288]" /> <span className="hidden sm:inline">Ask {companion}</span>
+                                    </button>
+                                )}
+                                {onVisualize && (
+                                    <button onClick={() => onVisualize(topic)} title="Open an interactive simulation of this topic"
+                                        className="flex items-center gap-1.5 rounded-xl border border-[#E6D5CC] px-3 py-2.5 text-sm text-[#4A3B32] hover:border-[#C8A288]">
+                                        <FlaskConical className="h-4 w-4 text-[#C8A288]" /> <span className="hidden sm:inline">Visualize</span>
                                     </button>
                                 )}
                                 <button onClick={goCheck} className="flex items-center gap-2 rounded-xl bg-[#C8A288] px-5 py-2.5 font-semibold text-white shadow-md shadow-[#C8A288]/30 hover:bg-[#B08B72] active:scale-95">

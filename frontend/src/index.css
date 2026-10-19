@@ -398,3 +398,10 @@ html.dark .bg-gradient-to-br.from-\[\#FDF6F0\] {
 
 .animate-aurora-1 { animation: aurora-drift-1 18s ease-in-out infinite; }
 .animate-aurora-2 { animation: aurora-drift-2 22s ease-in-out infinite; }
+
+/* Exam Tonight: print only the rapid revision sheet */
+@media print {
+  body * { visibility: hidden !important; }
+  #cram-revision-sheet, #cram-revision-sheet * { visibility: visible !important; }
+  #cram-revision-sheet { position: absolute; left: 0; top: 0; width: 100%; border: none; }
+}
