@@ -86,6 +86,15 @@ class Settings(BaseSettings):
     LLM_DEEP_MODEL: str = Field(default="")
     LLM_DEEP_BASE_URL: str = Field(default="")
     LLM_DEEP_API_KEY: str = Field(default="")
+    # ── Razorpay (payments) ── fill these in Render; empty = payments disabled
+    RAZORPAY_KEY_ID: str = Field(default="")            # rzp_test_... / rzp_live_...
+    RAZORPAY_KEY_SECRET: str = Field(default="")
+    RAZORPAY_WEBHOOK_SECRET: str = Field(default="")    # set when creating the webhook
+    # Plan IDs from Razorpay (scripts/create_razorpay_plans.py creates them)
+    RAZORPAY_PLAN_SCHOLAR_MONTHLY: str = Field(default="")
+    RAZORPAY_PLAN_SCHOLAR_YEARLY: str = Field(default="")
+    RAZORPAY_PLAN_TOPPER_MONTHLY: str = Field(default="")
+    RAZORPAY_PLAN_TOPPER_YEARLY: str = Field(default="")
     # Day boundary for daily plan limits
     PLAN_TIMEZONE: str = Field(default="Asia/Kolkata")
 

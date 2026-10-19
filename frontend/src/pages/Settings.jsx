@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
     Crown,
     Settings as SettingsIcon,
@@ -109,7 +109,8 @@ const Settings = () => {
     const { settings, updateSetting, updateSettings, resetSettings } = useSettings();
     const { data: gamificationData } = useGamification();
     const { user } = useAuth();
-    const [activeSection, setActiveSection] = useState('profile');
+    const [searchParams] = useSearchParams();
+    const [activeSection, setActiveSection] = useState(searchParams.get('section') || 'profile');
 
     const isDark = settings?.darkMode ?? false;
 

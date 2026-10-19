@@ -8,6 +8,12 @@ export default function usePlan() {
     const [loading, setLoading] = useState(true);
 
     const refresh = useCallback(async () => {
+        // Signed out (e.g. browsing /pricing): nothing to load
+        if (!localStorage.getItem('token')) {
+            setPlan(null);
+            setLoading(false);
+            return;
+        }
         try {
             setPlan(await getMyPlan());
         } catch {

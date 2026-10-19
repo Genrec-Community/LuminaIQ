@@ -142,3 +142,36 @@ Shared simulations are stored as `.html` files in the private `shared-assets`
 bucket. Only book-derived content is shared, and only with users whose own upload
 matches the book.
 
+
+## Plans, limits and payments (Razorpay)
+
+Plans and limits live in `backend/services/plans.py` (Free, Scholar ₹299 / ₹2,499 yr,
+Topper ₹999 / ₹8,499 yr, Institution ₹179 per student, Exam Night Pass ₹49 for 48 h).
+Every AI feature is metered (`services/usage_service.py`); over the limit the API returns
+`402 limit_reached` and the app shows an upgrade prompt. Token usage per user/day/model is
+logged in `llm_usage_daily` for real cost tracking. Migrations: `007_plans_and_usage`,
+`008_exam_night_pass`.
+
+Until the Razorpay variables are set, the Pricing page shows "payments are being switched on"
+and everyone is on Free. To switch payments on (test mode first):
+
+1. Razorpay Dashboard → Settings → API Keys → generate **test** keys.
+2. Create the subscription plans once:
+   `cd backend && RAZORPAY_KEY_ID=rzp_test_… RAZORPAY_KEY_SECRET=… python scripts/create_razorpay_plans.py`
+3. Razorpay Dashboard → Webhooks → add `https://luminaiq-backend-test.onrender.com/api/v1/billing/webhook`
+   with a secret of your choice and the events: `subscription.activated`, `subscription.charged`,
+   `subscription.pending`, `subscription.halted`, `subscription.cancelled`, `subscription.completed`,
+   `payment.captured`.
+4. Render → `luminaiq-backend-test` → Environment:
+
+   | Key | Value |
+   |---|---|
+   | `RAZORPAY_KEY_ID` | `rzp_test_…` |
+   | `RAZORPAY_KEY_SECRET` | from step 1 |
+   | `RAZORPAY_WEBHOOK_SECRET` | from step 3 |
+   | `RAZORPAY_PLAN_SCHOLAR_MONTHLY` / `_YEARLY`, `RAZORPAY_PLAN_TOPPER_MONTHLY` / `_YEARLY` | printed by step 2 |
+
+5. Pay with Razorpay's test UPI / cards. For live: repeat 1–4 with live keys (plan IDs differ).
+
+Optional model tiers: `LLM_LIGHT_MODEL` (bulk work), `LLM_DEEP_MODEL` (+ `LLM_DEEP_BASE_URL`,
+`LLM_DEEP_API_KEY`) for Deep answers, Topper cram cards and Visual Lab.

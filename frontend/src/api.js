@@ -89,7 +89,7 @@ api.interceptors.response.use(
                 localStorage.removeItem('user');
                 delete api.defaults.headers.common['Authorization'];
                 // Redirect to login without a hard reload loop
-                const isAlreadyOnAuth = ['/login', '/signup', '/'].includes(window.location.pathname);
+                const isAlreadyOnAuth = ['/login', '/signup', '/', '/pricing', '/institution'].includes(window.location.pathname);
                 if (!isAlreadyOnAuth) {
                     window.location.href = '/login';
                 }
@@ -1123,3 +1123,13 @@ export const generateVisualLab = async (projectId, topic, { selectedDocuments = 
 export const getPlans = async () => (await api.get('/billing/plans')).data;
 
 export const getMyPlan = async () => (await api.get('/billing/me')).data;
+
+export const startCheckout = async (plan, cycle) => (await api.post('/billing/checkout', { plan, cycle })).data;
+
+export const startPassCheckout = async () => (await api.post('/billing/pass/checkout')).data;
+
+export const verifyPayment = async (payload) => (await api.post('/billing/verify', payload)).data;
+
+export const cancelSubscription = async () => (await api.post('/billing/cancel')).data;
+
+export const getInvoices = async () => (await api.get('/billing/invoices')).data;

@@ -15,6 +15,7 @@ const ProjectView = lazy(() => import('./pages/ProjectView'));
 const Settings = lazy(() => import('./pages/Settings'));
 const BookStore = lazy(() => import('./pages/BookStore'));
 const Landing = lazy(() => import('./pages/Landing'));
+const Pricing = lazy(() => import('./pages/Pricing'));
 
 const PageLoader = () => (
     <div className="min-h-screen flex items-center justify-center bg-[#FDF6F0]">
@@ -33,6 +34,7 @@ function App() {
                             <Routes>
                                 <Route path="/" element={<Landing />} />
                                 <Route path="/login" element={<Login />} />
+                                <Route path="/pricing" element={<Pricing />} />
                                 
                                 {/* Protected Routes */}
                                 <Route element={<PrivateRoute />}>

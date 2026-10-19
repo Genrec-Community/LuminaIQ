@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Crown, Loader2 } from 'lucide-react';
+import { Crown, Loader2, FileText } from 'lucide-react';
 import usePlan from '../hooks/usePlan';
-import { formatReset } from '../utils/plan';
+import { formatReset, emitPlanChanged } from '../utils/plan';
+import { cancelSubscription, getInvoices } from '../api';
+import { isNativeApp } from '../utils/platform';
 
 const ORDER = ['chat', 'questions', 'tools', 'cram', 'visual', 'deep', 'books'];
 
@@ -10,6 +12,29 @@ const ORDER = ['chat', 'questions', 'tools', 'cram', 'visual', 'deep', 'books'];
 const PlanUsage = () => {
     const navigate = useNavigate();
     const { plan, loading } = usePlan();
+    const [invoices, setInvoices] = useState([]);
+    const [confirmCancel, setConfirmCancel] = useState(false);
+    const [cancelling, setCancelling] = useState(false);
+    const [cancelError, setCancelError] = useState('');
+    const native = isNativeApp();
+    const subscribed = plan?.source === 'razorpay';
+
+    useEffect(() => {
+        if (subscribed) getInvoices().then((r) => setInvoices(r.invoices || [])).catch(() => {});
+    }, [subscribed]);
+
+    const doCancel = async () => {
+        setCancelling(true); setCancelError('');
+        try {
+            await cancelSubscription();
+            emitPlanChanged();
+            setConfirmCancel(false);
+        } catch (e) {
+            setCancelError(e?.response?.data?.detail?.message || e?.response?.data?.detail || 'Could not cancel. Please try again.');
+        } finally {
+            setCancelling(false);
+        }
+    };
 
     if (loading) return <div className="flex items-center gap-2 text-[#8a6a5c]"><Loader2 className="h-4 w-4 animate-spin" /> Loading your plan…</div>;
     if (!plan) return <p className="text-[#8a6a5c]">Plan details are unavailable right now.</p>;
@@ -32,7 +57,7 @@ const PlanUsage = () => {
                                     plan.plan === 'free' ? 'Free forever. Upgrade any time.' : ''}
                     </p>
                 </div>
-                {plan.source !== 'institution' && (
+                {plan.source !== 'institution' && !native && (
                     <button onClick={() => navigate('/pricing')}
                         className="rounded-xl bg-[#C8A288] px-4 py-2 text-sm font-semibold text-white hover:bg-[#B08B72]">
                         {plan.plan === 'free' ? 'Upgrade' : 'Manage plan'}
@@ -58,6 +83,51 @@ const PlanUsage = () => {
                     );
                 })}
             </div>
+
+            {subscribed && !native && (
+                <div className="rounded-2xl border border-[#E6D5CC] bg-white p-5 space-y-4">
+                    {invoices.length > 0 && (
+                        <div>
+                            <h3 className="font-semibold text-[#4A3B32] mb-2">Invoices</h3>
+                            <ul className="divide-y divide-[#E6D5CC]">
+                                {invoices.map((inv) => (
+                                    <li key={inv.id} className="py-2 flex items-center justify-between text-sm">
+                                        <span className="text-[#4A3B32]">
+                                            {inv.date ? new Date(inv.date * 1000).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) : inv.id}
+                                            {inv.amount_paise ? ` · ₹${(inv.amount_paise / 100).toLocaleString('en-IN')}` : ''}
+                                        </span>
+                                        {inv.url && (
+                                            <a href={inv.url} target="_blank" rel="noopener noreferrer"
+                                                className="flex items-center gap-1 font-semibold text-[#C8A288] hover:underline">
+                                                <FileText className="h-4 w-4" /> GST invoice
+                                            </a>
+                                        )}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                    {!plan.cancel_at_period_end && (
+                        confirmCancel ? (
+                            <div className="rounded-xl bg-rose-50 border border-rose-200 p-4 text-sm text-rose-900">
+                                <p>You'll keep {plan.plan_name} until the end of this billing period, then move to Free. Your books and progress stay.</p>
+                                {cancelError && <p className="mt-2 font-semibold">{cancelError}</p>}
+                                <div className="mt-3 flex gap-2">
+                                    <button onClick={doCancel} disabled={cancelling}
+                                        className="rounded-xl bg-rose-600 px-4 py-2 font-semibold text-white disabled:opacity-60">
+                                        {cancelling ? 'Cancelling…' : 'Cancel subscription'}
+                                    </button>
+                                    <button onClick={() => setConfirmCancel(false)} className="rounded-xl border border-rose-300 px-4 py-2 font-semibold">Keep it</button>
+                                </div>
+                            </div>
+                        ) : (
+                            <button onClick={() => setConfirmCancel(true)} className="text-sm font-semibold text-[#8a6a5c] hover:text-rose-600">
+                                Cancel subscription
+                            </button>
+                        )
+                    )}
+                </div>
+            )}
         </div>
     );
 };

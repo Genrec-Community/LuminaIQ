@@ -10,6 +10,9 @@ import { useSettings } from '../../context/SettingsContext';
 import { useGamification } from '../../context/GamificationContext';
 import { bumpDailyProgress } from '../../utils/dailyProgress';
 import { getCharacter, aiName, displayName, pick } from '../../utils/persona';
+import { Link } from 'react-router-dom';
+import usePlan from '../../hooks/usePlan';
+import { isNativeApp } from '../../utils/platform';
 
 const BUDGETS = [
     { minutes: 30, label: '30 min', hint: 'Panic mode' },
@@ -233,6 +236,8 @@ const ExamTonightView = ({ projectId, selectedDocuments = [], onTopicMastered, o
     const character = getCharacter(settings.aiCharacter);
     const companion = aiName(settings);
     const name = displayName(settings, user);
+    const { plan: myPlan } = usePlan();
+    const offerPass = myPlan && myPlan.plan !== 'topper' && !isNativeApp();
 
     const saved = useMemo(() => loadSession(projectId), [projectId]);
     const [phase, setPhase] = useState(saved?.plan ? 'plan' : 'setup'); // setup | plan | study | revision
@@ -375,6 +380,11 @@ const ExamTonightView = ({ projectId, selectedDocuments = [], onTopicMastered, o
                             className="mt-4 w-full flex items-center justify-center gap-2 rounded-2xl bg-[#C8A288] px-4 py-3.5 font-semibold text-white hover:bg-[#B08B72] disabled:opacity-60 active:scale-[0.99]">
                             {loadingPlan ? <><Loader2 className="h-5 w-5 animate-spin" /> Weighing every topic in your book…</> : <>Build my plan <ArrowRight className="h-5 w-5" /></>}
                         </button>
+                        {offerPass && (
+                            <Link to="/pricing#pass" className="mt-3 flex items-center justify-center gap-2 rounded-2xl border border-dashed border-[#C8A288] px-4 py-2.5 text-sm text-[#4A3B32] hover:bg-[#FDF6F0]">
+                                <Moon className="h-4 w-4 text-[#C8A288]" /> Big night? Get Deep cram cards and Topper limits for 48 hours: <b>Exam Night Pass ₹49</b>
+                            </Link>
+                        )}
                     </div>
 
                     <div className="mt-4 grid gap-3 sm:grid-cols-3">

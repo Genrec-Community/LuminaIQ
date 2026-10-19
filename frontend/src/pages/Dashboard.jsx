@@ -18,12 +18,21 @@ import { useSettings } from '../context/SettingsContext';
 import TodayHero from '../components/TodayHero';
 import { displayName } from '../utils/persona';
 import { LAST_PROJECT_KEY } from '../utils/dailyProgress';
+import { takeAfterLogin } from '../utils/afterLogin';
+import usePlan from '../hooks/usePlan';
+import { isNativeApp } from '../utils/platform';
 
 const Dashboard = () => {
     const navigate = useNavigate();
     const { user, logout } = useAuth();
     const toast = useToast();
     const { settings } = useSettings();
+    const { plan: myPlan } = usePlan();
+    // Finish a "sign in, then go back to X" flow (e.g. Google sign-in from /pricing)
+    useEffect(() => {
+        const next = takeAfterLogin();
+        if (next) navigate(next, { replace: true });
+    }, [navigate]);
     const [projectSearch, setProjectSearch] = useState('');
     const [showNewProjectModal, setShowNewProjectModal] = useState(false);
     const [newProjectName, setNewProjectName] = useState('');
@@ -401,7 +410,18 @@ const Dashboard = () => {
                         <h1 className="text-2xl font-bold text-[#4A3B32]">Lumina IQ</h1>
                     </div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 sm:gap-4">
+                        {myPlan && !(isNativeApp() && myPlan.plan === 'free') && (
+                            <button
+                                onClick={() => navigate(myPlan.plan === 'free' ? '/pricing' : '/settings?section=plan')}
+                                className={`rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${myPlan.plan === 'free'
+                                    ? 'bg-[#C8A288] text-white hover:bg-[#B08B72]'
+                                    : 'border border-[#E6D5CC] bg-[#FDF6F0] text-[#4A3B32] hover:border-[#C8A288]'}`}
+                                title={myPlan.plan === 'free' ? 'See plans' : 'Your plan'}
+                            >
+                                {myPlan.plan === 'free' ? 'Upgrade' : `${myPlan.plan_name}${myPlan.source === 'pass' ? ' · pass' : ''}`}
+                            </button>
+                        )}
                         <button
                             onClick={() => navigate('/settings')}
                             className="flex items-center gap-2 pl-1.5 pr-4 py-1.5 bg-[#FDF6F0] rounded-full border border-[#E6D5CC] hover:border-[#C8A288] transition-colors"

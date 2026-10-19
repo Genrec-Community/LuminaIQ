@@ -1,10 +1,18 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { AFTER_LOGIN_KEY } from '../utils/afterLogin';
 import { BookOpen, Loader2, ArrowRight, Mail, Lock, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Login = () => {
     const navigate = useNavigate();
+    // Where to go after signing in (e.g. back to /pricing). Kept in session
+    // storage too, so Google sign-in (which lands on /dashboard) can follow it.
+    const [searchParams] = useSearchParams();
+    const next = (searchParams.get('next') || '').startsWith('/') ? searchParams.get('next') : '';
+    React.useEffect(() => {
+        if (next) sessionStorage.setItem(AFTER_LOGIN_KEY, next);
+    }, [next]);
     const { login, signup, loginWithGoogle, requestOtp, verifyOtpCode } = useAuth();
     const [isLogin, setIsLogin] = useState(true);
     const [isOtpMode, setIsOtpMode] = useState(false);
@@ -39,7 +47,10 @@ const Login = () => {
                 }
             } else if (isLogin) {
                 const success = await login(email, password);
-                if (success) navigate('/dashboard');
+                if (success) {
+                    sessionStorage.removeItem(AFTER_LOGIN_KEY);
+                    navigate(next || '/dashboard');
+                }
             } else {
                 // Password Validation
                 const pwdRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;

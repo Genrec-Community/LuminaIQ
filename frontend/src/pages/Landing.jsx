@@ -36,6 +36,7 @@ import {
 import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
 import { ThemeToggle } from "../components/ui/ThemeToggle";
+import { STUDENT_PLANS, INSTITUTION_PLAN, inr } from "../utils/pricing";
 
 const APP_URL = "https://luminaiq.fun";
 
@@ -211,51 +212,29 @@ const testimonials = [
   },
 ];
 
+// Built from the same data as the Pricing page (utils/pricing.js)
 const pricingTiers = [
+  ...STUDENT_PLANS.map((p) => ({
+    key: p.key,
+    name: p.name,
+    price: inr(p.monthly),
+    period: p.monthly ? "/month" : "forever",
+    description: p.tagline,
+    features: p.features.slice(0, 5),
+    cta: p.monthly ? `Get ${p.name}` : "Start free",
+    highlighted: !!p.popular,
+    to: p.monthly ? `/pricing?plan=${p.key}` : "/dashboard",
+  })),
   {
-    name: "Free",
-    price: "$0",
-    period: "forever",
-    description: "Perfect for trying it out",
-    features: [
-      "3 documents",
-      "Unlimited chat & quizzes",
-      "Basic notes & flashcards",
-      "7-day spaced repetition",
-    ],
-    cta: "Start free",
+    key: INSTITUTION_PLAN.key,
+    name: INSTITUTION_PLAN.name,
+    price: inr(INSTITUTION_PLAN.perSeat),
+    period: "/student/month",
+    description: INSTITUTION_PLAN.tagline,
+    features: INSTITUTION_PLAN.features,
+    cta: "Set up your institution",
     highlighted: false,
-  },
-  {
-    name: "Pro",
-    price: "$9",
-    period: "/month",
-    description: "For serious students",
-    features: [
-      "Unlimited documents",
-      "All 4 note types",
-      "Full learning path + analytics",
-      "Unlimited spaced repetition",
-      "Mindmaps & knowledge graph",
-      "Priority AI processing",
-    ],
-    cta: "Go Pro",
-    highlighted: true,
-  },
-  {
-    name: "Team",
-    price: "$29",
-    period: "/month",
-    description: "For study groups & classes",
-    features: [
-      "Everything in Pro",
-      "Up to 10 members",
-      "Shared document library",
-      "Collaborative flashcards",
-      "Teacher dashboard",
-    ],
-    cta: "Contact us",
-    highlighted: false,
+    to: "/institution",
   },
 ];
 
@@ -745,11 +724,11 @@ function Pricing() {
             Simple, student-friendly pricing
           </h2>
           <p className="mt-3 text-sm text-muted-foreground sm:text-base">
-            Start free. Upgrade when you're ready. Cancel anytime.
+            Start free. Upgrade when you're ready. Prices include GST. Exam tomorrow? The Exam Night Pass is just ₹49 for 48 hours.
           </p>
         </motion.div>
 
-        <div className="mt-12 grid gap-6 md:grid-cols-3">
+        <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           {pricingTiers.map((tier, i) => (
             <motion.div
               key={tier.name}
@@ -789,7 +768,7 @@ function Pricing() {
                 variant={tier.highlighted ? "default" : "outline"}
                 asChild
               >
-                <Link to="/dashboard">
+                <Link to={tier.to}>
                   {tier.cta}
                 </Link>
               </Button>

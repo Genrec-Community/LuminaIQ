@@ -113,6 +113,16 @@ class UsageService:
                         pass
                 if active and r.get("plan") in PLANS:
                     row = r
+                # An Exam Night Pass lifts anyone below Topper to Topper until it ends
+                pass_until = r.get("pass_until")
+                if pass_until and row["plan"] != "topper":
+                    try:
+                        until = datetime.fromisoformat(pass_until.replace("Z", "+00:00"))
+                        if until > datetime.now(timezone.utc):
+                            row = {**r, "plan": "topper", "status": "active", "source": "pass",
+                                   "current_period_end": pass_until, "underlying_plan": row["plan"]}
+                    except ValueError:
+                        pass
         except Exception as e:
             logger.debug(f"Plan lookup failed, treating as free: {e}")
         self._plans[user_id] = (time.time() + _PLAN_TTL, row)
