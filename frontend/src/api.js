@@ -1154,3 +1154,7 @@ export const getPublishableBooks = async () => (await api.get('/institutions/pub
 export const removeInstitutionMember = async (userId) => (await api.delete(`/institutions/members/${userId}`)).data;
 
 export const startSeatsCheckout = async (seats) => (await api.post('/institutions/seats/checkout', { seats })).data;
+
+// Full extracted text of a document (reader fallback when there's no original PDF)
+export const getDocumentText = async (projectId, documentId) =>
+    (await api.get(`/documents/${projectId}/${documentId}/text`)).data;

@@ -405,3 +405,17 @@ html.dark .bg-gradient-to-br.from-\[\#FDF6F0\] {
   #cram-revision-sheet, #cram-revision-sheet * { visibility: visible !important; }
   #cram-revision-sheet { position: absolute; left: 0; top: 0; width: 100%; border: none; }
 }
+
+/* Cited passage highlight in the document reader */
+.textLayer mark.lumina-cite {
+  background: rgba(250, 204, 21, 0.45);
+  color: transparent;
+  border-radius: 2px;
+  box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.25);
+}
+article mark.lumina-cite {
+  background: #fde68a;
+  color: inherit;
+  border-radius: 3px;
+  padding: 1px 0;
+}

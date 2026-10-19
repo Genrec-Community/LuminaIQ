@@ -144,9 +144,12 @@ class DocumentService:
 
             logger.info(f"Chunking text from {filename}")
             await progress.emit(document_id, "chunking", 0, "Splitting into chunks...")
-            text_storage_path, chunks = await asyncio.gather(
+            text_storage_path, chunks, _ = await asyncio.gather(
                 save_text(),
                 loop.run_in_executor(None, lambda: self.text_chunker.chunk_text(text)),
+                # Keep the original PDF so students can read it in the app and
+                # citations can open at the exact passage
+                self._save_original_to_storage(document_id, project_id, filename, file_path),
             )
 
             if not chunks:
@@ -308,6 +311,38 @@ class DocumentService:
 
         except Exception as e:
             logger.error(f"Failed to save text to storage for {document_id}: {e}")
+            return None
+
+    ORIGINALS_BUCKET = "documents"
+    MAX_ORIGINAL_BYTES = 50 * 1024 * 1024  # Supabase free-tier per-file limit
+
+    async def _save_original_to_storage(
+        self, document_id: str, project_id: str, filename: str, file_path: str
+    ) -> Optional[str]:
+        """Store the uploaded PDF (originals of other types aren't viewable, so skip them)."""
+        try:
+            if not filename.lower().endswith(".pdf") or not os.path.exists(file_path):
+                return None
+            if os.path.getsize(file_path) > self.MAX_ORIGINAL_BYTES:
+                logger.info(f"[{filename}] Original too large to store; reader will show text")
+                return None
+            path = f"{project_id}/{document_id}.pdf"
+            with open(file_path, "rb") as f:
+                data = f.read()
+
+            def _upload():
+                get_supabase_client().storage.from_(self.ORIGINALS_BUCKET).upload(
+                    file=data, path=path,
+                    file_options={"content-type": "application/pdf", "upsert": "true"},
+                )
+
+            await async_db(_upload)
+            stored = f"{self.ORIGINALS_BUCKET}/{path}"
+            await async_db(lambda: self.client.table("documents").update({"file_url": stored})
+                           .eq("id", document_id).execute())
+            return stored
+        except Exception as e:
+            logger.warning(f"[{filename}] Original file not stored: {e}")
             return None
 
     async def _update_document_text_path(self, document_id: str, path: str):

@@ -231,6 +231,7 @@ class InstitutionService:
             "upload_status": "completed", "topics": src.get("topics"),
             "topic_outline": src.get("topic_outline") or [],
             "text_storage_path": src.get("text_storage_path"),
+            "file_url": src.get("file_url"),  # students read the teacher's original PDF
         }).execute())).data[0]
         await async_db(lambda: self.client.table("class_book_copies").insert({
             "class_book_id": book["id"], "user_id": user_id, "document_id": copy["id"],

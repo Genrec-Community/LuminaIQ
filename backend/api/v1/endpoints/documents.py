@@ -228,6 +228,21 @@ async def list_documents(
         raise HTTPException(500, str(e))
 
 
+async def _owned_document(project_id: str, document_id: str, user_id: str) -> dict:
+    """The document, if it belongs to one of this user's projects (else 404)."""
+    client = get_supabase_client()
+    project = await async_db(lambda: client.table("projects").select("user_id")
+                             .eq("id", project_id).limit(1).execute())
+    if not project.data or project.data[0]["user_id"] != user_id:
+        raise HTTPException(404, "Document not found")
+    doc = await async_db(lambda: client.table("documents")
+                         .select("id, project_id, filename, file_type, file_url, text_storage_path")
+                         .eq("id", document_id).eq("project_id", project_id).limit(1).execute())
+    if not doc.data:
+        raise HTTPException(404, "Document not found")
+    return doc.data[0]
+
+
 @router.get("/{project_id}/{document_id}/url")
 async def get_document_url(
     project_id: str,
@@ -235,64 +250,54 @@ async def get_document_url(
     current_user: dict = Depends(get_current_user),
 ):
     """
-    Generate a short-lived signed URL for viewing a document in the PDF viewer.
-    Tries common storage path patterns and returns the first that works.
+    How to show a document in the reader:
+      {"kind": "pdf", "url": <signed URL>}  - the original PDF is stored
+      {"kind": "text"}                      - no original (older uploads, other file
+                                              types): the reader shows the full text
+                                              from GET /{project_id}/{document_id}/text
     """
+    doc = await _owned_document(project_id, document_id, current_user["id"])
     supabase = get_supabase_client()
-    BUCKET = "documents"
-    EXPIRY = 3600 * 24  # 24 hours
+    EXPIRY = 3600 * 6
 
-    # Try common storage path conventions
-    extensions = ["pdf", "txt", "docx", "doc", "pptx", "ppt", "xlsx", "xls", "png", "jpg", "jpeg"]
-    candidate_paths = [f"{project_id}/{document_id}.{ext}" for ext in extensions]
-    candidate_paths.insert(0, f"{project_id}/{document_id}")  # no extension
+    # Where the original lives: recorded at upload (class copies point at the
+    # teacher's file), else the legacy conventions
+    candidates = []
+    if doc.get("file_url") and "/" in doc["file_url"]:
+        bucket, path = doc["file_url"].split("/", 1)
+        candidates.append((bucket, path))
+    candidates += [("documents", f"{project_id}/{document_id}.pdf"), ("documents", f"{project_id}/{document_id}")]
 
     def _try_signed():
-        for path in candidate_paths:
+        for bucket, path in candidates:
             try:
-                result = supabase.storage.from_(BUCKET).create_signed_url(path, EXPIRY)
-                if isinstance(result, dict) and result.get("signedURL"):
-                    return result["signedURL"]
-                if isinstance(result, dict) and result.get("signed_url"):
-                    return result["signed_url"]
+                result = supabase.storage.from_(bucket).create_signed_url(path, EXPIRY)
+                if isinstance(result, dict):
+                    url = result.get("signedURL") or result.get("signed_url")
+                    if url:
+                        return url
             except Exception:
                 continue
         return None
 
     url = await async_db(_try_signed)
-    if not url:
-        # Final fallback — try fetching the doc record to find file type hint
-        try:
-            def _get_doc():
-                return (
-                    get_supabase_client()
-                    .table("documents")
-                    .select("filename, file_type")
-                    .eq("id", document_id)
-                    .single()
-                    .execute()
-                )
-            doc_res = await async_db(_get_doc)
-            if doc_res.data:
-                filename = doc_res.data.get("filename", "")
-                ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-                if ext:
-                    def _try_ext():
-                        path = f"{project_id}/{document_id}.{ext}"
-                        try:
-                            result = supabase.storage.from_(BUCKET).create_signed_url(path, EXPIRY)
-                            if isinstance(result, dict):
-                                return result.get("signedURL") or result.get("signed_url")
-                        except Exception:
-                            return None
-                    url = await async_db(_try_ext)
-        except Exception:
-            pass
+    if url:
+        return {"kind": "pdf", "url": url, "filename": doc["filename"]}
+    return {"kind": "text", "filename": doc["filename"]}
 
-    if not url:
-        raise HTTPException(404, "Document file not found in storage. It may have been uploaded as text-only.")
 
-    return {"url": url}
+@router.get("/{project_id}/{document_id}/text")
+async def get_document_text(
+    project_id: str,
+    document_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Full extracted text, for reading documents that have no stored original."""
+    doc = await _owned_document(project_id, document_id, current_user["id"])
+    text = await document_service.load_stored_text({**doc, "project_id": project_id})
+    if not text:
+        raise HTTPException(404, "This document's text isn't available.")
+    return {"filename": doc["filename"], "text": text}
 
 
 @router.delete("/{document_id}")

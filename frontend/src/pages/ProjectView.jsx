@@ -155,7 +155,7 @@ const AddDocumentModal = lazy(() => import('../components/AddDocumentModal'));
 // Chat Agentic Components
 import { CommandPicker, CommandParamForm } from '../components/chat/ChatCommands';
 import { ToolLoadingCard, ToolResultCard, ToolErrorCard } from '../components/chat/ToolResultCard';
-const PDFViewer = lazy(() => import('../components/chat/PDFViewer'));
+const DocumentReader = lazy(() => import('../components/chat/DocumentReader'));
 import ErrorBoundary from '../components/ErrorBoundary';
 
 
@@ -1095,26 +1095,19 @@ const ProjectView = () => {
         setActiveTab('lab');
     };
 
-    const handleOpenSource = async (source) => {
-        if (!source.doc_id) return;
+    // Open a document in the reader; with a citation, jump to and highlight its passage
+    const handleOpenSource = (source) => {
         const doc = documents.find(d => d.id === source.doc_id || d.filename === source.doc_name);
-        // Fallback to source.doc_name directly if not found in current documents list
-        const filename = doc ? doc.filename : source.doc_name;
-        
-        try {
-            toast.info(`Loading document: ${filename}`);
-            const { url } = await getDocumentUrl(projectId, source.doc_id);
-            
-            setActivePDF({
-                url: url,
-                title: filename,
-                highlightText: source.chunk_text,
-                initialPage: source.page || 1
-            });
-        } catch (error) {
-            console.error("Failed to generate or fetch document URL", error);
-            toast.error("Could not load the document. It may have been deleted or there is an issue with the server.");
+        const documentId = source.doc_id || doc?.id;
+        if (!documentId) {
+            toast.error("Couldn't find that book in this project.");
+            return;
         }
+        setActivePDF({
+            documentId,
+            title: doc ? doc.filename : (source.doc_name || 'Document'),
+            passage: source.chunk_text || '',
+        });
     };
     openSourceRef.current = handleOpenSource;
 
@@ -1175,6 +1168,21 @@ const ProjectView = () => {
                 steps={steps}
                 options={TOUR_OPTIONS}
             />
+
+            {/* In-app reader: whole book, jumping to a cited passage when opened from a reference */}
+            {activePDF && (
+                <ErrorBoundary>
+                    <Suspense fallback={null}>
+                        <DocumentReader
+                            projectId={projectId}
+                            documentId={activePDF.documentId}
+                            title={activePDF.title}
+                            passage={activePDF.passage}
+                            onClose={() => setActivePDF(null)}
+                        />
+                    </Suspense>
+                </ErrorBoundary>
+            )}
 
             {/* Mobile Sidebar Overlay */}
             {isMobileMenuOpen && (
@@ -1594,16 +1602,6 @@ const ProjectView = () => {
                     {/* Chat View */}
                     {activeTab === 'chat' && (
                         <div className="h-full flex flex-col relative">
-                            {activePDF && (
-                                <ErrorBoundary>
-                                    <PDFViewer
-                                        url={activePDF.url}
-                                        title={activePDF.title}
-                                        highlightText={activePDF.highlightText}
-                                        onClose={() => setActivePDF(null)}
-                                    />
-                                </ErrorBoundary>
-                            )}
                             <div className="relative flex-1 min-h-0 flex flex-col">
                             <div
                                 ref={chatScrollRef}
@@ -2205,7 +2203,7 @@ const ProjectView = () => {
                                                     }}
                                                     className={`text-sm font-medium truncate leading-tight hover:underline cursor-pointer ${isSelected ? 'text-[#4A3B32]' : 'text-[#5a4a42]'
                                                     }`}
-                                                    title="Click to view document"
+                                                    title="Read this book"
                                                 >
                                                     {doc.filename}
                                                 </p>
@@ -2235,17 +2233,17 @@ const ProjectView = () => {
                                             </div>
 
                                             {/* Actions */}
-                                            <div className="flex items-center opacity-0 group-hover:opacity-100 transition-all shrink-0">
+                                            <div className="flex items-center md:opacity-0 md:group-hover:opacity-100 transition-all shrink-0">
                                                 {isReady && (
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             handleOpenSource({ doc_id: doc.id, doc_name: doc.filename });
                                                         }}
-                                                        className="p-1.5 rounded-lg hover:bg-[#E6D5CC]/50 text-[#8a6a5c] transition-all"
-                                                        title="View Document"
+                                                        className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-[#E6D5CC]/50 text-[#8a6a5c] text-[11px] font-semibold transition-all"
+                                                        title="Read this book"
                                                     >
-                                                        <Eye className="h-3.5 w-3.5" />
+                                                        <BookOpen className="h-3.5 w-3.5" /> Read
                                                     </button>
                                                 )}
                                                 <button
