@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+    GraduationCap,
     Plus, Search, BookOpen, Calendar, ArrowRight, LogOut, Upload, FileText,
     Loader2, X, Trash2, RefreshCw, WifiOff, Globe, Lock, ArrowLeft,
     Tag, ChevronDown, ChevronUp, Check, Download, Settings as SettingsIcon
@@ -477,6 +478,14 @@ const Dashboard = () => {
                         >
                             <Globe className="h-5 w-5" />
                             <span>Book Store</span>
+                        </button>
+                        <button
+                            onClick={() => navigate('/institution')}
+                            className="px-5 py-3 bg-white border border-[#E6D5CC] text-[#4A3B32] rounded-xl font-medium hover:border-[#C8A288] transition-colors flex items-center justify-center gap-2 w-full md:w-auto"
+                            title="Join a class with a code, or manage your institution"
+                        >
+                            <GraduationCap className="h-5 w-5 text-[#C8A288]" />
+                            <span>{myPlan?.source === 'institution' ? 'My class' : 'Join a class'}</span>
                         </button>
                         <button
                             id="tour-new-project"

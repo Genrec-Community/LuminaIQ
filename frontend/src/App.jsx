@@ -16,6 +16,8 @@ const Settings = lazy(() => import('./pages/Settings'));
 const BookStore = lazy(() => import('./pages/BookStore'));
 const Landing = lazy(() => import('./pages/Landing'));
 const Pricing = lazy(() => import('./pages/Pricing'));
+const Institution = lazy(() => import('./pages/Institution'));
+const JoinClass = lazy(() => import('./pages/JoinClass'));
 
 const PageLoader = () => (
     <div className="min-h-screen flex items-center justify-center bg-[#FDF6F0]">
@@ -42,6 +44,8 @@ function App() {
                                     <Route path="/project/:projectId" element={<ProjectView />} />
                                     <Route path="/settings" element={<Settings />} />
                                     <Route path="/bookstore" element={<BookStore />} />
+                                    <Route path="/institution" element={<Institution />} />
+                                    <Route path="/join/:code" element={<JoinClass />} />
                                 </Route>
                             </Routes>
                             </Suspense>

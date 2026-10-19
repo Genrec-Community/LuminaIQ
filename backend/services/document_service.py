@@ -658,9 +658,17 @@ class DocumentService:
             collection_name = f"project_{project_id}"
             await qdrant_service.delete_vectors(collection_name, document_id)
 
-            # Delete extracted text from texts/ bucket
+            # Delete extracted text from texts/ bucket, unless class copies of
+            # this book (other documents) still read it
             try:
                 text_storage_path = f"{project_id}/{document_id}.txt"
+                still_used = await async_db(
+                    lambda: self.client.table("documents").select("id")
+                    .eq("text_storage_path", text_storage_path).neq("id", document_id)
+                    .limit(1).execute()
+                )
+                if still_used.data:
+                    raise RuntimeError("text still used by class copies; kept")
 
                 def _delete_text():
                     self.client.storage.from_(

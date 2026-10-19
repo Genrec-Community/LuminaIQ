@@ -1133,3 +1133,24 @@ export const verifyPayment = async (payload) => (await api.post('/billing/verify
 export const cancelSubscription = async () => (await api.post('/billing/cancel')).data;
 
 export const getInvoices = async () => (await api.get('/billing/invoices')).data;
+
+// ============== Institutions ==============
+
+export const getMyInstitution = async () => (await api.get('/institutions/me')).data;
+
+export const createInstitution = async (data) => (await api.post('/institutions', data)).data;
+
+export const joinWithCode = async (code) => (await api.post('/institutions/join', { code })).data;
+
+export const createClass = async (name) => (await api.post('/institutions/classes', { name })).data;
+
+export const getClassDashboard = async (classId) => (await api.get(`/institutions/classes/${classId}`)).data;
+
+export const publishBookToClass = async (classId, documentId) =>
+    (await api.post(`/institutions/classes/${classId}/books`, { document_id: documentId })).data;
+
+export const getPublishableBooks = async () => (await api.get('/institutions/publishable')).data;
+
+export const removeInstitutionMember = async (userId) => (await api.delete(`/institutions/members/${userId}`)).data;
+
+export const startSeatsCheckout = async (seats) => (await api.post('/institutions/seats/checkout', { seats })).data;

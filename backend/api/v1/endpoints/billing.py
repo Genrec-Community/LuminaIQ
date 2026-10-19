@@ -115,7 +115,7 @@ async def pass_checkout(current_user: dict = Depends(get_current_user)):
 
 
 class VerifyRequest(BaseModel):
-    kind: Literal["subscription", "pass"]
+    kind: Literal["subscription", "pass", "seats"]
     razorpay_payment_id: str
     razorpay_signature: str
     razorpay_subscription_id: Optional[str] = None
@@ -141,6 +141,15 @@ async def verify(request: VerifyRequest, current_user: dict = Depends(get_curren
             "razorpay_payment_id": request.razorpay_payment_id,
             "razorpay_subscription_id": request.razorpay_subscription_id,
         })
+    elif request.kind == "seats":
+        if not request.razorpay_order_id or not rzp.verify_order_payment(
+                request.razorpay_order_id, request.razorpay_payment_id, request.razorpay_signature):
+            raise HTTPException(400, "Payment could not be verified.")
+        record = await billing.checkout_record(order_id=request.razorpay_order_id)
+        if not record or record["user_id"] != user_id or record["kind"] != "seats":
+            raise HTTPException(400, "Unknown order.")
+        if not await billing.payment_paid(request.razorpay_payment_id):
+            await _apply_seats(record, request.razorpay_payment_id, request.razorpay_order_id)
     else:
         if not request.razorpay_order_id or not rzp.verify_order_payment(
                 request.razorpay_order_id, request.razorpay_payment_id, request.razorpay_signature):
@@ -192,6 +201,18 @@ async def invoices(current_user: dict = Depends(get_current_user)):
     ]}
 
 
+async def _apply_seats(record: dict, payment_id: str, order_id: str, raw: dict = None) -> None:
+    from services.institution_service import institutions
+
+    _, institution_id, seats = record["plan"].split(":")
+    await institutions.activate_seats(institution_id, int(seats))
+    await billing.record_payment({
+        "user_id": record["user_id"], "kind": "seats", "plan": record["plan"],
+        "amount_paise": record.get("amount_paise"), "status": "paid",
+        "razorpay_payment_id": payment_id, "razorpay_order_id": order_id, "raw": raw,
+    })
+
+
 # ----------------------------------------------------------------- webhook
 
 @router.post("/webhook")
@@ -239,6 +260,8 @@ async def webhook(request: Request):
         elif name == "payment.captured" and pay.get("order_id"):
             # Backup for the Exam Night Pass if the browser closed before /verify ran
             record = await billing.checkout_record(order_id=pay["order_id"])
+            if record and record["kind"] == "seats" and not await billing.payment_paid(pay["id"]):
+                await _apply_seats(record, pay["id"], pay["order_id"], raw=pay)
             if record and record["kind"] == "pass" and not await billing.payment_paid(pay["id"]):
                 await billing.grant_pass(record["user_id"])
                 await billing.record_payment({

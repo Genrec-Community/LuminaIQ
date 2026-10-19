@@ -18,6 +18,7 @@ from api.v1.endpoints import (
     jobs,
     study_modes,
     billing,
+    institutions,
 )
 
 api_router = APIRouter()
@@ -33,6 +34,7 @@ api_router.include_router(webhook.router, prefix="/webhook", tags=["webhook"])
 api_router.include_router(learning.router, prefix="/learning", tags=["learning"])
 # Plans, usage and payments
 api_router.include_router(billing.router, prefix="/billing", tags=["billing"])
+api_router.include_router(institutions.router, prefix="/institutions", tags=["institutions"])
 # Exam Tonight (crash mode) + Visual Lab
 api_router.include_router(study_modes.router, prefix="/learning", tags=["study-modes"])
 api_router.include_router(knowledge_graph.router, prefix="/knowledge-graph", tags=["knowledge-graph"])

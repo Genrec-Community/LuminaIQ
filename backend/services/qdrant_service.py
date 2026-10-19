@@ -297,6 +297,43 @@ class QdrantService:
             logger.error(f"Error searching: {str(e)}")
             raise
 
+    async def copy_document_vectors(
+        self, src_collection: str, src_document_id: str,
+        dst_collection: str, dst_document_id: str, dst_document_name: str,
+    ) -> int:
+        """
+        Copy a document's chunks + vectors into another project's collection under
+        a new document id (class books: no re-embedding per student). Returns the
+        number of chunks copied (0 if the source isn't indexed).
+        """
+        from qdrant_client.models import Filter, FieldCondition, MatchValue
+
+        flt = Filter(must=[FieldCondition(key="document_id", match=MatchValue(value=src_document_id))])
+        await self.create_collection(dst_collection)
+        copied, offset = 0, None
+        while True:
+            try:
+                points, offset = await self.async_client.scroll(
+                    collection_name=src_collection, scroll_filter=flt, limit=256,
+                    offset=offset, with_payload=True, with_vectors=True,
+                )
+            except Exception as e:
+                logger.warning(f"Vector copy: cannot read {src_collection}: {e}")
+                return copied
+            if not points:
+                break
+            await self.upsert_chunks(
+                collection_name=dst_collection,
+                chunks=[p.payload.get("text", "") for p in points],
+                embeddings=[p.vector for p in points],
+                metadata=[{"document_id": dst_document_id, "document_name": dst_document_name,
+                           "chunk_id": p.payload.get("chunk_id")} for p in points],
+            )
+            copied += len(points)
+            if offset is None:
+                break
+        return copied
+
     async def get_initial_chunks(
         self, collection_name: str, document_id: str, limit: int = 10
     ) -> List[str]:
