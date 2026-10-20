@@ -101,12 +101,12 @@ async def options_handler(full_path: str):
 app.include_router(api_router, prefix="/api/v1")
 
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 async def root():
     return {"message": "Welcome to Lumina IQ API"}
 
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 async def health():
     """Health check endpoint"""
     return {"status": "healthy", "service": "lumina-backend"}
