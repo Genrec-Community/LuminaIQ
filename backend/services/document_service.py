@@ -504,7 +504,7 @@ class DocumentService:
                         continue
 
                     logger.error(f"[{filename}] Batch {batch_idx + 1} failed: {e}")
-                    if any(x in error_str for x in ["401", "403", "invalid api key", "api key not valid", "invalid_api_key", "404"]):
+                    if any(x in error_str for x in ["401", "402", "403", "invalid api key", "api key not valid", "invalid_api_key", "404", "credits are depleted", "insufficient_quota"]):
                         fatal.append(e)
                     # Non-retryable, or out of retries: give up on this batch
                     failed_batches.append(batch_idx)
