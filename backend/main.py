@@ -48,6 +48,9 @@ async def startup_event():
     """Initialize on startup"""
     # Apply log filter to reduce noisy HTTP logs
     setup_uvicorn_log_filter()
+    if settings.SELF_CHECK_ON_STARTUP:
+        from services.self_check import run_self_check
+        app.state.self_check = asyncio.create_task(run_self_check())
 
 
 @app.on_event("shutdown")

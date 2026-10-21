@@ -97,6 +97,9 @@ class Settings(BaseSettings):
     RAZORPAY_PLAN_TOPPER_YEARLY: str = Field(default="")
     # Day boundary for daily plan limits
     PLAN_TIMEZONE: str = Field(default="Asia/Kolkata")
+    # On boot, make one tiny call to the LLM, embeddings, Qdrant and storage and log
+    # "[SelfCheck] ..." lines (see services/self_check.py)
+    SELF_CHECK_ON_STARTUP: bool = Field(default=True)
 
     # Webhook
     MAIN_API_WEBHOOK_SECRET: str = Field(default="supersecretwebhook")
