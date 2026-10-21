@@ -135,6 +135,9 @@ class Settings(BaseSettings):
     AZURE_CV_KEY: str = ""
     # Google Cloud Vision OCR for scanned PDFs: service-account JSON key, raw or base64
     GOOGLE_VISION_CREDENTIALS: str = ""
+    # Pages per calendar month (UTC) sent to Google Vision; the rest use Tesseract.
+    # Google's free tier is 1,000 pages a month, so this stays under it.
+    GOOGLE_VISION_MONTHLY_PAGES: int = 900
     # Local OCR (Tesseract, in the Docker image) for scanned PDFs when Azure isn't set
     OCR_LOCAL_ENABLED: bool = True
     OCR_DPI: int = 200

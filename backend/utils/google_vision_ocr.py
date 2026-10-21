@@ -76,14 +76,16 @@ class GoogleVisionOCR:
             return out
         return [""] * len(images)
 
-    def extract_pdf(self, file_path: str, dpi: int = 200, max_pages: int = 600,
+    def extract_pdf(self, file_path: str, dpi: int = 200, start: int = 0, end: Optional[int] = None,
                     on_progress: Optional[Callable[[int, int], None]] = None) -> Optional[str]:
+        """OCR pages start..end-1; on_progress(done, total) counts pages in that range."""
         import fitz
         from PIL import Image
 
         with fitz.open(file_path) as doc:
-            total = min(len(doc), max_pages)
-            logger.info(f"[GoogleVision] OCR → {total} pages")
+            end = len(doc) if end is None else min(end, len(doc))
+            total = max(0, end - start)
+            logger.info(f"[GoogleVision] OCR → pages {start + 1}-{end} ({total})")
 
             def render(i: int) -> bytes:
                 pix = doc[i].get_pixmap(dpi=dpi, colorspace=fitz.csGRAY, alpha=False)
@@ -96,11 +98,13 @@ class GoogleVisionOCR:
             texts = [""] * total
             done = 0
             batches = [list(range(s, min(s + PAGES_PER_REQUEST, total))) for s in range(0, total, PAGES_PER_REQUEST)]
+            if not batches:
+                return None
             # Render on this thread (PyMuPDF documents aren't thread-safe), send in parallel
             with ThreadPoolExecutor(max_workers=PARALLEL_REQUESTS) as pool:
                 pending = []
                 for batch in batches:
-                    pending.append((batch, pool.submit(self._annotate, [render(i) for i in batch])))
+                    pending.append((batch, pool.submit(self._annotate, [render(start + i) for i in batch])))
                     while len(pending) >= PARALLEL_REQUESTS or (pending and batch is batches[-1]):
                         b, fut = pending.pop(0)
                         for i, t in zip(b, fut.result()):

@@ -111,13 +111,9 @@ class FileParser:
         if azure_text and len(azure_text.strip()) >= FileParser.MIN_TEXT_CHARS:
             return azure_text
 
-        # ── Stage 3: Google Cloud Vision OCR (when credentials are set) ───────
-        vision_text = FileParser._try_google_vision_ocr(file_path, on_progress)
-        if vision_text and len(vision_text.strip()) >= FileParser.MIN_TEXT_CHARS:
-            return vision_text
-
-        # ── Stage 4: local Tesseract OCR (no cloud service needed) ────────────
-        ocr_text = FileParser._try_tesseract_ocr(file_path, on_progress)
+        # ── Stage 3: Google Vision for the pages this month's free allowance
+        #    covers, local Tesseract for the rest ──────────────────────────────
+        ocr_text = FileParser._ocr_scanned_pdf(file_path, on_progress)
         if ocr_text and len(ocr_text.strip()) >= FileParser.MIN_TEXT_CHARS:
             return ocr_text
 
@@ -167,23 +163,75 @@ class FileParser:
     # ──────────────────────────────────────────────────────────────────────────
 
     @staticmethod
-    def _try_google_vision_ocr(file_path: str, on_progress=None) -> Optional[str]:
-        """Cloud OCR with Google Vision; None when it isn't configured or fails."""
-        try:
-            from config.settings import settings
-            from utils.google_vision_ocr import get_google_vision
+    def _vision_pages_allowed(pages: int) -> int:
+        """
+        Reserve up to `pages` of this month's Google Vision allowance
+        (GOOGLE_VISION_MONTHLY_PAGES). 0 when Vision isn't set up, the allowance
+        is used up, or the counter can't be reached (never risk a bill).
+        """
+        from datetime import datetime, timezone
 
-            vision = get_google_vision()
-            if not vision:
-                return None
-            return vision.extract_pdf(file_path, dpi=settings.OCR_DPI, max_pages=settings.OCR_MAX_PAGES,
-                                      on_progress=on_progress)
+        from config.settings import settings
+        from utils.google_vision_ocr import get_google_vision
+
+        if pages <= 0 or settings.GOOGLE_VISION_MONTHLY_PAGES <= 0 or not get_google_vision():
+            return 0
+        try:
+            from db.client import get_supabase_client
+
+            month = datetime.now(timezone.utc).strftime("%Y-%m")
+            res = get_supabase_client().rpc("reserve_ocr_pages", {
+                "p_provider": "google_vision", "p_month": month,
+                "p_pages": pages, "p_cap": settings.GOOGLE_VISION_MONTHLY_PAGES,
+            }).execute()
+            granted = int(res.data or 0)
+            logger.info(f"[FileParser] Google Vision allowance: {granted} of {pages} pages granted ({month})")
+            return granted
         except Exception as e:
-            logger.error(f"[FileParser] Google Vision OCR failed, trying Tesseract: {e}")
-            return None
+            logger.error(f"[FileParser] Could not check the Google Vision allowance, using Tesseract: {e}")
+            return 0
 
     @staticmethod
-    def _try_tesseract_ocr(file_path: str, on_progress=None) -> Optional[str]:
+    def _ocr_scanned_pdf(file_path: str, on_progress=None) -> Optional[str]:
+        """Google Vision for the allowed pages (from the start), Tesseract for the rest."""
+        import fitz
+        from config.settings import settings
+
+        with fitz.open(file_path) as doc:
+            total = min(len(doc), settings.OCR_MAX_PAGES)
+            if len(doc) > total:
+                logger.warning(f"[FileParser] OCR limited to the first {total} of {len(doc)} pages")
+
+        def report(done: int):
+            if on_progress:
+                try:
+                    on_progress(done, total)
+                except Exception:
+                    pass
+
+        granted = FileParser._vision_pages_allowed(total)
+        vision_text, vision_done = "", 0
+        if granted:
+            try:
+                from utils.google_vision_ocr import get_google_vision
+
+                vision_text = get_google_vision().extract_pdf(
+                    file_path, dpi=settings.OCR_DPI, start=0, end=granted,
+                    on_progress=lambda d, _t: report(d),
+                ) or ""
+                vision_done = granted
+            except Exception as e:
+                logger.error(f"[FileParser] Google Vision OCR failed, using Tesseract: {e}")
+
+        rest = ""
+        if vision_done < total:
+            rest = FileParser._try_tesseract_ocr(
+                file_path, lambda d, _t: report(vision_done + d), start=vision_done, end=total,
+            ) or ""
+        return "\n\n".join(t for t in (vision_text.strip(), rest.strip()) if t) or None
+
+    @staticmethod
+    def _try_tesseract_ocr(file_path: str, on_progress=None, start: int = 0, end: Optional[int] = None) -> Optional[str]:
         """
         OCR a scanned PDF page by page with Tesseract (installed in the Docker
         image). Pages are rendered one at a time in greyscale so memory stays
@@ -207,12 +255,11 @@ class FileParser:
         parts = []
         try:
             with fitz.open(file_path) as doc:
-                total = min(len(doc), settings.OCR_MAX_PAGES)
-                if len(doc) > total:
-                    logger.warning(f"[FileParser] OCR limited to the first {total} of {len(doc)} pages")
-                logger.info(f"[FileParser] Tesseract OCR → {total} pages at {settings.OCR_DPI} dpi")
+                end = min(len(doc), settings.OCR_MAX_PAGES if end is None else end)
+                total = max(0, end - start)
+                logger.info(f"[FileParser] Tesseract OCR → pages {start + 1}-{end} ({total}) at {settings.OCR_DPI} dpi")
                 for i in range(total):
-                    pix = doc[i].get_pixmap(dpi=settings.OCR_DPI, colorspace=fitz.csGRAY, alpha=False)
+                    pix = doc[start + i].get_pixmap(dpi=settings.OCR_DPI, colorspace=fitz.csGRAY, alpha=False)
                     img = Image.frombytes("L", (pix.width, pix.height), pix.samples)
                     del pix
                     # psm 3: automatic layout, handles two-page spreads and columns
