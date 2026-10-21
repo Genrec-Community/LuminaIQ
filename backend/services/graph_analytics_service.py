@@ -145,13 +145,17 @@ class GraphAnalyticsService:
             
             # Search for relevant content
             collection_name = f"project_{project_id}"
-            query_embedding = await embedding_service.generate_embedding(topic)
-            
-            results = await qdrant_service.search(
-                collection_name=collection_name,
-                query_vector=query_embedding,
-                limit=8
-            )
+            try:
+                query_embedding = await embedding_service.generate_embedding(topic)
+                results = await qdrant_service.search(
+                    collection_name=collection_name,
+                    query_vector=query_embedding,
+                    limit=8
+                )
+            except Exception as search_err:
+                # Embeddings/index unavailable: the stored-text path below takes over
+                logger.warning(f"Vector search failed for topic '{topic}': {search_err}")
+                results = []
             
             context_parts = []
             sources = []

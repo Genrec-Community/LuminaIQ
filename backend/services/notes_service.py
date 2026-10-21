@@ -403,27 +403,9 @@ Respond ONLY with the Markdown content."""
             config = self._get_note_config(note_type, topic)
 
             # 2. Retrieve content in PARALLEL — all queries run concurrently
-            collection_name = f"project_{project_id}"
-            filter_conds = {"document_ids": selected_documents} if selected_documents else None
-
-            async def _search_one(q: str):
-                emb = await embedding_service.generate_embedding(q)
-                return await qdrant_service.search(
-                    collection_name=collection_name,
-                    query_vector=emb,
-                    limit=10,
-                    filter_conditions=filter_conds,
-                )
-
-            results_list = await asyncio.gather(*[_search_one(q) for q in config["queries"]])
-
-            all_hits = []
-            seen_texts = set()
-            for results in results_list:
-                for hit in results:
-                    if hit["text"] not in seen_texts:
-                        all_hits.append(hit)
-                        seen_texts.add(hit["text"])
+            # Vector search, or the stored text when the index is unavailable
+            from services.retrieval import search_passages
+            all_hits = await search_passages(project_id, config["queries"], 10, selected_documents)
 
             if not all_hits:
                 return "No content found to generate notes. Please ensure documents are uploaded and processed."

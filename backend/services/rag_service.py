@@ -616,7 +616,7 @@ Your job is to make the user understand.
             # 2. Generate if not found
             query = (
                 self.client.table("documents")
-                .select("id, filename")
+                .select("id, project_id, filename, text_storage_path")
                 .eq("project_id", project_id)
                 .eq("upload_status", "completed")
             )
@@ -635,6 +635,12 @@ Your job is to make the user understand.
                 chunks = await qdrant_service.get_initial_chunks(
                     collection_name, doc["id"], 3
                 )
+                if not chunks:
+                    # Not indexed (yet): use the opening of the stored text
+                    from services.document_service import document_service
+                    text = await document_service.load_stored_text(doc)
+                    if text:
+                        chunks = [text[i:i + 1500] for i in range(0, min(len(text), 4500), 1500)]
                 if chunks:
                     doc_text = "\n".join(chunks)
                     all_intro_text += (

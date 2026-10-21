@@ -358,9 +358,6 @@ Be constructive and specific in your feedback. Respond ONLY with the JSON object
     ) -> str:
         """Retrieve relevant context — parallel multi-query, no LLM expansion."""
         try:
-            collection_name = f"project_{project_id}"
-            filter_conds = {"document_ids": selected_documents} if selected_documents else None
-
             # Rule-based query variants (saves one full LLM round-trip)
             queries = [
                 query_text,
@@ -369,24 +366,9 @@ Be constructive and specific in your feedback. Respond ONLY with the JSON object
             ]
             limit_per_query = max(2, num_chunks // len(queries))
 
-            async def _search_one(q: str):
-                emb = await embedding_service.generate_embedding(q)
-                return await qdrant_service.search(
-                    collection_name=collection_name,
-                    query_vector=emb,
-                    limit=limit_per_query,
-                    filter_conditions=filter_conds,
-                )
-
-            results_list = await asyncio.gather(*[_search_one(q) for q in queries])
-
-            all_hits = []
-            seen_texts = set()
-            for results in results_list:
-                for hit in results:
-                    if hit["text"] not in seen_texts:
-                        all_hits.append(hit)
-                        seen_texts.add(hit["text"])
+            # Vector search, or the stored text when the index is unavailable
+            from services.retrieval import search_passages
+            all_hits = await search_passages(project_id, queries, limit_per_query, selected_documents)
 
             if not all_hits:
                 return ""

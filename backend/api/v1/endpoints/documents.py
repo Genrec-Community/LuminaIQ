@@ -121,7 +121,7 @@ async def upload_document(
                 os.unlink(temp_file.name)
                 raise HTTPException(
                     status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                    f"File size exceeds limit of {settings.MAX_FILE_SIZE} bytes",
+                    f"This file is larger than the {settings.MAX_FILE_SIZE // (1024 * 1024)} MB upload limit.",
                 )
             temp_file.write(chunk)
 
@@ -352,23 +352,12 @@ async def search_documents(
 ):
     """Semantic search across documents in a project."""
     try:
-        collection_name = f"project_{project_id}"
-
-        # Generate embedding for the search query
-        query_embedding = await embedding_service.generate_embedding(request.query)
-
-        # Build filter conditions
-        filter_conditions = None
-        if request.document_ids and len(request.document_ids) > 0:
-            filter_conditions = {"document_ids": request.document_ids}
-
-        # Search in Qdrant
-        results = await qdrant_service.search(
-            collection_name=collection_name,
-            query_vector=query_embedding,
-            limit=request.limit,
-            filter_conditions=filter_conditions,
-        )
+        # Vector search, or the stored text when the index is unavailable
+        from services.retrieval import search_passages
+        results = (await search_passages(
+            project_id, [request.query], per_query=request.limit,
+            document_ids=request.document_ids or None,
+        ))[:request.limit]
 
         # Get document names from the database for richer results
         doc_names = {}

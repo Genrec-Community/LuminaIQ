@@ -241,7 +241,7 @@ const pricingTiers = [
 const faqs = [
   {
     q: "What file types can I upload?",
-    a: "PDF, DOCX, TXT, HTML, and Markdown. Scanned PDFs work too — we use Azure OCR to extract text from images. Maximum file size is 10 MB on the free plan.",
+    a: "PDF, DOCX, TXT, HTML, and Markdown. Scanned PDFs work too — we use Azure OCR to extract text from images. Maximum file size is 50 MB per file.",
   },
   {
     q: "How accurate are the AI-generated quizzes?",

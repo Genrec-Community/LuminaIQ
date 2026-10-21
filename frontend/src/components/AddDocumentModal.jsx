@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { getPublicBooks, importBook } from '../api';
 import { useToast } from '../context/ToastContext';
+import { MAX_UPLOAD_MB } from '../utils/pricing';
 
 /* ─────────────────────────────────────────────────────────────
    Step 1 — Source Picker
@@ -345,7 +346,7 @@ const UploadStep = ({ onUpload, uploading, onBack }) => {
                     <p className="text-sm font-semibold text-[#4A3B32] mb-1">
                         {isDragging ? 'Drop it!' : 'Drag & drop your file here'}
                     </p>
-                    <p className="text-xs text-[#8a6a5c] mb-3">PDF, DOCX, TXT — up to 10MB</p>
+                    <p className="text-xs text-[#8a6a5c] mb-3">PDF, DOCX, TXT — up to {MAX_UPLOAD_MB} MB</p>
                     <label className="inline-block px-5 py-2.5 bg-[#C8A288] text-white text-sm font-medium rounded-xl hover:bg-[#B08B72] cursor-pointer transition-colors shadow-md shadow-[#C8A288]/20">
                         Browse Files
                         <input type="file" multiple accept=".pdf,.docx,.txt" onChange={handleFileSelect} className="hidden" />

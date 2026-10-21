@@ -75,6 +75,7 @@ import { supabase } from '../supabaseClient';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import UploadZone from '../components/UploadZone';
+import { MAX_UPLOAD_MB } from '../utils/pricing';
 import { getRotatingLoadingMessage, getRandomLoadingMessage } from '../utils/LoadingMessages';
 
 // View Components
@@ -999,6 +1000,11 @@ const ProjectView = () => {
 
     const handleFileUpload = async (files, bookOptions = {}) => {
         if (!files || files.length === 0) return;
+        const tooBig = Array.from(files).find(f => f.size > MAX_UPLOAD_MB * 1024 * 1024);
+        if (tooBig) {
+            toast.error(`"${tooBig.name}" is ${(tooBig.size / 1024 / 1024).toFixed(0)} MB. The limit is ${MAX_UPLOAD_MB} MB per file.`);
+            return;
+        }
         setUploading(true);
         try {
             // Upload files in parallel for better performance
@@ -1009,7 +1015,8 @@ const ProjectView = () => {
             setShowUploadModal(false);
         } catch (error) {
             console.error("Upload error", error);
-            toast.error('Failed to upload document(s)');
+            const detail = error.response?.data?.detail;
+            toast.error(typeof detail === 'string' ? detail : 'Failed to upload document(s)');
         } finally {
             setUploading(false);
         }

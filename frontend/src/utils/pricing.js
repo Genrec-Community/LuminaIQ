@@ -67,3 +67,6 @@ export const EXAM_NIGHT_PASS = { price: 49, hours: 48 };
 export const yearlySaving = (p) => (p.monthly ? Math.round((1 - p.yearly / (p.monthly * 12)) * 100) : 0);
 
 export const inr = (n) => `₹${Number(n).toLocaleString('en-IN')}`;
+
+// Per-file upload limit; keep in step with MAX_FILE_SIZE on the backend
+export const MAX_UPLOAD_MB = 50;

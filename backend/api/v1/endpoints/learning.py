@@ -750,34 +750,13 @@ async def generate_mindmap(
     await usage.consume(current_user["id"], "tools")
     try:
         # 1. Retrieve relevant document chunks for this topic using RAG
-        collection_name = f"project_{request.project_id}"
-        from services.qdrant_service import qdrant_service
-        from services.embedding_service import embedding_service
-
-        # Get embeddings for the topic query
+        # Vector search, or the stored text when the index is unavailable
+        from services.retrieval import passages_text
         query_text = f"{request.topic}: key concepts, subtopics, and important details"
-        query_vector = await embedding_service.generate_embedding(query_text)
-
-        # Search for relevant chunks
-        filter_conditions = None
-        if request.selected_documents:
-            filter_conditions = {"document_ids": request.selected_documents}
-
-        results = await qdrant_service.search(
-            collection_name=collection_name,
-            query_vector=query_vector,
-            limit=8,
-            filter_conditions=filter_conditions,
+        context = await passages_text(
+            request.project_id, [request.topic, query_text], per_query=4,
+            document_ids=request.selected_documents, limit=8,
         )
-
-        # Build context from chunks
-        context_parts = []
-        for result in results:
-            text = result.get("text", "")
-            if text:
-                context_parts.append(text)
-
-        context = "\n\n".join(context_parts) if context_parts else ""
 
         # 2. Generate mindmap using LLM
         prompt = f"""You are an expert educator. Create a detailed hierarchical mindmap for the topic below.
@@ -916,31 +895,13 @@ async def generate_flashcards(
     await usage.consume(current_user["id"], "tools")
     try:
         # 1. Retrieve relevant document chunks for this topic
-        collection_name = f"project_{request.project_id}"
-        from services.qdrant_service import qdrant_service
-        from services.embedding_service import embedding_service
-
+        # Vector search, or the stored text when the index is unavailable
+        from services.retrieval import passages_text
         query_text = f"{request.topic}: important facts, definitions, and key concepts"
-        query_vector = await embedding_service.generate_embedding(query_text)
-
-        filter_conditions = None
-        if request.selected_documents:
-            filter_conditions = {"document_ids": request.selected_documents}
-
-        results = await qdrant_service.search(
-            collection_name=collection_name,
-            query_vector=query_vector,
-            limit=8,
-            filter_conditions=filter_conditions,
+        context = await passages_text(
+            request.project_id, [request.topic, query_text], per_query=4,
+            document_ids=request.selected_documents, limit=8,
         )
-
-        context_parts = []
-        for result in results:
-            text = result.get("text", "")
-            if text:
-                context_parts.append(text)
-
-        context = "\n\n".join(context_parts) if context_parts else ""
 
         # 2. Generate flashcards using LLM
         prompt = f"""You are an expert educator creating study flashcards.
