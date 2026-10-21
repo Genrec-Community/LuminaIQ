@@ -41,6 +41,8 @@ const detailFor = (stage, message) => {
     if (!message) return '';
     const batch = /Batch (\d+)\/(\d+)/i.exec(message);
     if (stage === 'embedding' && batch) return `Part ${batch[1]} of ${batch[2]}`;
+    const scan = /Scanning page (\d+)\/(\d+)/i.exec(message);
+    if (scan) return `Scanned book · page ${scan[1]} of ${scan[2]}`;
     if (stage === 'uploading') return message;
     const chunks = /Generated (\d+) chunks/i.exec(message);
     if (chunks) return `${chunks[1]} sections found`;

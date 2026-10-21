@@ -133,6 +133,10 @@ class Settings(BaseSettings):
     # Format: https://<region>.api.cognitive.microsoft.com/
     AZURE_CV_ENDPOINT: str = ""
     AZURE_CV_KEY: str = ""
+    # Local OCR (Tesseract, in the Docker image) for scanned PDFs when Azure isn't set
+    OCR_LOCAL_ENABLED: bool = True
+    OCR_DPI: int = 200
+    OCR_MAX_PAGES: int = 600
 
     # Together AI (optional - for some services)
     TOGETHER_API_KEY: str = Field(default="")

@@ -119,8 +119,16 @@ class DocumentService:
             await self._update_document_status(
                 document_id, "processing", "Extracting text..."
             )
+            def on_ocr_page(done: int, total: int):
+                # Called from the extraction thread while a scanned PDF is OCR'd
+                asyncio.run_coroutine_threadsafe(
+                    progress.emit(document_id, "extracting", int(done * 100 / max(total, 1)),
+                                  f"Scanning page {done}/{total}"),
+                    loop,
+                )
+
             text = await loop.run_in_executor(
-                self._extraction_executor, self.file_parser.extract_text, file_path
+                self._extraction_executor, self.file_parser.extract_text, file_path, on_ocr_page
             )
 
             if not text:
