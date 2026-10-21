@@ -1,3 +1,4 @@
+import functools
 """
 LLM Service — Azure OpenAI
 
@@ -64,6 +65,123 @@ class _TokenRecorder:
         return Recorder()
 
 
+# Some open models (gpt-oss on Bedrock, DeepSeek, Qwen) put their hidden reasoning
+# inside the answer text as <reasoning>...</reasoning> or <think>...</think>.
+_REASONING_TAGS = (("<reasoning>", "</reasoning>"), ("<think>", "</think>"))
+
+
+def strip_reasoning(text: str) -> str:
+    """Remove reasoning blocks from a complete answer (an unclosed block is dropped to the end)."""
+    if not text or "<" not in text:
+        return text
+    f = _ReasoningFilter()
+    return (f.feed(text) + f.flush()).strip() if any(o in text for o, _ in _REASONING_TAGS) else text
+
+
+class _ReasoningFilter:
+    """Streaming filter that drops reasoning blocks even when a tag is split across chunks."""
+
+    def __init__(self):
+        self.buf = ""
+        self.close_tag = None  # set while inside a block
+        self.started = False
+
+    @staticmethod
+    def _partial_suffix(text: str, tags) -> int:
+        """Length of the longest suffix of text that is the start of one of the tags."""
+        best = 0
+        for tag in tags:
+            for n in range(min(len(tag) - 1, len(text)), 0, -1):
+                if text.endswith(tag[:n]):
+                    best = max(best, n)
+                    break
+        return best
+
+    def _emit(self, out: list, text: str):
+        if not self.started:
+            text = text.lstrip()
+            if text:
+                self.started = True
+        if text:
+            out.append(text)
+
+    def feed(self, chunk: str) -> str:
+        self.buf += chunk
+        out = []
+        while self.buf:
+            if self.close_tag:
+                i = self.buf.find(self.close_tag)
+                if i >= 0:
+                    self.buf = self.buf[i + len(self.close_tag):]
+                    self.close_tag = None
+                    continue
+                keep = self._partial_suffix(self.buf, [self.close_tag])
+                self.buf = self.buf[-keep:] if keep else ""
+                break
+            hits = [(self.buf.find(o), o, c) for o, c in _REASONING_TAGS if o in self.buf]
+            if hits:
+                i, open_tag, close_tag = min(hits)
+                self._emit(out, self.buf[:i])
+                self.buf = self.buf[i + len(open_tag):]
+                self.close_tag = close_tag
+                continue
+            keep = self._partial_suffix(self.buf, [o for o, _ in _REASONING_TAGS])
+            self._emit(out, self.buf[:-keep] if keep else self.buf)
+            self.buf = self.buf[-keep:] if keep else ""
+            break
+        return "".join(out)
+
+    def flush(self) -> str:
+        rest, self.buf = ("" if self.close_tag else self.buf), ""
+        out = []
+        self._emit(out, rest)
+        return "".join(out)
+
+
+@functools.lru_cache(maxsize=None)
+def _reasoning_free(base_cls):
+    """A chat model class whose answers (normal and streamed) never contain reasoning blocks."""
+    from langchain_core.messages import AIMessageChunk
+    from langchain_core.outputs import ChatGenerationChunk
+
+    class ReasoningFree(base_cls):
+        def _create_chat_result(self, response, generation_info=None):
+            result = super()._create_chat_result(response, generation_info)
+            for g in result.generations:
+                if isinstance(g.message.content, str):
+                    cleaned = strip_reasoning(g.message.content)
+                    g.message.content = cleaned
+                    g.text = cleaned
+            return result
+
+        def _filter_chunk(self, chunk, f):
+            c = chunk.message.content
+            if isinstance(c, str) and c:
+                cleaned = f.feed(c)
+                chunk.message.content = cleaned
+                chunk.text = cleaned
+            return chunk
+
+        def _stream(self, *args, **kwargs):
+            f = _ReasoningFilter()
+            for chunk in super()._stream(*args, **kwargs):
+                yield self._filter_chunk(chunk, f)
+            rest = f.flush()
+            if rest:
+                yield ChatGenerationChunk(message=AIMessageChunk(content=rest))
+
+        async def _astream(self, *args, **kwargs):
+            f = _ReasoningFilter()
+            async for chunk in super()._astream(*args, **kwargs):
+                yield self._filter_chunk(chunk, f)
+            rest = f.flush()
+            if rest:
+                yield ChatGenerationChunk(message=AIMessageChunk(content=rest))
+
+    ReasoningFree.__name__ = base_cls.__name__
+    return ReasoningFree
+
+
 def _build_client(
     temperature: float = 0.7,
     max_tokens: int = 4000,
@@ -104,7 +222,7 @@ def _build_client(
         else:
             kwargs["temperature"] = temperature
             
-        return AzureChatOpenAI(**kwargs)
+        return _reasoning_free(AzureChatOpenAI)(**kwargs)
 
     # Fallback OpenAI-compatible providers
     from langchain_openai import ChatOpenAI
@@ -140,7 +258,7 @@ def _build_client(
     if settings.LLM_REASONING_EFFORT:
         # Sent as a raw body field so it works with any OpenAI-compatible provider
         kwargs["extra_body"] = {"reasoning_effort": settings.LLM_REASONING_EFFORT}
-    return ChatOpenAI(**kwargs)
+    return _reasoning_free(ChatOpenAI)(**kwargs)
 
 def _convert_messages(messages: List[Dict[str, str]]):
     """Convert dict messages to LangChain message objects."""
