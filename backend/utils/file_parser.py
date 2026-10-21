@@ -111,7 +111,12 @@ class FileParser:
         if azure_text and len(azure_text.strip()) >= FileParser.MIN_TEXT_CHARS:
             return azure_text
 
-        # ── Stage 3: local Tesseract OCR (no cloud service needed) ────────────
+        # ── Stage 3: Google Cloud Vision OCR (when credentials are set) ───────
+        vision_text = FileParser._try_google_vision_ocr(file_path, on_progress)
+        if vision_text and len(vision_text.strip()) >= FileParser.MIN_TEXT_CHARS:
+            return vision_text
+
+        # ── Stage 4: local Tesseract OCR (no cloud service needed) ────────────
         ocr_text = FileParser._try_tesseract_ocr(file_path, on_progress)
         if ocr_text and len(ocr_text.strip()) >= FileParser.MIN_TEXT_CHARS:
             return ocr_text
@@ -160,6 +165,22 @@ class FileParser:
     # ──────────────────────────────────────────────────────────────────────────
     # Local OCR (Tesseract) for scanned PDFs
     # ──────────────────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _try_google_vision_ocr(file_path: str, on_progress=None) -> Optional[str]:
+        """Cloud OCR with Google Vision; None when it isn't configured or fails."""
+        try:
+            from config.settings import settings
+            from utils.google_vision_ocr import get_google_vision
+
+            vision = get_google_vision()
+            if not vision:
+                return None
+            return vision.extract_pdf(file_path, dpi=settings.OCR_DPI, max_pages=settings.OCR_MAX_PAGES,
+                                      on_progress=on_progress)
+        except Exception as e:
+            logger.error(f"[FileParser] Google Vision OCR failed, trying Tesseract: {e}")
+            return None
 
     @staticmethod
     def _try_tesseract_ocr(file_path: str, on_progress=None) -> Optional[str]:

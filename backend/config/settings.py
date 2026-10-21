@@ -133,6 +133,8 @@ class Settings(BaseSettings):
     # Format: https://<region>.api.cognitive.microsoft.com/
     AZURE_CV_ENDPOINT: str = ""
     AZURE_CV_KEY: str = ""
+    # Google Cloud Vision OCR for scanned PDFs: service-account JSON key, raw or base64
+    GOOGLE_VISION_CREDENTIALS: str = ""
     # Local OCR (Tesseract, in the Docker image) for scanned PDFs when Azure isn't set
     OCR_LOCAL_ENABLED: bool = True
     OCR_DPI: int = 200
