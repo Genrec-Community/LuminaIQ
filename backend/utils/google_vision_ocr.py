@@ -21,8 +21,9 @@ from utils.logger import logger
 _TOKEN_URL = "https://oauth2.googleapis.com/token"
 _ANNOTATE_URL = "https://vision.googleapis.com/v1/images:annotate"
 _SCOPE = "https://www.googleapis.com/auth/cloud-vision"
-PAGES_PER_REQUEST = 8      # Vision allows 16; 8 keeps each request well under 10 MB
-PARALLEL_REQUESTS = 3
+PAGES_PER_REQUEST = 4      # small batches keep memory low on a 512 MB server
+PARALLEL_REQUESTS = 2
+MAX_SIDE_PX = 2400         # longest side sent to Vision; plenty for text, small in memory
 
 
 class GoogleVisionOCR:
@@ -88,12 +89,10 @@ class GoogleVisionOCR:
             logger.info(f"[GoogleVision] OCR → pages {start + 1}-{end} ({total})")
 
             def render(i: int) -> bytes:
-                pix = doc[i].get_pixmap(dpi=dpi, colorspace=fitz.csGRAY, alpha=False)
-                img = Image.frombytes("L", (pix.width, pix.height), pix.samples)
-                buf = io.BytesIO()
-                img.save(buf, format="JPEG", quality=80, optimize=True)
-                img.close()
-                return buf.getvalue()
+                pix = render_page(doc[i], dpi, MAX_SIDE_PX)
+                data = pix.tobytes("jpeg", jpg_quality=80)
+                del pix
+                return data
 
             texts = [""] * total
             done = 0
@@ -119,6 +118,22 @@ class GoogleVisionOCR:
         text = "\n\n".join(t.strip() for t in texts if t and t.strip())
         logger.info(f"[GoogleVision] OCR → {len(text)} chars from {sum(1 for t in texts if t.strip())} pages")
         return text or None
+
+
+def render_page(page, dpi: int, max_side_px: int):
+    """
+    Greyscale pixmap of a page at `dpi`, scaled down so its longest side is at
+    most max_side_px. Scanned books often store pages at scanner size (a
+    two-page spread can be 3500 pt wide), which at 200 dpi would be a ~70 MB
+    image per page.
+    """
+    import fitz
+
+    zoom = dpi / 72.0
+    longest = max(page.rect.width, page.rect.height) * zoom
+    if longest > max_side_px:
+        zoom *= max_side_px / longest
+    return page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), colorspace=fitz.csGRAY, alpha=False)
 
 
 def load_credentials(raw: str) -> Optional[dict]:

@@ -372,6 +372,28 @@ const ProjectView = () => {
     const [showRightSidebarUpload, setShowRightSidebarUpload] = useState(false);
     const [isMobileDocsOpen, setIsMobileDocsOpen] = useState(false);
     const [isRightCollapsed, setIsRightCollapsed] = useState(false);
+    // Documents panel width (desktop): drag its left edge; remembered per browser
+    const DOCS_MIN = 280, DOCS_MAX = 560, DOCS_DEFAULT = 320;
+    const [docsWidth, setDocsWidth] = useState(() => {
+        try {
+            const w = Number(localStorage.getItem('lumina_docs_width'));
+            return w >= DOCS_MIN && w <= DOCS_MAX ? w : DOCS_DEFAULT;
+        } catch { return DOCS_DEFAULT; }
+    });
+    const [resizingDocs, setResizingDocs] = useState(false);
+    const startDocsResize = (e) => {
+        e.preventDefault();
+        setResizingDocs(true);
+        const onMove = (ev) => setDocsWidth(Math.min(DOCS_MAX, Math.max(DOCS_MIN, window.innerWidth - ev.clientX)));
+        const onUp = () => {
+            setResizingDocs(false);
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onUp);
+            setDocsWidth(w => { try { localStorage.setItem('lumina_docs_width', String(w)); } catch { /* ignore */ } return w; });
+        };
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
+    };
 
     // Derived: force expanded when mobile drawers open
     const leftCollapsed = isLeftCollapsed && !isMobileMenuOpen;
@@ -2095,13 +2117,29 @@ const ProjectView = () => {
                             onClick={() => setIsMobileDocsOpen(false)}
                         />
                     )}
-                    <div className={`
-                    fixed inset-y-0 right-0 z-50 w-80 bg-[#FDF6F0]/98 backdrop-blur-xl border-l border-[#E6D5CC]/60 flex flex-col transition-all duration-300 ease-in-out
-                    md:translate-x-0 md:static md:shrink-0
-                    ${isRightCollapsed ? 'md:w-0 md:border-0 md:overflow-hidden md:p-0' : 'md:w-80'}
+                    <div
+                        style={{ '--docs-w': `${docsWidth}px` }}
+                        className={`
+                    fixed inset-y-0 right-0 z-50 w-80 bg-[#FDF6F0]/98 backdrop-blur-xl border-l border-[#E6D5CC]/60 flex flex-col ${resizingDocs ? 'transition-none select-none' : 'transition-all duration-300 ease-in-out'}
+                    md:translate-x-0 md:relative md:shrink-0
+                    ${isRightCollapsed ? 'md:w-0 md:border-0 md:overflow-hidden md:p-0' : 'md:w-[var(--docs-w)]'}
                     ${isMobileDocsOpen ? 'translate-x-0' : 'translate-x-full'}
                     shadow-2xl md:shadow-none
                 `}>
+                        {/* Drag the left edge to resize (desktop); double-click resets */}
+                        {!isRightCollapsed && (
+                            <div
+                                role="separator"
+                                aria-orientation="vertical"
+                                aria-label="Resize documents panel"
+                                title="Drag to resize · double-click to reset"
+                                onPointerDown={startDocsResize}
+                                onDoubleClick={() => { setDocsWidth(DOCS_DEFAULT); try { localStorage.setItem('lumina_docs_width', String(DOCS_DEFAULT)); } catch { /* ignore */ } }}
+                                className="group/resize absolute inset-y-0 -left-1.5 z-10 hidden w-3 cursor-col-resize md:block"
+                            >
+                                <span className={`absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 rounded-full transition-colors ${resizingDocs ? 'bg-[#C8A288]' : 'bg-transparent group-hover/resize:bg-[#C8A288]/60'}`} />
+                            </div>
+                        )}
                         {/* Right Sidebar Header */}
                         <div className="shrink-0 px-5 py-4 border-b border-[#E6D5CC]/50 bg-gradient-to-br from-[#FDF6F0] to-white/80">
                             <div className="flex items-center justify-between">

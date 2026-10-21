@@ -134,7 +134,8 @@ const Steps = ({ current, done }) => (
  * message: the stream's message; variant: "compact" (document list) or "full".
  */
 const ProcessingProgress = ({ stage = 'processing', stagePct = 0, message = '', variant = 'compact', title }) => {
-    const value = useSmoothProgress(stage, stagePct);
+    // Background tabs pause the animation loop, so never show less than the real progress
+    const value = Math.max(useSmoothProgress(stage, stagePct), overallPercent(stage, stagePct));
     const info = STAGES[stage] || STAGES.processing;
     const done = stage === 'completed' || stage === 'ready';
     const detail = detailFor(stage, message);
@@ -167,11 +168,10 @@ const ProcessingProgress = ({ stage = 'processing', stagePct = 0, message = '', 
             <div className="mt-1.5 w-full">
                 {bar}
                 <div className="mt-1 flex items-center justify-between gap-2 text-[10px]">
-                    <span className="truncate font-medium text-[#8a6a5c]">
-                        {info.label}{detail ? ` · ${detail}` : ''}
-                    </span>
+                    <span className="truncate font-medium text-[#8a6a5c]">{info.label}</span>
                     <span className="shrink-0 tabular-nums font-semibold text-[#6b4c38]">{done ? 'Ready' : `${pct}%`}</span>
                 </div>
+                {detail && <p className="truncate text-[10px] text-[#a08070]" title={detail}>{detail}</p>}
             </div>
         );
     }

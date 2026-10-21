@@ -246,6 +246,8 @@ class FileParser:
             import pytesseract
             from PIL import Image
 
+            from utils.google_vision_ocr import render_page
+
             pytesseract.get_tesseract_version()
         except Exception as e:
             logger.warning(f"[FileParser] Tesseract OCR unavailable: {e}")
@@ -259,7 +261,7 @@ class FileParser:
                 total = max(0, end - start)
                 logger.info(f"[FileParser] Tesseract OCR → pages {start + 1}-{end} ({total}) at {settings.OCR_DPI} dpi")
                 for i in range(total):
-                    pix = doc[start + i].get_pixmap(dpi=settings.OCR_DPI, colorspace=fitz.csGRAY, alpha=False)
+                    pix = render_page(doc[start + i], settings.OCR_DPI, 3000)
                     img = Image.frombytes("L", (pix.width, pix.height), pix.samples)
                     del pix
                     # psm 3: automatic layout, handles two-page spreads and columns
