@@ -419,3 +419,31 @@ article mark.lumina-cite {
   border-radius: 3px;
   padding: 1px 0;
 }
+
+/* ── Book processing progress (components/ProcessingProgress.jsx) ── */
+@keyframes lumina-sheen {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+.lumina-progress-sheen {
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 251, 247, 0.55) 50%, transparent 100%);
+  animation: lumina-sheen 2.6s ease-in-out infinite;
+}
+@keyframes lumina-step-pulse {
+  0%, 100% { transform: scale(0.8); opacity: 0.7; }
+  50% { transform: scale(1.15); opacity: 1; }
+}
+.lumina-step-now { animation: lumina-step-pulse 2s ease-in-out infinite; }
+@keyframes lumina-breathe {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-1.5px) rotate(-3deg); }
+}
+.lumina-book-breathe { animation: lumina-breathe 3.2s ease-in-out infinite; }
+@keyframes lumina-done-glow {
+  0% { box-shadow: 0 0 0 0 rgba(200, 162, 136, 0.45); }
+  100% { box-shadow: 0 0 0 14px rgba(200, 162, 136, 0); }
+}
+.lumina-progress-done { animation: lumina-done-glow 1.2s ease-out 1; }
+@media (prefers-reduced-motion: reduce) {
+  .lumina-progress-sheen, .lumina-step-now, .lumina-book-breathe, .lumina-progress-done { animation: none; }
+}

@@ -75,6 +75,7 @@ import { supabase } from '../supabaseClient';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import UploadZone from '../components/UploadZone';
+import ProcessingProgress from '../components/ProcessingProgress';
 import { MAX_UPLOAD_MB } from '../utils/pricing';
 import { getRotatingLoadingMessage, getRandomLoadingMessage } from '../utils/LoadingMessages';
 
@@ -350,7 +351,9 @@ const ProjectView = () => {
     const [uploading, setUploading] = useState(false);
     const [isProcessingDocs, setIsProcessingDocs] = useState(true);
     // Per-document SSE stage: { [docId]: 'extracting'|'chunking'|'embedding'|'topics'|'graph'|'completed'|'failed' }
-    const [docStages, setDocStages] = useState({});
+    const [docStages, setDocStages] = useState({}); // docId -> { stage, progress, message } from the progress stream
+    const [uploadsInFlight, setUploadsInFlight] = useState([]); // [{ key, name, size, pct }]
+    const [justReady, setJustReady] = useState(() => new Set()); // docs that finished a moment ago
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isLeftCollapsed, setIsLeftCollapsed] = useState(false);
     const [showRightSidebarUpload, setShowRightSidebarUpload] = useState(false);
@@ -551,9 +554,16 @@ const ProjectView = () => {
                     doc.id,
                     async (event) => {
                         const { stage } = event;
+                        if (stage === 'keepalive') return;
 
-                        // Update per-doc stage label in real time
-                        setDocStages(prev => ({ ...prev, [doc.id]: stage }));
+                        // Live stage + percentage for the progress bar
+                        setDocStages(prev => ({ ...prev, [doc.id]: { stage, progress: event.progress, message: event.message } }));
+
+                        if (stage === 'completed') {
+                            // Hold the "Ready" state on screen for a moment before the bar goes away
+                            setJustReady(prev => new Set(prev).add(doc.id));
+                            setTimeout(() => setJustReady(prev => { const n = new Set(prev); n.delete(doc.id); return n; }), 2600);
+                        }
 
                         if (stage === 'completed' || stage === 'failed') {
                             // Refresh this document's status from DB to get error_message etc.
@@ -1006,18 +1016,24 @@ const ProjectView = () => {
             return;
         }
         setUploading(true);
+        // Show each upload's progress in the document list straight away
+        const entries = Array.from(files).map((file, i) => ({ key: `${Date.now()}-${i}`, name: file.name, size: file.size, pct: 0, file }));
+        setUploadsInFlight(prev => [...prev, ...entries.map(({ file, ...e }) => e)]);
+        setShowUploadModal(false);
+        const setPct = (key, pct) => setUploadsInFlight(prev => prev.map(u => (u.key === key ? { ...u, pct: Math.max(u.pct, pct) } : u)));
         try {
             // Upload files in parallel for better performance
             await Promise.all(
-                Array.from(files).map(file => uploadDocument(projectId, file, null, bookOptions))
+                entries.map(({ key, file }) => uploadDocument(projectId, file, (pct) => setPct(key, pct), bookOptions))
             );
             await fetchDocuments();
-            setShowUploadModal(false);
         } catch (error) {
             console.error("Upload error", error);
             const detail = error.response?.data?.detail;
             toast.error(typeof detail === 'string' ? detail : 'Failed to upload document(s)');
         } finally {
+            const done = new Set(entries.map(e => e.key));
+            setUploadsInFlight(prev => prev.filter(u => !done.has(u.key)));
             setUploading(false);
         }
     };
@@ -1696,27 +1712,25 @@ const ProjectView = () => {
                                     </React.Fragment>
                                 ))}
                                 <div ref={messagesEndRef} />
-                                {isProcessingDocs && selectedDocuments.some(id => {
-                                    const doc = documents.find(d => d.id === id);
-                                    return doc && (doc.upload_status === 'pending' || doc.upload_status === 'processing' || doc.upload_status === 'embedding' || doc.upload_status === 'queued');
-                                }) && (
-                                    <div className="flex justify-center my-4 animate-in fade-in slide-in-from-bottom-2">
-                                        <div className="bg-gradient-to-r from-[#FDF6F0] to-[#f7ede3] text-[#6b4c38] px-5 py-4 rounded-xl text-sm flex items-start gap-3 border border-[#E6D5CC] shadow-md max-w-lg w-full">
-                                            <div className="relative shrink-0 mt-0.5">
-                                                <div className="h-8 w-8 border-2 border-[#E6D5CC] rounded-full"></div>
-                                                <div className="absolute inset-0 h-8 w-8 border-2 border-[#C8A288] rounded-full border-t-transparent animate-spin"></div>
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="font-bold text-[#4A3B32] tracking-wide text-xs uppercase mb-1.5">
-                                                    {getRotatingLoadingMessage(loadingMsgIdx + 17)}
-                                                </p>
-                                                <div className="text-[11px] leading-relaxed italic text-[#8a6a5c] whitespace-pre-line transition-opacity duration-300 font-medium">
-                                                    {getRotatingLoadingMessage(loadingMsgIdx)}
-                                                </div>
+                                {(() => {
+                                    // The book being prepared, with live progress
+                                    const doc = documents.find(d => selectedDocuments.includes(d.id) && ['pending', 'processing', 'embedding', 'queued'].includes(d.upload_status));
+                                    if (!isProcessingDocs || !doc) return null;
+                                    const live = docStages[doc.id];
+                                    return (
+                                        <div className="flex justify-center my-4 animate-in fade-in slide-in-from-bottom-2">
+                                            <div className="max-w-lg w-full">
+                                                <ProcessingProgress
+                                                    variant="full"
+                                                    title={doc.filename}
+                                                    stage={live?.stage || doc.upload_status}
+                                                    stagePct={live?.progress}
+                                                    message={live?.message}
+                                                />
                                             </div>
                                         </div>
-                                    </div>
-                                )}
+                                    );
+                                })()}
 
                                 {/* Failed doc banner — shown when any doc fails */}
                                 {!isProcessingDocs && documents.some(d => d.upload_status === 'failed' || d.upload_status === 'error') && (
@@ -2161,7 +2175,18 @@ const ProjectView = () => {
                                 </div>
                             )}
 
-                            {documents.length > 0 ? (
+                            {uploadsInFlight.map((u) => (
+                                <div key={u.key} className="p-3 rounded-xl bg-white/70 border border-[#E6D5CC]/70">
+                                    <p className="text-sm font-medium truncate leading-tight text-[#5a4a42]">{u.name}</p>
+                                    <ProcessingProgress
+                                        stage="uploading"
+                                        stagePct={u.pct}
+                                        message={`${(u.size * u.pct / 100 / 1048576).toFixed(1)} of ${(u.size / 1048576).toFixed(1)} MB`}
+                                    />
+                                </div>
+                            ))}
+
+                            {documents.length > 0 || uploadsInFlight.length > 0 ? (
                                 documents.map((doc) => {
                                     const isSelected = selectedDocuments.includes(doc.id);
                                     const isDeleting = deletingDocIds.has(doc.id);
@@ -2214,14 +2239,15 @@ const ProjectView = () => {
                                                 >
                                                     {doc.filename}
                                                 </p>
+                                                {(isProcessing || (isReady && justReady.has(doc.id))) && (
+                                                    <ProcessingProgress
+                                                        stage={isReady ? 'completed' : (docStages[doc.id]?.stage || doc.upload_status)}
+                                                        stagePct={isReady ? 100 : docStages[doc.id]?.progress}
+                                                        message={docStages[doc.id]?.message}
+                                                    />
+                                                )}
                                                 <div className="flex items-center gap-2 mt-1">
-                                                    {isProcessing && (
-                                                        <span className="flex items-center gap-1 text-[10px] text-amber-600 font-medium">
-                                                            <Loader2 className="h-2.5 w-2.5 animate-spin shrink-0" />
-                                                            <span className="truncate" key={loadingMsgIdx}>{getRandomLoadingMessage()}</span>
-                                                        </span>
-                                                    )}
-                                                    {isReady && (
+                                                    {isReady && !justReady.has(doc.id) && (
                                                         <span className="flex items-center gap-1 text-[10px] text-emerald-600 font-medium">
                                                             <div className="h-1.5 w-1.5 bg-emerald-500 rounded-full" />
                                                             Ready

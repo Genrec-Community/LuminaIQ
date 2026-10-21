@@ -184,7 +184,7 @@ export const uploadDocument = async (projectId, file, onProgress, bookOptions = 
                 onProgress(percentCompleted);
             }
         },
-        timeout: 120000, // 2 min for large files
+        timeout: 15 * 60 * 1000, // large books on slow connections
     });
     return response.data;
 };
