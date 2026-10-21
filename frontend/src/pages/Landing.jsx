@@ -379,7 +379,7 @@ function Hero() {
             className="mb-6 gap-2 rounded-full border-primary/30 bg-primary/5 px-4 py-1.5 text-xs font-medium text-primary"
           >
             <Sparkles className="h-3 w-3" />
-            From textbook to exam-ready, even overnight
+            From textbook to exam-ready
           </Badge>
 
           <h1 className="font-display text-4xl font-800 leading-[1.05] tracking-tight sm:text-6xl lg:text-7xl">
@@ -897,7 +897,7 @@ function Footer() {
             </div>
             <p className="mt-4 max-w-md text-sm text-muted-foreground">
               Exams come faster than textbooks can be read. LuminaIQ turns any
-              book into the shortest, smartest path to exam-ready, even overnight.
+              book into the shortest, smartest path to exam-ready.
             </p>
             <div className="mt-4 flex gap-2">
               <Badge variant="secondary" className="rounded-md text-xs">AI-powered</Badge>

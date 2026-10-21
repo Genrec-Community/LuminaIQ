@@ -1,6 +1,6 @@
 # LuminaIQ
 
-> **Exams come faster than textbooks can be read. LuminaIQ turns any book into the shortest, smartest path to exam-ready, even overnight.**
+> **Exams come faster than textbooks can be read. LuminaIQ turns any book into the shortest, smartest path to exam-ready.**
 
 Upload a textbook and every feature works toward that one goal:
 
