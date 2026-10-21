@@ -159,6 +159,30 @@ export const getProjects = async () => {
 };
 
 export const uploadDocument = async (projectId, file, onProgress, bookOptions = {}) => {
+    // Preferred: resumable upload straight to storage, then the backend fetches it
+    try {
+        const { uploadToStorage, forgetPendingUpload } = await import('./utils/resumableUpload');
+        const { path, key } = await uploadToStorage(file, projectId, onProgress);
+        const res = await api.post('/documents/upload-from-storage', {
+            project_id: projectId,
+            storage_path: path,
+            filename: file.name,
+            is_public: !!bookOptions.isPublic,
+            book_title: bookOptions.bookTitle,
+            book_author: bookOptions.bookAuthor,
+            book_description: bookOptions.bookDescription,
+            book_tags: bookOptions.bookTags,
+        }, { timeout: 5 * 60 * 1000 });
+        forgetPendingUpload(key);
+        return res.data;
+    } catch (err) {
+        if (!err?.fallback) throw err;
+        // No storage session or the storage server refused: use the direct upload below
+    }
+    return uploadDocumentDirect(projectId, file, onProgress, bookOptions);
+};
+
+const uploadDocumentDirect = async (projectId, file, onProgress, bookOptions = {}) => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('project_id', projectId);

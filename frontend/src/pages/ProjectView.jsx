@@ -76,6 +76,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import UploadZone from '../components/UploadZone';
 import ProcessingProgress from '../components/ProcessingProgress';
+import { pendingUploads, forgetPendingUpload } from '../utils/resumableUpload';
 import { MAX_UPLOAD_MB } from '../utils/pricing';
 import { getRotatingLoadingMessage, getRandomLoadingMessage } from '../utils/LoadingMessages';
 
@@ -354,6 +355,18 @@ const ProjectView = () => {
     const [docStages, setDocStages] = useState({}); // docId -> { stage, progress, message } from the progress stream
     const [uploadsInFlight, setUploadsInFlight] = useState([]); // [{ key, name, size, pct }]
     const [justReady, setJustReady] = useState(() => new Set()); // docs that finished a moment ago
+    const [pausedUploads, setPausedUploads] = useState([]); // uploads interrupted by a refresh
+    const resumeInputRef = useRef(null);
+
+    useEffect(() => { setPausedUploads(pendingUploads(projectId)); }, [projectId]);
+
+    // Leaving mid-upload pauses it: say so before the tab closes
+    useEffect(() => {
+        if (!uploadsInFlight.some(u => u.pct < 100)) return undefined;
+        const warn = (e) => { e.preventDefault(); e.returnValue = ''; };
+        window.addEventListener('beforeunload', warn);
+        return () => window.removeEventListener('beforeunload', warn);
+    }, [uploadsInFlight]);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isLeftCollapsed, setIsLeftCollapsed] = useState(false);
     const [showRightSidebarUpload, setShowRightSidebarUpload] = useState(false);
@@ -1018,6 +1031,8 @@ const ProjectView = () => {
         setUploading(true);
         // Show each upload's progress in the document list straight away
         const entries = Array.from(files).map((file, i) => ({ key: `${Date.now()}-${i}`, name: file.name, size: file.size, pct: 0, file }));
+        // Re-picking a paused file resumes it, so it no longer shows as paused
+        setPausedUploads(prev => prev.filter(p => !entries.some(e => e.name === p.name && e.size === p.size)));
         setUploadsInFlight(prev => [...prev, ...entries.map(({ file, ...e }) => e)]);
         setShowUploadModal(false);
         const setPct = (key, pct) => setUploadsInFlight(prev => prev.map(u => (u.key === key ? { ...u, pct: Math.max(u.pct, pct) } : u)));
@@ -1034,6 +1049,7 @@ const ProjectView = () => {
         } finally {
             const done = new Set(entries.map(e => e.key));
             setUploadsInFlight(prev => prev.filter(u => !done.has(u.key)));
+            setPausedUploads(pendingUploads(projectId));
             setUploading(false);
         }
     };
@@ -2175,18 +2191,50 @@ const ProjectView = () => {
                                 </div>
                             )}
 
+                            {pausedUploads.length > 0 && (
+                                <input
+                                    ref={resumeInputRef}
+                                    type="file"
+                                    accept=".pdf,.docx,.txt"
+                                    className="hidden"
+                                    onChange={(e) => { if (e.target.files?.length) handleFileUpload(e.target.files); e.target.value = ''; }}
+                                />
+                            )}
+                            {pausedUploads.filter(p => !uploadsInFlight.some(u => u.name === p.name && u.size === p.size)).map((p) => (
+                                <div key={p.key} className="p-3 rounded-xl bg-[#FDF6F0] border border-dashed border-[#d2bab0]">
+                                    <p className="text-sm font-medium truncate leading-tight text-[#5a4a42]">{p.name}</p>
+                                    <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[#F1E6DD]">
+                                        <div className="h-full rounded-full bg-[#d9c2b2]" style={{ width: `${Math.max(3, p.pct)}%` }} />
+                                    </div>
+                                    <p className="mt-1 text-[10px] text-[#8a6a5c]">Paused at {p.pct}%. Choose the same file and it carries on from there.</p>
+                                    <div className="mt-2 flex gap-2">
+                                        <button
+                                            onClick={() => resumeInputRef.current?.click()}
+                                            className="rounded-lg bg-[#C8A288] px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-[#B08B72]"
+                                        >
+                                            Resume upload
+                                        </button>
+                                        <button
+                                            onClick={() => { forgetPendingUpload(p.key); setPausedUploads(pendingUploads(projectId)); }}
+                                            className="rounded-lg px-2.5 py-1 text-[11px] font-semibold text-[#8a6a5c] hover:bg-[#E6D5CC]/50"
+                                        >
+                                            Discard
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
                             {uploadsInFlight.map((u) => (
                                 <div key={u.key} className="p-3 rounded-xl bg-white/70 border border-[#E6D5CC]/70">
                                     <p className="text-sm font-medium truncate leading-tight text-[#5a4a42]">{u.name}</p>
                                     <ProcessingProgress
-                                        stage="uploading"
-                                        stagePct={u.pct}
+                                        stage={u.pct >= 100 ? 'pending' : 'uploading'}
+                                        stagePct={u.pct >= 100 ? 50 : u.pct}
                                         message={`${(u.size * u.pct / 100 / 1048576).toFixed(1)} of ${(u.size / 1048576).toFixed(1)} MB`}
                                     />
                                 </div>
                             ))}
 
-                            {documents.length > 0 || uploadsInFlight.length > 0 ? (
+                            {documents.length > 0 || uploadsInFlight.length > 0 || pausedUploads.length > 0 ? (
                                 documents.map((doc) => {
                                     const isSelected = selectedDocuments.includes(doc.id);
                                     const isDeleting = deletingDocIds.has(doc.id);

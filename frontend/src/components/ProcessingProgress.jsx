@@ -61,9 +61,12 @@ const prefersReducedMotion = () =>
  */
 const useSmoothProgress = (stage, stagePct) => {
     const target = overallPercent(stage, stagePct);
+    // Uploads show only real bytes sent (no creep): the browser knows exactly how far it is
     const ceiling = stage === 'completed' || stage === 'ready'
         ? 100
-        : Math.max(target, (STAGES[stage] || STAGES.processing).range[1] - 0.5);
+        : stage === 'uploading'
+            ? target
+            : Math.max(target, (STAGES[stage] || STAGES.processing).range[1] - 0.5);
     const [shown, setShown] = useState(target);
     const shownRef = useRef(target);
     const targetRef = useRef(target);

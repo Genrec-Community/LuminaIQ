@@ -40,6 +40,80 @@ class SearchResult(BaseModel):
     score: float
 
 
+async def _start_processing(
+    current_user: dict, project_id: str, temp_path: str, filename: str, content_type: str,
+    file_size: int, is_public: bool = False, book_title: Optional[str] = None,
+    book_author: Optional[str] = None, book_description: Optional[str] = None,
+    book_tags: Optional[str] = None,
+) -> dict:
+    """Create the document record and process the file at temp_path in the background."""
+    # 3. Create document record in Supabase
+    doc_data = {
+        "project_id": project_id,
+        "filename": filename,
+        "file_type": content_type,
+        "file_size": file_size,
+        "upload_status": "pending",
+        "user_id": current_user.get("id"),
+    }
+
+    response = await async_db(
+        lambda: get_supabase_client()
+        .table("documents")
+        .insert(doc_data)
+        .execute()
+    )
+
+    if not response.data:
+        raise HTTPException(500, "Failed to create document record")
+
+    document = response.data[0]
+    document_id = document["id"]
+
+    # 4. Start CONCURRENT background processing
+    # asyncio.create_task = truly parallel (vs Starlette BackgroundTasks which are serial)
+    book_meta = None
+    if is_public:
+        book_meta = {
+            "title": book_title or filename,
+            "author": book_author,
+            "description": book_description,
+            "tags": [t.strip() for t in (book_tags or "").split(",") if t.strip()],
+            "file_size": file_size,
+            "file_type": content_type,
+            "user_id": current_user.get("id"),
+        }
+
+    task = asyncio.create_task(
+        document_service.process_document(
+            document_id=document_id,
+            project_id=project_id,
+            file_path=temp_path,
+            filename=filename,
+            user_id=current_user.get("id"),
+            book_meta=book_meta,
+        )
+    )
+
+    # Ensure background task errors are always logged (not silently swallowed)
+    def _log_task_exception(t):
+        if t.cancelled():
+            logger.warning(f"Background processing cancelled for {filename}")
+        elif t.exception():
+            logger.error(
+                f"Background processing FAILED for {filename}: {t.exception()}"
+            )
+
+    task.add_done_callback(_log_task_exception)
+
+    logger.info(
+        f"Document {filename} upload started, processing in background "
+        f"(public={is_public})"
+    )
+
+    return document
+
+
 @router.post("/upload", response_model=DocumentUploadResponse)
 async def upload_document(
     file: UploadFile = File(...),
@@ -128,71 +202,11 @@ async def upload_document(
         temp_file.close()
         temp_path = temp_file.name
 
-        # 3. Create document record in Supabase
-        doc_data = {
-            "project_id": project_id,
-            "filename": file.filename,
-            "file_type": file.content_type,
-            "file_size": file_size,
-            "upload_status": "pending",
-            "user_id": current_user.get("id"),
-        }
-
-        response = await async_db(
-            lambda: get_supabase_client()
-            .table("documents")
-            .insert(doc_data)
-            .execute()
+        # 3-4. Create the record and start background processing
+        return await _start_processing(
+            current_user, project_id, temp_path, file.filename, file.content_type, file_size,
+            is_public, book_title, book_author, book_description, book_tags,
         )
-
-        if not response.data:
-            raise HTTPException(500, "Failed to create document record")
-
-        document = response.data[0]
-        document_id = document["id"]
-
-        # 4. Start CONCURRENT background processing
-        # asyncio.create_task = truly parallel (vs Starlette BackgroundTasks which are serial)
-        book_meta = None
-        if is_public:
-            book_meta = {
-                "title": book_title or file.filename,
-                "author": book_author,
-                "description": book_description,
-                "tags": [t.strip() for t in (book_tags or "").split(",") if t.strip()],
-                "file_size": file_size,
-                "file_type": file.content_type,
-                "user_id": current_user.get("id"),
-            }
-
-        task = asyncio.create_task(
-            document_service.process_document(
-                document_id=document_id,
-                project_id=project_id,
-                file_path=temp_path,
-                filename=file.filename,
-                user_id=current_user.get("id"),
-                book_meta=book_meta,
-            )
-        )
-
-        # Ensure background task errors are always logged (not silently swallowed)
-        def _log_task_exception(t):
-            if t.cancelled():
-                logger.warning(f"Background processing cancelled for {file.filename}")
-            elif t.exception():
-                logger.error(
-                    f"Background processing FAILED for {file.filename}: {t.exception()}"
-                )
-
-        task.add_done_callback(_log_task_exception)
-
-        logger.info(
-            f"Document {file.filename} upload started, processing in background "
-            f"(public={is_public})"
-        )
-
-        return document
 
     except HTTPException:
         if temp_path and os.path.exists(temp_path):
@@ -209,6 +223,98 @@ async def upload_document(
                 pass
         logger.error(f"Upload error: {str(e)}")
         raise HTTPException(500, str(e))
+
+
+UPLOADS_BUCKET = "uploads"
+
+_UPLOAD_TYPES = {
+    "pdf": "application/pdf",
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "txt": "text/plain",
+}
+
+
+class StorageUploadRequest(BaseModel):
+    project_id: str
+    storage_path: str
+    filename: str
+    is_public: bool = False
+    book_title: Optional[str] = None
+    book_author: Optional[str] = None
+    book_description: Optional[str] = None
+    book_tags: Optional[str] = None
+
+
+@router.post("/upload-from-storage")
+async def upload_from_storage(
+    request: StorageUploadRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Process a file the browser uploaded straight to Supabase Storage (resumable,
+    in chunks; survives a page refresh). The file must be in the user's own
+    folder of the private "uploads" bucket. It is streamed here, processed like
+    a normal upload, and removed from the bucket.
+    """
+    import httpx
+
+    metered(current_user, "upload")
+    await usage.check_books(current_user["id"])
+
+    path = request.storage_path.strip("/")
+    if not path.startswith(f"{current_user['id']}/") or ".." in path:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "That upload doesn't belong to you.")
+    file_ext = os.path.splitext(request.filename)[1].lower().lstrip(".")
+    if file_ext not in _UPLOAD_TYPES:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Supported files: PDF, DOCX and TXT.")
+
+    url = f"{settings.SUPABASE_URL.rstrip('/')}/storage/v1/object/{UPLOADS_BUCKET}/{path}"
+    headers = {"Authorization": f"Bearer {settings.SUPABASE_SERVICE_KEY}", "apikey": settings.SUPABASE_SERVICE_KEY}
+    os.makedirs("temp", exist_ok=True)
+    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_ext}", dir="temp")
+    temp_path = temp_file.name
+    file_size = 0
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(300, connect=20)) as client:
+            async with client.stream("GET", url, headers=headers) as resp:
+                if resp.status_code == 404:
+                    raise HTTPException(status.HTTP_404_NOT_FOUND, "The upload wasn't found. Please upload the file again.")
+                if resp.status_code >= 400:
+                    raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Couldn't fetch the upload ({resp.status_code}).")
+                async for chunk in resp.aiter_bytes(1024 * 1024):
+                    file_size += len(chunk)
+                    if file_size > settings.MAX_FILE_SIZE:
+                        raise HTTPException(
+                            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                            f"This file is larger than the {settings.MAX_FILE_SIZE // (1024 * 1024)} MB upload limit.",
+                        )
+                    temp_file.write(chunk)
+        temp_file.close()
+
+        document = await _start_processing(
+            current_user, request.project_id, temp_path, request.filename, _UPLOAD_TYPES[file_ext], file_size,
+            request.is_public, request.book_title, request.book_author, request.book_description, request.book_tags,
+        )
+    except HTTPException:
+        temp_file.close()
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+        raise
+    except Exception as e:
+        temp_file.close()
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+        logger.error(f"Upload-from-storage error: {e}")
+        raise HTTPException(500, str(e))
+
+    # The file is now on this server (the original PDF is kept by processing); free the bucket
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            await client.request("DELETE", f"{settings.SUPABASE_URL.rstrip('/')}/storage/v1/object/{UPLOADS_BUCKET}",
+                                 headers=headers, json={"prefixes": [path]})
+    except Exception as e:
+        logger.debug(f"Could not remove {path} from {UPLOADS_BUCKET}: {e}")
+    return document
 
 
 @router.get("/{project_id}", response_model=DocumentList)
