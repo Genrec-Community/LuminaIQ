@@ -1132,14 +1132,16 @@ export const getCramCard = async (projectId, topic, selectedDocuments = [], refr
     return response.data;
 };
 
-export const generateVisualLab = async (projectId, topic, { selectedDocuments = [], refresh = false, repair = null } = {}) => {
+export const generateVisualLab = async (projectId, topic, { selectedDocuments = [], refresh = false, repair = null, signal } = {}) => {
+    // No silent retries: a lost 3-minute build would otherwise spin for up to 15 minutes.
+    // The screen offers Try again instead.
     const response = await api.post('/learning/visualize', {
         project_id: projectId,
         topic,
         selected_documents: selectedDocuments,
         refresh,
         repair,
-    }, { timeout: 240000 });
+    }, { timeout: 180000, signal, _retryCount: 3 });
     return response.data;
 };
 

@@ -43,7 +43,12 @@ const withGuard = (html) => {
     return html.replace(/<html[^>]*>/i, (tag) => `${tag}<head>${GUARD}</head>`);
 };
 
-const errMsg = (e, fallback) => e?.response?.data?.detail || fallback;
+const errMsg = (e, fallback) => {
+    if (e?.code === 'ECONNABORTED') return 'That took too long, so it was stopped. Try again: builds usually take under a minute.';
+    if (!e?.response) return 'Lost the connection while building. Check your internet and try again.';
+    const d = e.response.data?.detail;
+    return typeof d === 'string' ? d : (d?.message || fallback);
+};
 
 /**
  * Visual Lab: turn any topic into a working interactive simulation (sliders,
@@ -64,8 +69,11 @@ const VisualLabView = ({ projectId, availableTopics = [], selectedDocuments = []
     const [runtimeError, setRuntimeError] = useState('');
     const [stepIdx, setStepIdx] = useState(0);
     const [full, setFull] = useState(false);
+    const [elapsed, setElapsed] = useState(0);
     const iframeRef = useRef(null);
     const repairedRef = useRef(false);
+    const abortRef = useRef(null);
+    const buildIdRef = useRef(0);
     const htmlRef = useRef('');
     htmlRef.current = html;
 
@@ -81,15 +89,30 @@ const VisualLabView = ({ projectId, availableTopics = [], selectedDocuments = []
         setTopic(name); setQuery(name);
         setLoading(true); setError(''); setRuntimeError(''); setHtml('');
         repairedRef.current = false;
+        abortRef.current?.abort();
+        const controller = new AbortController();
+        abortRef.current = controller;
+        const id = ++buildIdRef.current;
         try {
-            const r = await generateVisualLab(projectId, name, { selectedDocuments, refresh });
+            const r = await generateVisualLab(projectId, name, { selectedDocuments, refresh, signal: controller.signal });
+            if (id !== buildIdRef.current) return;
+            if (!r?.html) throw Object.assign(new Error('empty'), { response: { data: { detail: 'The AI returned an empty simulation. Please try again.' } } });
             setHtml(r.html);
         } catch (e) {
+            if (id !== buildIdRef.current || controller.signal.aborted) return;
             setError(errMsg(e, 'Could not build this simulation. Please try again.'));
         } finally {
-            setLoading(false);
+            if (id === buildIdRef.current) setLoading(false);
         }
     }, [projectId, selectedDocuments]);
+
+    const cancel = () => {
+        buildIdRef.current++;
+        abortRef.current?.abort();
+        setLoading(false);
+        setError('');
+    };
+    useEffect(() => () => abortRef.current?.abort(), []);
 
     // Opened from another screen with a topic ("See it in the Visual Lab")
     useEffect(() => {
@@ -104,8 +127,11 @@ const VisualLabView = ({ projectId, availableTopics = [], selectedDocuments = []
     useEffect(() => {
         if (!loading && !repairing) return undefined;
         setStepIdx(0);
+        setElapsed(0);
+        const started = Date.now();
         const id = setInterval(() => setStepIdx((i) => Math.min(i + 1, BUILD_STEPS.length - 1)), 6000);
-        return () => clearInterval(id);
+        const tick = setInterval(() => setElapsed(Math.round((Date.now() - started) / 1000)), 1000);
+        return () => { clearInterval(id); clearInterval(tick); };
     }, [loading, repairing]);
 
     // Errors from inside the simulation: repair once automatically
@@ -187,7 +213,18 @@ const VisualLabView = ({ projectId, availableTopics = [], selectedDocuments = []
                             </div>
                             <h3 className="mt-3 text-lg font-bold text-[#4A3B32]">{repairing ? 'Fixing a glitch in the simulation…' : `${companion} is building “${topic}”`}</h3>
                             <p className="mt-1 text-sm text-[#8a6a5c]">{BUILD_STEPS[stepIdx]}</p>
-                            <p className="mt-3 text-xs text-[#8a6a5c]">A first build takes up to a minute. Next time it opens instantly.</p>
+                            <p className="mt-3 text-xs text-[#8a6a5c]">
+                                {elapsed < 75 ? 'A first build takes up to a minute. Next time it opens instantly.' : 'Taking longer than usual. You can wait a bit more or try again.'}
+                                <span className="ml-1 tabular-nums">({elapsed}s)</span>
+                            </p>
+                            {loading && (
+                                <div className="mt-4 flex justify-center gap-2">
+                                    {elapsed >= 75 && (
+                                        <button onClick={() => build(topic)} className="rounded-xl bg-[#C8A288] px-4 py-2 text-sm font-semibold text-white hover:bg-[#B08B72]">Try again</button>
+                                    )}
+                                    <button onClick={cancel} className="rounded-xl border border-[#E6D5CC] bg-white px-4 py-2 text-sm font-semibold text-[#4A3B32] hover:border-[#C8A288]">Cancel</button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
