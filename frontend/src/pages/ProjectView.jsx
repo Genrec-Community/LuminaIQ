@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, lazy, Suspense } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
     MessageSquare,
     FileText,
@@ -101,7 +101,14 @@ import { LAST_PROJECT_KEY } from '../utils/dailyProgress';
 import { aiName } from '../utils/persona';
 import usePlan from '../hooks/usePlan';
 import { emitLimit, emitPlanChanged } from '../utils/plan';
-import { isNativeApp } from '../utils/platform';
+import { isNativeApp, isAppShell } from '../utils/platform';
+
+// Inside the phone app: no sidebar or tour; a back button and tool chips instead
+const APP_SHELL = isAppShell();
+const APP_TOOLS = [
+    ['power', 'Power Hour'], ['cram', 'Exam Tonight'], ['chat', 'Ask'], ['quiz', 'Quiz'], ['flashcards', 'Flashcards'],
+    ['notes', 'Notes'], ['mindmap', 'Mind map'], ['path', 'Path'], ['qa', 'Q&A'], ['lab', 'Visual Lab'], ['knowledge', 'Graph'],
+];
 
 
 // One chat message's Markdown. Memoized so that while an answer streams in,
@@ -198,7 +205,11 @@ const ProjectView = () => {
     const isDark = settings?.darkMode ?? false;
     const { data: gamificationData } = useGamification();
     const [showGamification, setShowGamification] = useState(false);
+    const [searchParams] = useSearchParams();
+    const askParam = searchParams.get('ask');
     const [activeTab, setActiveTab] = useState(() => {
+        const tool = searchParams.get('tool');
+        if (tool && tool !== 'general') return tool;
         const saved = sessionStorage.getItem(`lumina_tab_${projectId}`);
         // 'general' was a menu toggle, not a real view
         return saved && saved !== 'general' ? saved : 'power';
@@ -970,6 +981,21 @@ const ProjectView = () => {
         }
     };
 
+    // ?ask=… (from the app's feed): ask it as soon as the book's files are selected
+    const askRef = useRef(askParam);
+    useEffect(() => {
+        if (askRef.current && selectedDocuments.length > 0 && !loading) {
+            setInputMessage(askRef.current);
+        }
+    }, [selectedDocuments.length, loading]);
+    useEffect(() => {
+        if (askRef.current && inputMessage === askRef.current) {
+            askRef.current = null;
+            handleSendMessage({ preventDefault() {} });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [inputMessage]);
+
     const handleSendMessage = async (e) => {
         e.preventDefault();
         if (!inputMessage.trim() || loading) return;
@@ -1200,15 +1226,15 @@ const ProjectView = () => {
 
     return (
         <div className="h-[100dvh] flex overflow-hidden font-sans transition-colors duration-300"
-            style={isDark ? {
+            style={{ ...(APP_SHELL ? { paddingBottom: 'var(--sab)' } : {}), ...(isDark ? {
                 background: 'radial-gradient(ellipse at 20% 0%, color-mix(in srgb, var(--dm-accent) 10%, var(--dm-bg)) 0%, var(--dm-bg) 45%, var(--dm-bg) 100%)',
                 color: '#e8e2dc'
-            } : { background: 'var(--th-bg, #FDF6F0)', color: 'var(--th-text, #4A3B32)' }}>
+            } : { background: 'var(--th-bg, #FDF6F0)', color: 'var(--th-text, #4A3B32)' }) }}>
 
             <Joyride
                 onEvent={handleJoyrideCallback}
                 continuous
-                run={run}
+                run={run && !APP_SHELL}
                 steps={steps}
                 options={TOUR_OPTIONS}
             />
@@ -1237,7 +1263,7 @@ const ProjectView = () => {
             )}
 
             {/* Sidebar - Desktop & Mobile - Hidden when quiz/qa is active */}
-            {!isSidebarHidden && (
+            {!isSidebarHidden && !APP_SHELL && (
                 <div className={`
                 fixed inset-y-0 left-0 z-50 ${leftCollapsed ? 'w-20' : 'w-80'} backdrop-blur-xl border-r flex flex-col transition-all duration-300 ease-in-out md:translate-x-0 md:static md:shrink-0 shadow-2xl md:shadow-none
                 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}
@@ -1335,16 +1361,26 @@ const ProjectView = () => {
                 {/* Header (Context) - Hidden in Zen Mode */}
                 {!zenMode && (
                     <div className="px-3 md:px-5 py-2.5 border-b backdrop-blur-md sticky top-0 z-30"
-                        style={isDark ? { borderColor: 'var(--dm-border-strong)', background: 'color-mix(in srgb, var(--dm-sidebar) 80%, transparent)' } : { borderColor: 'var(--th-border, rgba(230,213,204,0.5))', background: 'color-mix(in srgb, var(--th-surface, #ffffff) 50%, transparent)' }}>
+                        style={APP_SHELL ? { paddingTop: 'calc(var(--sat) + 0.5rem)', ...(isDark ? { borderColor: 'var(--dm-border-strong)', background: 'var(--dm-sidebar)' } : { borderColor: 'var(--th-border, rgba(230,213,204,0.5))', background: 'var(--th-surface, #ffffff)' }) } : isDark ? { borderColor: 'var(--dm-border-strong)', background: 'color-mix(in srgb, var(--dm-sidebar) 80%, transparent)' } : { borderColor: 'var(--th-border, rgba(230,213,204,0.5))', background: 'color-mix(in srgb, var(--th-surface, #ffffff) 50%, transparent)' }}>
                         {/* Single-row header with proper spacing */}
                         <div className="flex items-center gap-2 h-11">
-                            {/* Mobile Menu Button */}
-                            <button
-                                onClick={() => setIsMobileMenuOpen(true)}
-                                className="md:hidden p-2 -ml-1 hover:bg-[#E6D5CC]/30 rounded-lg text-[#4A3B32] transition-colors shrink-0"
-                            >
-                                <Menu className="h-5 w-5" />
-                            </button>
+                            {/* Mobile Menu Button (the phone app has a back button instead) */}
+                            {APP_SHELL ? (
+                                <button
+                                    onClick={() => (window.history.length > 1 ? navigate(-1) : navigate(`/app/book/${projectId}`))}
+                                    className="p-2 -ml-1.5 rounded-full text-[#4A3B32] active:bg-[#E6D5CC]/40 shrink-0"
+                                    aria-label="Back"
+                                >
+                                    <ChevronLeft className="h-6 w-6" />
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={() => setIsMobileMenuOpen(true)}
+                                    className="md:hidden p-2 -ml-1 hover:bg-[#E6D5CC]/30 rounded-lg text-[#4A3B32] transition-colors shrink-0"
+                                >
+                                    <Menu className="h-5 w-5" />
+                                </button>
+                            )}
 
                             {/* Left: Tab name + Summary */}
                             <div className="flex items-center gap-2 min-w-0 shrink-0">
@@ -1468,15 +1504,25 @@ const ProjectView = () => {
                                 </button>
 
                                 {/* Exit */}
-                                <button
+                                {!APP_SHELL && <button
                                     onClick={() => navigate('/dashboard')}
                                     className="p-2.5 rounded-lg text-[#8a6a5c]/50 hover:bg-red-50 hover:text-red-500 transition-colors ml-0.5"
                                     title="Back to Dashboard"
                                 >
                                     <LogOut className="h-5 w-5" />
-                                </button>
+                                </button>}
                             </div>
                         </div>
+                        {APP_SHELL && (
+                            <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 pt-1.5" style={{ scrollbarWidth: 'none' }}>
+                                {APP_TOOLS.map(([id, label]) => (
+                                    <button key={id} onClick={() => setActiveTab(id)}
+                                        className={`shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${activeTab === id ? 'bg-[#C8A288] text-white' : isDark ? 'bg-[#2e2318] text-[#c4a882]' : 'bg-[#F3E8DF] text-[#6b4c38]'}`}>
+                                        {id === 'chat' ? `Ask ${aiName(settings)}` : label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
 
                         {/* Summary Content Area - positioned below header */}
                         {showSummary && (

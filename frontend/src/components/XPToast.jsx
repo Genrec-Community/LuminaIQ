@@ -2,6 +2,10 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Zap, Award, TrendingUp, Star } from 'lucide-react';
 import { useGamification } from '../context/GamificationContext';
+import { isAppShell } from '../utils/platform';
+
+// Phone app: a small pill above the tab bar, so it never covers a screen's title
+const APP_SHELL = isAppShell();
 
 const ACTIVITY_LABELS = {
     quiz: 'Quiz Completed',
@@ -20,7 +24,7 @@ const XPToast = () => {
     const { xpEvents, dismissXpEvent } = useGamification();
 
     return (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[110] flex flex-col items-center gap-2 pointer-events-none">
+        <div className={`fixed left-1/2 -translate-x-1/2 z-[110] flex flex-col items-center gap-2 pointer-events-none ${APP_SHELL ? 'bottom-[calc(var(--sab)+88px)]' : 'top-4'}`}>
             <AnimatePresence>
                 {xpEvents.map((event) => (
                     <motion.div
@@ -85,6 +89,11 @@ const XPToast = () => {
                                 >
                                     <Star className="h-6 w-6 text-yellow-200 fill-yellow-200" />
                                 </motion.div>
+                            </motion.div>
+                        ) : APP_SHELL ? (
+                            <motion.div onClick={() => dismissXpEvent(event.id)}
+                                className="flex items-center gap-1.5 rounded-full bg-[#2a1d15]/90 px-3.5 py-1.5 text-[13px] font-extrabold text-amber-300 shadow-lg backdrop-blur">
+                                <Zap className="h-4 w-4 fill-amber-300" /> +{event.xp_earned} XP
                             </motion.div>
                         ) : (
                             /* Regular XP Toast */

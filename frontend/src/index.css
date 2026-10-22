@@ -1,6 +1,13 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/* Phone notch / gesture bar spacing. The Android app sets --safe-area-inset-*
+   (Capacitor SystemBars); browsers use env(). */
+:root {
+  --sat: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --sab: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+}
+
 @theme {
   --color-primary-50: #fdf8f6;
   --color-primary-100: #f2e8e5;

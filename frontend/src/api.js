@@ -102,7 +102,8 @@ api.interceptors.response.use(
 
         // ── 402: a plan limit was reached — show the upgrade prompt ──
         if (status === 402 && isLimitDetail(error.response?.data?.detail)) {
-            emitLimit(error.response.data.detail);
+            // silentLimit: the caller shows its own message (e.g. the app's feed)
+            if (!config?.silentLimit) emitLimit(error.response.data.detail);
             return Promise.reject(error);
         }
 
@@ -1182,3 +1183,6 @@ export const startSeatsCheckout = async (seats) => (await api.post('/institution
 // Full extracted text of a document (reader fallback when there's no original PDF)
 export const getDocumentText = async (projectId, documentId) =>
     (await api.get(`/documents/${projectId}/${documentId}/text`)).data;
+
+// Permanently delete the signed-in account and all of its data
+export const deleteAccount = async () => (await api.delete('/auth/account')).data;

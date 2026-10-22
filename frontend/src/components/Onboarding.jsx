@@ -40,7 +40,7 @@ const inputCls = 'w-full px-4 py-3 bg-[#FDF6F0] border border-[#E6D5CC] rounded-
  * First-run experience: the learner introduces themselves, designs their AI
  * companion and sets a goal. Everything can be changed later in Settings.
  */
-const Onboarding = ({ onDone }) => {
+const Onboarding = ({ onDone, fullScreen = false }) => {
     const { user } = useAuth();
     const { settings, updateSettings } = useSettings();
     const [step, setStep] = useState(0);
@@ -242,11 +242,13 @@ const Onboarding = ({ onDone }) => {
     ];
 
     return (
-        <div className="fixed inset-0 z-[9999] bg-[#2A1F18]/50 backdrop-blur-md flex items-center justify-center p-3 md:p-6">
+        <div className={`fixed inset-0 z-[9999] flex items-center justify-center ${fullScreen ? 'bg-white' : 'bg-[#2A1F18]/50 backdrop-blur-md p-3 md:p-6'}`}>
             <motion.div
                 initial={{ opacity: 0, y: 30, scale: 0.97 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[94vh] flex flex-col overflow-hidden"
+                className={fullScreen
+                    ? 'bg-white w-full h-[100dvh] flex flex-col overflow-hidden pt-[var(--sat)] pb-[var(--sab)]'
+                    : 'bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[94vh] flex flex-col overflow-hidden'}
             >
                 <div className="flex items-center gap-2 px-6 pt-5">
                     {Array.from({ length: STEPS + 1 }).map((_, i) => (

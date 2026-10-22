@@ -36,8 +36,18 @@ export async function initNative(supabase) {
         else if (access_token && refresh_token) await supabase.auth.setSession({ access_token, refresh_token });
     });
 
+    // Back: close an open sheet first, then step back; the main tabs return to
+    // Home, and Home (or the sign-in screens) leaves the app
     App.addListener('backButton', ({ canGoBack }) => {
-        if (canGoBack && window.location.pathname !== '/dashboard') window.history.back();
-        else App.exitApp();
+        const handled = !window.dispatchEvent(new CustomEvent('lumina-back', { cancelable: true }));
+        if (handled) return;
+        const path = window.location.pathname;
+        if (['/app/home', '/welcome', '/signin', '/'].includes(path)) { App.exitApp(); return; }
+        if (/^\/app\/(feed|library|me)$/.test(path)) {
+            window.dispatchEvent(new CustomEvent('lumina-navigate', { detail: '/app/home' }));
+            return;
+        }
+        if (canGoBack) window.history.back();
+        else window.dispatchEvent(new CustomEvent('lumina-navigate', { detail: '/app/home' }));
     });
 }

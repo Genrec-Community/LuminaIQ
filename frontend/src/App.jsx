@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { isNativeApp } from './utils/platform';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { isAppShell } from './utils/platform';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import { SettingsProvider } from './context/SettingsContext';
@@ -19,6 +19,11 @@ const Landing = lazy(() => import('./pages/Landing'));
 const Pricing = lazy(() => import('./pages/Pricing'));
 const Institution = lazy(() => import('./pages/Institution'));
 const JoinClass = lazy(() => import('./pages/JoinClass'));
+const Privacy = lazy(() => import('./pages/Legal').then((m) => ({ default: m.Privacy })));
+const Terms = lazy(() => import('./pages/Legal').then((m) => ({ default: m.Terms })));
+// The phone app has its own interface (bottom tabs, feed, onboarding)
+const MobileApp = lazy(() => import('./mobile/MobileApp'));
+const APP_SHELL = isAppShell();
 
 const PageLoader = () => (
     <div className="min-h-screen flex items-center justify-center bg-[#FDF6F0]">
@@ -34,11 +39,13 @@ function App() {
                     <ToastProvider>
                         <Router>
                             <Suspense fallback={<PageLoader />}>
+                            {APP_SHELL ? <MobileApp /> : (
                             <Routes>
-                                {/* The Android app opens straight into the product, not the marketing page */}
-                                <Route path="/" element={isNativeApp() ? <Navigate to="/dashboard" replace /> : <Landing />} />
+                                <Route path="/" element={<Landing />} />
                                 <Route path="/login" element={<Login />} />
                                 <Route path="/pricing" element={<Pricing />} />
+                                <Route path="/privacy" element={<Privacy />} />
+                                <Route path="/terms" element={<Terms />} />
                                 
                                 {/* Protected Routes */}
                                 <Route element={<PrivateRoute />}>
@@ -50,6 +57,7 @@ function App() {
                                     <Route path="/join/:code" element={<JoinClass />} />
                                 </Route>
                             </Routes>
+                            )}
                             </Suspense>
                             <LimitModal />
                         </Router>
