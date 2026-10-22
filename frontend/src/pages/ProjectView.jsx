@@ -349,7 +349,6 @@ const ProjectView = () => {
     const [deleteConfirmDoc, setDeleteConfirmDoc] = useState(null);
     const [deletingDocIds, setDeletingDocIds] = useState(new Set());
     const [loading, setLoading] = useState(false);
-    const [uploading, setUploading] = useState(false);
     const [isProcessingDocs, setIsProcessingDocs] = useState(true);
     // Per-document SSE stage: { [docId]: 'extracting'|'chunking'|'embedding'|'topics'|'graph'|'completed'|'failed' }
     const [docStages, setDocStages] = useState({}); // docId -> { stage, progress, message } from the progress stream
@@ -1054,7 +1053,6 @@ const ProjectView = () => {
             toast.error(`"${tooBig.name}" is ${(tooBig.size / 1024 / 1024).toFixed(0)} MB. The limit is ${MAX_UPLOAD_MB} MB per file.`);
             return;
         }
-        setUploading(true);
         // Show each upload's progress in the document list straight away
         const entries = Array.from(files).map((file, i) => ({ key: `${Date.now()}-${i}`, name: file.name, size: file.size, pct: 0, file }));
         // Re-picking a paused file resumes it, so it no longer shows as paused
@@ -1076,7 +1074,6 @@ const ProjectView = () => {
             const done = new Set(entries.map(e => e.key));
             setUploadsInFlight(prev => prev.filter(u => !done.has(u.key)));
             setPausedUploads(pendingUploads(projectId));
-            setUploading(false);
         }
     };
 
@@ -2472,7 +2469,7 @@ const ProjectView = () => {
             {showAddDocModal && (
                 <AddDocumentModal
                     projectId={projectId}
-                    uploading={uploading}
+                    uploading={false /* progress shows in the document list; more books can be added meanwhile */}
                     onUpload={async (files, bookOptions) => {
                         await handleFileUpload(files, bookOptions);
                         setShowAddDocModal(false);
