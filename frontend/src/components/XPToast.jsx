@@ -4,7 +4,7 @@ import { Zap, Award, TrendingUp, Star } from 'lucide-react';
 import { useGamification } from '../context/GamificationContext';
 import { isAppShell } from '../utils/platform';
 
-// Phone app: a small pill above the tab bar, so it never covers a screen's title
+// Phone app: a small pill under the top bar, clear of the feed's caption and buttons
 const APP_SHELL = isAppShell();
 
 const ACTIVITY_LABELS = {
@@ -24,7 +24,7 @@ const XPToast = () => {
     const { xpEvents, dismissXpEvent } = useGamification();
 
     return (
-        <div className={`fixed left-1/2 -translate-x-1/2 z-[110] flex flex-col items-center gap-2 pointer-events-none ${APP_SHELL ? 'bottom-[calc(var(--sab)+88px)]' : 'top-4'}`}>
+        <div className={`fixed left-1/2 -translate-x-1/2 z-[110] flex flex-col items-center gap-2 pointer-events-none ${APP_SHELL ? 'top-[calc(var(--sat)+64px)]' : 'top-4'}`}>
             <AnimatePresence>
                 {xpEvents.map((event) => (
                     <motion.div

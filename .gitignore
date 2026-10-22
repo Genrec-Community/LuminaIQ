@@ -372,3 +372,4 @@ logs_extracted*/
 *.bat
 *.ps1
 .vercel
+play-store-keys/

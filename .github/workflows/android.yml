@@ -105,3 +105,22 @@ jobs:
           name: LuminaIQ-android-${{ github.run_number }}
           path: out/
           retention-days: 30
+
+      # Straight to Google Play (internal testing track) once the Play API key is
+      # set. Google needs the very first .aab uploaded by hand in Play Console;
+      # every build after that goes up automatically. See ANDROID.md.
+      - name: Check Play upload key
+        id: play
+        env:
+          PLAY_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: echo "enabled=$([ -n "$PLAY_JSON" ] && [ "$SIGNED" = "1" ] && echo 1 || echo 0)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload to Google Play (internal testing)
+        if: steps.play.outputs.enabled == '1'
+        uses: r0adkll/upload-google-play@v1.1.3
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: fun.luminaiq.app
+          releaseFiles: out/LuminaIQ-release.aab
+          track: ${{ vars.PLAY_TRACK || 'internal' }}
+          status: ${{ vars.PLAY_STATUS || 'completed' }}

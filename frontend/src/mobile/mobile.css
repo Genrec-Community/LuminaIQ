@@ -93,6 +93,8 @@ html.dark .m-app {
     overflow-anchor: none;
 }
 .m-feed::-webkit-scrollbar { display: none; }
+.m-card-scroll { scrollbar-width: none; overscroll-behavior-y: auto; }
+.m-card-scroll::-webkit-scrollbar { display: none; }
 .m-feed > section { height: 100dvh; scroll-snap-align: start; scroll-snap-stop: always; }
 
 /* Flip cards */

@@ -87,6 +87,11 @@ const QuizCard = ({ card, onAnswer, active }) => {
     const [picked, setPicked] = useState(null);
     const [line, setLine] = useState('');
     const correct = picked && picked === card.correct;
+    const whyRef = useRef(null);
+    // Bring the explanation into view on small screens
+    useEffect(() => {
+        if (picked) setTimeout(() => whyRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 180);
+    }, [picked]);
     const choose = (opt) => {
         if (picked) return;
         setPicked(opt);
@@ -95,7 +100,9 @@ const QuizCard = ({ card, onAnswer, active }) => {
         onAnswer(card, ok);
     };
     return (
-        <div className="flex h-full flex-col justify-center px-5 pb-[calc(var(--m-tabbar-h)+var(--m-safe-bottom)+92px)] pr-16 pt-[calc(var(--m-safe-top)+64px)]">
+        // Centred when it fits, scrolls inside the card when it doesn't (small phones)
+        <div className="m-card-scroll absolute inset-x-0 bottom-[calc(var(--m-tabbar-h)+var(--m-safe-bottom)+86px)] top-[calc(var(--m-safe-top)+76px)] flex flex-col overflow-y-auto px-5 pr-16">
+            <div className="my-auto py-2">
             <span className="mb-3 inline-flex w-fit items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white/90">
                 <Sparkles className="h-3.5 w-3.5" /> Quick question
             </span>
@@ -128,7 +135,7 @@ const QuizCard = ({ card, onAnswer, active }) => {
             </div>
             <AnimatePresence>
                 {picked && (
-                    <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="mt-4 max-h-[26dvh] overflow-y-auto rounded-2xl bg-black/30 p-4 text-white backdrop-blur">
+                    <motion.div ref={whyRef} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="mt-4 rounded-2xl bg-black/30 p-4 text-white backdrop-blur">
                         <p className={`text-[15px] font-extrabold ${correct ? 'text-green-300' : 'text-amber-200'}`}>{line}</p>
                         {card.explanation && <Md className="m-selectable mt-1 text-[13.5px] leading-relaxed text-white/85">{card.explanation}</Md>}
                     </motion.div>
@@ -139,6 +146,7 @@ const QuizCard = ({ card, onAnswer, active }) => {
                     <ChevronUp className="h-4 w-4" /> Swipe up for the next one
                 </motion.div>
             )}
+            </div>
         </div>
     );
 };
@@ -152,11 +160,13 @@ const FlashCard = ({ card, onGrade }) => {
         onGrade(card, ok);
     };
     return (
-        <div className="flex h-full flex-col justify-center px-5 pb-[calc(var(--m-tabbar-h)+var(--m-safe-bottom)+92px)] pr-16 pt-[calc(var(--m-safe-top)+64px)]">
+        // Centred when it fits, scrolls inside the card when it doesn't (small phones)
+        <div className="m-card-scroll absolute inset-x-0 bottom-[calc(var(--m-tabbar-h)+var(--m-safe-bottom)+86px)] top-[calc(var(--m-safe-top)+76px)] flex flex-col overflow-y-auto px-5 pr-16">
+            <div className="my-auto py-2">
             <span className="mb-3 inline-flex w-fit items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white/90">
                 {card.source === 'review' ? <><RotateCcw className="h-3.5 w-3.5" /> Due for review</> : <><BookOpen className="h-3.5 w-3.5" /> Flashcard</>}
             </span>
-            <button onClick={() => { tap(); setFlipped((f) => !f); }} className={`m-flip h-[44dvh] w-full text-left ${flipped ? 'is-flipped' : ''}`} aria-label="Flip card">
+            <button onClick={() => { tap(); setFlipped((f) => !f); }} className={`m-flip h-[min(44dvh,360px)] min-h-[220px] w-full text-left ${flipped ? 'is-flipped' : ''}`} aria-label="Flip card">
                 <div className="m-flip-inner">
                     <div className="m-flip-face flex flex-col rounded-[26px] border border-white/20 bg-white/12 p-6 text-white backdrop-blur-md" style={{ background: 'rgba(255,255,255,0.12)' }}>
                         <div className="flex flex-1 items-center overflow-y-auto">
@@ -187,6 +197,7 @@ const FlashCard = ({ card, onGrade }) => {
                     </motion.div>
                 )}
             </AnimatePresence>
+            </div>
         </div>
     );
 };
