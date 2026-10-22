@@ -15,6 +15,17 @@ RIGHT = ["Respect for others and responsibility for", "one's actions build trust
          "personal loss, and empathy means sharing", "and understanding the feelings of others."]
 
 
+SIDE = 2400
+
+
+def mem(cmd: str) -> str:
+    import subprocess
+    try:
+        return f"{int(subprocess.check_output(cmd, shell=True)) // 1048576} MB"
+    except Exception:
+        return "?"
+
+
 def spread(n: int) -> bytes:
     """A two-page spread scanned at 300 dpi, sent as the backend sends it (long side 2400 px, JPEG)."""
     font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf", 38)
@@ -25,7 +36,7 @@ def spread(n: int) -> bytes:
     for i, t in enumerate(RIGHT * 3):
         d.text((1880, 220 + i * 105), t, font=font, fill=18)
     d.text((1700, 2380), str(n), font=font, fill=18)
-    img = img.resize((2400, int(2480 * 2400 / 3508)), Image.LANCZOS)
+    img = img.resize((SIDE, int(2480 * SIDE / 3508)), Image.LANCZOS)
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=80)
     return buf.getvalue()
@@ -37,7 +48,11 @@ def main():
     ap.add_argument("--token", default="")
     ap.add_argument("--pages", type=int, default=4)
     ap.add_argument("--label", default="")
+    ap.add_argument("--side", type=int, default=2400)
+    ap.add_argument("--mem-cmd", default="")
     a = ap.parse_args()
+    global SIDE
+    SIDE = a.side
 
     t = time.time()
     while True:
@@ -52,7 +67,7 @@ def main():
         if time.time() - t > 600:
             sys.exit("service not ready after 600 s")
         time.sleep(3)
-    print(f"[{a.label}] ready after {time.time() - t:.0f} s (startup + model load)")
+    print(f"[{a.label}] ready after {time.time() - t:.0f} s; memory after model load: {mem(a.mem_cmd)}")
 
     # unauthorised request is refused
     r = requests.post(f"{a.url}/ocr", files=[("files", ("p.jpg", spread(0), "image/jpeg"))], timeout=600)
@@ -66,9 +81,9 @@ def main():
     wall = time.time() - t
     per = [p["ms"] for p in out["pages"]]
     print(f"[{a.label}] {a.pages} spreads in {wall:.1f} s; per spread ms: {per}; "
-          f"{wall / a.pages:.1f} s per spread")
+          f"{wall / a.pages:.1f} s per spread; memory now: {mem(a.mem_cmd)}")
     text = out["pages"][0]["text"]
-    print(f"[{a.label}] first spread text:\n{text[:600]}")
+    print(f"[{a.label}] first spread text:\n{text[:300]}")
     must = ["Engineering Ethics", "paramount", "Integrity", "responsibility", "empathy"]
     found = {m: m.lower() in text.lower() for m in must}
     print(f"[{a.label}] key phrases found: {found}")

@@ -18,18 +18,19 @@ jobs:
         run: docker build -t lumina-ocr ocr-service
       - name: Test tools
         run: pip install pillow requests
-      - name: Like Render free (512 MB, 0.1 CPU)
+      - name: Memory and speed at Render limits
         run: |
-          docker run -d --name ocr-free --memory 512m --memory-swap 512m --cpus 0.1 -e OCR_TOKEN=ci -p 8080:10000 lumina-ocr
-          python ocr-service/ci_test.py --url http://127.0.0.1:8080 --token ci --pages 4 --label "free 0.1 CPU"
-          echo "peak memory: $(( $(docker exec ocr-free cat /sys/fs/cgroup/memory.peak) / 1048576 )) MB"
-          docker inspect -f 'OOM killed: {{.State.OOMKilled}}' ocr-free
-      - name: Like Render Starter (512 MB, 0.5 CPU), for comparison
-        if: always()
-        run: |
-          docker run -d --name ocr-starter --memory 512m --memory-swap 512m --cpus 0.5 -e OCR_TOKEN=ci -p 8081:10000 lumina-ocr
-          python ocr-service/ci_test.py --url http://127.0.0.1:8081 --token ci --pages 4 --label "0.5 CPU"
-          echo "peak memory: $(( $(docker exec ocr-starter cat /sys/fs/cgroup/memory.peak) / 1048576 )) MB"
+          mem() { echo "$(( $(docker exec $1 cat /sys/fs/cgroup/$2) / 1048576 )) MB"; }
+          run() {  # name cpus max_side
+            docker run -d --name $1 --memory 512m --memory-swap 512m --cpus $2 -e OCR_TOKEN=ci -e OCR_MAX_SIDE=$3 -p $4:10000 lumina-ocr
+            python ocr-service/ci_test.py --url http://127.0.0.1:$4 --token ci --pages 4 --side $3 --label "$1 ($2 CPU, $3 px)" \
+              --mem-cmd "docker exec $1 cat /sys/fs/cgroup/memory.current" || echo "FAILED: $1"
+            echo "[$1] peak memory: $(mem $1 memory.peak)"
+            docker inspect -f "[$1] OOM killed: {{.State.OOMKilled}}" $1
+          }
+          run free-2400 0.1 2400 8080
+          run free-1800 0.1 1800 8081
+          run starter-2400 0.5 2400 8082
       - name: Logs
         if: always()
-        run: docker logs ocr-free 2>&1 | tail -40
+        run: for c in free-2400 free-1800; do echo "== $c"; docker logs $c 2>&1 | grep -v onnxruntime | tail -15; done
