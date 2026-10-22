@@ -1,4 +1,6 @@
 import * as tus from 'tus-js-client';
+// Static import (not lazy): a lazily loaded chunk breaks in tabs opened before a redeploy
+import { api } from '../api';
 
 /*
  * Book uploads go straight from the browser to Supabase Storage with the TUS
@@ -85,7 +87,6 @@ const putSigned = (file, bucket, path, token, onProgress) => new Promise((resolv
  * upload can't be used, so the caller can use the old route.
  */
 export async function uploadToStorage(file, projectId, onProgress) {
-    const { api } = await import('../api');
     let permit;
     try {
         permit = (await api.post('/documents/upload-url', { project_id: projectId, filename: file.name, size: file.size })).data;

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { uploadToStorage, forgetPendingUpload } from './utils/resumableUpload';
 import { emitLimit, isLimitDetail } from './utils/plan';
 
 // Fallback to localhost so a missing VITE_MAIN_API_URL env var doesn't silently
@@ -161,7 +162,6 @@ export const getProjects = async () => {
 export const uploadDocument = async (projectId, file, onProgress, bookOptions = {}) => {
     // Preferred: resumable upload straight to storage, then the backend fetches it
     try {
-        const { uploadToStorage, forgetPendingUpload } = await import('./utils/resumableUpload');
         const { path, key } = await uploadToStorage(file, projectId, onProgress);
         const res = await api.post('/documents/upload-from-storage', {
             project_id: projectId,

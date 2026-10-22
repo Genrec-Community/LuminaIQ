@@ -360,6 +360,13 @@ const ProjectView = () => {
     const isStalled = (doc) => !docStages[doc.id] && !!doc.updated_at
         && Date.now() - new Date(doc.updated_at).getTime() > 20 * 60 * 1000;
     const resumeInputRef = useRef(null);
+    const uploadFilesRef = useRef({}); // upload key -> File, so a stalled upload can be retried
+    const [, setNowTick] = useState(0);
+    useEffect(() => { // re-render every 15 s while uploading, so a stall shows up
+        if (!uploadsInFlight.length) return undefined;
+        const t = setInterval(() => setNowTick(n => n + 1), 15000);
+        return () => clearInterval(t);
+    }, [uploadsInFlight.length]);
 
     useEffect(() => { setPausedUploads(pendingUploads(projectId)); }, [projectId]);
 
@@ -1054,7 +1061,8 @@ const ProjectView = () => {
             return;
         }
         // Show each upload's progress in the document list straight away
-        const entries = Array.from(files).map((file, i) => ({ key: `${Date.now()}-${i}`, name: file.name, size: file.size, pct: 0, file }));
+        const entries = Array.from(files).map((file, i) => ({ key: `${Date.now()}-${i}`, name: file.name, size: file.size, pct: 0, file, startedAt: Date.now() }));
+        uploadFilesRef.current = { ...uploadFilesRef.current, ...Object.fromEntries(entries.map(e => [e.key, e.file])) };
         // Re-picking a paused file resumes it, so it no longer shows as paused
         setPausedUploads(prev => prev.filter(p => !entries.some(e => e.name === p.name && e.size === p.size)));
         setUploadsInFlight(prev => [...prev, ...entries.map(({ file, ...e }) => e)]);
@@ -2146,6 +2154,21 @@ const ProjectView = () => {
                             {uploadsInFlight.map((u) => (
                                 <div key={u.key} className="p-3 rounded-xl bg-white/70 border border-[#E6D5CC]/70">
                                     <p className="text-sm font-medium truncate leading-tight text-[#5a4a42]">{u.name}</p>
+                                    {u.pct === 0 && Date.now() - (u.startedAt || Date.now()) > 45000 && (
+                                        <div className="mt-1.5 flex items-center gap-2 text-[10px] text-amber-700">
+                                            <span className="flex-1">The upload hasn't started. Check your connection, or refresh the page and try again.</span>
+                                            <button
+                                                onClick={() => {
+                                                    const file = uploadFilesRef.current[u.key];
+                                                    setUploadsInFlight(prev => prev.filter(x => x.key !== u.key));
+                                                    if (file) handleFileUpload([file]);
+                                                }}
+                                                className="shrink-0 rounded-md bg-[#C8A288] px-2 py-0.5 font-semibold text-white hover:bg-[#B08B72]"
+                                            >
+                                                Retry
+                                            </button>
+                                        </div>
+                                    )}
                                     <ProcessingProgress
                                         stage={u.pct >= 100 ? 'pending' : 'uploading'}
                                         stagePct={u.pct >= 100 ? 50 : u.pct}
