@@ -63,7 +63,8 @@ async def _embedding() -> str:
 async def _qdrant() -> str:
     from services.qdrant_service import qdrant_service
 
-    client = qdrant_service.async_client
+    # Raw client: names listed by Qdrant are already physical (suffix included)
+    client = getattr(qdrant_service.async_client, "_client", qdrant_service.async_client)
     cols = (await client.get_collections()).collections
     detail = f"collections={len(cols)}"
     if cols:
