@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
     Moon, Target, Bell, Sparkles, Settings as SettingsIcon, Shield, FileText, LogOut, Trash2, ChevronRight, Mail, Loader2, Check, Award,
 } from 'lucide-react';
@@ -57,7 +57,9 @@ const Me = () => {
     const { settings, updateSetting, updateSettings } = useSettings();
     const { data: g } = useGamification();
     const toast = useToast();
-    const [sheet, setSheet] = useState(null); // goal | reminder | delete | signout
+    const location = useLocation();
+    // Opened from the Home checklist: go straight to the reminder picker
+    const [sheet, setSheet] = useState(() => location.state?.open || null); // goal | reminder | delete | signout
     const [confirmText, setConfirmText] = useState('');
     const [busy, setBusy] = useState(false);
 
@@ -106,7 +108,7 @@ const Me = () => {
                         <div className="min-w-0 flex-1">
                             <p className="truncate text-[20px] font-extrabold">{displayName(settings, user)}</p>
                             <p className="truncate text-[13px]" style={{ color: 'var(--m-muted)' }}>{user?.email}</p>
-                            <p className="mt-1 text-[13px] font-bold" style={{ color: 'var(--m-accent)' }}>Level {g?.level || 1} · {g?.level_title || 'Curious Reader'}</p>
+                            <p className="mt-1 text-[13px] font-bold" style={{ color: 'var(--m-accent-text)' }}>Level {g?.level || 1} · {g?.level_title || 'Curious Reader'}</p>
                         </div>
                     </div>
                     <div className="px-5 pb-4">
@@ -133,7 +135,7 @@ const Me = () => {
                     <div className="m-hscroll -mx-4 gap-2 px-4">
                         {badges.map((b) => (
                             <div key={b.id || b.title} className="flex w-28 shrink-0 flex-col items-center rounded-2xl p-3 text-center" style={{ background: 'var(--m-soft)' }}>
-                                <Award className="h-7 w-7" style={{ color: 'var(--m-accent)' }} />
+                                <Award className="h-7 w-7" style={{ color: 'var(--m-accent-text)' }} />
                                 <p className="mt-1 line-clamp-2 text-[12px] font-bold">{b.title || b.name || b.id}</p>
                             </div>
                         ))}

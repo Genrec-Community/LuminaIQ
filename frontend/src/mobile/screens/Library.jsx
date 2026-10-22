@@ -65,7 +65,7 @@ const Library = () => {
 
                 {error && !books.length && (
                     <div className="mx-4 rounded-2xl p-4 text-[14px]" style={{ background: 'var(--m-soft)' }}>
-                        Couldn't load your books. The server may be waking up. <button onClick={refresh} className="font-bold" style={{ color: 'var(--m-accent)' }}>Try again</button>
+                        Couldn't load your books. The server may be waking up. <button onClick={refresh} className="font-bold" style={{ color: 'var(--m-accent-text)' }}>Try again</button>
                     </div>
                 )}
 

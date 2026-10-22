@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Heart, MessageCircle, ChevronUp, ChevronDown, Check, X, RotateCcw, Sparkles, Upload, RefreshCw, BookOpen } from 'lucide-react';
@@ -15,6 +15,7 @@ import { aiName, pick } from '../../utils/persona';
 import useFocusTimer from '../../hooks/useFocusTimer';
 import { useBooks, coverFor, emojiFor } from '../data';
 import { Sheet } from '../ui';
+import { addAnswered } from '../GetStarted';
 import { tap, notify, setStatusBar } from '../device';
 
 /*
@@ -25,6 +26,7 @@ import { tap, notify, setStatusBar } from '../device';
  */
 
 const QUESTIONS_PER_BATCH = 4;
+const DAILY_TARGET = 10; // matches the "Answer 10 questions" daily quest
 const MILESTONES = { 5: 'Warmed up', 10: 'On a roll', 20: 'Unstoppable', 35: 'Big brain energy', 50: 'Legendary session' };
 const PRAISE = ['Nailed it!', 'Yes! 🎯', 'Too easy.', 'Brain: activated.', 'Correct!', 'Big brain move.'];
 const COMFORT = ['Close one. It is in your review deck now.', 'Now you will remember it. Saved for review.', 'Mistakes are memory glue. Saved for later.'];
@@ -229,6 +231,7 @@ const LoaderCard = ({ book }) => (
 
 const Feed = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const { user } = useAuth();
     const { settings } = useSettings();
     const { earnXP } = useGamification();
@@ -236,7 +239,8 @@ const Feed = () => {
     useFocusTimer(user?.id);
 
     const books = useMemo(() => allBooks.filter((b) => (b.docs || 0) > 0), [allBooks]);
-    const [filter, setFilter] = useState('all');
+    // Opened from a book ("Learn feed" / book ready): that book only
+    const [filter, setFilter] = useState(() => location.state?.bookId || 'all');
     const [cards, setCards] = useState([]);
     const [active, setActive] = useState(0);
     const [generating, setGenerating] = useState(false);
@@ -383,9 +387,19 @@ const Feed = () => {
         setTimeout(() => setToast((t) => (t && Date.now() - t.id >= 1400 ? null : t)), 1500);
     };
 
+    // Daily goal reached: celebrate, and make it OK to stop (no endless-scroll guilt)
+    const insertGoalDone = () => {
+        notify('success');
+        setCards((c) => {
+            const at = Math.min(c.length, active + 1);
+            const m = { key: `goal-${Date.now()}`, type: 'milestone', emoji: '🎉', title: "Today's goal: done!", body: `Your streak is safe for today. Keep going if you're enjoying it, or come back tomorrow. ${aiName(settings)} will be here.` };
+            return [...c.slice(0, at), m, ...c.slice(at)];
+        });
+    };
+
     const insertMilestone = (answered) => {
         const title = MILESTONES[answered];
-        if (!title) return;
+        if (!title || answered === DAILY_TARGET) return;
         notify('success');
         setCards((c) => {
             const at = Math.min(c.length, active + 1);
@@ -398,7 +412,9 @@ const Feed = () => {
         notify(ok ? 'success' : 'error');
         const next = { answered: session.answered + 1, correct: session.correct + (ok ? 1 : 0), combo: ok ? session.combo + 1 : 0 };
         setSession(next);
-        bumpDailyProgress(user?.id, { answered: 1, correct: ok ? 1 : 0, bestCombo: next.combo });
+        const today = bumpDailyProgress(user?.id, { answered: 1, correct: ok ? 1 : 0, bestCombo: next.combo });
+        addAnswered();
+        if (today.answered === DAILY_TARGET) insertGoalDone();
         recordPerformance(card.projectId, card.topic || 'General', ok ? 1 : 0, ok ? 0 : 1).catch(() => {});
         if (ok) {
             earnXP('sprint', { topic: card.topic, source: 'feed' });
@@ -493,7 +509,11 @@ const Feed = () => {
                         <motion.span key={session.combo} initial={{ scale: 1.4 }} animate={{ scale: 1 }} className="rounded-full bg-orange-500/90 px-2.5 py-1 text-[12px] font-extrabold">🔥 x{session.combo}</motion.span>
                     )}
                     {accuracy != null && <span className="rounded-full bg-white/15 px-2.5 py-1 text-[12px] font-bold">{accuracy}% · {session.answered}</span>}
-                    <span className="rounded-full bg-white/15 px-2.5 py-1 text-[12px] font-bold">🎯 {daily.answered}</span>
+                    <span className="rounded-full bg-white/15 px-2.5 py-1 text-[12px] font-bold tabular-nums">🎯 {Math.min(daily.answered, DAILY_TARGET)}/{DAILY_TARGET}</span>
+                </div>
+                <div className="mx-4 h-1 overflow-hidden rounded-full bg-white/15" aria-label={`Today's goal: ${daily.answered} of ${DAILY_TARGET} answered`}>
+                    <motion.div className="h-full rounded-full" style={{ background: daily.answered >= DAILY_TARGET ? '#4ade80' : 'linear-gradient(90deg, #f59e0b, #f97316)' }}
+                        animate={{ width: `${Math.min(100, (daily.answered / DAILY_TARGET) * 100)}%` }} transition={{ type: 'spring', damping: 20 }} />
                 </div>
             </div>
 

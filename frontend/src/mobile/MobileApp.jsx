@@ -1,8 +1,10 @@
 import React, { lazy, Suspense, useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { WifiOff } from 'lucide-react';
 import { Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
-import Onboarding, { onboardedKey } from '../components/Onboarding';
+import { onboardedKey } from '../components/Onboarding';
 import { isNativeApp } from '../utils/platform';
 import { TabBar } from './ui';
 import AddSheet from './AddSheet';
@@ -14,7 +16,9 @@ import Feed from './screens/Feed';
 import Library from './screens/Library';
 import Me from './screens/Me';
 import Book from './screens/Book';
+import Setup from './screens/Setup';
 import './mobile.css';
+import logo from './logo.png';
 
 // Full study tools and secondary pages are shared with the website
 const ProjectView = lazy(() => import('../pages/ProjectView'));
@@ -27,7 +31,7 @@ const Terms = lazy(() => import('../pages/Legal').then((m) => ({ default: m.Term
 
 const Loader = () => (
     <div className="m-app flex min-h-[100dvh] items-center justify-center">
-        <div className="h-12 w-12 animate-pulse rounded-2xl" style={{ background: 'var(--m-accent)' }} />
+        <img src={logo} alt="" className="h-16 w-16 animate-pulse" />
     </div>
 );
 
@@ -44,7 +48,7 @@ const Guard = () => {
     return (
         <>
             <Outlet />
-            {loaded && !onboarded && <Onboarding fullScreen />}
+            {loaded && !onboarded && <Setup />}
         </>
     );
 };
@@ -70,6 +74,29 @@ const Tabs = () => {
 const Public = ({ children }) => {
     const { user } = useAuth();
     return user ? <Navigate to="/app/home" replace /> : children;
+};
+
+/** Calm notice when the connection drops, so a spinner never looks like a bug. */
+const OfflineNotice = () => {
+    const [offline, setOffline] = useState(() => typeof navigator !== 'undefined' && navigator.onLine === false);
+    useEffect(() => {
+        const on = () => setOffline(false);
+        const off = () => setOffline(true);
+        window.addEventListener('online', on);
+        window.addEventListener('offline', off);
+        return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+    }, []);
+    return (
+        <AnimatePresence>
+            {offline && (
+                <motion.div initial={{ y: -40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -40, opacity: 0 }}
+                    className="fixed left-1/2 top-[calc(var(--sat)+10px)] z-[10000] flex -translate-x-1/2 items-center gap-2 rounded-full bg-[#2a1d15] px-4 py-2 text-[13px] font-semibold text-white shadow-xl"
+                    role="status">
+                    <WifiOff className="h-4 w-4 text-amber-300" /> You're offline. We'll pick up where you left off.
+                </motion.div>
+            )}
+        </AnimatePresence>
+    );
 };
 
 const Wrap = ({ children }) => <div className="m-app">{children}</div>;
@@ -111,6 +138,7 @@ const MobileApp = () => {
 
     return (
         <Suspense fallback={<Loader />}>
+            <OfflineNotice />
             <Routes>
                 <Route path="/" element={<Navigate to={user ? '/app/home' : welcomed() ? '/signin' : '/welcome'} replace />} />
                 <Route path="/welcome" element={<Public><Welcome /></Public>} />

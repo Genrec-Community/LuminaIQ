@@ -17,7 +17,7 @@ export const AI_CHARACTERS = {
         tagline: 'Calm, patient, and always asks the question behind the question.',
         cheers: ['Well reasoned.', 'Exactly right.', 'Your understanding is deepening.', 'Precisely.'],
         consoles: ['A valuable mistake — study the explanation.', "Understanding grows from this. Let's review.", 'Not quite. Notice the subtle difference.'],
-        greet: (n) => `Welcome back, ${n}. Small steps every day build mastery.`,
+        greet: (n) => `Hello, ${n}. Small steps every day build mastery.`,
     },
     coach: {
         label: 'Hype Coach',

@@ -9,6 +9,8 @@
     --m-muted: var(--th-muted, #8a6a5c);
     --m-accent: var(--th-accent, #C8A288);
     --m-accent-deep: color-mix(in srgb, var(--m-accent) 78%, #3a2418);
+    /* Accent for text on light backgrounds: darker, so it stays readable (WCAG AA) */
+    --m-accent-text: color-mix(in srgb, var(--m-accent) 55%, #3a2418);
     --m-on-accent: #ffffff;
     --m-shadow: 0 10px 30px -12px rgba(74, 59, 50, 0.28);
     --m-tabbar-h: 64px;
@@ -34,6 +36,7 @@ html.dark .m-app {
     --m-muted: var(--dm-text-secondary, #b9ab9b);
     --m-accent: var(--dm-accent, #d4aa82);
     --m-on-accent: #1c1410;
+    --m-accent-text: var(--m-accent);
     --m-shadow: 0 12px 32px -14px rgba(0, 0, 0, 0.7);
 }
 

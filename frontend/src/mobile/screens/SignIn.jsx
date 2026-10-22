@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Mail, Loader2, ChevronLeft, KeyRound } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { tap, notify } from '../device';
+import logo from '../logo.png';
 
 const GoogleLogo = () => (
     <svg viewBox="0 0 48 48" className="h-5 w-5" aria-hidden="true">
@@ -97,11 +98,10 @@ const SignIn = () => {
                     {step === 'choose' && (
                         <motion.div key="choose" className="flex flex-1 flex-col" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}>
                             <div className="flex flex-1 flex-col justify-center">
-                                <motion.div initial={{ scale: 0.6, rotate: -12 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', damping: 11 }}
-                                    className="mb-8 flex h-20 w-20 items-center justify-center rounded-[26px] text-4xl shadow-xl"
-                                    style={{ background: 'linear-gradient(135deg, var(--m-accent), var(--m-accent-deep))' }}>📖</motion.div>
+                                <motion.img src={logo} alt="" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', damping: 12 }}
+                                    className="mb-8 h-20 w-20" />
                                 <h1 className="text-[34px] font-extrabold leading-[1.08] tracking-tight">Study smarter,<br />starting now.</h1>
-                                <p className="mt-3 text-[16px]" style={{ color: 'var(--m-muted)' }}>Sign in to turn your books into a feed you can't put down.</p>
+                                <p className="mt-3 text-[16px]" style={{ color: 'var(--m-muted)' }}>One step and your books start working for you. No password needed.</p>
                             </div>
                             <div className="space-y-3 pb-6">
                                 <button onClick={google} disabled={busy}
@@ -167,7 +167,7 @@ const SignIn = () => {
                             {busy && <p className="mt-4 flex items-center gap-2 text-sm" style={{ color: 'var(--m-muted)' }}><Loader2 className="h-4 w-4 animate-spin" /> Signing you in…</p>}
                             {error && <p className="mt-4 text-sm font-medium text-red-500">{error}</p>}
                             <button disabled={resendIn > 0 || busy} onClick={sendCode}
-                                className="m-pressable mt-6 self-start text-[14px] font-semibold disabled:opacity-50" style={{ color: 'var(--m-accent)' }}>
+                                className="m-pressable mt-6 self-start text-[14px] font-semibold disabled:opacity-50" style={{ color: 'var(--m-accent-text)' }}>
                                 {resendIn > 0 ? `Send a new code in ${resendIn}s` : 'Send a new code'}
                             </button>
                         </motion.div>

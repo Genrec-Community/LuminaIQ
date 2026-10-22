@@ -10,7 +10,8 @@ import { displayName, aiName, timeGreeting, daysUntil, pick } from '../../utils/
 import { getReviewStats } from '../../api';
 import { useBooks, coverFor, emojiFor } from '../data';
 import { Screen, Ring } from '../ui';
-import { tap } from '../device';
+import { tap, reminderScheduled } from '../device';
+import GetStarted from '../GetStarted';
 
 const NUDGES = [
     'Two minutes now beats two hours the night before.',
@@ -84,6 +85,14 @@ const Home = () => {
             </header>
 
             <div className="mt-5 space-y-5 px-5">
+                <GetStarted
+                    hasBook={books.length > 0}
+                    reminderOn={reminderScheduled()}
+                    onAddBook={() => window.dispatchEvent(new Event('lumina-add'))}
+                    onFeed={() => navigate('/app/feed')}
+                    onReminder={() => navigate('/app/me', { state: { open: 'reminder' } })}
+                />
+
                 {/* The habit: one tap into the feed */}
                 <motion.button
                     whileTap={{ scale: 0.97 }}
@@ -124,7 +133,7 @@ const Home = () => {
                     </div>
                 </div>
                 {questDone === quests.length && (
-                    <p className="-mt-2 text-center text-[13px] font-semibold" style={{ color: 'var(--m-accent)' }}>All done today. Legend. 🏆</p>
+                    <p className="-mt-2 text-center text-[13px] font-semibold" style={{ color: 'var(--m-accent-text)' }}>All done today. Legend. 🏆</p>
                 )}
 
                 {examIn != null && examIn >= 0 && (
@@ -161,7 +170,7 @@ const Home = () => {
                                     { id: 'cram', icon: Moon, label: 'Cram' },
                                 ].map((t) => (
                                     <button key={t.id} onClick={() => openTool(last.id, t.id)} className="m-pressable flex flex-col items-center gap-1 py-3 text-[12px] font-semibold">
-                                        <t.icon className="h-5 w-5" style={{ color: 'var(--m-accent)' }} />{t.label}
+                                        <t.icon className="h-5 w-5" style={{ color: 'var(--m-accent-text)' }} />{t.label}
                                     </button>
                                 ))}
                             </div>
@@ -179,7 +188,7 @@ const Home = () => {
                     <section>
                         <div className="mb-2 flex items-baseline justify-between">
                             <h2 className="text-[18px] font-extrabold">Your books</h2>
-                            <button onClick={() => navigate('/app/library')} className="text-[13px] font-bold" style={{ color: 'var(--m-accent)' }}>See all</button>
+                            <button onClick={() => navigate('/app/library')} className="text-[13px] font-bold" style={{ color: 'var(--m-accent-text)' }}>See all</button>
                         </div>
                         <div className="m-hscroll -mx-5 gap-3 px-5 pb-2">
                             {books.slice(0, 10).map((b) => <BookCover key={b.id} book={b} onClick={() => navigate(`/app/book/${b.id}`)} />)}

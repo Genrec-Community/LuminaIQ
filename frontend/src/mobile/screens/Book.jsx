@@ -47,6 +47,7 @@ const Book = () => {
     const [live, setLive] = useState({}); // docId -> { stage, progress, message }
     const [uploads, setUploads] = useState([]); // [{ key, name, pct }]
     const [menu, setMenu] = useState(false);
+    const [readyName, setReadyName] = useState(null); // a file just finished: celebrate
     const [confirm, setConfirm] = useState(null); // { type: 'doc'|'book', doc }
     const streams = useRef({});
     const fileInput = useRef(null);
@@ -74,7 +75,7 @@ const Book = () => {
                 setLive((l) => ({ ...l, [d.id]: ev }));
                 if (ev.stage === 'completed' || ev.stage === 'failed') {
                     delete streams.current[d.id];
-                    if (ev.stage === 'completed') notify('success');
+                    if (ev.stage === 'completed') { notify('success'); setReadyName(d.filename); }
                     load();
                 }
             }, () => { delete streams.current[d.id]; });
@@ -158,7 +159,7 @@ const Book = () => {
                             {docs == null ? 'Loading…' : `${docs.length} ${docs.length === 1 ? 'file' : 'files'}${working ? ' · reading now' : ready ? ' · ready to study' : ''}`}
                         </p>
                         <div className="mt-4 flex gap-2">
-                            <button onClick={() => { tap('medium'); navigate('/app/feed'); }} disabled={!ready}
+                            <button onClick={() => { tap('medium'); navigate('/app/feed', { state: { bookId } }); }} disabled={!ready}
                                 className="m-pressable flex h-11 items-center gap-2 rounded-full m-white px-5 text-[14px] font-bold text-[#2a1d15] disabled:opacity-50">
                                 <Flame className="h-4 w-4" fill="currentColor" /> Learn feed
                             </button>
@@ -251,6 +252,19 @@ const Book = () => {
                 <div className="mt-5 grid grid-cols-2 gap-3">
                     <button onClick={() => setConfirm(null)} className="m-pressable h-12 rounded-2xl text-[15px] font-bold" style={{ background: 'var(--m-soft)' }}>Cancel</button>
                     <button onClick={doDelete} className="m-pressable h-12 rounded-2xl bg-red-500 text-[15px] font-bold text-white">Delete</button>
+                </div>
+            </Sheet>
+            <Sheet open={!!readyName} onClose={() => setReadyName(null)}>
+                <div className="px-2 pb-2 text-center">
+                    <motion.div initial={{ scale: 0.4, rotate: -20 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', damping: 9 }} className="text-[72px]">🎉</motion.div>
+                    <h3 className="mt-2 text-[24px] font-extrabold">Your book is ready!</h3>
+                    <p className="mt-1 text-[14.5px]" style={{ color: 'var(--m-muted)' }}>“{readyName}” is read and your first questions are waiting.</p>
+                    <button onClick={() => { setReadyName(null); tap('medium'); navigate('/app/feed', { state: { bookId } }); }}
+                        className="m-pressable mt-6 flex h-14 w-full items-center justify-center gap-2 rounded-2xl text-[16px] font-bold text-white"
+                        style={{ background: 'linear-gradient(135deg, var(--m-accent), var(--m-accent-deep))' }}>
+                        <Flame className="h-5 w-5" fill="currentColor" /> Start learning
+                    </button>
+                    <button onClick={() => setReadyName(null)} className="m-pressable mt-1 h-11 w-full text-[14px] font-semibold" style={{ color: 'var(--m-muted)' }}>See all study tools</button>
                 </div>
             </Sheet>
         </Screen>
