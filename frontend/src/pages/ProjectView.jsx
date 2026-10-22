@@ -76,6 +76,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import UploadZone from '../components/UploadZone';
 import ProcessingProgress from '../components/ProcessingProgress';
+import SidebarNav from '../components/SidebarNav';
 import { pendingUploads, forgetPendingUpload } from '../utils/resumableUpload';
 import { MAX_UPLOAD_MB } from '../utils/pricing';
 import { getRotatingLoadingMessage, getRandomLoadingMessage } from '../utils/LoadingMessages';
@@ -197,7 +198,6 @@ const ProjectView = () => {
     const isDark = settings?.darkMode ?? false;
     const { data: gamificationData } = useGamification();
     const [showGamification, setShowGamification] = useState(false);
-    const [toolsOpen, setToolsOpen] = useState(true);
     const [activeTab, setActiveTab] = useState(() => {
         const saved = sessionStorage.getItem(`lumina_tab_${projectId}`);
         // 'general' was a menu toggle, not a real view
@@ -356,6 +356,10 @@ const ProjectView = () => {
     const [uploadsInFlight, setUploadsInFlight] = useState([]); // [{ key, name, size, pct }]
     const [justReady, setJustReady] = useState(() => new Set()); // docs that finished a moment ago
     const [pausedUploads, setPausedUploads] = useState([]); // uploads interrupted by a refresh
+    // A book still "processing" with no live updates and no server heartbeat for 20 min
+    // was interrupted (e.g. the server restarted); say so instead of showing a frozen bar
+    const isStalled = (doc) => !docStages[doc.id] && !!doc.updated_at
+        && Date.now() - new Date(doc.updated_at).getTime() > 20 * 60 * 1000;
     const resumeInputRef = useRef(null);
 
     useEffect(() => { setPausedUploads(pendingUploads(projectId)); }, [projectId]);
@@ -1113,32 +1117,6 @@ const ProjectView = () => {
     // Called as a plain function, not <NavItem/>: defined inside this component,
     // it would be a new component type every render and remount the buttons,
     // which made the guided-tour tooltips jump around.
-    const NavItem = ({ id, icon: Icon, label }) => (
-        <button
-            id={`tour-nav-${id}`}
-            onClick={() => {
-                setActiveTab(id);
-                setIsMobileMenuOpen(false);
-            }}
-            className={`w-full flex items-center ${leftCollapsed ? 'justify-center px-3 py-4' : 'gap-4 px-5 py-4'} rounded-xl transition-all duration-200 relative overflow-hidden ${activeTab === id
-                ? isDark
-                    ? 'bg-gradient-to-r from-[#C8A288] to-[#a8824a] text-white font-semibold shadow-lg shadow-[#C8A288]/30 ring-1 ring-[#C8A288]/40'
-                    : 'bg-[#C8A288] text-white font-semibold shadow-md shadow-[#C8A288]/20'
-                : isDark
-                    ? 'text-[#c4a882] hover:bg-[#2e2318]/80 hover:text-[#e8c898]'
-                    : 'text-[#4A3B32] hover:bg-[#E6D5CC] hover:shadow-sm'
-                }`}
-            title={leftCollapsed ? label : undefined}
-        >
-            {/* Active indicator bar */}
-            {activeTab === id && !leftCollapsed && (
-                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full bg-white/60" />
-            )}
-            <Icon className="h-6 w-6 shrink-0" />
-            {!leftCollapsed && <span className="text-base">{label}</span>}
-        </button>
-    );
-
     const markTopicMastered = (topic) => {
         setLearningProgress(prev => {
             if (prev.has(topic)) return prev;
@@ -1263,8 +1241,8 @@ const ProjectView = () => {
                     borderColor: 'rgba(90,60,30,0.35)'
                 } : { background: 'color-mix(in srgb, var(--th-alt, #FDF6F0) 95%, transparent)', borderColor: 'rgba(255,255,255,0.20)'
                 }}>
-                    <div className={`flex-1 flex flex-col min-h-0 ${leftCollapsed ? 'p-3' : 'p-6'}`}>
-                        <div className={`flex items-center ${leftCollapsed ? 'justify-center' : 'justify-between'} mb-8`}>
+                    <div className={`flex-1 flex flex-col min-h-0 ${leftCollapsed ? 'p-3' : 'px-4 pt-5 pb-3'}`}>
+                        <div className={`flex items-center ${leftCollapsed ? 'justify-center' : 'justify-between px-1.5'} mb-6`}>
                             {!leftCollapsed && (
                                 <div className="flex items-center gap-3">
                                     <div className="h-10 w-10 bg-gradient-to-br from-[#C8A288] to-[#A08072] rounded-xl flex items-center justify-center text-white shadow-lg shadow-[#C8A288]/20">
@@ -1292,106 +1270,13 @@ const ProjectView = () => {
                             </div>
                         </div>
 
-                        <nav className={`flex-1 overflow-y-auto min-h-0 custom-scrollbar ${leftCollapsed ? 'space-y-2' : 'space-y-4'}`}>
-                            {/* Main Navigation Items */}
-                            {NavItem({ id: "cram", icon: Moon, label: "Exam Tonight" })}
-                            {NavItem({ id: "power", icon: Zap, label: "Power Hour" })}
-                            {NavItem({ id: "chat", icon: MessageSquare, label: `Chat with ${aiName(settings)}` })}
-                            {NavItem({ id: "path", icon: Target, label: "Learning Path" })}
-                            {NavItem({ id: "lab", icon: FlaskConical, label: "Visual Lab" })}
-
-                            {NavItem({ id: "knowledge", icon: Network, label: "Knowledge Graph" })}
-
-                            {/* General Section - Expandable */}
-                            <div className={leftCollapsed ? '' : ''}>
-                                <button
-                                    id="tour-nav-general"
-                                    onClick={() => {
-                                        // Toggle the tools list (no empty "general" view). When the
-                                        // sidebar is collapsed, expand it so the tools are visible.
-                                        if (leftCollapsed) { setIsLeftCollapsed(false); setToolsOpen(true); }
-                                        else setToolsOpen(o => !o);
-                                    }}
-                                    className={`w-full flex items-center ${leftCollapsed ? 'justify-center px-3 py-4' : 'gap-4 px-5 py-4'} rounded-xl transition-colors ${leftCollapsed && (activeTab === 'general' || activeTab === 'qa' || activeTab === 'quiz' || activeTab === 'notes' || activeTab === 'flashcards' || activeTab === 'mindmap')
-                                        ? 'bg-[#C8A288] text-white font-semibold shadow-md shadow-[#C8A288]/20'
-                                        : 'text-[#4A3B32] hover:bg-[#E6D5CC] hover:shadow-sm'
-                                        }`}
-                                    title={leftCollapsed ? 'Study Tools' : undefined}
-                                    aria-expanded={toolsOpen}
-                                >
-                                    <FileText className="h-6 w-6 shrink-0" />
-                                    {!leftCollapsed && (
-                                        <>
-                                            <span className="flex-1 text-left text-base">Study Tools</span>
-                                            <ChevronDown className={`h-5 w-5 transition-transform ${toolsOpen ? 'rotate-180' : ''}`} />
-                                        </>
-                                    )}
-                                </button>
-
-                                {/* General Sub-items */}
-                                {!leftCollapsed && toolsOpen && (
-                                    <div className={`ml-6 mt-2 space-y-2 border-l-2 pl-4 ${isDark ? 'border-[#5a3a20]' : 'border-[#E6D5CC]'}`}>
-                                        <button
-                                            onClick={() => {
-                                                setActiveTab('qa');
-                                                setIsMobileMenuOpen(false);
-                                            }}
-                                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-base transition-colors ${activeTab === 'qa' ? isDark ? 'text-[#e8b870] font-semibold bg-[#2e2010]/80' : 'text-[#C8A288] font-semibold bg-[#FDF6F0]' : isDark ? 'text-[#a08060] hover:text-[#e8c898] hover:bg-[#2e2318]/60' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/50'
-                                                }`}
-                                        >
-                                            <HelpCircle className="h-5 w-5" />
-                                            <span>Q&A</span>
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                setActiveTab('quiz');
-                                                setIsMobileMenuOpen(false);
-                                            }}
-                                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-base transition-colors ${activeTab === 'quiz' ? isDark ? 'text-[#e8b870] font-semibold bg-[#2e2010]/80' : 'text-[#C8A288] font-semibold bg-[#FDF6F0]' : isDark ? 'text-[#a08060] hover:text-[#e8c898] hover:bg-[#2e2318]/60' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/50'
-                                                }`}
-                                        >
-                                            <CheckSquare className="h-5 w-5" />
-                                            <span>Answer Quiz</span>
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                setActiveTab('notes');
-                                                setIsMobileMenuOpen(false);
-                                            }}
-                                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-base transition-colors ${activeTab === 'notes' ? isDark ? 'text-[#e8b870] font-semibold bg-[#2e2010]/80' : 'text-[#C8A288] font-semibold bg-[#FDF6F0]' : isDark ? 'text-[#a08060] hover:text-[#e8c898] hover:bg-[#2e2318]/60' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/50'
-                                                }`}
-                                        >
-                                            <FileText className="h-5 w-5" />
-                                            <span>Notes</span>
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                setActiveTab('flashcards');
-                                                setIsMobileMenuOpen(false);
-                                            }}
-                                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-base transition-colors ${activeTab === 'flashcards' ? isDark ? 'text-[#e8b870] font-semibold bg-[#2e2010]/80' : 'text-[#C8A288] font-semibold bg-[#FDF6F0]' : isDark ? 'text-[#a08060] hover:text-[#e8c898] hover:bg-[#2e2318]/60' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/50'
-                                                }`}
-                                        >
-                                            <Layers className="h-5 w-5" />
-                                            <span>Flashcards</span>
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                setActiveTab('mindmap');
-                                                setIsMobileMenuOpen(false);
-                                            }}
-                                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-base transition-colors ${activeTab === 'mindmap' ? isDark ? 'text-[#e8b870] font-semibold bg-[#2e2010]/80' : 'text-[#C8A288] font-semibold bg-[#FDF6F0]' : isDark ? 'text-[#a08060] hover:text-[#e8c898] hover:bg-[#2e2318]/60' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/50'
-                                                }`}
-                                        >
-                                            <Brain className="h-5 w-5" />
-                                            <span>Mindmap</span>
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-
-
-                        </nav>
+                        <SidebarNav
+                            activeTab={activeTab}
+                            onSelect={(id) => { setActiveTab(id); setIsMobileMenuOpen(false); }}
+                            collapsed={leftCollapsed}
+                            isDark={isDark}
+                            aiLabel={aiName(settings)}
+                        />
 
                         {/* Profile Section - Fixed at Bottom of Sidebar */}
                         <div className={`shrink-0 ${leftCollapsed ? 'p-3' : 'p-4'} border-t backdrop-blur-sm`}
@@ -1752,7 +1637,7 @@ const ProjectView = () => {
                                 <div ref={messagesEndRef} />
                                 {(() => {
                                     // The book being prepared, with live progress
-                                    const doc = documents.find(d => selectedDocuments.includes(d.id) && ['pending', 'processing', 'embedding', 'queued'].includes(d.upload_status));
+                                    const doc = documents.find(d => selectedDocuments.includes(d.id) && ['pending', 'processing', 'embedding', 'queued'].includes(d.upload_status) && !isStalled(d));
                                     if (!isProcessingDocs || !doc) return null;
                                     const live = docStages[doc.id];
                                     return (
@@ -2276,7 +2161,9 @@ const ProjectView = () => {
                                 documents.map((doc) => {
                                     const isSelected = selectedDocuments.includes(doc.id);
                                     const isDeleting = deletingDocIds.has(doc.id);
-                                    const isProcessing = doc.upload_status === 'pending' || doc.upload_status === 'processing' || doc.upload_status === 'embedding' || doc.upload_status === 'queued';
+                                    const isWorking = doc.upload_status === 'pending' || doc.upload_status === 'processing' || doc.upload_status === 'embedding' || doc.upload_status === 'queued';
+                                    const isStalledDoc = isWorking && isStalled(doc);
+                                    const isProcessing = isWorking && !isStalledDoc;
                                     const isReady = doc.upload_status === 'completed' || doc.upload_status === 'ready';
                                     const isFailed = doc.upload_status === 'failed' || doc.upload_status === 'error';
 
@@ -2331,6 +2218,11 @@ const ProjectView = () => {
                                                         stagePct={isReady ? 100 : docStages[doc.id]?.progress}
                                                         message={docStages[doc.id]?.message}
                                                     />
+                                                )}
+                                                {isStalledDoc && (
+                                                    <p className="mt-1 text-[10px] leading-snug text-amber-700">
+                                                        This upload stopped (the server restarted while reading it). Delete it and upload it again.
+                                                    </p>
                                                 )}
                                                 <div className="flex items-center gap-2 mt-1">
                                                     {isReady && !justReady.has(doc.id) && (

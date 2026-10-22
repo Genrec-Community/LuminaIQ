@@ -119,6 +119,8 @@ class DocumentService:
             await self._update_document_status(
                 document_id, "processing", "Extracting text..."
             )
+            last_beat = [0.0]
+
             def on_ocr_page(done: int, total: int):
                 # Called from the extraction thread while a scanned PDF is OCR'd
                 asyncio.run_coroutine_threadsafe(
@@ -126,6 +128,13 @@ class DocumentService:
                                   f"Scanning page {done}/{total}"),
                     loop,
                 )
+                # Heartbeat (bumps updated_at) so the app can tell slow from stopped
+                if time.monotonic() - last_beat[0] >= 30 or done == total:
+                    last_beat[0] = time.monotonic()
+                    asyncio.run_coroutine_threadsafe(
+                        self._update_document_status(document_id, "processing", f"Scanning page {done}/{total}"),
+                        loop,
+                    )
 
             text = await loop.run_in_executor(
                 self._extraction_executor, self.file_parser.extract_text, file_path, on_ocr_page
@@ -193,7 +202,7 @@ class DocumentService:
             async def embed():
                 try:
                     await self._process_embeddings_direct(
-                        chunks, document_id, filename, collection_name
+                        chunks, document_id, filename, collection_name, heartbeat=True
                     )
                     return None
                 except Exception as embed_err:
@@ -416,7 +425,8 @@ class DocumentService:
             logger.warning(f"Failed to clean up temp file {file_path}: {e}")
 
     async def _process_embeddings_direct(
-        self, chunks: List[str], document_id: str, filename: str, collection_name: str
+        self, chunks: List[str], document_id: str, filename: str, collection_name: str,
+        heartbeat: bool = False,
     ):
         """
         Process embeddings using GLOBAL concurrency limits (shared across all docs).
@@ -440,6 +450,7 @@ class DocumentService:
         )
 
         completed = [0]
+        embed_beat = [time.monotonic()]
         failed_batches = []
         # A rejected key or bad config fails every batch: stop after the first
         fatal = []
@@ -483,6 +494,12 @@ class DocumentService:
                         document_id, "embedding", pct,
                         f"Batch {completed[0]}/{total_batches}"
                     )
+                    # Heartbeat (bumps updated_at) so the app can tell slow from stopped
+                    if heartbeat and time.monotonic() - embed_beat[0] >= 30:
+                        embed_beat[0] = time.monotonic()
+                        await self._update_document_status(
+                            document_id, "embedding", f"Learning part {completed[0]}/{total_batches}"
+                        )
 
                     if completed[0] % 5 == 0 or completed[0] == total_batches:
                         logger.info(
