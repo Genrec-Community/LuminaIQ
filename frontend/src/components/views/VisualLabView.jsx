@@ -20,10 +20,10 @@ const EXAMPLES = [
 
 const BUILD_STEPS = [
     'Reading what your book says about it…',
-    'Working out the equations…',
-    'Building the simulation…',
-    'Wiring up the sliders…',
-    'Writing the derivation and the why…',
+    'Choosing the best way to show it…',
+    'Building the interactive…',
+    'Wiring up the controls…',
+    'Writing the idea and real examples…',
     'Testing it runs…',
 ];
 
@@ -211,7 +211,7 @@ const VisualLabView = ({ projectId, availableTopics = [], selectedDocuments = []
                                 <FlaskConical className="h-16 w-16 text-[#C8A288]" />
                                 <Loader2 className="absolute -right-2 -bottom-2 h-6 w-6 animate-spin text-[#C8A288]" />
                             </div>
-                            <h3 className="mt-3 text-lg font-bold text-[#4A3B32]">{repairing ? 'Fixing a glitch in the simulation…' : `${companion} is building “${topic}”`}</h3>
+                            <h3 className="mt-3 text-lg font-bold text-[#4A3B32]">{repairing ? 'Fixing a glitch in the interactive…' : `${companion} is building “${topic}”`}</h3>
                             <p className="mt-1 text-sm text-[#8a6a5c]">{BUILD_STEPS[stepIdx]}</p>
                             <p className="mt-3 text-xs text-[#8a6a5c]">
                                 {elapsed < 75 ? 'A first build takes up to a minute. Next time it opens instantly.' : 'Taking longer than usual. You can wait a bit more or try again.'}
@@ -233,7 +233,7 @@ const VisualLabView = ({ projectId, availableTopics = [], selectedDocuments = []
                     <div className="absolute bottom-3 left-3 right-3 md:left-auto md:max-w-md rounded-2xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 shadow-lg">
                         <div className="flex items-start gap-2">
                             <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-                            <div className="flex-1">Part of this simulation hit an error, so some controls might not work.
+                            <div className="flex-1">Part of this interactive hit an error, so some controls might not work.
                                 <button onClick={() => build(topic, { refresh: true })} className="ml-1 font-semibold underline">Build a fresh one</button>
                             </div>
                             <button onClick={() => setRuntimeError('')} className="font-bold" aria-label="Dismiss">×</button>
@@ -250,8 +250,9 @@ const VisualLabView = ({ projectId, availableTopics = [], selectedDocuments = []
                                 <div className="relative flex items-center gap-2 text-teal-200 text-sm font-semibold"><FlaskConical className="h-4 w-4" /> Visual Lab</div>
                                 <h2 className="relative mt-2 text-3xl md:text-4xl font-bold leading-tight">See it. Play with it. Get it.</h2>
                                 <p className="relative mt-2 text-white/80 max-w-xl">
-                                    Pick a topic and get a working simulation built from your book, with sliders to experiment,
-                                    the formulas, a step-by-step derivation and why it happens. Like a lab practical, on any screen.
+                                    Pick a topic and get an interactive built from your book that fits it: a live simulation with
+                                    the formulas for science and maths, a scenario you play through for ideas and strategy, a
+                                    timeline for history, a step-by-step process for biology.
                                 </p>
                             </motion.div>
                             {error && <p className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}

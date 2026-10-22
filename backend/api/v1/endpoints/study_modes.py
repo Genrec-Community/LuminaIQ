@@ -318,39 +318,59 @@ class VisualizeRequest(BaseModel):
 
 MAX_VISUAL_BYTES = 120_000
 
-VISUAL_PROMPT = """You are a world-class science/maths educator and creative front-end developer.
-Build ONE self-contained, working, interactive HTML page that lets a student SEE and PLAY with the
-topic below, like a virtual practical/lab. Think PhET simulations.
+VISUAL_PROMPT = """You are a brilliant teacher and creative front-end developer. Build ONE self-contained,
+working, interactive HTML page that lets a student SEE and PLAY with the topic below.
 
 TOPIC: {topic}
 
-BOOK PASSAGES (for accuracy and the book's notation):
+BOOK PASSAGES (the source of truth for content, examples and terminology):
 {context}
 
-The page must contain, in this order:
-1. A title and a one-line "what you're looking at".
-2. The live simulation: <canvas> (requestAnimationFrame) or inline SVG, driven by REAL equations
-   (e.g. a pendulum uses θ'' = -(g/L)·sinθ integrated each frame; light scattering uses
-   I ∝ 1/λ⁴; a heart animates the cardiac cycle with labelled chambers/valves and blood flow).
-   For non-physical topics (history, biology, economics, CS...) build an animated, explorable
-   diagram, timeline, process or algorithm stepper instead.
-3. Controls: 2-5 labelled sliders/buttons (with live values and units) that change the parameters,
-   plus Play/Pause and Reset. Show live readouts (numbers that update as it runs).
-4. "Formulas": the key equations, each with what every symbol means.
-5. "Derivation": a short step-by-step derivation or reasoning chain (numbered steps).
-6. "Why it happens": the intuition in plain words, linked to what the student sees.
-7. "Try this": 3 guided experiments ("set L to 2 m and watch the period double? no — √2!").
+STEP 1 - decide what kind of topic this is (from the topic AND the passages), then build the
+interactive that genuinely fits it. NEVER force equations, graphs or derivations onto a topic that
+has none. Inventing formulas or "quotients" for ideas, behaviour, history or literature is WRONG.
+
+- Physics / chemistry / engineering / quantitative: a live simulation (<canvas> + requestAnimationFrame
+  or SVG) driven by the REAL equations, sliders for the parameters with units, live readouts,
+  Formulas (every symbol explained), a short step-by-step Derivation, Why it happens, Try this.
+- Maths / statistics / algorithms / CS: a manipulable visual (draggable points, step-through
+  stepper, live plot) with the real rules, worked steps and what changes when you change inputs.
+- Biology / medicine / earth science: an animated, labelled process or structure diagram the student
+  can step through, hover/tap for parts, toggle states (e.g. healthy vs diseased).
+- History / politics / economics stories: an interactive timeline or cause-and-effect map; tap events
+  for who/what/why, and see consequences unfold.
+- Self-help, strategy, psychology, philosophy, ethics, business, law, literature (e.g. "The 48 Laws of
+  Power"): NO equations and NO graphs of made-up quantities. Build something like:
+    * a scenario simulator: a realistic situation, 2-4 choices, each revealing what happens and
+      which principle it shows (branching story, with a "replay" button);
+    * a "spot the principle" mini game with real examples (from the book where possible);
+    * do / don't cards that flip, a before-vs-after comparison, a concept map of related ideas;
+    * real historical or everyday examples the book uses, and the exceptions/when it backfires.
+- Languages / grammar: interactive sentence builders, fill-the-gap with instant feedback.
+Mix formats if it helps, but every element must be faithful to the topic and the passages.
+
+STEP 2 - the page contains:
+1. A title and one line saying what the student will explore.
+2. The main interactive (the centrepiece, chosen above), with clear controls and instant feedback.
+3. "The idea": the core explanation in plain words, grounded in the passages.
+4. A section that fits the subject: Formulas + Derivation (quantitative topics only), OR Key steps,
+   OR Real examples, OR When it backfires / common mistakes.
+5. "Try this": 3 short guided things to do with the interactive.
 
 Hard rules:
 - Single file. Inline <style> and <script> only. NO external scripts, fonts, images, CDNs or
-  network requests (they are blocked). Draw everything yourself.
-- Write maths with HTML/Unicode (x², x<sub>0</sub>, √, π, θ, Δ, Σ, ∝, ·), no LaTeX.
+  network requests (they are blocked). Draw everything yourself (CSS, SVG, canvas, emoji are fine).
+- Any maths in HTML/Unicode (x², x<sub>0</sub>, √, π, θ, Δ), no LaTeX.
 - Must run without errors in a sandboxed iframe (no localStorage, alert, prompt, forms, popups).
-- Responsive: fits 360px-1200px wide; canvas resizes to its container (handle devicePixelRatio).
+- Responsive: fits 360px-1200px wide and works with touch; canvases handle devicePixelRatio.
 - Clean, modern look: dark background #0f172a, cards, rounded corners, accent #f59e0b, readable 15px text.
-- Keep it under 25 KB. Physically/factually correct.
+- Keep it under 25 KB. Factually correct and true to the book; don't invent facts or numbers.
 
 Return ONLY the HTML document, starting with <!DOCTYPE html>. No markdown fences, no commentary."""
+
+# Bumped when the prompt changes so earlier builds (e.g. equations for a non-science book)
+# are rebuilt instead of served from the cache
+VISUAL_KIND = "visual_v2"
 
 REPAIR_PROMPT = """This interactive HTML lesson about "{topic}" throws an error in the browser:
 
@@ -395,13 +415,13 @@ async def visualize(request: VisualizeRequest, current_user: dict = Depends(get_
         prompt = REPAIR_PROMPT.format(topic=topic, error=request.repair.error, html=request.repair.html[:60000])
     else:
         if not request.refresh:
-            cached = await _cache_get(request.project_id, topic, "visual")
+            cached = await _cache_get(request.project_id, topic, VISUAL_KIND)
             if cached and cached.get("html"):
                 return {"html": cached["html"], "topic": topic, "cached": True}
             # Same topic already built from the same book by another student
-            shared = await book_library.get_asset(books, topic, "visual")
+            shared = await book_library.get_asset(books, topic, VISUAL_KIND)
             if shared and shared.get("html"):
-                await _cache_put(request.project_id, topic, "visual", {"html": shared["html"]})
+                await _cache_put(request.project_id, topic, VISUAL_KIND, {"html": shared["html"]})
                 return {"html": shared["html"], "topic": topic, "cached": True}
         # New build (repairs are free); cached and shared ones cost nothing
         metered(current_user, "visual")
@@ -424,9 +444,9 @@ async def visualize(request: VisualizeRequest, current_user: dict = Depends(get_
     html = _sanitize_html(raw)
     if not html:
         raise HTTPException(502, "The AI couldn't build a working simulation this time. Please try again.")
-    await _cache_put(request.project_id, topic, "visual", {"html": html})
+    await _cache_put(request.project_id, topic, VISUAL_KIND, {"html": html})
     # Shared copy is stored as an .html file; repairs replace a broken one for everyone
-    await book_library.put_asset(books, topic, "visual", {"html": html})
+    await book_library.put_asset(books, topic, VISUAL_KIND, {"html": html})
     if not request.repair:
         await usage.charge(current_user["id"], "visual")
     return {"html": html, "topic": topic, "cached": False}

@@ -274,8 +274,8 @@ class BookLibrary:
                 key = topic_key(topic)
                 storage_path = None
                 stored = content
-                if kind == "visual" and content.get("html"):
-                    storage_path = f"{book_id}/visual/{hashlib.sha1(key.encode()).hexdigest()}.html"
+                if kind.startswith("visual") and content.get("html"):
+                    storage_path = f"{book_id}/{kind}/{hashlib.sha1(key.encode()).hexdigest()}.html"
                     body = content["html"].encode("utf-8")
                     await async_db(lambda: self.client.storage.from_(BUCKET).upload(
                         file=body, path=storage_path,
