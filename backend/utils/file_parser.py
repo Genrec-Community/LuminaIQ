@@ -194,8 +194,8 @@ class FileParser:
     @staticmethod
     def _ocr_scanned_pdf(file_path: str, on_progress=None) -> Optional[str]:
         """
-        Indra OCR service first (free, no page limit); whatever it couldn't read
-        goes to Google Vision (within the monthly allowance), then Tesseract.
+        Google Vision first (fastest, within the monthly allowance); the pages it
+        doesn't cover go to the Indra OCR service (free, no limit), then Tesseract.
         Each engine continues from the page the previous one stopped at.
         """
         import fitz
@@ -215,35 +215,36 @@ class FileParser:
 
         parts, pos = [], 0
 
-        # 1. Indra OCR service
-        try:
-            from utils.indra_ocr_client import get_indra_ocr
+        # 1. Google Vision first (fastest: ~1-2 min a book), within this month's allowance
+        granted = FileParser._vision_pages_allowed(total)
+        if granted:
+            try:
+                from utils.google_vision_ocr import get_google_vision
 
-            indra = get_indra_ocr()
-            if indra:
-                indra_text, pos = indra.extract_pdf(
-                    file_path, dpi=settings.OCR_DPI, start=0, end=total,
+                parts.append(get_google_vision().extract_pdf(
+                    file_path, dpi=settings.OCR_DPI, start=0, end=granted,
                     on_progress=lambda d, _t: report(d),
-                )
-                parts.append(indra_text)
-        except Exception as e:
-            logger.error(f"[FileParser] Indra OCR failed: {e}")
+                ) or "")
+                pos = granted
+            except Exception as e:
+                logger.error(f"[FileParser] Google Vision OCR failed, trying Indra: {e}")
 
-        # 2. Google Vision for what is left, within this month's allowance
+        # 2. Indra OCR service for what is left (free, no page limit, slower on a free server)
         if pos < total:
-            granted = FileParser._vision_pages_allowed(total - pos)
-            if granted:
-                start = pos
-                try:
-                    from utils.google_vision_ocr import get_google_vision
+            start = pos
+            try:
+                from utils.indra_ocr_client import get_indra_ocr
 
-                    parts.append(get_google_vision().extract_pdf(
-                        file_path, dpi=settings.OCR_DPI, start=start, end=start + granted,
+                indra = get_indra_ocr()
+                if indra:
+                    indra_text, done = indra.extract_pdf(
+                        file_path, dpi=settings.OCR_DPI, start=start, end=total,
                         on_progress=lambda d, _t: report(start + d),
-                    ) or "")
-                    pos = start + granted
-                except Exception as e:
-                    logger.error(f"[FileParser] Google Vision OCR failed, using Tesseract: {e}")
+                    )
+                    parts.append(indra_text)
+                    pos = start + done
+            except Exception as e:
+                logger.error(f"[FileParser] Indra OCR failed: {e}")
 
         # 3. Tesseract for the rest
         if pos < total:

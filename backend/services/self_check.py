@@ -94,6 +94,25 @@ async def _storage() -> str:
     return f"buckets={sorted(n for n in names if n)}"
 
 
+async def _indra() -> str:
+    # Render a line of text, OCR it on the Indra service, check the words come back
+    import fitz
+    from utils.indra_ocr_client import get_indra_ocr
+
+    client = get_indra_ocr()
+    doc = fitz.open()
+    page = doc.new_page(width=600, height=200)
+    page.insert_text((40, 110), "Integrity builds trust", fontsize=32)
+    image = page.get_pixmap(dpi=150, colorspace=fitz.csGRAY).tobytes("jpeg")
+    loop = asyncio.get_running_loop()
+    if not await loop.run_in_executor(None, client.wait_ready, 180):
+        raise RuntimeError("service not ready")
+    text = (await loop.run_in_executor(None, client._ocr_batch, [image]))[0]
+    if "integrity" not in text.lower():
+        raise RuntimeError(f"unexpected text: {text[:80]!r}")
+    return f"read {text.strip()[:40]!r}"
+
+
 async def run_self_check():
     await asyncio.sleep(2)  # let the server finish binding first
     checks = [
@@ -103,11 +122,13 @@ async def run_self_check():
         ("qdrant", _qdrant()),
         ("storage", _storage()),
     ]
+    if settings.INDRA_OCR_URL:
+        checks.append(("ocr.indra", _indra()))
     if settings.LLM_LIGHT_MODEL and settings.LLM_LIGHT_MODEL != settings.LLM_MODEL:
         checks.append((f"llm.light ({settings.LLM_LIGHT_MODEL})", _llm(light=True)))
     if settings.LLM_DEEP_MODEL or settings.LLM_DEEP_BASE_URL:
         checks.append((f"llm.deep ({settings.LLM_DEEP_MODEL or settings.LLM_MODEL})", _llm(deep=True)))
-    results = await asyncio.gather(*(_timed(n, c) for n, c in checks))
+    results = await asyncio.gather(*(_timed(n, c, 240 if n == "ocr.indra" else 60) for n, c in checks))
     failed = [n for (n, _), ok in zip(checks, results) if not ok]
     if failed:
         logger.error(f"[SelfCheck] done: {len(failed)} failed: {', '.join(failed)}")

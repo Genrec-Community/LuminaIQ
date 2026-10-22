@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import {
     X, Globe, Upload, BookOpen, ArrowLeft, File, Check,
     Lock, ChevronDown, ChevronUp, Tag, Loader2, Search,
-    Download, ChevronLeft, ChevronRight
+    Download, ChevronLeft, ChevronRight, ClipboardPaste, Zap
 } from 'lucide-react';
 import { getPublicBooks, importBook } from '../api';
 import { useToast } from '../context/ToastContext';
@@ -59,8 +59,105 @@ const SourcePicker = ({ onChoose }) => (
                 </span>
             </button>
         </div>
+
+        {/* Paste text: fastest path, no upload or OCR */}
+        <button
+            onClick={() => onChoose('paste')}
+            className="group mt-4 flex w-full items-center gap-4 rounded-2xl border-2 border-dashed border-[#E6D5CC] p-4 text-left transition-all duration-200 hover:border-[#C8A288] hover:bg-[#FDF6F0]"
+        >
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#FDF6F0] text-[#C8A288] transition-transform duration-200 group-hover:scale-110">
+                <ClipboardPaste className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-bold text-[#4A3B32]">Paste text instead</h3>
+                <p className="text-xs leading-relaxed text-[#8a6a5c]">
+                    Open your PDF, select all (Ctrl/Cmd + A), copy and paste it here. Ready in seconds, no upload or scanning.
+                </p>
+            </div>
+            <span className="hidden shrink-0 items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700 sm:inline-flex">
+                <Zap className="h-3 w-3" /> Fastest
+            </span>
+        </button>
     </div>
 );
+
+/* ─────────────────────────────────────────────────────────────
+   Step 2C — Paste text
+───────────────────────────────────────────────────────────── */
+const MIN_PASTE_WORDS = 30;
+const MAX_PASTE_CHARS = 4_000_000; // ~ a 1,500-page book; the stored text limit is 5 MB
+
+const PasteStep = ({ onUpload, uploading, onBack }) => {
+    const [title, setTitle] = useState('');
+    const [text, setText] = useState('');
+    const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+    const tooShort = words < MIN_PASTE_WORDS;
+    const tooLong = text.length > MAX_PASTE_CHARS;
+
+    const submit = () => {
+        if (tooShort || tooLong || uploading) return;
+        const name = (title.trim() || text.trim().split('\n')[0].slice(0, 60) || 'Pasted text')
+            .replace(/[\\/:*?"<>|]+/g, ' ').trim();
+        // globalThis.File: this module imports lucide's File icon, which shadows the DOM File
+        const file = new globalThis.File([text], `${name}.txt`, { type: 'text/plain' });
+        onUpload([file], {});
+    };
+
+    return (
+        <div className="flex h-full flex-col">
+            <div className="shrink-0 border-b border-[#E6D5CC] px-6 pb-4 pt-6">
+                <div className="flex items-center gap-3">
+                    <button onClick={onBack} className="rounded-xl p-2 text-[#8a6a5c] transition-colors hover:bg-[#FDF6F0] hover:text-[#4A3B32]" aria-label="Back">
+                        <ArrowLeft className="h-4 w-4" />
+                    </button>
+                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-[#C8A288] to-[#B08B72]">
+                        <ClipboardPaste className="h-4 w-4 text-white" />
+                    </div>
+                    <div>
+                        <h3 className="font-bold text-[#4A3B32]">Paste text</h3>
+                        <p className="text-xs text-[#8a6a5c]">Copy from your PDF viewer, a website or notes</p>
+                    </div>
+                </div>
+            </div>
+            <div className="flex min-h-0 flex-1 flex-col gap-3 p-6">
+                <input
+                    value={title}
+                    onChange={e => setTitle(e.target.value)}
+                    placeholder="Title (e.g. Human Values and Ethics)"
+                    className="w-full rounded-xl border border-[#E6D5CC] bg-[#FDF6F0] px-4 py-2.5 text-sm text-[#4A3B32] outline-none placeholder:text-[#b8a094] focus:ring-2 focus:ring-[#C8A288]"
+                />
+                <textarea
+                    value={text}
+                    onChange={e => setText(e.target.value)}
+                    autoFocus
+                    placeholder={'Paste the book or chapter text here.\n\nTip: in the PDF, press Ctrl/Cmd + A to select everything, Ctrl/Cmd + C to copy, then Ctrl/Cmd + V here.'}
+                    className="min-h-[260px] w-full flex-1 resize-none rounded-xl border border-[#E6D5CC] bg-white px-4 py-3 text-sm leading-relaxed text-[#4A3B32] outline-none placeholder:text-[#b8a094] focus:ring-2 focus:ring-[#C8A288]"
+                />
+                <div className="flex items-center justify-between text-xs">
+                    <span className={tooLong ? 'font-semibold text-red-600' : 'text-[#8a6a5c]'}>
+                        {words.toLocaleString()} words
+                        {tooLong ? ' · too long, split it into parts' : tooShort && words > 0 ? ` · add at least ${MIN_PASTE_WORDS} words` : ''}
+                    </span>
+                    {words > 0 && !tooShort && !tooLong && (
+                        <span className="text-[#a08070]">about {Math.max(1, Math.round(words / 300))} pages</span>
+                    )}
+                </div>
+            </div>
+            <div className="shrink-0 border-t border-[#E6D5CC] px-6 py-4">
+                <button
+                    onClick={submit}
+                    disabled={tooShort || tooLong || uploading}
+                    className={`flex w-full items-center justify-center gap-2 rounded-2xl py-3 font-semibold transition-all ${tooShort || tooLong || uploading
+                        ? 'cursor-not-allowed bg-[#E6D5CC] text-[#a08070]'
+                        : 'bg-gradient-to-r from-[#C8A288] to-[#B08B72] text-white shadow-lg shadow-[#C8A288]/30 hover:shadow-xl'}`}
+                >
+                    {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                    Add to project
+                </button>
+            </div>
+        </div>
+    );
+};
 
 /* ─────────────────────────────────────────────────────────────
    Step 2A — Book Store Browse & Import
@@ -538,7 +635,7 @@ const UploadStep = ({ onUpload, uploading, onBack }) => {
      onClose    — close the modal
 ───────────────────────────────────────────────────────────── */
 const AddDocumentModal = ({ projectId, uploading, onUpload, onImported, onClose }) => {
-    const [step, setStep] = useState('pick'); // 'pick' | 'store' | 'upload'
+    const [step, setStep] = useState('pick'); // 'pick' | 'store' | 'upload' | 'paste'
 
     const handleUpload = (files, bookOptions) => {
         onUpload(files, bookOptions);
@@ -564,7 +661,7 @@ const AddDocumentModal = ({ projectId, uploading, onUpload, onImported, onClose 
                 <div className="flex items-center justify-between px-6 pt-5 pb-0 shrink-0">
                     <div className="flex gap-1.5">
                         {/* Step indicator dots */}
-                        {['pick', 'store', 'upload'].map((s, i) => (
+                        {['pick', step === 'paste' ? 'paste' : step === 'store' ? 'store' : 'upload'].map((s, i) => (
                             <div key={s} className={`h-1.5 rounded-full transition-all duration-300 ${
                                 step === s
                                     ? 'w-6 bg-[#C8A288]'
@@ -594,6 +691,13 @@ const AddDocumentModal = ({ projectId, uploading, onUpload, onImported, onClose 
                     )}
                     {step === 'upload' && (
                         <UploadStep
+                            onUpload={handleUpload}
+                            uploading={uploading}
+                            onBack={() => setStep('pick')}
+                        />
+                    )}
+                    {step === 'paste' && (
+                        <PasteStep
                             onUpload={handleUpload}
                             uploading={uploading}
                             onBack={() => setStep('pick')}
