@@ -113,6 +113,49 @@ async def _indra() -> str:
     return f"read {text.strip()[:40]!r}"
 
 
+async def _signed_uploads() -> str:
+    """Browser upload paths with a signed token: resumable (TUS) and single PUT."""
+    import base64
+    import httpx
+    from api.v1.endpoints.documents import UPLOADS_BUCKET, create_signed_upload
+
+    base = settings.SUPABASE_URL.rstrip("/")
+    anon = settings.SUPABASE_KEY
+    data = b"self-check upload"
+    results = {}
+    async with httpx.AsyncClient(timeout=30) as client:
+        # Resumable with a signed token
+        path = "selfcheck/tus-probe.txt"
+        token = await create_signed_upload(path)
+        b64 = lambda v: base64.b64encode(v.encode()).decode()
+        meta = f"bucketName {b64(UPLOADS_BUCKET)},objectName {b64(path)},contentType {b64('text/plain')}"
+        r = await client.post(f"{base}/storage/v1/upload/resumable/sign", headers={
+            "Tus-Resumable": "1.0.0", "Upload-Length": str(len(data)), "Upload-Metadata": meta,
+            "x-signature": token, "x-upsert": "true", "apikey": anon,
+        })
+        loc = r.headers.get("location")
+        if r.status_code == 201 and loc:
+            r2 = await client.patch(loc, content=data, headers={
+                "Tus-Resumable": "1.0.0", "Upload-Offset": "0", "Content-Type": "application/offset+octet-stream",
+                "x-signature": token, "apikey": anon,
+            })
+            results["tus"] = r2.status_code
+        else:
+            results["tus"] = f"{r.status_code} {r.text[:120]}"
+        # Single PUT with a signed token
+        path2 = "selfcheck/put-probe.txt"
+        token2 = await create_signed_upload(path2)
+        r3 = await client.put(f"{base}/storage/v1/object/upload/sign/{UPLOADS_BUCKET}/{path2}?token={token2}",
+                              content=data, headers={"Content-Type": "text/plain", "x-upsert": "true", "apikey": anon})
+        results["put"] = r3.status_code
+        await client.request("DELETE", f"{base}/storage/v1/object/{UPLOADS_BUCKET}", json={"prefixes": [path, path2]},
+                             headers={"Authorization": f"Bearer {settings.SUPABASE_SERVICE_KEY}", "apikey": settings.SUPABASE_SERVICE_KEY})
+    ok = results.get("tus") == 204 or results.get("put") in (200, 201)
+    if not ok:
+        raise RuntimeError(f"browser uploads would fail: {results}")
+    return f"resumable={results['tus']} put={results['put']}"
+
+
 async def run_self_check():
     await asyncio.sleep(2)  # let the server finish binding first
     checks = [
@@ -121,6 +164,7 @@ async def run_self_check():
         ("embedding", _embedding()),
         ("qdrant", _qdrant()),
         ("storage", _storage()),
+        ("storage.signed_upload", _signed_uploads()),
     ]
     if settings.INDRA_OCR_URL:
         checks.append(("ocr.indra", _indra()))

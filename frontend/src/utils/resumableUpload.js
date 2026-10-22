@@ -1,5 +1,4 @@
 import * as tus from 'tus-js-client';
-import { supabase } from '../supabaseClient';
 
 /*
  * Book uploads go straight from the browser to Supabase Storage with the TUS
@@ -65,73 +64,99 @@ const whenBackOnline = () => new Promise((resolve) => {
     window.addEventListener('online', check);
 });
 
+/** Single PUT with the signed token (not resumable), with real progress. */
+const putSigned = (file, bucket, path, token, onProgress) => new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/upload/sign/${bucket}/${path.split('/').map(encodeURIComponent).join('/')}?token=${encodeURIComponent(token)}`);
+    xhr.setRequestHeader('x-upsert', 'true');
+    xhr.setRequestHeader('apikey', import.meta.env.VITE_SUPABASE_ANON_KEY);
+    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress?.(Math.round((e.loaded / e.total) * 100), e.loaded); };
+    xhr.onload = () => (xhr.status < 300 ? resolve() : reject(Object.assign(new Error(`Upload failed (${xhr.status})`), { status: xhr.status })));
+    xhr.onerror = () => reject(new Error('Upload failed (network)'));
+    xhr.send(file);
+});
+
 /**
  * Upload a file to the user's folder in the "uploads" bucket.
- * Resolves with the storage path. Throws { fallback: true } when direct upload
- * can't be used (no Supabase session), so the caller can use the old route.
+ * The backend hands out a signed token for this one file, so it works for every
+ * login method (email logins have no Supabase session in the browser).
+ * Resolves with the storage path. Throws { fallback: true } when the direct
+ * upload can't be used, so the caller can use the old route.
  */
 export async function uploadToStorage(file, projectId, onProgress) {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user?.id) {
-        const err = new Error('No storage session');
+    const { api } = await import('../api');
+    let permit;
+    try {
+        permit = (await api.post('/documents/upload-url', { project_id: projectId, filename: file.name, size: file.size })).data;
+    } catch (e) {
+        if (e?.response?.status && e.response.status < 500 && e.response.status !== 404) throw e; // limit, too big, wrong type
+        const err = new Error('Upload permit unavailable');
         err.fallback = true;
         throw err;
     }
-    const objectName = `${session.user.id}/${projectId}/${file.size}-${safeName(file.name)}`;
+    const { bucket, path, token } = permit;
     const key = keyOf(file);
     const entry = { key, projectId, name: file.name, size: file.size, pct: 0, startedAt: Date.now() };
     rememberPending(entry);
 
     const release = keepAwake();
-    await new Promise((resolve, reject) => {
-        let lastSaved = 0;
-        const upload = new tus.Upload(file, {
-            endpoint: `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/upload/resumable`,
-            retryDelays: [0, 1000, 3000, 5000, 10000, 20000, 30000],
-            // Same file (name + size) for the same user and project = same upload, even after re-picking
-            fingerprint: async () => ['lumina', session.user.id, projectId, file.name, file.size].join('|'),
-            chunkSize: CHUNK_SIZE,
-            uploadDataDuringCreation: true,
-            removeFingerprintOnSuccess: true,
-            headers: { authorization: `Bearer ${session.access_token}`, apikey: import.meta.env.VITE_SUPABASE_ANON_KEY, 'x-upsert': 'true' },
-            metadata: {
-                bucketName: BUCKET,
-                objectName,
-                contentType: file.type || 'application/octet-stream',
-                cacheControl: '3600',
-            },
-            // Long uploads can outlive the login token: always send the current one
-            onBeforeRequest: async (req) => {
-                const { data } = await supabase.auth.getSession();
-                if (data.session?.access_token) req.setHeader('authorization', `Bearer ${data.session.access_token}`);
-            },
-            onProgress: (sent, total) => {
-                const pct = total ? Math.round((sent / total) * 100) : 0;
-                onProgress?.(pct, sent);
-                if (pct - lastSaved >= 5) {
-                    lastSaved = pct;
-                    rememberPending({ ...entry, pct });
-                }
-            },
-            onError: (error) => {
-                const status = error?.originalResponse?.getStatus?.();
-                if (!status) {
-                    // Connection lost (screen off, signal, tab in background): wait, then carry on
-                    // from the last finished chunk with the same file; nothing to re-pick
-                    whenBackOnline().then(() => upload.start());
-                    return;
-                }
-                // The server refused the upload itself: let the caller fall back
-                if (status >= 400 && status < 500 && status !== 409) error.fallback = true;
-                reject(error);
-            },
-            onSuccess: () => resolve(),
+    try {
+        await new Promise((resolve, reject) => {
+            let lastSaved = 0;
+            const upload = new tus.Upload(file, {
+                endpoint: `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/upload/resumable/sign`,
+                retryDelays: [0, 1000, 3000, 5000, 10000, 20000, 30000],
+                // Same file (name + size) in the same project = same upload, even after re-picking
+                fingerprint: async () => ['lumina', path].join('|'),
+                chunkSize: CHUNK_SIZE,
+                uploadDataDuringCreation: true,
+                removeFingerprintOnSuccess: true,
+                headers: { 'x-signature': token, apikey: import.meta.env.VITE_SUPABASE_ANON_KEY, 'x-upsert': 'true' },
+                metadata: {
+                    bucketName: bucket,
+                    objectName: path,
+                    contentType: file.type || 'application/octet-stream',
+                    cacheControl: '3600',
+                },
+                onProgress: (sent, total) => {
+                    const pct = total ? Math.round((sent / total) * 100) : 0;
+                    onProgress?.(pct, sent);
+                    if (pct - lastSaved >= 5) {
+                        lastSaved = pct;
+                        rememberPending({ ...entry, pct });
+                    }
+                },
+                onError: (error) => {
+                    const status = error?.originalResponse?.getStatus?.();
+                    if (!status) {
+                        // Connection lost (screen off, signal, tab in background): wait, then carry on
+                        // from the last finished chunk with the same file; nothing to re-pick
+                        whenBackOnline().then(() => upload.start());
+                        return;
+                    }
+                    reject(Object.assign(error, { status }));
+                },
+                onSuccess: () => resolve(),
+            });
+            upload.findPreviousUploads().then((previous) => {
+                if (previous.length) upload.resumeFromPreviousUpload(previous[0]);
+                upload.start();
+            }).catch(() => upload.start());
         });
-        upload.findPreviousUploads().then((previous) => {
-            if (previous.length) upload.resumeFromPreviousUpload(previous[0]);
-            upload.start();
-        }).catch(() => upload.start());
-    }).finally(release);
+    } catch (tusError) {
+        // Resumable refused (e.g. an expired token on an old resume): one plain upload with a fresh token
+        console.warn('Resumable upload refused, uploading in one go', tusError?.status);
+        try {
+            const fresh = (await api.post('/documents/upload-url', { project_id: projectId, filename: file.name, size: file.size })).data;
+            await putSigned(file, fresh.bucket, fresh.path, fresh.token, onProgress);
+        } catch (putError) {
+            putError.fallback = true;
+            throw putError;
+        }
+    } finally {
+        release();
+    }
 
-    return { path: objectName, key };
+    return { path, key };
 }

@@ -245,6 +245,67 @@ class StorageUploadRequest(BaseModel):
     book_tags: Optional[str] = None
 
 
+class UploadUrlRequest(BaseModel):
+    project_id: str
+    filename: str
+    size: int
+
+
+def upload_object_path(user_id: str, project_id: str, filename: str, size: int) -> str:
+    """Stable per file (name + size), so a re-picked file resumes the same upload."""
+    import re
+    import unicodedata
+
+    name = unicodedata.normalize("NFKD", filename)
+    name = re.sub(r"[^\w.-]+", "_", name)[-120:]
+    return f"{user_id}/{project_id}/{size}-{name}"
+
+
+async def create_signed_upload(path: str) -> str:
+    """A short-lived token that lets the browser upload this one object (any login method)."""
+    import httpx
+
+    base = settings.SUPABASE_URL.rstrip("/")
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(
+            f"{base}/storage/v1/object/upload/sign/{UPLOADS_BUCKET}/{path}",
+            headers={"Authorization": f"Bearer {settings.SUPABASE_SERVICE_KEY}",
+                     "apikey": settings.SUPABASE_SERVICE_KEY, "x-upsert": "true"},
+            json={},
+        )
+    if resp.status_code >= 400:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Couldn't prepare the upload ({resp.status_code}).")
+    url = resp.json().get("url", "")
+    from urllib.parse import parse_qs, urlparse
+
+    token = (parse_qs(urlparse(url).query).get("token") or [""])[0]
+    if not token:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Couldn't prepare the upload (no token).")
+    return token
+
+
+@router.post("/upload-url")
+async def get_upload_url(request: UploadUrlRequest, current_user: dict = Depends(get_current_user)):
+    """
+    Permission for the browser to upload one book straight to storage
+    (resumable), without needing a Supabase session in the browser: email
+    logins go through this API and have none.
+    """
+    metered(current_user, "upload")
+    await usage.check_books(current_user["id"])
+    ext = os.path.splitext(request.filename)[1].lower().lstrip(".")
+    if ext not in _UPLOAD_TYPES:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Supported files: PDF, DOCX and TXT.")
+    if request.size <= 0 or request.size > settings.MAX_FILE_SIZE:
+        raise HTTPException(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            f"This file is larger than the {settings.MAX_FILE_SIZE // (1024 * 1024)} MB upload limit.",
+        )
+    path = upload_object_path(current_user["id"], request.project_id, request.filename, request.size)
+    token = await create_signed_upload(path)
+    return {"bucket": UPLOADS_BUCKET, "path": path, "token": token}
+
+
 @router.post("/upload-from-storage")
 async def upload_from_storage(
     request: StorageUploadRequest,
