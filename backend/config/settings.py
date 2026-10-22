@@ -135,6 +135,9 @@ class Settings(BaseSettings):
     AZURE_CV_KEY: str = ""
     # Google Cloud Vision OCR for scanned PDFs: service-account JSON key, raw or base64
     GOOGLE_VISION_CREDENTIALS: str = ""
+    # Self-hosted Indra OCR service (ocr-service/), tried before Google Vision
+    INDRA_OCR_URL: str = ""
+    INDRA_OCR_TOKEN: str = ""
     # Pages per calendar month (UTC) sent to Google Vision; the rest use Tesseract.
     # Google's free tier is 1,000 pages a month, so this stays under it.
     GOOGLE_VISION_MONTHLY_PAGES: int = 900
