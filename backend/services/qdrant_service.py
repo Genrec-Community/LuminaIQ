@@ -18,6 +18,40 @@ from services.embedding_service import embedding_service
 import asyncio
 
 
+def physical_collection(name):
+    """
+    Book collections are named project_<id>; QDRANT_COLLECTION_SUFFIX (e.g. "_cf")
+    gives an environment its own set, so switching the embedding model starts from
+    empty collections (rebuilt automatically from the stored text) instead of
+    mixing vectors from two models.
+    """
+    sfx = settings.QDRANT_COLLECTION_SUFFIX
+    if sfx and isinstance(name, str) and name.startswith("project_") and not name.endswith(sfx):
+        return name + sfx
+    return name
+
+
+class _SuffixedClient:
+    """Wraps a Qdrant client so every call uses the physical collection name."""
+
+    def __init__(self, client):
+        self._client = client
+
+    def __getattr__(self, attr):
+        fn = getattr(self._client, attr)
+        if not callable(fn):
+            return fn
+
+        def call(*args, **kwargs):
+            if "collection_name" in kwargs:
+                kwargs["collection_name"] = physical_collection(kwargs["collection_name"])
+            elif args and isinstance(args[0], str):
+                args = (physical_collection(args[0]),) + args[1:]
+            return fn(*args, **kwargs)
+
+        return call
+
+
 class QdrantService:
     """
     Qdrant vector database service with ASYNC client for non-blocking operations.
@@ -56,7 +90,7 @@ class QdrantService:
             "timeout": self.ASYNC_TIMEOUT,
         }
 
-        self._async_client_instance = AsyncQdrantClient(**kwargs)
+        self._async_client_instance = _SuffixedClient(AsyncQdrantClient(**kwargs))
         logger.info(
             f"[QdrantService] Initialized with AsyncQdrantClient | "
             f"async_timeout={self.ASYNC_TIMEOUT}s"
@@ -72,7 +106,7 @@ class QdrantService:
             url=settings.QDRANT_URL,
             api_key=settings.QDRANT_API_KEY,
             timeout=self.SYNC_TIMEOUT,
-        )
+        )  # raw client: LangChain needs a real QdrantClient (names mapped in get_vector_store)
         logger.info(f"[QdrantService] Initialized Sync QdrantClient | sync_timeout={self.SYNC_TIMEOUT}s")
         return self._sync_client_instance
 
@@ -225,7 +259,7 @@ class QdrantService:
         """Get LangChain VectorStore instance (uses sync client for LangChain compat)"""
         return QdrantVectorStore(
             client=self._sync_client,
-            collection_name=collection_name,
+            collection_name=physical_collection(collection_name),
             embedding=embedding_service.embeddings,
             content_payload_key="text",
             metadata_payload_key="metadata",

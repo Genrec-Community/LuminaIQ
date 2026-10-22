@@ -119,6 +119,9 @@ class Settings(BaseSettings):
     # "dimensions" parameter). Use with models that support shortening, e.g.
     # Gemini gemini-embedding-001 (768/1536/3072) or OpenAI text-embedding-3-*.
     EMBEDDING_SEND_DIMENSIONS: bool = Field(default=False)
+    # Appended to book collection names (project_<id><suffix>). Change it when switching
+    # embedding model: books are then re-embedded from their stored text automatically.
+    QDRANT_COLLECTION_SUFFIX: str = Field(default="")
 
     # ─────────────────────────────────────────────────────────
     # Qdrant Vector Store
