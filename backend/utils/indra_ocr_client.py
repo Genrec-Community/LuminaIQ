@@ -27,7 +27,7 @@ class IndraOCRClient:
         deadline = time.time() + timeout
         while time.time() < deadline:
             try:
-                h = http.get(f"{self.url}/health", timeout=30).json()
+                h = http.get(f"{self.url}/health", timeout=90).json()
                 if h.get("ready"):
                     return True
                 if h.get("error"):
@@ -94,6 +94,36 @@ class IndraOCRClient:
             logger.info(f"[IndraOCR] {done}/{total} pages in {time.time() - t0:.0f} s")
         text = "\n\n".join(t.strip() for t in texts if t and t.strip())
         return text, done
+
+
+def warm_up() -> None:
+    """Fire-and-forget ping so a sleeping free service is awake by the time pages arrive."""
+    client = get_indra_ocr()
+    if not client:
+        return
+    import threading
+
+    def ping():
+        try:
+            http.get(f"{client.url}/health", timeout=90)
+        except Exception:
+            pass
+
+    threading.Thread(target=ping, daemon=True).start()
+
+
+async def keep_warm(interval: float = 600) -> None:
+    """
+    While this backend is running, ping the OCR service every 10 minutes so it
+    doesn't fall asleep (free Render services sleep after 15 idle minutes and
+    can take minutes to wake). When the backend itself sleeps, the pings stop
+    and the OCR service sleeps too, so free hours aren't burned overnight.
+    """
+    import asyncio
+
+    while True:
+        warm_up()
+        await asyncio.sleep(interval)
 
 
 _instance: Optional[IndraOCRClient] = None

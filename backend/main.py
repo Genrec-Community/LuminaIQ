@@ -48,6 +48,9 @@ async def startup_event():
     """Initialize on startup"""
     # Apply log filter to reduce noisy HTTP logs
     setup_uvicorn_log_filter()
+    if settings.INDRA_OCR_URL:
+        from utils.indra_ocr_client import keep_warm
+        app.state.ocr_keep_warm = asyncio.create_task(keep_warm())
     if settings.SELF_CHECK_ON_STARTUP:
         from services.self_check import run_self_check
         app.state.self_check = asyncio.create_task(run_self_check())

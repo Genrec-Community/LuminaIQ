@@ -303,6 +303,10 @@ async def get_upload_url(request: UploadUrlRequest, current_user: dict = Depends
         )
     path = upload_object_path(current_user["id"], request.project_id, request.filename, request.size)
     token = await create_signed_upload(path)
+    if ext == "pdf":
+        # A scanned book may need the OCR service: wake it while the file uploads
+        from utils.indra_ocr_client import warm_up
+        warm_up()
     return {"bucket": UPLOADS_BUCKET, "path": path, "token": token}
 
 
