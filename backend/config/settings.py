@@ -97,6 +97,9 @@ class Settings(BaseSettings):
     RAZORPAY_PLAN_TOPPER_YEARLY: str = Field(default="")
     # Day boundary for daily plan limits
     PLAN_TIMEZONE: str = Field(default="Asia/Kolkata")
+    # Plan limits are switched off for now: usage is still counted, nothing is blocked.
+    # Set PLAN_LIMITS_ENABLED=true (env) to enforce the limits in services/plans.py again.
+    PLAN_LIMITS_ENABLED: bool = Field(default=False)
     # On boot, make one tiny call to the LLM, embeddings, Qdrant and storage and log
     # "[SelfCheck] ..." lines (see services/self_check.py)
     SELF_CHECK_ON_STARTUP: bool = Field(default=True)

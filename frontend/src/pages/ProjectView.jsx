@@ -218,10 +218,12 @@ const ProjectView = () => {
     // Deep mode: Topper answers from the stronger model (monthly allowance)
     const { plan: myPlan } = usePlan();
     const [deepMode, setDeepMode] = useState(false);
-    const deepLeft = myPlan?.usage?.deep?.limit ? Math.max(0, myPlan.usage.deep.limit - myPlan.usage.deep.used) : 0;
+    // No limit (limit null, e.g. while plan limits are switched off) means Deep is open to everyone
+    const deepUnlimited = !!myPlan?.usage?.deep && myPlan.usage.deep.limit == null;
+    const deepLeft = deepUnlimited ? Infinity : myPlan?.usage?.deep?.limit ? Math.max(0, myPlan.usage.deep.limit - myPlan.usage.deep.used) : 0;
     const toggleDeep = () => {
         if (deepMode) { setDeepMode(false); return; }
-        if (!myPlan?.usage?.deep?.limit) {
+        if (!deepUnlimited && !myPlan?.usage?.deep?.limit) {
             emitLimit({
                 code: 'limit_reached', plan: myPlan?.plan || 'free', feature: 'deep', limit: 0, used: 0,
                 message: 'Deep answers use our most capable model for tricky questions. They come with Topper.',
@@ -1781,13 +1783,13 @@ const ProjectView = () => {
                                             type="button"
                                             onClick={toggleDeep}
                                             aria-pressed={deepMode}
-                                            title={deepMode ? `Deep mode on · ${deepLeft} left this month` : 'Deep mode: our most capable model for tricky questions'}
+                                            title={deepMode ? (deepUnlimited ? 'Deep mode on' : `Deep mode on · ${deepLeft} left this month`) : 'Deep mode: our most capable model for tricky questions'}
                                             className={`shrink-0 flex items-center gap-1 rounded-full px-3 py-2.5 text-xs font-semibold transition-colors ${deepMode
                                                 ? 'bg-[#4A3B32] text-white shadow-md'
                                                 : 'bg-[#FDF6F0] text-[#8a6a5c] hover:text-[#4A3B32]'}`}
                                         >
                                             <Brain className="h-4 w-4" />
-                                            <span className="hidden sm:inline">Deep{deepMode ? ` · ${deepLeft}` : ''}</span>
+                                            <span className="hidden sm:inline">Deep{deepMode && !deepUnlimited ? ` · ${deepLeft}` : ''}</span>
                                         </button>}
                                         <div className="flex-1 relative">
                                             <input

@@ -26,7 +26,7 @@ from fastapi import HTTPException
 
 from config.settings import settings
 from db.client import async_db, get_supabase_client
-from services.plans import FEATURE_LABELS, FEATURE_NAMES, FEATURE_PERIOD, PLANS, plan_limits
+from services.plans import FEATURE_LABELS, FEATURE_NAMES, FEATURE_PERIOD, PLANS, plan_limits as _plan_limits
 from utils.logger import logger
 
 # Who the current request is for; read by the LLM token recorder
@@ -34,6 +34,11 @@ current_user_id: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
 current_feature: contextvars.ContextVar[str] = contextvars.ContextVar("current_feature", default="other")
 
 _PLAN_TTL = 60  # seconds a resolved plan is cached in-process
+
+
+def plan_limits(plan: str) -> Dict[str, Optional[int]]:
+    """The limits in force: none at all while PLAN_LIMITS_ENABLED is off."""
+    return _plan_limits(plan) if getattr(settings, "PLAN_LIMITS_ENABLED", False) else {}
 
 
 def _tz():
@@ -244,6 +249,7 @@ class UsageService:
             "cancel_at_period_end": row.get("cancel_at_period_end", False),
             "institution_id": row.get("institution_id"),
             "usage": usage,
+            "limits_enabled": bool(getattr(settings, "PLAN_LIMITS_ENABLED", False)),
         }
 
     # --------------------------------------------------------------- tokens
