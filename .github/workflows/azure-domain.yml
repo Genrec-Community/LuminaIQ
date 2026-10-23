@@ -14,7 +14,7 @@ permissions:
 jobs:
   domain:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 50
     env:
       RG: ${{ vars.AZURE_RESOURCE_GROUP || 'luminaiq' }}
       WEB: luminaiq-web
@@ -54,3 +54,14 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
           echo "TXT token: ${TOKEN}"
           az staticwebapp hostname list -n "$WEB" -g "$RG" --query "[].{domain:name,status:status,error:errorMessage}" -o table
+      - name: Wait until both domains are ready (certificate issued)
+        run: |
+          for i in $(seq 1 45); do
+            STATES=$(az staticwebapp hostname list -n "$WEB" -g "$RG" --query "[].status" -o tsv | sort -u | tr '\n' ' ')
+            echo "$(date -u +%H:%M) $STATES"
+            case "$STATES" in "Ready ") break ;; esac
+            echo "$STATES" | grep -q Failed && break
+            sleep 60
+          done
+          az staticwebapp hostname list -n "$WEB" -g "$RG" --query "[].{domain:name,status:status,error:errorMessage}" -o table
+          { echo "## Final status"; echo '```'; az staticwebapp hostname list -n "$WEB" -g "$RG" --query "[].{domain:name,status:status,error:errorMessage}" -o table; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
