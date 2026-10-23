@@ -54,6 +54,87 @@ const daysUntil = (iso) => {
     return Math.round((d - today) / 86400000);
 };
 
+/* ── Skimmable text ───────────────────────────────────────────────────────
+ * Card text arrives as plain strings, sometimes one long run-on paragraph
+ * ("Performance: Car — …; Fridge — …. Features: …"). These helpers lay it out
+ * for fast reading: "Label:" sections become a list with bold labels, "; "
+ * separated parts become lines, and "Thing — detail" starts with a bold thing.
+ */
+const inline = (text) => {
+    // **bold** first, then a leading "Thing — " / "Thing: " in bold
+    const parts = String(text).split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
+    return parts.map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**')) return <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong>;
+        if (i === 0) {
+            const m = part.match(/^([^—:]{1,40}?)\s*(—|–|:)\s+(.+)$/s);
+            if (m) return <React.Fragment key={i}><strong className="font-semibold">{m[1]}</strong> <span className="text-[#8a6a5c]">{m[2] === ':' ? '' : '— '}</span>{m[3]}</React.Fragment>;
+        }
+        return <React.Fragment key={i}>{part}</React.Fragment>;
+    });
+};
+
+// "Label: text. Label2: text" → [{label, body}] when there are at least two labels
+const labelledSections = (text) => {
+    const re = /(?:^|(?<=[.;!?]\s))([A-Z][A-Za-z0-9()/&' -]{1,40}):\s/g;
+    const hits = [...text.matchAll(re)];
+    if (hits.length < 2) return null;
+    const out = [];
+    if (hits[0].index > 0) out.push({ label: '', body: text.slice(0, hits[0].index).trim() });
+    hits.forEach((h, i) => {
+        const end = i + 1 < hits.length ? hits[i + 1].index : text.length;
+        out.push({ label: h[1].trim(), body: text.slice(h.index + h[0].length, end).trim().replace(/[.;]$/, '') });
+    });
+    return out;
+};
+
+const splitParts = (body) => body.split(/;\s+/).map((x) => x.trim()).filter(Boolean);
+
+const RichText = ({ text, className = '' }) => {
+    const t = String(text || '').trim();
+    if (!t) return null;
+    const lines = t.split(/\n+/).map((l) => l.replace(/^\s*(?:[-•*]|\d+[.)])\s+/, '').trim()).filter(Boolean);
+    if (lines.length > 1) {
+        return (
+            <ul className={`space-y-1.5 ${className}`}>
+                {lines.map((l, i) => (
+                    <li key={i} className="flex gap-2 leading-relaxed"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#C8A288]" /><span>{inline(l)}</span></li>
+                ))}
+            </ul>
+        );
+    }
+    const sections = labelledSections(t);
+    if (sections) {
+        return (
+            <div className={`divide-y divide-[#F1E6DD] rounded-xl border border-[#E6D5CC] bg-white ${className}`}>
+                {sections.map((sec, i) => {
+                    const parts = splitParts(sec.body);
+                    return (
+                        <div key={i} className="px-3.5 py-2.5 sm:flex sm:gap-4">
+                            {sec.label && <div className="mb-1 shrink-0 text-sm font-bold text-[#4A3B32] sm:mb-0 sm:w-40">{sec.label}</div>}
+                            <div className="min-w-0 flex-1 space-y-1 text-[15px] leading-relaxed text-[#4A3B32]">
+                                {parts.length > 1
+                                    ? parts.map((p, j) => <div key={j}>{inline(p)}</div>)
+                                    : <div>{inline(sec.body)}</div>}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    }
+    const parts = splitParts(t);
+    if (parts.length >= 3) {
+        return (
+            <ul className={`space-y-1.5 ${className}`}>
+                {parts.map((p, i) => (
+                    <li key={i} className="flex gap-2 leading-relaxed"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#C8A288]" /><span>{inline(p)}</span></li>
+                ))}
+            </ul>
+        );
+    }
+    return <p className={`leading-relaxed ${className}`}>{inline(t)}</p>;
+};
+
 /** One cram card: the minimum you need to understand a topic and score on it. */
 const CramCard = ({ card, tier, onVisualize }) => (
     <div className="space-y-4">
@@ -68,7 +149,7 @@ const CramCard = ({ card, tier, onVisualize }) => (
                 <h4 className="text-sm font-bold text-[#4A3B32] mb-2 flex items-center gap-1.5"><Target className="h-4 w-4 text-[#C8A288]" /> What carries the marks</h4>
                 <ul className="space-y-1.5">
                     {card.key_points.map((p, i) => (
-                        <li key={i} className="flex gap-2 text-[#4A3B32]"><span className="text-[#C8A288] font-bold">{i + 1}.</span><span>{p}</span></li>
+                        <li key={i} className="flex gap-2 leading-relaxed text-[#4A3B32]"><span className="text-[#C8A288] font-bold">{i + 1}.</span><span>{inline(p)}</span></li>
                     ))}
                 </ul>
             </div>
@@ -88,28 +169,28 @@ const CramCard = ({ card, tier, onVisualize }) => (
         )}
         {tier === 'learn' && card.example && (
             <div>
-                <h4 className="text-sm font-bold text-[#4A3B32] mb-1">Example</h4>
-                <p className="text-[#4A3B32] whitespace-pre-line">{card.example}</p>
+                <h4 className="text-sm font-bold text-[#4A3B32] mb-2 flex items-center gap-1.5"><BookOpen className="h-4 w-4 text-[#C8A288]" /> Example</h4>
+                <RichText text={card.example} className="text-[#4A3B32]" />
             </div>
         )}
         <div className="grid gap-2 sm:grid-cols-2">
             {card.memory_hook && (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900">
                     <span className="text-xs font-bold uppercase tracking-wide flex items-center gap-1"><Lightbulb className="h-3.5 w-3.5" /> Memory hook</span>
-                    <p className="mt-1 text-sm">{card.memory_hook}</p>
+                    <RichText text={card.memory_hook} className="mt-1 text-sm" />
                 </div>
             )}
             {card.exam_tip && (
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-emerald-900">
                     <span className="text-xs font-bold uppercase tracking-wide flex items-center gap-1"><Sparkles className="h-3.5 w-3.5" /> Exam tip</span>
-                    <p className="mt-1 text-sm">{card.exam_tip}</p>
+                    <RichText text={card.exam_tip} className="mt-1 text-sm" />
                 </div>
             )}
         </div>
         {tier === 'learn' && card.mistakes?.length > 0 && (
             <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-rose-900">
                 <span className="text-xs font-bold uppercase tracking-wide flex items-center gap-1"><AlertTriangle className="h-3.5 w-3.5" /> Don&apos;t lose marks on</span>
-                <ul className="mt-1 text-sm list-disc pl-5 space-y-0.5">{card.mistakes.map((m, i) => <li key={i}>{m}</li>)}</ul>
+                <ul className="mt-1 text-sm list-disc pl-5 space-y-0.5">{card.mistakes.map((m, i) => <li key={i}>{inline(m)}</li>)}</ul>
             </div>
         )}
         {onVisualize && (

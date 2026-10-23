@@ -268,7 +268,7 @@ Return ONLY valid JSON (no markdown) with this exact shape:
   "tldr": "2-3 sentence plain-language explanation of the core idea",
   "key_points": ["4-6 short points that carry the marks"],
   "formulas": [{{"expr": "F = m·a", "meaning": "what each symbol means / when to use it"}}],
-  "example": "one short worked example or concrete illustration",
+  "example": "one short worked example or concrete illustration, laid out for skimming: one item per line separated by \\n, each line 'Label: detail' (e.g. 'Performance: Car — good mileage; Fridge — even cooling')",
   "memory_hook": "a vivid mnemonic or analogy that makes it stick",
   "exam_tip": "how this is usually asked and how to answer it for full marks",
   "mistakes": ["1-3 common mistakes to avoid"],
@@ -277,7 +277,9 @@ Return ONLY valid JSON (no markdown) with this exact shape:
   ]
 }}
 Rules: formulas may be [] if the topic has none; write formulas in plain text/Unicode (x², √, π, Σ, ·),
-not LaTeX; give exactly 2 quick_check questions; keep the whole card readable in about 3 minutes."""
+not LaTeX; give exactly 2 quick_check questions; keep the whole card readable in about 3 minutes.
+Write for fast reading: short lines, no paragraph longer than 2 sentences, start key points with the
+key term followed by ' — ', and use **bold** for at most one or two key terms per field."""
 
     # Topper cram cards come from the Deep model
     deep = (await usage.plan(current_user["id"])) == "topper"
