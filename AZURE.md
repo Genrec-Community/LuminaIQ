@@ -5,7 +5,7 @@ Workflow: `.github/workflows/azure.yml` (branch `jaisamyukth-changes`; `main` is
 | Piece | Azure service | Notes |
 |---|---|---|
 | Backend API | **Container Apps** `luminaiq-api` (Central India) | Always on (min 1 replica, no cold starts), scales to 10 replicas at 40 concurrent requests each, 1 vCPU / 2 GiB per replica |
-| Container images | **Container Registry** (Basic) | Images are built inside Azure (`az acr build`) |
+| Container images | **Container Registry** (Basic) | Images are built by GitHub Actions and pushed here |
 | Website | **Static Web Apps** `luminaiq-web` (Free) | Served from a global CDN |
 | AI | Foundry `Luminaiq` (East US) | GPT-5-mini, text-embedding-3-small, Document Intelligence |
 | Database / auth | Supabase (unchanged) | |

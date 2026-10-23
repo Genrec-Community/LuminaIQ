@@ -71,12 +71,17 @@ jobs:
           az containerapp env show -n "$ENVIRONMENT" -g "$RG" >/dev/null 2>&1 || \
             az containerapp env create -n "$ENVIRONMENT" -g "$RG" -l "$LOCATION" -o none
 
-      - name: Build backend image (in Azure)
+      - name: Build and push backend image
         if: steps.check.outputs.enabled == '1'
         run: |
           set -euo pipefail
-          az acr build -r "$ACR" -t "backend:${GITHUB_SHA}" -t backend:latest backend/ --only-show-errors -o none
-          echo "IMAGE=$ACR.azurecr.io/backend:${GITHUB_SHA}" >> "$GITHUB_ENV"
+          # Built on the runner: ACR Tasks (az acr build) are not allowed on free-credit subscriptions
+          az acr login -n "$ACR" --only-show-errors
+          IMAGE="$ACR.azurecr.io/backend:${GITHUB_SHA}"
+          docker build -t "$IMAGE" -t "$ACR.azurecr.io/backend:latest" backend/
+          docker push "$IMAGE"
+          docker push "$ACR.azurecr.io/backend:latest"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
 
       - name: Deploy backend
         if: steps.check.outputs.enabled == '1'
