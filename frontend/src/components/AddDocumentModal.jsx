@@ -384,15 +384,18 @@ const UploadStep = ({ onUpload, uploading, onBack }) => {
             accept.some(ext => f.name.toLowerCase().endsWith(ext))
         );
         if (files.length) {
-            setSelectedFiles(files);
+            // Picking again adds to the list (several books at once), without repeats
+            setSelectedFiles(prev => [...prev, ...files.filter(f => !prev.some(p => p.name === f.name && p.size === f.size))]);
             if (!bookTitle) setBookTitle(files[0].name.replace(/\.[^.]+$/, ''));
         }
     }, [bookTitle]);
 
     const handleFileSelect = (e) => {
         const files = Array.from(e.target.files);
+        e.target.value = '';
         if (files.length) {
-            setSelectedFiles(files);
+            // Picking again adds to the list (several books at once), without repeats
+            setSelectedFiles(prev => [...prev, ...files.filter(f => !prev.some(p => p.name === f.name && p.size === f.size))]);
             if (!bookTitle) setBookTitle(files[0].name.replace(/\.[^.]+$/, ''));
         }
     };
@@ -441,9 +444,9 @@ const UploadStep = ({ onUpload, uploading, onBack }) => {
                         <Upload className={`h-7 w-7 ${isDragging ? 'text-white' : 'text-[#C8A288]'}`} />
                     </div>
                     <p className="text-sm font-semibold text-[#4A3B32] mb-1">
-                        {isDragging ? 'Drop it!' : 'Drag & drop your file here'}
+                        {isDragging ? 'Drop it!' : 'Drag & drop your books here'}
                     </p>
-                    <p className="text-xs text-[#8a6a5c] mb-3">PDF, DOCX, TXT — up to {MAX_UPLOAD_MB} MB</p>
+                    <p className="text-xs text-[#8a6a5c] mb-3">PDF, DOCX, TXT — up to {MAX_UPLOAD_MB} MB each. Pick several at once.</p>
                     <label className="inline-block px-5 py-2.5 bg-[#C8A288] text-white text-sm font-medium rounded-xl hover:bg-[#B08B72] cursor-pointer transition-colors shadow-md shadow-[#C8A288]/20">
                         Browse Files
                         <input type="file" multiple accept=".pdf,.docx,.txt" onChange={handleFileSelect} className="hidden" />
@@ -639,8 +642,7 @@ const AddDocumentModal = ({ projectId, uploading, onUpload, onImported, onClose 
 
     const handleUpload = (files, bookOptions) => {
         onUpload(files, bookOptions);
-        // Modal stays open so the user can see the uploading spinner in UploadStep
-        // Parent should close it after upload completes
+        // The parent closes the modal at once; progress shows in the document list
     };
 
     const handleImported = (doc) => {

@@ -342,6 +342,11 @@ const Dashboard = () => {
                         setUploadStatus(prev => ({ ...prev, [file.name]: 'success' }));
                     } catch (err) {
                         setUploadStatus(prev => ({ ...prev, [file.name]: 'error' }));
+                        const detail = err?.response?.data?.detail;
+                        // A plan limit opens the upgrade prompt on its own; say what failed otherwise
+                        if (err?.response?.status !== 402) {
+                            toast.error(`${file.name}: ${typeof detail === 'string' ? detail : !err?.response ? "couldn't reach the server" : 'upload failed'}`);
+                        }
                     }
                 }
                 setTimeout(() => navigate(`/project/${projectData.id}`), 1000);

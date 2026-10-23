@@ -39,4 +39,4 @@ jobs:
       - name: Application logs
         run: az containerapp logs show -n "$APP" -g "$RG" --type console --tail "${{ inputs.lines || 300 }}" --format text 2>&1 | tail -n "${{ inputs.lines || 300 }}"
       - name: System logs
-        run: az containerapp logs show -n "$APP" -g "$RG" --type system --tail 60 --format text 2>&1 | tail -n 60
+        run: az containerapp logs show -n "$APP" -g "$RG" --type system --tail 60 --format json 2>&1 | tail -n 60

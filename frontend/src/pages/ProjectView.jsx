@@ -371,6 +371,8 @@ const ProjectView = () => {
     const isStalled = (doc) => !docStages[doc.id] && !!doc.updated_at
         && Date.now() - new Date(doc.updated_at).getTime() > 20 * 60 * 1000;
     const resumeInputRef = useRef(null);
+    const uploadsInFlightRef = useRef([]);
+    uploadsInFlightRef.current = uploadsInFlight;
     const uploadFilesRef = useRef({}); // upload key -> File, so a stalled upload can be retried
     const [, setNowTick] = useState(0);
     useEffect(() => { // re-render every 15 s while uploading, so a stall shows up
@@ -1086,6 +1088,15 @@ const ProjectView = () => {
             toast.error(`"${tooBig.name}" is ${(tooBig.size / 1024 / 1024).toFixed(0)} MB. The limit is ${MAX_UPLOAD_MB} MB per file.`);
             return;
         }
+        // Skip books already uploading or already in this project (double taps, re-picks)
+        const inFlight = new Set(uploadsInFlightRef.current.map(u => `${u.name}|${u.size}`));
+        const inProject = new Set(documents.filter(d => d.upload_status !== 'failed').map(d => `${d.filename}|${d.file_size}`));
+        const fresh = Array.from(files).filter(f => !inFlight.has(`${f.name}|${f.size}`) && !inProject.has(`${f.name}|${f.size}`));
+        const skipped = files.length - fresh.length;
+        if (skipped) toast.info(skipped === 1 && files.length === 1 ? `"${files[0].name}" is already in this project.` : `${skipped} book${skipped > 1 ? 's are' : ' is'} already in this project, skipped.`);
+        setShowUploadModal(false);
+        if (!fresh.length) return;
+        files = fresh;
         // Show each upload's progress in the document list straight away
         const entries = Array.from(files).map((file, i) => ({ key: `${Date.now()}-${i}`, name: file.name, size: file.size, pct: 0, file, startedAt: Date.now() }));
         uploadFilesRef.current = { ...uploadFilesRef.current, ...Object.fromEntries(entries.map(e => [e.key, e.file])) };
@@ -1096,14 +1107,21 @@ const ProjectView = () => {
         const setPct = (key, pct) => setUploadsInFlight(prev => prev.map(u => (u.key === key ? { ...u, pct: Math.max(u.pct, pct) } : u)));
         try {
             // Upload files in parallel for better performance
-            await Promise.all(
+            const results = await Promise.allSettled(
                 entries.map(({ key, file }) => uploadDocument(projectId, file, (pct) => setPct(key, pct), bookOptions))
             );
+            results.forEach((r, i) => {
+                if (r.status !== 'rejected') return;
+                const error = r.reason;
+                console.error("Upload error", error);
+                const detail = error?.response?.data?.detail;
+                const why = typeof detail === 'string' ? detail
+                    : error?.response?.status === 402 ? "your plan's book limit is reached"
+                    : error?.code === 'ECONNABORTED' ? 'the server took too long to answer'
+                    : !error?.response ? "couldn't reach the server" : `server error ${error.response.status}`;
+                toast.error(`${entries[i].name}: ${why}`);
+            });
             await fetchDocuments();
-        } catch (error) {
-            console.error("Upload error", error);
-            const detail = error.response?.data?.detail;
-            toast.error(typeof detail === 'string' ? detail : 'Failed to upload document(s)');
         } finally {
             const done = new Set(entries.map(e => e.key));
             setUploadsInFlight(prev => prev.filter(u => !done.has(u.key)));
@@ -2539,9 +2557,10 @@ const ProjectView = () => {
                 <AddDocumentModal
                     projectId={projectId}
                     uploading={false /* progress shows in the document list; more books can be added meanwhile */}
-                    onUpload={async (files, bookOptions) => {
-                        await handleFileUpload(files, bookOptions);
+                    onUpload={(files, bookOptions) => {
+                        // Close straight away: progress shows in the document list
                         setShowAddDocModal(false);
+                        handleFileUpload(files, bookOptions);
                     }}
                     onImported={(doc) => {
                         fetchDocuments();

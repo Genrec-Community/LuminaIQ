@@ -40,6 +40,20 @@ class SearchResult(BaseModel):
     score: float
 
 
+async def _existing_copy(project_id: str, filename: str, file_size: int) -> Optional[dict]:
+    """A copy of this file (same name and size) already in the project that hasn't failed."""
+    try:
+        res = await async_db(
+            lambda: get_supabase_client().table("documents").select("*")
+            .eq("project_id", project_id).eq("filename", filename).eq("file_size", file_size)
+            .neq("upload_status", "failed").limit(1).execute()
+        )
+        return res.data[0] if res.data else None
+    except Exception as e:
+        logger.debug(f"Duplicate check skipped: {e}")
+        return None
+
+
 async def _start_processing(
     current_user: dict, project_id: str, temp_path: str, filename: str, content_type: str,
     file_size: int, is_public: bool = False, book_title: Optional[str] = None,
@@ -47,6 +61,13 @@ async def _start_processing(
     book_tags: Optional[str] = None,
 ) -> dict:
     """Create the document record and process the file at temp_path in the background."""
+    # The same book sent twice (double tap, retry) is not processed again
+    existing = await _existing_copy(project_id, filename, file_size)
+    if existing:
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+        return existing
+
     # 3. Create document record in Supabase
     doc_data = {
         "project_id": project_id,
@@ -301,6 +322,8 @@ async def get_upload_url(request: UploadUrlRequest, current_user: dict = Depends
             status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             f"This file is larger than the {settings.MAX_FILE_SIZE // (1024 * 1024)} MB upload limit.",
         )
+    if await _existing_copy(request.project_id, request.filename, request.size):
+        raise HTTPException(status.HTTP_409_CONFLICT, f"\"{request.filename}\" is already in this project.")
     path = upload_object_path(current_user["id"], request.project_id, request.filename, request.size)
     token = await create_signed_upload(path)
     if ext == "pdf":

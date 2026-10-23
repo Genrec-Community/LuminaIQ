@@ -89,7 +89,8 @@ const putSigned = (file, bucket, path, token, onProgress) => new Promise((resolv
 export async function uploadToStorage(file, projectId, onProgress) {
     let permit;
     try {
-        permit = (await api.post('/documents/upload-url', { project_id: projectId, filename: file.name, size: file.size })).data;
+        // Short timeout: the permit is instant, so a slow answer means the server is unreachable
+        permit = (await api.post('/documents/upload-url', { project_id: projectId, filename: file.name, size: file.size }, { timeout: 30000 })).data;
     } catch (e) {
         if (e?.response?.status && e.response.status < 500 && e.response.status !== 404) throw e; // limit, too big, wrong type
         const err = new Error('Upload permit unavailable');
