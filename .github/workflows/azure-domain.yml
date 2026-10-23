@@ -1,0 +1,56 @@
+# Connects luminaiq.fun (and www) to the Azure Static Web App and prints the
+# DNS records to add in Cloudflare. Safe to re-run: it reports each domain's status.
+name: Azure domain
+
+on:
+  push:
+    branches: [jaisamyukth-changes]
+    paths: [".github/workflows/azure-domain.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  domain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      RG: ${{ vars.AZURE_RESOURCE_GROUP || 'luminaiq' }}
+      WEB: luminaiq-web
+      APEX: luminaiq.fun
+      WWW: www.luminaiq.fun
+    steps:
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Add the domains
+        run: |
+          HOST=$(az staticwebapp show -n "$WEB" -g "$RG" --query defaultHostname -o tsv)
+          # Root domain: proven with a TXT record
+          az staticwebapp hostname set -n "$WEB" -g "$RG" --hostname "$APEX" --validation-method dns-txt-token --no-wait -o none || true
+          # www: proven by its CNAME (works once the CNAME exists; re-run after adding it)
+          az staticwebapp hostname set -n "$WEB" -g "$RG" --hostname "$WWW" --no-wait -o none 2>&1 | tail -2 || true
+          TOKEN=""
+          for i in $(seq 1 18); do
+            TOKEN=$(az staticwebapp hostname show -n "$WEB" -g "$RG" --hostname "$APEX" --query validationToken -o tsv 2>/dev/null || true)
+            [ -n "$TOKEN" ] && break; sleep 10
+          done
+          {
+            echo "## Add these records in Cloudflare → luminaiq.fun → DNS (Proxy status: DNS only, grey cloud)"
+            echo ""
+            echo "| Type | Name | Content |"
+            echo "|---|---|---|"
+            echo "| TXT | \`@\` | \`${TOKEN:-(not ready yet, re-run this workflow)}\` |"
+            echo "| CNAME | \`@\` | \`$HOST\` |"
+            echo "| CNAME | \`www\` | \`$HOST\` |"
+            echo ""
+            echo "Delete any existing A / AAAA / CNAME records for \`@\` and \`www\` first (the old Vercel ones)."
+            echo ""
+            echo "## Current status"
+            echo '```'
+            az staticwebapp hostname list -n "$WEB" -g "$RG" --query "[].{domain:name,status:status,error:errorMessage}" -o table
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "TXT token: ${TOKEN}"
+          az staticwebapp hostname list -n "$WEB" -g "$RG" --query "[].{domain:name,status:status,error:errorMessage}" -o table
