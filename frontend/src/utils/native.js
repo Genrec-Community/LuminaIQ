@@ -5,8 +5,9 @@ export const NATIVE_AUTH_REDIRECT = 'fun.luminaiq.app://login-callback';
 
 // Web OAuth client ID (Google Cloud → Credentials → "Web application"), the same
 // one Supabase's Google provider uses. Not a secret. Set VITE_GOOGLE_WEB_CLIENT_ID
-// (GitHub variable GOOGLE_WEB_CLIENT_ID) to turn on native sign-in.
-const GOOGLE_WEB_CLIENT_ID = import.meta.env.VITE_GOOGLE_WEB_CLIENT_ID || '';
+// (GitHub variable GOOGLE_WEB_CLIENT_ID) to use a different one.
+const GOOGLE_WEB_CLIENT_ID = import.meta.env.VITE_GOOGLE_WEB_CLIENT_ID
+    || '350306574610-l8caa4eeqqiocisiptr4raoe8r5ne165.apps.googleusercontent.com';
 
 let socialLoginReady = null;
 const sha256Hex = async (text) => {
