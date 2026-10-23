@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Layers, Plus, Trash2, Edit2, Save, X, ChevronDown, Loader2, BookOpen, Sparkles, Shuffle, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
-import { getFlashcardSets, createFlashcardSet, deleteFlashcardSet, generateFlashcardsWithAI } from '../../api';
+import { getFlashcardSets, createFlashcardSet, deleteFlashcardSet, generateFlashcardsWithAI, recordLearning } from '../../api';
 
 const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
     const toast = useToast();
@@ -186,7 +186,14 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
         }
     };
 
+    // Self-graded recall is evidence for the learner model (when the set has a topic)
+    const recordCard = (known) => {
+        const topic = studyCards[currentCardIndex]?.topic || selectedSet?.topic;
+        if (topic) recordLearning(projectId, { topic, correct: known, kind: 'flashcard', source: 'flashcards' });
+    };
+
     const markKnown = () => {
+        recordCard(true);
         const cardId = studyCards[currentCardIndex]?.id;
         if (cardId) {
             setKnownCards(prev => new Set(prev).add(cardId));
@@ -196,6 +203,7 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
     };
 
     const markUnknown = () => {
+        recordCard(false);
         const cardId = studyCards[currentCardIndex]?.id;
         if (cardId) {
             setUnknownCards(prev => new Set(prev).add(cardId));

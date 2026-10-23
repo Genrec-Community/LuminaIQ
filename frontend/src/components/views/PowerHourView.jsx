@@ -6,7 +6,7 @@ import {
     Zap, Timer, Flame, SkipForward, ArrowRight, RotateCcw, Trophy, Loader2,
     BookOpen, Target, Sparkles, CheckCircle2, XCircle, Brain, FlaskConical,
 } from 'lucide-react';
-import { getTopicSummary, generateMCQ } from '../../api';
+import { getTopicSummary, generateMCQ, recordLearning } from '../../api';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
 import { useGamification } from '../../context/GamificationContext';
@@ -226,6 +226,7 @@ const PowerHourView = ({ projectId, availableTopics = [], selectedDocuments = []
             bestCombo: Math.max(s.bestCombo, newCombo),
         }));
         bumpDailyProgress(user?.id, { answered: 1, correct: correct ? 1 : 0, bestCombo: newCombo });
+        recordLearning(projectId, { topic, correct, kind: 'mcq', difficulty: mcqDifficulty, source: 'power_hour' });
         setReaction(correct
             ? (newCombo >= 3 ? `${newCombo}× combo! ${pick(character.cheers)}` : pick(character.cheers))
             : pick(character.consoles));

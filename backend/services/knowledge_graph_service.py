@@ -54,6 +54,8 @@ class KnowledgeGraph:
     _build_locks: WeakValueDictionary = WeakValueDictionary()
     _locks_meta_lock = asyncio.Lock()
 
+    RELATION_KINDS = {"REQUIRES", "SUPPORTS", "PART_OF", "CONTRASTS_WITH", "APPLIED_IN"}
+
     def __init__(self):
         self.client = get_supabase_client()
 
@@ -201,27 +203,32 @@ class KnowledgeGraph:
 
         target_relationships = max(15, len(batch_topics) * 2)
 
-        prompt = f"""You are an expert curriculum designer. Create a learning dependency graph for these topics.
+        prompt = f"""You are an expert curriculum designer. Map how these topics relate, so a learner
+can be guided through them in the best order.
 
 TOPICS:
 {topics_str}
 
-TASK: Identify which topics must be learned before others.
-
-RELATIONSHIP TYPES:
-- "prerequisite": Topic A MUST be learned before Topic B
-- "related": Topics are connected but order doesn't matter
+RELATIONSHIP KINDS:
+- "REQUIRES": B cannot be understood without A first (strict prerequisite). Use sparingly.
+- "SUPPORTS": A helps explain or understand B, but B is learnable without it.
+- "PART_OF": A is a component or sub-idea of the larger topic B.
+- "CONTRASTS_WITH": A and B are easily confused and should be compared.
+- "APPLIED_IN": A is used in the method, technique or scenario B.
 
 RULES:
 1. Use EXACT topic names from the numbered list (copy exactly)
 2. Every topic should connect to at least one other topic
-3. Foundational/intro topics have no prerequisites
-4. Create {target_relationships} relationships total
-5. Weight: 0.9 = essential prerequisite, 0.5 = helpful, 0.3 = loosely related
+3. Foundational/intro topics have nothing they REQUIRE
+4. Create about {target_relationships} relationships in total
+5. "weight": strength, 0.9 = essential, 0.5 = helpful, 0.3 = loose
+6. "confidence": how sure you are the relationship is correct (0.0-1.0)
+7. "basis": "explicit" if the material states it, "inferred" if it is your teaching judgement
+8. Do not chain REQUIRES through everything: most links are SUPPORTS or APPLIED_IN
 
 OUTPUT FORMAT - Return ONLY valid JSON, no markdown:
 [
-  {{"from_topic": "Topic 1 Name", "to_topic": "Topic 2 Name", "relation_type": "prerequisite", "weight": 0.9}}
+  {{"from_topic": "Topic 1 Name", "to_topic": "Topic 2 Name", "kind": "REQUIRES", "weight": 0.9, "confidence": 0.8, "basis": "inferred"}}
 ]"""
 
         messages = [{"role": "user", "content": prompt}]
@@ -259,16 +266,24 @@ OUTPUT FORMAT - Return ONLY valid JSON, no markdown:
             to_exists = to_topic_raw.lower() in topics_lower
 
             if from_exists and to_exists and from_topic != to_topic:
-                relation_type = rel.get("relation_type", "related")
-                if relation_type not in [
-                    "prerequisite",
-                    "related",
-                    "subtopic",
-                    "builds_on",
-                ]:
-                    relation_type = "related"
-                if relation_type in ["builds_on", "subtopic"]:
-                    relation_type = "prerequisite"
+                kind = str(rel.get("kind") or "").upper().replace(" ", "_")
+                if not kind:
+                    # Older answer format
+                    legacy = rel.get("relation_type", "related")
+                    kind = "REQUIRES" if legacy in ("prerequisite", "builds_on") else "SUPPORTS"
+                if kind not in self.RELATION_KINDS:
+                    kind = "SUPPORTS"
+                try:
+                    weight = min(1.0, max(0.1, float(rel.get("weight", 0.5))))
+                except (TypeError, ValueError):
+                    weight = 0.5
+                try:
+                    confidence = min(1.0, max(0.0, float(rel.get("confidence", 0.6))))
+                except (TypeError, ValueError):
+                    confidence = 0.6
+                # The model proposes; a doubtful "requires" is only treated as support
+                if kind == "REQUIRES" and confidence < 0.5:
+                    kind = "SUPPORTS"
 
                 edges.append(
                     {
@@ -276,8 +291,12 @@ OUTPUT FORMAT - Return ONLY valid JSON, no markdown:
                         "project_id": project_id,
                         "from_topic": from_topic,
                         "to_topic": to_topic,
-                        "relation_type": relation_type,
-                        "weight": min(1.0, max(0.1, float(rel.get("weight", 0.5)))),
+                        # Older screens read relation_type; the engine reads kind
+                        "relation_type": "prerequisite" if kind == "REQUIRES" else "related",
+                        "weight": weight,
+                        "kind": kind,
+                        "confidence": round(confidence, 2),
+                        "evidence": "explicit" if str(rel.get("basis", "")).lower() == "explicit" else "inferred",
                     }
                 )
 

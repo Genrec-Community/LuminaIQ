@@ -4,7 +4,7 @@ import {
     Moon, Clock, Loader2, ArrowRight, ArrowLeft, CheckCircle2, XCircle, Coffee, Printer,
     Sparkles, Lightbulb, AlertTriangle, Target, FlaskConical, RotateCcw, Layers, BookOpen,
 } from 'lucide-react';
-import { getCramPlan, getCramCard } from '../../api';
+import { getCramPlan, getCramCard, recordLearning } from '../../api';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
 import { useGamification } from '../../context/GamificationContext';
@@ -203,7 +203,7 @@ const CramCard = ({ card, tier, onVisualize }) => (
 );
 
 /** Two quick questions to lock the topic in before moving on. */
-const QuickCheck = ({ questions, onDone }) => {
+const QuickCheck = ({ questions, onDone, onAnswer }) => {
     const [i, setI] = useState(0);
     const [picked, setPicked] = useState(null);
     const [correct, setCorrect] = useState(0);
@@ -214,6 +214,7 @@ const QuickCheck = ({ questions, onDone }) => {
         if (answered) return;
         setPicked(idx);
         if (idx === q.answer_index) setCorrect((c) => c + 1);
+        onAnswer?.(idx === q.answer_index);
     };
     const next = () => {
         const total = correct;
@@ -689,6 +690,7 @@ const ExamTonightView = ({ projectId, selectedDocuments = [], onTopicMastered, o
                                         <div className="mt-5">
                                             {checking && cards[entry.topic].quick_check?.length > 0 ? (
                                                 <QuickCheck key={entry.topic} questions={cards[entry.topic].quick_check}
+                                                    onAnswer={(right) => recordLearning(projectId, { topic: entry.topic, correct: right, kind: 'quick_check', source: 'exam_tonight' })}
                                                     onDone={(right, total) => {
                                                         setCheer(right === total ? pick(character.cheers) : right ? 'Nearly there: reread the key points once more.' : pick(character.consoles));
                                                         setChecking(false);

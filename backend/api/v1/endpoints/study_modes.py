@@ -154,7 +154,11 @@ async def _book_coverage(project_id: str, documents: List[Dict[str, Any]], topic
 
 
 async def _mastery(user_id: str, project_id: str) -> Dict[str, float]:
-    """0..1 per topic from quiz accuracy (trusted more with more attempts) and completed topics."""
+    """
+    0..1 per topic: the learning engine's estimate of what the student knows
+    now (evidence-weighted, faded by forgetting). Falls back to quiz accuracy
+    and completed topics if the learner model is unavailable.
+    """
     from services.user_data_service import user_data
 
     mastery: Dict[str, float] = {}
@@ -168,6 +172,13 @@ async def _mastery(user_id: str, project_id: str) -> Dict[str, float]:
         logger.warning(f"Could not load performance for cram plan: {e}")
     for t in await user_data.get_learning_progress(user_id, project_id):
         mastery[t] = max(mastery.get(t, 0.0), 0.85)
+    # The learner model wins wherever it has evidence
+    try:
+        from services.learning_engine import get_learning_engine, effective_mastery
+        for t, state in (await get_learning_engine().load_states(user_id, project_id)).items():
+            mastery[t] = round(effective_mastery(state), 3)
+    except Exception as e:
+        logger.warning(f"Learner model unavailable for cram plan: {e}")
     return mastery
 
 

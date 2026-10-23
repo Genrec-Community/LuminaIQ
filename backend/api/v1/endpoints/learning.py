@@ -32,6 +32,7 @@ Dashboard:
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
+from services.learning_engine import get_learning_engine
 from services.learning_service import (
     learning_service,
     performance_tracker,
@@ -125,6 +126,16 @@ async def record_performance(
     """
     try:
         user_id = current_user["id"]
+
+        # Feed the learner model first: it seeds unseen topics from the older
+        # tallies, which must not already include this quiz
+        try:
+            quiz = [{"topic": request.topic, "correct": True, "kind": "mcq", "source": "quiz"}] * max(0, min(request.correct, 30)) \
+                + [{"topic": request.topic, "correct": False, "kind": "mcq", "source": "quiz"}] * max(0, min(request.wrong, 30))
+            if quiz:
+                await get_learning_engine().record(user_id, request.project_id, quiz)
+        except Exception as engine_err:
+            logger.warning(f"Learning engine update skipped: {engine_err}")
 
         result = await performance_tracker.record_performance(
             user_id=user_id,
@@ -1007,3 +1018,79 @@ def _parse_flashcards_json(response: str) -> Optional[List[Dict]]:
             pass
 
     return None
+
+
+# ============== Learning engine ==============
+
+
+class LearningEvent(BaseModel):
+    topic: str
+    correct: bool
+    kind: str = Field("mcq", pattern="^(mcq|quick_check|recall|flashcard|written|feed)$")
+    difficulty: Optional[str] = Field("medium", pattern="^(easy|medium|hard)$")
+    hinted: bool = False
+    source: Optional[str] = None
+
+
+class LearningEventsRequest(BaseModel):
+    project_id: str
+    events: List[LearningEvent] = Field(..., min_length=1, max_length=100)
+
+
+async def _check_project(project_id: str, user_id: str) -> None:
+    from db.client import async_db, get_supabase_client
+    res = await async_db(lambda: get_supabase_client().table("projects").select("user_id")
+                         .eq("id", project_id).limit(1).execute())
+    if not res.data or res.data[0]["user_id"] != user_id:
+        raise HTTPException(404, "Project not found")
+
+
+@router.post("/events")
+async def record_learning_events(request: LearningEventsRequest, current_user: dict = Depends(get_current_user)):
+    """
+    Evidence of learning (answers, recalls, flashcard grades) for the learner
+    model. Updates each topic's mastery estimate and review schedule.
+    """
+    user_id = current_user["id"]
+    await _check_project(request.project_id, user_id)
+    events = [e.model_dump() for e in request.events]
+    result = await get_learning_engine().record(user_id, request.project_id, events)
+
+    # Keep the older per-topic tallies (weak topics, dashboards) in step
+    tallies: Dict[str, List[int]] = {}
+    for e in events:
+        t = tallies.setdefault(e["topic"], [0, 0])
+        t[0 if e["correct"] else 1] += 1
+    for topic, (right, wrong) in tallies.items():
+        try:
+            await performance_tracker.record_performance(user_id, request.project_id, topic, right, wrong)
+        except Exception as perf_err:
+            logger.debug(f"Tally update skipped for {topic}: {perf_err}")
+    return result
+
+
+@router.get("/engine/{project_id}")
+async def learning_engine_plan(
+    project_id: str,
+    goal: Optional[str] = None,
+    horizon: int = 12,
+    minutes: Optional[float] = None,
+    documents: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    The adaptive learning plan: what to learn next and why, the learner's
+    mastery profile (with how well each estimate is supported), topics waiting
+    on a foundation, and reviews that are due.
+
+    goal: comma-separated topics to aim for (default: the whole subject).
+    minutes: optional time budget for the sequence.
+    """
+    user_id = current_user["id"]
+    await _check_project(project_id, user_id)
+    goal_topics = [t.strip() for t in goal.split("||") if t.strip()] if goal else None
+    docs = [d for d in (documents or "").split(",") if d] or None
+    return await get_learning_engine().build_plan(
+        user_id, project_id, goal_topics=goal_topics, horizon=max(1, min(horizon, 40)),
+        budget_minutes=minutes, selected_documents=docs,
+    )

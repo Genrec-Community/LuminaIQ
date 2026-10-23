@@ -541,6 +541,43 @@ export const deleteSavedNote = async (noteId) => {
 // ============== Learning API (Adaptive Learning System) ==============
 
 // Performance Tracking
+// ── Learning engine ───────────────────────────────────────────────
+// Evidence is batched (a burst of answers becomes one request) and never
+// blocks or breaks the screen that produced it.
+const learningQueue = new Map(); // projectId -> events
+let learningTimer = null;
+const flushLearning = () => {
+    learningTimer = null;
+    for (const [projectId, events] of learningQueue) {
+        learningQueue.delete(projectId);
+        for (let i = 0; i < events.length; i += 100) {
+            api.post('/learning/events', { project_id: projectId, events: events.slice(i, i + 100) }, { _retryCount: 3 })
+                .catch(() => { /* evidence is best effort */ });
+        }
+    }
+};
+/** Record that the learner got a topic right or wrong ({ topic, correct, kind, difficulty, hinted, source }). */
+export const recordLearning = (projectId, event) => {
+    if (!projectId || !event?.topic) return;
+    const list = learningQueue.get(projectId) || [];
+    list.push({ kind: 'mcq', difficulty: 'medium', hinted: false, ...event, correct: !!event.correct });
+    learningQueue.set(projectId, list);
+    if (list.length >= 20) flushLearning();
+    else if (!learningTimer) learningTimer = setTimeout(flushLearning, 1500);
+};
+if (typeof window !== 'undefined') window.addEventListener('pagehide', flushLearning);
+
+/** The adaptive plan: next topics with reasons, mastery profile, blocked topics, due reviews. */
+export const getLearningPlan = async (projectId, { goal, horizon, minutes, documents } = {}) => {
+    const params = {};
+    if (goal?.length) params.goal = goal.join('||');
+    if (horizon) params.horizon = horizon;
+    if (minutes) params.minutes = minutes;
+    if (documents?.length) params.documents = documents.join(',');
+    const response = await api.get(`/learning/engine/${projectId}`, { params, timeout: 60000 });
+    return response.data;
+};
+
 export const recordPerformance = async (projectId, topic, correct, wrong) => {
     const response = await api.post('/learning/performance/record', {
         project_id: projectId,
