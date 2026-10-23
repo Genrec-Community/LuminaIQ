@@ -401,7 +401,43 @@ const ExamTonightView = ({ projectId, selectedDocuments = [], onTopicMastered, o
         setPhase('study');
     };
 
+    // Next topic opens at the top; going back lands at the bottom of the previous
+    // topic, where its "next" button was
+    const scrollRef = useRef(null);
+    const pendingScroll = useRef(null);
+    useEffect(() => {
+        if (phase !== 'study' || !pendingScroll.current) return;
+        const where = pendingScroll.current;
+        const apply = () => {
+            const el = scrollRef.current;
+            if (!el) return;
+            const top = where === 'bottom' ? el.scrollHeight : 0;
+            el.scrollTo({ top, behavior: 'auto' });
+            // Phone app: the page itself may be what scrolls
+            if (where === 'top') window.scrollTo({ top: 0 });
+            else window.scrollTo({ top: document.documentElement.scrollHeight });
+        };
+        apply();
+        // Again after the card's enter animation has laid out its full height
+        const t1 = setTimeout(apply, 120);
+        const t2 = setTimeout(apply, 450);
+        const t3 = setTimeout(() => { apply(); pendingScroll.current = null; }, 800);
+        return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+    }, [phase, step]);
+
+    const prevTopicIndex = (() => {
+        for (let i = step - 1; i >= 0; i--) if (timeline[i]?.type === 'topic') return i;
+        return -1;
+    })();
+    const goBack = () => {
+        if (prevTopicIndex < 0) return;
+        setChecking(false); setCheer('');
+        pendingScroll.current = 'bottom';
+        setStep(prevTopicIndex);
+    };
+
     const advance = (topicDone) => {
+        pendingScroll.current = 'top';
         if (topicDone && entry?.type === 'topic') {
             setDone((d) => new Set(d).add(entry.topic));
             if (entry.tier === 'learn') onTopicMastered?.(entry.topic);
@@ -603,7 +639,7 @@ const ExamTonightView = ({ projectId, selectedDocuments = [], onTopicMastered, o
     const progress = topicEntries.length ? (done.size / topicEntries.length) * 100 : 0;
 
     return (
-        <div className="h-full overflow-y-auto p-4 md:p-8">
+        <div ref={scrollRef} className="h-full overflow-y-auto p-4 md:p-8">
             <div className="max-w-3xl mx-auto">
                 <div className="flex items-center gap-3 mb-4">
                     <button onClick={() => setPhase('plan')} className="inline-flex items-center gap-1 rounded-xl border border-[#E6D5CC] px-3 py-1.5 text-sm font-semibold text-[#4A3B32] hover:border-[#C8A288]">
@@ -622,9 +658,16 @@ const ExamTonightView = ({ projectId, selectedDocuments = [], onTopicMastered, o
                             <Coffee className="mx-auto h-12 w-12 text-[#C8A288]" />
                             <h2 className="mt-3 text-2xl font-bold text-[#4A3B32]">{fmtMin(entry.minutes)} break</h2>
                             <p className="mt-1 text-[#8a6a5c]">Stand up, drink water, look away from the screen. Your brain files away what you just learned while you rest.</p>
-                            <button onClick={() => advance(false)} className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-[#C8A288] px-6 py-3 font-semibold text-white hover:bg-[#B08B72]">
-                                I&apos;m back <ArrowRight className="h-4 w-4" />
-                            </button>
+                            <div className="mt-5 flex flex-wrap justify-center gap-2">
+                                {prevTopicIndex >= 0 && (
+                                    <button onClick={goBack} className="inline-flex items-center gap-1.5 rounded-2xl border border-[#E6D5CC] px-5 py-3 font-semibold text-[#4A3B32] hover:border-[#C8A288]">
+                                        <ArrowLeft className="h-4 w-4" /> Previous
+                                    </button>
+                                )}
+                                <button onClick={() => advance(false)} className="inline-flex items-center gap-2 rounded-2xl bg-[#C8A288] px-6 py-3 font-semibold text-white hover:bg-[#B08B72]">
+                                    I&apos;m back <ArrowRight className="h-4 w-4" />
+                                </button>
+                            </div>
                         </motion.div>
                     ) : entry?.type === 'topic' ? (
                         <motion.div key={entry.topic} initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}
@@ -653,6 +696,12 @@ const ExamTonightView = ({ projectId, selectedDocuments = [], onTopicMastered, o
                                                     }} />
                                             ) : (
                                                 <div className="flex flex-col sm:flex-row gap-2">
+                                                    {prevTopicIndex >= 0 && (
+                                                        <button onClick={goBack}
+                                                            className="order-last sm:order-first flex items-center justify-center gap-1.5 rounded-2xl border border-[#E6D5CC] px-4 py-3 font-semibold text-[#4A3B32] hover:border-[#C8A288] hover:bg-[#FDF6F0]">
+                                                            <ArrowLeft className="h-4 w-4" /> Previous
+                                                        </button>
+                                                    )}
                                                     {cheer && <p className="flex-1 self-center text-sm font-semibold text-[#C8A288]">{companion}: {cheer}</p>}
                                                     {!cheer && entry.tier === 'learn' && cards[entry.topic].quick_check?.length > 0 && (
                                                         <button onClick={() => setChecking(true)}
