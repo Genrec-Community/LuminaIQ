@@ -1,0 +1,179 @@
+# Deploys LuminaIQ to Azure from branch jaisamyukth-changes:
+#   - backend  → Azure Container Apps (Central India), always-on, autoscaling 1-10 replicas
+#   - frontend → Azure Static Web Apps (global CDN)
+# Everything is created on the first run (idempotent after that).
+#
+# Needs two repository secrets (Settings → Secrets and variables → Actions):
+#   AZURE_CREDENTIALS  JSON from `az ad sp create-for-rbac ... --json-auth` (see AZURE.md)
+#   BACKEND_ENV        the backend's settings as KEY=VALUE lines (see AZURE.md)
+# Optional repository variables:
+#   AZURE_LOCATION (default centralindia), AZURE_RESOURCE_GROUP (default luminaiq),
+#   AZURE_API_URL (custom API domain, e.g. https://api.luminaiq.fun/api/v1)
+name: Deploy to Azure
+
+on:
+  push:
+    branches: [jaisamyukth-changes]
+    paths: ["backend/**", "frontend/src/**", "frontend/public/**", "frontend/index.html", "frontend/package.json", ".github/workflows/azure.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: azure-deploy
+  cancel-in-progress: false
+
+env:
+  RG: ${{ vars.AZURE_RESOURCE_GROUP || 'luminaiq' }}
+  LOCATION: ${{ vars.AZURE_LOCATION || 'centralindia' }}
+  APP: luminaiq-api
+  ENVIRONMENT: luminaiq-env
+  WEB: luminaiq-web
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    outputs:
+      api_url: ${{ steps.url.outputs.api_url }}
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - name: Check Azure credentials
+        id: check
+        env:
+          CREDS: ${{ secrets.AZURE_CREDENTIALS }}
+        run: echo "enabled=$([ -n "$CREDS" ] && echo 1 || echo 0)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.enabled == '1'
+
+      - uses: azure/login@v2
+        if: steps.check.outputs.enabled == '1'
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Prepare Azure (providers, registry, environment)
+        if: steps.check.outputs.enabled == '1'
+        run: |
+          set -euo pipefail
+          az extension add --name containerapp --upgrade --only-show-errors
+          for p in Microsoft.App Microsoft.OperationalInsights Microsoft.ContainerRegistry Microsoft.Web; do
+            az provider register --namespace $p --only-show-errors >/dev/null
+          done
+          az group show -n "$RG" >/dev/null 2>&1 || az group create -n "$RG" -l "$LOCATION" -o none
+          SUB=$(az account show --query id -o tsv)
+          ACR="luminaiq$(echo -n "$SUB" | sha1sum | cut -c1-8)"
+          echo "ACR=$ACR" >> "$GITHUB_ENV"
+          az acr show -n "$ACR" -g "$RG" >/dev/null 2>&1 || \
+            az acr create -n "$ACR" -g "$RG" -l "$LOCATION" --sku Basic --admin-enabled true -o none
+          az containerapp env show -n "$ENVIRONMENT" -g "$RG" >/dev/null 2>&1 || \
+            az containerapp env create -n "$ENVIRONMENT" -g "$RG" -l "$LOCATION" -o none
+
+      - name: Build backend image (in Azure)
+        if: steps.check.outputs.enabled == '1'
+        run: |
+          set -euo pipefail
+          az acr build -r "$ACR" -t "backend:${GITHUB_SHA}" -t backend:latest backend/ --only-show-errors -o none
+          echo "IMAGE=$ACR.azurecr.io/backend:${GITHUB_SHA}" >> "$GITHUB_ENV"
+
+      - name: Deploy backend
+        if: steps.check.outputs.enabled == '1'
+        env:
+          BACKEND_ENV: ${{ secrets.BACKEND_ENV }}
+        run: |
+          set -euo pipefail
+          # KEY=VALUE lines → Container Apps secrets (values never printed) + env vars that reference them
+          SECRETS=(); ENVS=("PORT=8000" "SELF_CHECK_ON_STARTUP=true")
+          while IFS= read -r line || [ -n "$line" ]; do
+            line="${line%$'\r'}"
+            [[ -z "$line" || "$line" == \#* || "$line" != *=* ]] && continue
+            key="${line%%=*}"; val="${line#*=}"
+            val="${val%\"}"; val="${val#\"}"
+            name=$(echo "$key" | tr 'A-Z_' 'a-z-')
+            echo "::add-mask::$val"
+            SECRETS+=("$name=$val"); ENVS+=("$key=secretref:$name")
+          done <<< "$BACKEND_ENV"
+          if [ ${#SECRETS[@]} -eq 0 ]; then echo "::error::BACKEND_ENV secret is empty"; exit 1; fi
+          USER=$(az acr credential show -n "$ACR" --query username -o tsv)
+          PASS=$(az acr credential show -n "$ACR" --query "passwords[0].value" -o tsv)
+          echo "::add-mask::$PASS"
+          if az containerapp show -n "$APP" -g "$RG" >/dev/null 2>&1; then
+            az containerapp secret set -n "$APP" -g "$RG" --secrets "${SECRETS[@]}" -o none
+            az containerapp update -n "$APP" -g "$RG" --image "$IMAGE" \
+              --min-replicas 1 --max-replicas 10 --cpu 1 --memory 2Gi \
+              --scale-rule-name http-load --scale-rule-type http --scale-rule-http-concurrency 40 \
+              --set-env-vars "${ENVS[@]}" -o none
+          else
+            az containerapp create -n "$APP" -g "$RG" --environment "$ENVIRONMENT" --image "$IMAGE" \
+              --registry-server "$ACR.azurecr.io" --registry-username "$USER" --registry-password "$PASS" \
+              --target-port 8000 --ingress external --transport auto \
+              --min-replicas 1 --max-replicas 10 --cpu 1 --memory 2Gi \
+              --scale-rule-name http-load --scale-rule-type http --scale-rule-http-concurrency 40 \
+              --secrets "${SECRETS[@]}" --env-vars "${ENVS[@]}" -o none
+          fi
+
+      - name: Backend URL and health
+        id: url
+        if: steps.check.outputs.enabled == '1'
+        run: |
+          set -euo pipefail
+          FQDN=$(az containerapp show -n "$APP" -g "$RG" --query properties.configuration.ingress.fqdn -o tsv)
+          API="${{ vars.AZURE_API_URL }}"; [ -z "$API" ] && API="https://$FQDN/api/v1"
+          echo "api_url=$API" >> "$GITHUB_OUTPUT"
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "https://$FQDN/health" || true)
+            [ "$code" = "200" ] && break; sleep 10
+          done
+          echo "Health: $code"
+          { echo "### Backend"; echo "- URL: https://$FQDN"; echo "- API: $API"; echo "- Health: $code"; } >> "$GITHUB_STEP_SUMMARY"
+          [ "$code" = "200" ]
+
+  frontend:
+    needs: backend
+    if: needs.backend.outputs.enabled == '1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      VITE_MAIN_API_URL: ${{ needs.backend.outputs.api_url }}
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://bcosfvilvwyxtrctsmez.supabase.co' }}
+      VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJjb3Nmdmlsdnd5eHRyY3RzbWV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY3ODIyMTMsImV4cCI6MjA4MjM1ODIxM30.bj9wwAT41fkvGX6CLrmyQT16-Fph4_mgqSXZintsNX0' }}
+      VITE_GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build
+
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Static Web App (create once) and deploy token
+        id: swa
+        working-directory: .
+        run: |
+          set -euo pipefail
+          # Static Web Apps run in a few regions only; the content is served from a global CDN anyway
+          az staticwebapp show -n "$WEB" -g "$RG" >/dev/null 2>&1 || \
+            az staticwebapp create -n "$WEB" -g "$RG" -l eastasia --sku Free -o none
+          TOKEN=$(az staticwebapp secrets list -n "$WEB" -g "$RG" --query properties.apiKey -o tsv)
+          echo "::add-mask::$TOKEN"
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+          HOST=$(az staticwebapp show -n "$WEB" -g "$RG" --query defaultHostname -o tsv)
+          { echo "### Website"; echo "- https://$HOST"; } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ steps.swa.outputs.token }}
+          action: upload
+          app_location: frontend/dist
+          skip_app_build: true
+          skip_api_build: true

@@ -373,3 +373,4 @@ logs_extracted*/
 *.ps1
 .vercel
 play-store-keys/
+azure-deploy-secrets/

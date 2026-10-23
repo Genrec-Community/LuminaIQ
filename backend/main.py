@@ -37,6 +37,8 @@ for app_origin in ("https://localhost", "capacitor://localhost"):
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    # The website on Azure Static Web Apps (its default *.azurestaticapps.net address)
+    allow_origin_regex=r"https://[a-z0-9-]+(\.[a-z0-9]+)?\.azurestaticapps\.net",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
