@@ -57,6 +57,7 @@ import {
     generateSubjectiveTest,
     submitSubjectiveTest,
     deleteDocument,
+    retryDocument,
     generateNotes,
     getLearningProgress,
     saveLearningProgress,
@@ -1131,6 +1132,22 @@ const ProjectView = () => {
         }
     };
 
+    const [retryingIds, setRetryingIds] = useState(() => new Set());
+    const retryDoc = async (doc) => {
+        if (retryingIds.has(doc.id)) return;
+        setRetryingIds(prev => new Set(prev).add(doc.id));
+        try {
+            await retryDocument(projectId, doc.id);
+            setDocuments(prev => prev.map(d => (d.id === doc.id ? { ...d, upload_status: 'pending', error_message: null } : d)));
+            fetchDocuments();
+        } catch (error) {
+            const detail = error?.response?.data?.detail;
+            toast.error(typeof detail === 'string' ? detail : `Couldn't retry "${doc.filename}". Try again in a moment.`);
+        } finally {
+            setRetryingIds(prev => { const next = new Set(prev); next.delete(doc.id); return next; });
+        }
+    };
+
     const requestDelete = (doc) => {
         setDeleteConfirmDoc(doc);
     };
@@ -1737,8 +1754,8 @@ const ProjectView = () => {
                                                 <p className="font-bold text-red-800 tracking-wide text-xs uppercase mb-1.5">Document Processing Failed</p>
                                                 <p className="text-[11px] leading-relaxed text-red-700/90">
                                                     {documents.filter(d => d.upload_status === 'failed' || d.upload_status === 'error').length === 1
-                                                        ? `"${documents.find(d => d.upload_status === 'failed' || d.upload_status === 'error')?.filename}" couldn't be processed. This usually means it's a scanned image PDF with no readable text, encrypted, or corrupted. Delete it and try a different file.`
-                                                        : `${documents.filter(d => d.upload_status === 'failed' || d.upload_status === 'error').length} documents couldn't be processed — likely scanned image PDFs, encrypted, or corrupted. Delete them and try different files.`
+                                                        ? `"${documents.find(d => d.upload_status === 'failed' || d.upload_status === 'error')?.filename}" couldn't be processed. Tap Retry next to it in the sidebar. If it fails again, the file may be encrypted or damaged: delete it and try a different copy.`
+                                                        : `${documents.filter(d => d.upload_status === 'failed' || d.upload_status === 'error').length} documents couldn't be processed. Tap Retry next to each one in the sidebar. If one fails again, the file may be encrypted or damaged.`
                                                     }
                                                 </p>
                                             </div>
@@ -2325,6 +2342,15 @@ const ProjectView = () => {
                                                             <div className="h-1.5 w-1.5 bg-red-500 rounded-full shrink-0" />
                                                             Can’t be processed
                                                         </span>
+                                                    )}
+                                                    {isFailed && (
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); retryDoc(doc); }}
+                                                            disabled={retryingIds.has(doc.id)}
+                                                            className="rounded-md bg-[#C8A288] px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-[#B08B72] disabled:opacity-60"
+                                                        >
+                                                            {retryingIds.has(doc.id) ? 'Retrying…' : 'Retry'}
+                                                        </button>
                                                     )}
                                                 </div>
                                             </div>

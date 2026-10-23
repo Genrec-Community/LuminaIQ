@@ -113,17 +113,23 @@ class QdrantService:
     async def create_collection(self, collection_name: str, vector_size: int = settings.EMBEDDING_DIMENSION):
         """Create a new collection and ensure indexes exist (fully async)"""
         try:
-            collections = await self.async_client.get_collections()
-            exists = any(col.name == collection_name for col in collections.collections)
+            # Goes through the suffix wrapper, so it checks the physical name
+            exists = await self.async_client.collection_exists(collection_name=collection_name)
 
             if not exists:
-                await self.async_client.create_collection(
-                    collection_name=collection_name,
-                    vectors_config=VectorParams(
-                        size=vector_size, distance=Distance.COSINE
-                    ),
-                )
-                logger.info(f"Created collection: {collection_name}")
+                try:
+                    await self.async_client.create_collection(
+                        collection_name=collection_name,
+                        vectors_config=VectorParams(
+                            size=vector_size, distance=Distance.COSINE
+                        ),
+                    )
+                    logger.info(f"Created collection: {collection_name}")
+                except Exception as e:
+                    # Two books uploaded together into a new project race to create it
+                    if "already exists" not in str(e):
+                        raise
+                    await self._check_vector_size(collection_name, vector_size)
             else:
                 await self._check_vector_size(collection_name, vector_size)
 

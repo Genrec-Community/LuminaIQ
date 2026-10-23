@@ -5,7 +5,7 @@ import {
     MoreHorizontal, Plus, Zap, Moon, Target, MessageSquare, FlaskConical, Network, HelpCircle, CheckSquare,
     FileText, Layers, Brain, Flame, Trash2, AlertTriangle, FileCheck2, BookOpen,
 } from 'lucide-react';
-import { getDocuments, uploadDocument, subscribeDocumentProgress, deleteDocument, deleteProject } from '../../api';
+import { getDocuments, uploadDocument, subscribeDocumentProgress, deleteDocument, deleteProject, retryDocument } from '../../api';
 import { useToast } from '../../context/ToastContext';
 import { useSettings } from '../../context/SettingsContext';
 import { aiName } from '../../utils/persona';
@@ -54,6 +54,21 @@ const Book = () => {
 
     useEffect(() => { try { localStorage.setItem(LAST_PROJECT_KEY, bookId); } catch { /* ignore */ } }, [bookId]);
 
+    const [retrying, setRetrying] = useState(null);
+    const retry = async (d) => {
+        tap();
+        setRetrying(d.id);
+        try {
+            await retryDocument(bookId, d.id);
+            setDocs((list) => (list || []).map((x) => (x.id === d.id ? { ...x, upload_status: 'pending' } : x)));
+            load();
+        } catch (e) {
+            const detail = e?.response?.data?.detail;
+            toast.error(typeof detail === 'string' ? detail : "Couldn't retry. Try again in a moment.");
+        } finally {
+            setRetrying(null);
+        }
+    };
     const load = useCallback(async () => {
         try {
             const data = await getDocuments(bookId);
@@ -197,7 +212,16 @@ const Book = () => {
                                     <p className="truncate text-[14.5px] font-bold">{d.filename}</p>
                                     {workingDoc && <ProcessingProgress stage={st?.stage || d.upload_status} stagePct={st?.progress || 0} message={st?.message || ''} />}
                                     {isReady(d) && <p className="text-[12.5px]" style={{ color: 'var(--m-muted)' }}>Ready</p>}
-                                    {isFailed(d) && <p className="text-[12.5px] text-red-500">Couldn't be read. Delete it and try another copy.</p>}
+                                    {isFailed(d) && (
+                                        <div className="mt-1 flex items-center gap-2">
+                                            <p className="text-[12.5px] text-red-500">Couldn't be read.</p>
+                                            <button onClick={() => retry(d)} disabled={retrying === d.id}
+                                                className="m-pressable rounded-full px-3 py-1 text-[12px] font-bold disabled:opacity-60"
+                                                style={{ background: 'var(--m-accent)', color: 'var(--m-on-accent)' }}>
+                                                {retrying === d.id ? 'Retrying…' : 'Retry'}
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                                 {!workingDoc && (
                                     <button onClick={() => { tap(); setConfirm({ type: 'doc', doc: d }); }} aria-label={`Delete ${d.filename}`} className="m-pressable p-2" style={{ color: 'var(--m-muted)' }}>

@@ -437,6 +437,55 @@ async def _owned_document(project_id: str, document_id: str, user_id: str) -> di
     return doc.data[0]
 
 
+@router.post("/{project_id}/{document_id}/retry")
+async def retry_document(
+    project_id: str,
+    document_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Process a failed document again without re-uploading: from the stored
+    original PDF when there is one, else from its extracted text.
+    """
+    doc = await _owned_document(project_id, document_id, current_user["id"])
+    client = get_supabase_client()
+    status_row = await async_db(lambda: client.table("documents").select("upload_status")
+                                .eq("id", document_id).limit(1).execute())
+    if status_row.data and status_row.data[0]["upload_status"] != "failed":
+        raise HTTPException(status.HTTP_409_CONFLICT, "This document isn't in a failed state.")
+
+    data, suffix = None, None
+    if doc.get("file_url") and "/" in doc["file_url"]:
+        bucket, path = doc["file_url"].split("/", 1)
+        try:
+            data = await async_db(lambda: client.storage.from_(bucket).download(path))
+            suffix = os.path.splitext(path)[1] or ".pdf"
+        except Exception as e:
+            logger.warning(f"Retry: original not available for {document_id}: {e}")
+    if not data:
+        text = await document_service.load_stored_text(doc)
+        if text:
+            data, suffix = text.encode("utf-8"), ".txt"
+    if not data:
+        raise HTTPException(status.HTTP_410_GONE, "The file for this document is gone. Please upload it again.")
+
+    os.makedirs("temp", exist_ok=True)
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix, dir="temp") as f:
+        f.write(data)
+        temp_path = f.name
+
+    await async_db(lambda: client.table("documents")
+                   .update({"upload_status": "pending", "error_message": None})
+                   .eq("id", document_id).execute())
+    task = asyncio.create_task(document_service.process_document(
+        document_id=document_id, project_id=project_id, file_path=temp_path,
+        filename=doc["filename"], user_id=current_user["id"],
+    ))
+    document_service._background_tasks.add(task)
+    task.add_done_callback(document_service._background_tasks.discard)
+    return {"status": "pending", "document_id": document_id}
+
+
 @router.get("/{project_id}/{document_id}/url")
 async def get_document_url(
     project_id: str,

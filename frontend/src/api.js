@@ -462,6 +462,12 @@ export const submitSubjectiveTest = async (testId, answers) => {
     return response.data;
 };
 
+// Process a failed document again (from its stored file), no re-upload needed
+export const retryDocument = async (projectId, documentId) => {
+    const response = await api.post(`/documents/${projectId}/${documentId}/retry`);
+    return response.data;
+};
+
 export const deleteDocument = async (projectId, documentId) => {
     const response = await api.delete(`/documents/${documentId}`, {
         params: { project_id: projectId }
