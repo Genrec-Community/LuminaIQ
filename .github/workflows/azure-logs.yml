@@ -2,6 +2,9 @@
 name: Azure logs
 
 on:
+  push:
+    branches: [jaisamyukth-changes]
+    paths: [".github/workflows/azure-logs.yml"]
   workflow_dispatch:
     inputs:
       lines:
