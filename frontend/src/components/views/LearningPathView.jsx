@@ -13,6 +13,7 @@ import {
     getPerformance 
 } from '../../api';
 import { useToast } from '../../context/ToastContext';
+import AdaptivePlan from '../AdaptivePlan';
 import { useSettings } from '../../context/SettingsContext';
 import { recordActivity } from '../../utils/studyActivity';
 import { getRotatingLoadingMessage } from '../../utils/LoadingMessages';
@@ -338,6 +339,15 @@ const LearningPathView = ({
                     <h2 className="text-2xl font-bold mb-2" style={{ color: bodyText }}>Learning Path</h2>
                     <p style={{ color: mutedText }}>Your personalized study sequence</p>
                 </div>
+
+                {/* Adaptive plan from the learning engine: next step, why, what you know */}
+                <AdaptivePlan
+                    projectId={projectId}
+                    selectedDocuments={selectedDocuments}
+                    colors={{ card, cardBorder, bodyText, mutedText }}
+                    onLearn={(topic) => { onOpenTutor?.(topic); recordActivity(projectId, 'path', { action: 'engine_learn', topic }); }}
+                    onPractise={(topic) => { onStartQuiz?.(topic, 'mcq', findDocumentsForTopic(topic)); recordActivity(projectId, 'path', { action: 'engine_practise', topic }); }}
+                />
 
                 {/* Progress Bar */}
                 {learningPath?.learning_path?.length > 0 && (
