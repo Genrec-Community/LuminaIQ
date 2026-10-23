@@ -36,13 +36,18 @@ class ProjectService:
             # We'll fetch basic info first.
             projects = response.data
             
-            # Fetch doc counts
+            # Document counts for all projects in one query (was one query per project)
+            ids = [p["id"] for p in projects]
+            counts: Dict[str, int] = {}
+            for i in range(0, len(ids), 200):
+                batch = ids[i:i + 200]
+                docs = await async_db(lambda: self.client.table("documents").select("project_id")
+                                      .in_("project_id", batch).execute())
+                for d in docs.data or []:
+                    counts[d["project_id"]] = counts.get(d["project_id"], 0) + 1
             for p in projects:
-                # This is N+1 query, but okay for small scale prototype. 
-                # Better way: use a postgres function or view.
-                doc_res = await async_db(lambda: self.client.table("documents").select("id", count="exact").eq("project_id", p["id"]).execute())
-                p["docs"] = doc_res.count
-                
+                p["docs"] = counts.get(p["id"], 0)
+
             return projects
         except Exception as e:
             logger.error(f"Error getting projects: {str(e)}")
