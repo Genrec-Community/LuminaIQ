@@ -36,6 +36,15 @@ jobs:
           curl -s -m 20 -o /dev/null -D - -X OPTIONS "https://$FQDN/api/v1/documents/upload-url" \
             -H "Origin: https://witty-field-041424a00.5.azurestaticapps.net" \
             -H "Access-Control-Request-Method: POST" -H "Access-Control-Request-Headers: authorization,content-type" | head -20
+      - name: Speed probes
+        run: |
+          t() { curl -s -o /dev/null -w "%{http_code}  dns=%{time_namelookup}s  connect=%{time_connect}s  tls=%{time_appconnect}s  first-byte=%{time_starttransfer}s  total=%{time_total}s  size=%{size_download}B  $1\n" "$1"; }
+          for u in https://luminaiq.fun/ https://www.luminaiq.fun/ https://witty-field-041424a00.5.azurestaticapps.net/; do t "$u"; t "$u"; done
+          JS=$(curl -s https://luminaiq.fun/ | grep -o '/assets/index-[^"]*\.js' | head -1)
+          [ -n "$JS" ] && { t "https://luminaiq.fun$JS"; curl -s -o /dev/null -H 'Accept-Encoding: gzip, br' -w "compressed main js: %{size_download}B\n" "https://luminaiq.fun$JS"; curl -sI -H 'Accept-Encoding: gzip, br' "https://luminaiq.fun$JS" | grep -i 'content-encoding\|cache-control\|x-cache\|age'; }
+          FQDN=$(az containerapp show -n "$APP" -g "$RG" --query properties.configuration.ingress.fqdn -o tsv)
+          for i in 1 2 3; do t "https://$FQDN/health"; done
+          t "https://$FQDN/api/v1/billing/plans"
       - name: Application logs
         run: az containerapp logs show -n "$APP" -g "$RG" --type console --tail "${{ inputs.lines || 300 }}" --format text 2>&1 | tail -n "${{ inputs.lines || 300 }}"
       - name: System logs

@@ -6,6 +6,12 @@ import { nativeGoogleSignIn, initNative } from '../utils/native';
 
 const AuthContext = createContext(null);
 
+// Resolve with `fallback` if a promise takes longer than `ms` (start-up must never hang)
+const withTimeout = (promise, ms, fallback) => Promise.race([
+    promise,
+    new Promise((resolve) => setTimeout(() => resolve(fallback), ms)),
+]);
+
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -46,8 +52,12 @@ export const AuthProvider = ({ children }) => {
                 }
             }
 
-            // Wait for Supabase session to initialize (handles OAuth callback)
-            const { data: { session } } = await supabase.auth.getSession();
+            // Wait for Supabase session to initialize (handles OAuth callback).
+            // Capped: in some Android WebViews the session refresh can hang, which
+            // left the app on a blank screen.
+            const { data: { session } } = await withTimeout(
+                supabase.auth.getSession(), 8000, { data: { session: null } }
+            );
             
             if (session && !tokenExchanged.current) {
                 console.log("Supabase session found, exchanging token...");
@@ -74,11 +84,17 @@ export const AuthProvider = ({ children }) => {
             setLoading(false);
         };
 
-        initAuth();
+        initAuth().catch((e) => console.error('Auth start-up failed:', e)).finally(() => setLoading(false));
         initNative(supabase); // Android app: sign-in deep link + back button
 
         // Listen for Supabase auth changes (including OAuth callbacks)
-        const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+        const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+            // Run outside the callback: awaiting Supabase (signOut, getSession in the
+            // 401 handler) inside it deadlocks the auth lock, so sign-in spun forever
+            setTimeout(() => handleAuthEvent(event, session), 0);
+        });
+
+        const handleAuthEvent = async (event, session) => {
             console.log("Auth event:", event, session ? "with session" : "no session");
             
             if (event === 'SIGNED_IN' && session && !tokenExchanged.current) {
@@ -127,7 +143,7 @@ export const AuthProvider = ({ children }) => {
                 localStorage.removeItem('user');
                 setUser(null);
             }
-        });
+        };
 
         return () => {
             authListener.subscription.unsubscribe();
@@ -215,7 +231,12 @@ export const AuthProvider = ({ children }) => {
     return (
         <AuthContext.Provider value={{ user, login, signup, loginWithGoogle, requestOtp, verifyOtpCode, logout, loading }}>
 
-            {!loading && children}
+            {loading ? (
+                // Not a blank screen while the saved sign-in is checked
+                <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FDF6F0' }}>
+                    <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-[#E6D5CC] border-t-[#C8A288]" />
+                </div>
+            ) : children}
         </AuthContext.Provider >
     );
 };

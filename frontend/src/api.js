@@ -142,7 +142,8 @@ export const signup = async (email, password, fullName) => {
 };
 
 export const exchangeToken = async (accessToken) => {
-    const response = await api.post('auth/exchange', { access_token: accessToken });
+    // Short timeout: a sign-in should never spin for minutes
+    const response = await api.post('auth/exchange', { access_token: accessToken }, { timeout: 20000 });
     return response.data;
 };
 

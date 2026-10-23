@@ -23,12 +23,14 @@ const sha256Hex = async (text) => {
  * through the fun.luminaiq.app://login-callback deep link (AndroidManifest.xml).
  * Throws an error with code 'cancelled' when the user closes the picker.
  */
+const timeoutAfter = (ms, message) => new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms));
+
 export async function nativeGoogleSignIn(supabase) {
     if (GOOGLE_WEB_CLIENT_ID) {
         try {
             const { SocialLogin } = await import('@capgo/capacitor-social-login');
             socialLoginReady = socialLoginReady || SocialLogin.initialize({ google: { webClientId: GOOGLE_WEB_CLIENT_ID } });
-            await socialLoginReady;
+            await Promise.race([socialLoginReady, timeoutAfter(10000, 'Google sign-in did not start')]);
             // Supabase checks the token's nonce against the hash of the raw value
             const rawNonce = crypto.randomUUID();
             const res = await SocialLogin.login({
@@ -37,7 +39,10 @@ export async function nativeGoogleSignIn(supabase) {
             });
             const idToken = res?.result?.idToken;
             if (!idToken) throw new Error('Google did not return a sign-in token');
-            const { error } = await supabase.auth.signInWithIdToken({ provider: 'google', token: idToken, nonce: rawNonce });
+            const { error } = await Promise.race([
+                supabase.auth.signInWithIdToken({ provider: 'google', token: idToken, nonce: rawNonce }),
+                timeoutAfter(20000, 'Sign-in took too long'),
+            ]);
             if (error) throw error;
             return; // AuthContext's SIGNED_IN listener finishes the sign-in
         } catch (e) {
