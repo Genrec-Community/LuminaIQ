@@ -19,6 +19,15 @@
     },
     "LocalNotifications": {
       "iconColor": "#C8A288"
+    },
+    "SocialLogin": {
+      "providers": {
+        "google": true,
+        "facebook": false,
+        "apple": false,
+        "twitter": false
+      },
+      "logLevel": 1
     }
   }
 }

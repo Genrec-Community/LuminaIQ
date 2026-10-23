@@ -39,6 +39,8 @@ jobs:
       VITE_MAIN_API_URL: ${{ vars.ANDROID_API_URL || 'https://luminaiq-backend-test.onrender.com/api/v1' }}
       VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://bcosfvilvwyxtrctsmez.supabase.co' }}
       VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJjb3Nmdmlsdnd5eHRyY3RzbWV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY3ODIyMTMsImV4cCI6MjA4MjM1ODIxM30.bj9wwAT41fkvGX6CLrmyQT16-Fph4_mgqSXZintsNX0' }}
+      # Native Google sign-in (Web OAuth client ID; not a secret). Empty = browser sign-in
+      VITE_GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
       # Play needs a higher versionCode for every upload
       ANDROID_VERSION_CODE: ${{ github.run_number }}
       ANDROID_VERSION_NAME: ${{ inputs.version_name || '1.0.0' }}

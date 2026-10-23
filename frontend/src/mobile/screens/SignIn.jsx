@@ -36,6 +36,12 @@ const SignIn = () => {
     const codeRef = useRef(null);
 
     useEffect(() => { if (user) navigate('/app/home', { replace: true }); }, [user, navigate]);
+    // Errors from the Google round trip or the token exchange (AuthContext, native.js)
+    useEffect(() => {
+        const onErr = (e) => { notify('error'); setBusy(false); setError(e.detail || 'Sign-in failed. Please try again.'); };
+        window.addEventListener('lumina-auth-error', onErr);
+        return () => window.removeEventListener('lumina-auth-error', onErr);
+    }, []);
     useEffect(() => {
         if (resendIn <= 0) return undefined;
         const t = setTimeout(() => setResendIn(resendIn - 1), 1000);
@@ -49,9 +55,15 @@ const SignIn = () => {
 
     const google = async () => {
         tap('medium'); setError(''); setBusy(true);
-        try { await loginWithGoogle(); } catch (e) { fail(e, 'Google sign-in did not start. Try again.'); }
-        // The app returns through a deep link; keep the spinner briefly so taps don't stack
-        setTimeout(() => setBusy(false), 4000);
+        try {
+            await loginWithGoogle();
+            // Native picker: signed in, the effect above opens the app once the account is ready
+        } catch (e) {
+            if (e?.code === 'cancelled') { setBusy(false); return; }
+            fail(e, 'Google sign-in did not start. Try again.');
+        }
+        // Browser fallback returns through a deep link; don't leave the button stuck
+        setTimeout(() => setBusy(false), 12000);
     };
 
     const sendCode = async (e) => {
