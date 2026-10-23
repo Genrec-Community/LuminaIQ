@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-    Sparkles, Clock, ArrowRight, Brain, RotateCcw, Lock, Layers, ChevronDown, Info, Loader2, GitBranch, Scale,
+    Sparkles, Clock, ArrowRight, Brain, RotateCcw, Lock, Layers, ChevronDown, Info, Loader2, GitBranch, Scale, Activity,
 } from 'lucide-react';
-import { getLearningPlan } from '../api';
+import { getLearningPlan, getLearningMetrics } from '../api';
 
 /*
  * The learning engine's plan: what to learn next and why, what follows, the
@@ -55,6 +55,16 @@ const AdaptivePlan = ({ projectId, selectedDocuments, onLearn, onPractise, color
     const [error, setError] = useState('');
     const [showAll, setShowAll] = useState(false);
     const [showHow, setShowHow] = useState(false);
+    const [metrics, setMetrics] = useState(null);
+    const [showMetrics, setShowMetrics] = useState(false);
+    const toggleMetrics = async () => {
+        const open = !showMetrics;
+        setShowMetrics(open);
+        if (open) {
+            setMetrics(null);
+            try { setMetrics(await getLearningMetrics(projectId)); } catch { setMetrics({ error: true }); }
+        }
+    };
 
     const load = useCallback(async () => {
         try {
@@ -234,6 +244,60 @@ const AdaptivePlan = ({ projectId, selectedDocuments, onLearn, onPractise, color
                                 </div>
                             </div>
                         ))}
+                    </div>
+                )}
+            </div>
+
+            {/* Measured outcomes: is it working? */}
+            <div className="rounded-2xl border" style={{ background: card, borderColor: cardBorder }}>
+                <button onClick={toggleMetrics} className="flex w-full items-center justify-between px-5 py-4 text-left">
+                    <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide" style={{ color: mutedText }}>
+                        <Activity className="h-3.5 w-3.5" /> Is it working?
+                    </span>
+                    <ChevronDown className={`h-4 w-4 transition-transform ${showMetrics ? 'rotate-180' : ''}`} style={{ color: mutedText }} />
+                </button>
+                {showMetrics && (
+                    <div className="px-5 pb-5">
+                        {!metrics ? (
+                            <div className="flex items-center gap-2 text-sm" style={{ color: mutedText }}><Loader2 className="h-4 w-4 animate-spin text-[#C8A288]" /> Measuring…</div>
+                        ) : metrics.error ? (
+                            <p className="text-sm" style={{ color: mutedText }}>Couldn't load your metrics right now.</p>
+                        ) : !metrics.events ? (
+                            <p className="text-sm" style={{ color: mutedText }}>{metrics.message}</p>
+                        ) : (
+                            <>
+                                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                                    {[
+                                        ['Mastery gained', metrics.mastery_gain != null ? `+${Math.round(metrics.mastery_gain * 100)} pts` : '—', `avg per topic practised (${metrics.topics_with_gain})`],
+                                        ['Gain per hour', metrics.gain_per_hour != null ? `+${Math.round(metrics.gain_per_hour * 100)} pts` : '—', `${metrics.study_minutes} min studied`],
+                                        ['Remembered later', metrics.delayed_retention != null ? pct(metrics.delayed_retention) : '—', metrics.delayed_checks ? `${metrics.delayed_checks} checks a day+ later` : 'needs a day or more between practice'],
+                                        ['Unfamiliar questions', metrics.transfer != null ? pct(metrics.transfer) : '—', `${metrics.transfer_checks} hard / explain-it answers`],
+                                        ['Mistakes fixed', metrics.remediation != null ? pct(metrics.remediation) : '—', `${metrics.mistakes} mistakes so far`],
+                                        ['Material covered', metrics.coverage != null ? pct(metrics.coverage) : '—', `${metrics.topics_practised} of ${metrics.total_topics} topics`],
+                                    ].map(([label, value, note]) => (
+                                        <div key={label} className="rounded-xl border px-3 py-2.5" style={{ borderColor: cardBorder }}>
+                                            <div className="text-lg font-bold tabular-nums" style={{ color: bodyText }}>{value}</div>
+                                            <div className="text-xs font-semibold" style={{ color: bodyText }}>{label}</div>
+                                            <div className="mt-0.5 text-[11px] leading-snug" style={{ color: mutedText }}>{note}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                                {metrics.daily?.length > 1 && (
+                                    <div className="mt-4">
+                                        <div className="mb-1.5 text-[11px]" style={{ color: mutedText }}>Answers per day (darker = more correct)</div>
+                                        <div className="flex h-16 items-end gap-1">
+                                            {(() => {
+                                                const top = Math.max(...metrics.daily.map((d) => d.answers), 1);
+                                                return metrics.daily.map((d) => (
+                                                    <div key={d.day} title={`${d.day}: ${d.correct}/${d.answers} correct`} className="flex-1 rounded-t"
+                                                        style={{ height: `${Math.max(6, (d.answers / top) * 100)}%`, background: `color-mix(in srgb, #C8A288 ${30 + 70 * (d.correct / Math.max(d.answers, 1))}%, #F1E6DD)` }} />
+                                                ));
+                                            })()}
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        )}
                     </div>
                 )}
             </div>

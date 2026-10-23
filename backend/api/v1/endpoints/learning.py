@@ -1094,3 +1094,109 @@ async def learning_engine_plan(
         user_id, project_id, goal_topics=goal_topics, horizon=max(1, min(horizon, 40)),
         budget_minutes=minutes, selected_documents=docs,
     )
+
+
+@router.get("/engine/{project_id}/metrics")
+async def learning_metrics(project_id: str, current_user: dict = Depends(get_current_user)):
+    """
+    Is the learning working? Outcomes measured from stored evidence, not
+    engagement: mastery gained, gain per minute studied, recall after a delay,
+    performance on hard/unfamiliar questions, whether mistakes get fixed, and
+    how much of the material has been covered.
+    """
+    from datetime import datetime, timezone
+    from db.client import async_db, get_supabase_client
+    from services.knowledge_graph_service import knowledge_graph
+    from services.topic_ordering import topics_in_book_order
+
+    user_id = current_user["id"]
+    await _check_project(project_id, user_id)
+    client = get_supabase_client()
+    rows: List[Dict[str, Any]] = []
+    for start in range(0, 20000, 1000):
+        res = await async_db(lambda s=start: client.table("learning_events")
+                             .select("topic, correct, kind, difficulty, p_known_before, p_known_after, created_at")
+                             .eq("user_id", user_id).eq("project_id", project_id)
+                             .order("created_at").range(s, s + 999).execute())
+        rows.extend(res.data or [])
+        if len(res.data or []) < 1000:
+            break
+
+    def ts(r):
+        return datetime.fromisoformat(str(r["created_at"]).replace("Z", "+00:00"))
+
+    total_topics = 0
+    try:
+        total_topics = len(topics_in_book_order(await knowledge_graph.load_project_documents(project_id)))
+    except Exception:
+        pass
+
+    if not rows:
+        return {"events": 0, "total_topics": total_topics, "message": "Answer a few questions and your learning metrics appear here."}
+
+    by_topic: Dict[str, List[Dict[str, Any]]] = {}
+    for r in rows:
+        by_topic.setdefault(r["topic"], []).append(r)
+
+    # Pre-to-post gain per topic (first estimate before practice → latest after)
+    gains = []
+    for evs in by_topic.values():
+        before = evs[0].get("p_known_before")
+        after = evs[-1].get("p_known_after")
+        if before is not None and after is not None and len(evs) >= 2:
+            gains.append(after - before)
+
+    # Study minutes: events grouped into sessions (a 10-minute pause starts a new one)
+    minutes, session_start, prev = 0.0, None, None
+    for r in rows:
+        t = ts(r)
+        if prev is None or (t - prev).total_seconds() > 600:
+            if session_start is not None:
+                minutes += max(1.0, (prev - session_start).total_seconds() / 60)
+            session_start = t
+        prev = t
+    minutes += max(1.0, (prev - session_start).total_seconds() / 60)
+
+    # Delayed retention: answers given a day or more after the topic was last practised, on topics
+    # that were known by then; remediation: a wrong answer followed by a right one on the same topic
+    delayed_right = delayed_total = fixed = mistakes = 0
+    for evs in by_topic.values():
+        for a, b in zip(evs, evs[1:]):
+            if (ts(b) - ts(a)).total_seconds() >= 86400 and (a.get("p_known_after") or 0) >= 0.6:
+                delayed_total += 1
+                delayed_right += 1 if b["correct"] else 0
+        for i, e in enumerate(evs):
+            if not e["correct"]:
+                mistakes += 1
+                if any(x["correct"] for x in evs[i + 1:i + 4]):
+                    fixed += 1
+
+    hard = [r for r in rows if r.get("difficulty") == "hard" or r.get("kind") in ("recall", "written")]
+    recent = {}
+    for r in rows[-400:]:
+        day = ts(r).date().isoformat()
+        d = recent.setdefault(day, [0, 0])
+        d[0] += 1
+        d[1] += 1 if r["correct"] else 0
+
+    def ratio(a, b):
+        return round(a / b, 3) if b else None
+
+    return {
+        "events": len(rows),
+        "total_topics": total_topics,
+        "topics_practised": len(by_topic),
+        "coverage": ratio(len(by_topic), total_topics),
+        "accuracy": ratio(sum(1 for r in rows if r["correct"]), len(rows)),
+        "mastery_gain": round(sum(gains) / len(gains), 3) if gains else None,
+        "topics_with_gain": len(gains),
+        "study_minutes": round(minutes),
+        "gain_per_hour": round(sum(gains) / (minutes / 60), 3) if gains and minutes else None,
+        "delayed_retention": ratio(delayed_right, delayed_total),
+        "delayed_checks": delayed_total,
+        "transfer": ratio(sum(1 for r in hard if r["correct"]), len(hard)),
+        "transfer_checks": len(hard),
+        "remediation": ratio(fixed, mistakes),
+        "mistakes": mistakes,
+        "daily": [{"day": d, "answers": v[0], "correct": v[1]} for d, v in sorted(recent.items())[-14:]],
+    }

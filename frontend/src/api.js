@@ -578,6 +578,28 @@ export const getLearningPlan = async (projectId, { goal, horizon, minutes, docum
     return response.data;
 };
 
+/** A structured six-step lesson for a topic (cached per project). */
+export const getLesson = async (projectId, topic, selectedDocuments = [], refresh = false) => {
+    const response = await api.post('/learning/lesson', {
+        project_id: projectId, topic, selected_documents: selectedDocuments, refresh,
+    }, { timeout: 120000 });
+    return response.data;
+};
+
+/** Grade an explanation written from memory; recorded as recall evidence. */
+export const gradeRecall = async (projectId, topic, prompt, answer, keyPoints = []) => {
+    const response = await api.post('/learning/lesson/grade', {
+        project_id: projectId, topic, prompt, answer, key_points: keyPoints,
+    }, { timeout: 60000 });
+    return response.data;
+};
+
+/** Outcome metrics: mastery gain, gain per hour, delayed retention, transfer, remediation, coverage. */
+export const getLearningMetrics = async (projectId) => {
+    const response = await api.get(`/learning/engine/${projectId}/metrics`, { timeout: 60000 });
+    return response.data;
+};
+
 export const recordPerformance = async (projectId, topic, correct, wrong) => {
     const response = await api.post('/learning/performance/record', {
         project_id: projectId,

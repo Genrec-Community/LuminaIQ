@@ -97,6 +97,7 @@ const MindmapView = lazy(() => import('../components/views/MindmapView'));
 const PowerHourView = lazy(() => import('../components/views/PowerHourView'));
 const ExamTonightView = lazy(() => import('../components/views/ExamTonightView'));
 const VisualLabView = lazy(() => import('../components/views/VisualLabView'));
+const LessonView = lazy(() => import('../components/LessonView'));
 import useFocusTimer from '../hooks/useFocusTimer';
 import { LAST_PROJECT_KEY } from '../utils/dailyProgress';
 import { aiName } from '../utils/persona';
@@ -216,6 +217,9 @@ const ProjectView = () => {
         return saved && saved !== 'general' ? saved : 'power';
     });
     const [labTopic, setLabTopic] = useState('');
+    // Six-step lesson opened from the adaptive plan; planVersion refreshes the plan after it
+    const [lessonTopic, setLessonTopic] = useState(null);
+    const [planVersion, setPlanVersion] = useState(0);
     // Deep mode: Topper answers from the stronger model (monthly allowance)
     const { plan: myPlan } = usePlan();
     const [deepMode, setDeepMode] = useState(false);
@@ -2012,6 +2016,8 @@ const ProjectView = () => {
                                 setTutorTopic(topic);
                                 setShowAITutor(true);
                             }}
+                            onStartLesson={(topic) => setLessonTopic(topic)}
+                            planVersion={planVersion}
                             onOpenKnowledgeGraph={() => {
                                 setActiveTab('knowledge');
                             }}
@@ -2579,6 +2585,17 @@ const ProjectView = () => {
                     setShowSearch(false);
                 }}
             />}
+
+            {lessonTopic && (
+                <LessonView
+                    key={lessonTopic}
+                    projectId={projectId}
+                    topic={lessonTopic}
+                    selectedDocuments={selectedDocuments}
+                    onClose={() => { setLessonTopic(null); setPlanVersion((v) => v + 1); }}
+                    onNextTopic={(next) => { setLessonTopic(next); setPlanVersion((v) => v + 1); }}
+                />
+            )}
 
             {/* Add Document Modal — unified source picker (Book Store + Upload) */}
             {showAddDocModal && (

@@ -51,6 +51,8 @@ const LearningPathView = ({
     onGenerateNotes,
     onStartQA,
     onOpenTutor,
+    onStartLesson,
+    planVersion = 0,
     onOpenKnowledgeGraph,
     onOpenMindmap,
     onOpenFlashcards
@@ -342,10 +344,11 @@ const LearningPathView = ({
 
                 {/* Adaptive plan from the learning engine: next step, why, what you know */}
                 <AdaptivePlan
+                    key={planVersion}
                     projectId={projectId}
                     selectedDocuments={selectedDocuments}
                     colors={{ card, cardBorder, bodyText, mutedText }}
-                    onLearn={(topic) => { onOpenTutor?.(topic); recordActivity(projectId, 'path', { action: 'engine_learn', topic }); }}
+                    onLearn={(topic) => { (onStartLesson || onOpenTutor)?.(topic); recordActivity(projectId, 'path', { action: 'engine_learn', topic }); }}
                     onPractise={(topic) => { onStartQuiz?.(topic, 'mcq', findDocumentsForTopic(topic)); recordActivity(projectId, 'path', { action: 'engine_practise', topic }); }}
                 />
 

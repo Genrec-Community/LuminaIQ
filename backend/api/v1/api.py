@@ -17,6 +17,7 @@ from api.v1.endpoints import (
     progress,
     jobs,
     study_modes,
+    lessons,
     billing,
     institutions,
 )
@@ -37,6 +38,7 @@ api_router.include_router(billing.router, prefix="/billing", tags=["billing"])
 api_router.include_router(institutions.router, prefix="/institutions", tags=["institutions"])
 # Exam Tonight (crash mode) + Visual Lab
 api_router.include_router(study_modes.router, prefix="/learning", tags=["study-modes"])
+api_router.include_router(lessons.router, prefix="/learning", tags=["lessons"])
 api_router.include_router(knowledge_graph.router, prefix="/knowledge-graph", tags=["knowledge-graph"])
 api_router.include_router(user_data.router, prefix="/user-data", tags=["user-data"])
 api_router.include_router(flashcards.router, prefix="/flashcards", tags=["flashcards"])
