@@ -7,7 +7,7 @@
 #   - LuminaIQ-release.aab   signed bundle to upload to Google Play
 #
 # Optional repository settings (Settings → Secrets and variables → Actions):
-#   Variables: ANDROID_API_URL (backend, default: the test backend),
+#   Variables: ANDROID_API_URL (backend, default: the Azure API),
 #              VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY (defaults below are the
 #              project's public values, the same ones the website ships)
 #   Secrets:   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,
@@ -36,7 +36,7 @@ jobs:
       run:
         working-directory: frontend
     env:
-      VITE_MAIN_API_URL: ${{ vars.ANDROID_API_URL || 'https://luminaiq-backend-test.onrender.com/api/v1' }}
+      VITE_MAIN_API_URL: ${{ vars.ANDROID_API_URL || 'https://luminaiq-api.graygrass-e72a94bd.centralindia.azurecontainerapps.io/api/v1' }}
       VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://bcosfvilvwyxtrctsmez.supabase.co' }}
       VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJjb3Nmdmlsdnd5eHRyY3RzbWV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY3ODIyMTMsImV4cCI6MjA4MjM1ODIxM30.bj9wwAT41fkvGX6CLrmyQT16-Fph4_mgqSXZintsNX0' }}
       # Native Google sign-in (Web OAuth client ID; not a secret). Empty = browser sign-in
