@@ -274,14 +274,25 @@ const ExamTonightView = ({ projectId, selectedDocuments = [], onTopicMastered, o
             });
     }, [projectId, selectedDocuments]);
 
-    // Keep the current and the next two topics warm so there's no waiting
+    // Keep the current and the next three topics warm so there's no waiting.
+    // While the plan is on screen, the first ones are prepared already.
     useEffect(() => {
-        if (phase !== 'study') return;
+        if (phase !== 'study' && phase !== 'plan') return;
+        const from = phase === 'plan' ? 0 : step;
+        const ahead = phase === 'plan' ? 2 : 4;
         let warmed = 0;
-        for (let i = step; i < timeline.length && warmed < 3; i++) {
+        for (let i = from; i < timeline.length && warmed < ahead; i++) {
             if (timeline[i].type === 'topic') { fetchCard(timeline[i].topic); warmed++; }
         }
     }, [phase, step, timeline, fetchCard]);
+
+    // A card that failed in the background is fetched again when it comes up
+    useEffect(() => {
+        if (phase === 'study' && entry?.type === 'topic' && cardErrors[entry.topic] && !inflight.current[entry.topic]) {
+            fetchCard(entry.topic);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [phase, step]);
 
     // The revision sheet needs every studied card
     useEffect(() => {

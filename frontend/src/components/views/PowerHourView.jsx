@@ -57,6 +57,9 @@ const Confetti = () => {
  * feedback, combos, XP and a companion cheering you on. The next card is
  * prefetched while you work so there is no waiting between topics.
  */
+// Prepared cards survive leaving and re-opening Power Hour (per project)
+const PREPARED = {};
+
 const PowerHourView = ({ projectId, availableTopics = [], selectedDocuments = [], completedTopics, topicMeta = {}, onTopicMastered, onOpenChat, onVisualize }) => {
     const { user } = useAuth();
     const { settings } = useSettings();
@@ -80,8 +83,11 @@ const PowerHourView = ({ projectId, availableTopics = [], selectedDocuments = []
     const [, forceRender] = useState(0);
 
     // topic -> { summary?, questions?, error? , loading flags }
-    const cacheRef = useRef({});
-    const inflight = useRef({});
+    const prepared = (PREPARED[projectId] = PREPARED[projectId] || { cache: {}, inflight: {} });
+    const cacheRef = useRef(prepared.cache);
+    const inflight = useRef(prepared.inflight);
+    cacheRef.current = prepared.cache;
+    inflight.current = prepared.inflight;
 
     const mcqDifficulty = ['easy', 'medium', 'hard'].includes(settings.quizDifficulty) ? settings.quizDifficulty : 'medium';
 
@@ -113,27 +119,39 @@ const PowerHourView = ({ projectId, availableTopics = [], selectedDocuments = []
         if (!topic || inflight.current[topic]) return;
         inflight.current[topic] = true;
         const entry = (cacheRef.current[topic] = cacheRef.current[topic] || {});
-        getTopicSummary(projectId, topic)
+        delete entry.error;
+        delete entry.failed;
+        let failed = false;
+        const summary = getTopicSummary(projectId, topic)
             .then((r) => { entry.summary = r?.summary || ''; })
-            .catch(() => { entry.error = 'summary'; })
+            .catch(() => { entry.error = 'summary'; failed = true; })
             .finally(() => forceRender((n) => n + 1));
-        generateMCQ(projectId, topic, QUESTIONS_PER_TOPIC, selectedDocuments, mcqDifficulty)
+        const questions = generateMCQ(projectId, topic, QUESTIONS_PER_TOPIC, selectedDocuments, mcqDifficulty)
             .then((r) => { entry.questions = r?.questions || []; })
-            .catch(() => { entry.questions = []; })
+            .catch(() => { entry.questions = []; failed = true; })
             .finally(() => forceRender((n) => n + 1));
+        // A failed prefetch may be fetched again when the topic comes up
+        Promise.all([summary, questions]).then(() => {
+            if (failed) { entry.failed = true; inflight.current[topic] = false; }
+        });
     }, [projectId, selectedDocuments, mcqDifficulty]);
 
     const topic = queue[index];
     const card = topic ? cacheRef.current[topic] || {} : {};
 
-    // Keep the current and next two cards warm
+    // Keep the current and next three cards warm; on the start screen, prepare
+    // the first ones already so the first card doesn't wait either
     useEffect(() => {
         if (phase === 'learn' || phase === 'check') {
-            prefetch(queue[index]);
-            prefetch(queue[index + 1]);
-            prefetch(queue[index + 2]);
+            const current = cacheRef.current[queue[index]];
+            if (current?.failed) prefetch(queue[index]);
+            for (let i = index; i <= index + 3 && i < queue.length; i++) prefetch(queue[i]);
+        } else if (phase === 'start') {
+            const first = remainingTopics.length ? remainingTopics : availableTopics;
+            first.slice(0, 2).forEach(prefetch);
         }
-    }, [phase, index, queue, prefetch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [phase, index, queue, prefetch, availableTopics.length, mastered.size]);
 
     // Sprint timer
     useEffect(() => {
@@ -178,6 +196,9 @@ const PowerHourView = ({ projectId, availableTopics = [], selectedDocuments = []
         setStats((s) => ({ ...s, cards: s.cards + 1, xp: s.xp + 12 }));
         bumpDailyProgress(user?.id, { cards: 1 });
         earnXP('sprint', { topic });
+        // Finished: next time this topic comes up it gets fresh questions
+        const doneTopic = topic;
+        setTimeout(() => { delete cacheRef.current[doneTopic]; inflight.current[doneTopic] = false; }, 10000);
         let nextWeak = weak.filter((t) => t !== topic);
         if (hadMistake) nextWeak = [topic, ...nextWeak];
         else onTopicMastered?.(topic);
