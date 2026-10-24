@@ -101,7 +101,7 @@ const QuizCard = ({ card, onAnswer, active }) => {
     };
     return (
         // Centred when it fits, scrolls inside the card when it doesn't (small phones)
-        <div className="m-card-scroll absolute inset-x-0 bottom-[calc(var(--m-tabbar-h)+var(--m-safe-bottom)+86px)] top-[calc(var(--m-safe-top)+76px)] flex flex-col overflow-y-auto px-5 pr-16">
+        <div className="m-card-scroll m-feed-col absolute inset-x-0 bottom-[calc(var(--m-tabbar-h)+var(--m-safe-bottom)+86px)] top-[calc(var(--m-safe-top)+76px)] flex flex-col overflow-y-auto px-5 pr-16">
             <div className="my-auto py-2">
             <span className="mb-3 inline-flex w-fit items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white/90">
                 <Sparkles className="h-3.5 w-3.5" /> Quick question
@@ -161,7 +161,7 @@ const FlashCard = ({ card, onGrade }) => {
     };
     return (
         // Centred when it fits, scrolls inside the card when it doesn't (small phones)
-        <div className="m-card-scroll absolute inset-x-0 bottom-[calc(var(--m-tabbar-h)+var(--m-safe-bottom)+86px)] top-[calc(var(--m-safe-top)+76px)] flex flex-col overflow-y-auto px-5 pr-16">
+        <div className="m-card-scroll m-feed-col absolute inset-x-0 bottom-[calc(var(--m-tabbar-h)+var(--m-safe-bottom)+86px)] top-[calc(var(--m-safe-top)+76px)] flex flex-col overflow-y-auto px-5 pr-16">
             <div className="my-auto py-2">
             <span className="mb-3 inline-flex w-fit items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white/90">
                 {card.source === 'review' ? <><RotateCcw className="h-3.5 w-3.5" /> Due for review</> : <><BookOpen className="h-3.5 w-3.5" /> Flashcard</>}
@@ -227,7 +227,7 @@ const InfoCard = ({ emoji, title, body, action, onAction, icon: Icon }) => (
 );
 
 const LoaderCard = ({ book }) => (
-    <div className="flex h-full flex-col justify-center px-6 pb-[calc(var(--m-tabbar-h)+60px)] pt-24">
+    <div className="m-col flex h-full flex-col justify-center px-6 pb-[calc(var(--m-tabbar-h)+60px)] pt-24">
         <p className="mb-5 flex items-center gap-2 text-[14px] font-semibold text-white/80">
             <motion.span animate={{ rotate: 360 }} transition={{ duration: 1.6, repeat: Infinity, ease: 'linear' }}><Sparkles className="h-4 w-4" /></motion.span>
             {book ? `Writing fresh questions from ${book}…` : 'Getting your feed ready…'}

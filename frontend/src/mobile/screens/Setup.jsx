@@ -311,7 +311,7 @@ const Setup = () => {
     const ft = footers[step];
 
     return (
-        <div className="m-app fixed inset-0 z-[9999] flex flex-col m-safe-top m-safe-bottom">
+        <div className="m-app m-shell fixed inset-0 z-[9999] flex flex-col m-safe-top m-safe-bottom">
             <div className="flex h-14 items-center gap-3 px-3">
                 <button onClick={() => { tap(); if (step > 0) go(step - 1); }} aria-label="Back"
                     className={`m-pressable flex h-10 w-10 items-center justify-center rounded-full ${step === 0 ? 'invisible' : ''}`}>

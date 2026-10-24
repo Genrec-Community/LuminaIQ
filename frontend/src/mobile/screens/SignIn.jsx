@@ -97,7 +97,7 @@ const SignIn = () => {
     const back = () => { tap(); setError(''); setStep(step === 'code' || step === 'password' ? 'email' : 'choose'); };
 
     return (
-        <div className="m-app relative flex min-h-[100dvh] flex-col overflow-hidden m-safe-top m-safe-bottom">
+        <div className="m-app m-shell relative flex min-h-[100dvh] flex-col overflow-hidden m-safe-top m-safe-bottom">
             <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(120% 60% at 50% 0%, color-mix(in srgb, var(--m-accent) 30%, transparent) 0%, transparent 65%)' }} />
             <div className="relative flex h-14 items-center px-3">
                 {step !== 'choose' && (

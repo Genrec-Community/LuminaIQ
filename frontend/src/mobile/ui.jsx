@@ -87,7 +87,7 @@ export const Sheet = ({ open, onClose, title, children }) => {
                         role="dialog"
                         aria-modal="true"
                         aria-label={title}
-                        className="fixed inset-x-0 bottom-0 z-[71] max-h-[88dvh] overflow-hidden rounded-t-[28px] m-safe-bottom"
+                        className="m-sheet fixed inset-x-0 bottom-0 z-[71] max-h-[88dvh] overflow-hidden rounded-t-[28px] m-safe-bottom"
                         style={{ background: 'var(--m-surface)', color: 'var(--m-text)' }}
                         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
                         transition={{ type: 'spring', damping: 32, stiffness: 380 }}
@@ -144,7 +144,7 @@ export const Screen = ({ children, className = '', style }) => (
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
     >
-        {children}
+        <div className="m-col">{children}</div>
     </motion.div>
 );
 

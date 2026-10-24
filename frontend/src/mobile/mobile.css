@@ -16,6 +16,9 @@
     --m-tabbar-h: 64px;
     --m-safe-top: var(--sat);
     --m-safe-bottom: var(--sab);
+    /* Content column: full width on phones, a centred reading column on
+       unfolded foldables, tablets and landscape (no stretched cards/buttons) */
+    --m-col: 100%;
 
     background: var(--m-bg);
     color: var(--m-text);
@@ -133,4 +136,26 @@ html.dark .m-app {
 @media (prefers-reduced-motion: reduce) {
     .m-flame, .m-skeleton, .m-heart { animation: none; }
     .m-flip-inner { transition: none; }
+}
+
+/* ── Large screens: foldables (unfolded), tablets, landscape ───────────── */
+@media (min-width: 600px) {
+    .m-app { --m-col: 600px; }
+}
+@media (min-width: 1024px) {
+    .m-app { --m-col: 680px; }
+}
+.m-col { width: 100%; max-width: var(--m-col); margin-inline: auto; }
+/* Full-screen shells (welcome, sign-in, setup): every child but the
+   decorative backdrop sits in the column */
+.m-shell > *:not(.absolute) { width: 100%; max-width: var(--m-col); margin-inline: auto; }
+/* Feed cards stay a readable width; the action rail keeps to the edge */
+@media (min-width: 600px) {
+    .m-feed-col { left: max(0px, calc(50% - var(--m-col) / 2)) !important; right: max(0px, calc(50% - var(--m-col) / 2)) !important; }
+    .m-feed-col.pr-16 { padding-right: 1.25rem; }
+    .m-sheet { left: 50% !important; right: auto !important; width: 100%; max-width: var(--m-col); translate: -50% 0; border-radius: 28px 28px 0 0; }
+}
+/* Short landscape screens: tighter feed offsets so the card keeps room */
+@media (max-height: 500px) and (orientation: landscape) {
+    .m-feed-col { top: calc(var(--m-safe-top) + 56px) !important; bottom: calc(var(--m-safe-bottom) + 24px) !important; }
 }

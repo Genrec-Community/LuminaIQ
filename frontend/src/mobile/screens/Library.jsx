@@ -69,7 +69,7 @@ const Library = () => {
                     </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-x-3 gap-y-4 px-4">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-4 px-4 min-[600px]:grid-cols-3">
                     {loading && !books.length && [0, 1, 2, 3].map((i) => <div key={i} className="m-skeleton h-44" />)}
                     {shown.map((b, i) => (
                         <motion.div key={b.id} initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: Math.min(i, 10) * 0.03 }}>

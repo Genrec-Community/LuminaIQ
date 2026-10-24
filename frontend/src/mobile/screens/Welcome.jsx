@@ -155,7 +155,7 @@ const Welcome = () => {
     const cta = i === 0 ? 'Get started' : i === 1 ? (picked ? 'Continue' : 'Skip this') : 'Create my free account';
 
     return (
-        <div className="m-app relative flex min-h-[100dvh] flex-col overflow-hidden m-safe-top m-safe-bottom">
+        <div className="m-app m-shell relative flex min-h-[100dvh] flex-col overflow-hidden m-safe-top m-safe-bottom">
             <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(110% 55% at 50% 0%, color-mix(in srgb, var(--m-accent) 22%, transparent) 0%, transparent 70%)' }} />
 
             <div className="relative flex h-14 items-center justify-between px-6">
