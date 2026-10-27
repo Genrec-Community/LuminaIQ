@@ -20,6 +20,7 @@ const Pricing = lazy(() => import('./pages/Pricing'));
 const Institution = lazy(() => import('./pages/Institution'));
 const JoinClass = lazy(() => import('./pages/JoinClass'));
 const Privacy = lazy(() => import('./pages/Legal').then((m) => ({ default: m.Privacy })));
+const DeleteAccount = lazy(() => import('./pages/Legal').then((m) => ({ default: m.DeleteAccount })));
 const Terms = lazy(() => import('./pages/Legal').then((m) => ({ default: m.Terms })));
 // The phone app has its own interface (bottom tabs, feed, onboarding)
 const MobileApp = lazy(() => import('./mobile/MobileApp'));
@@ -46,6 +47,7 @@ function App() {
                                 <Route path="/pricing" element={<Pricing />} />
                                 <Route path="/privacy" element={<Privacy />} />
                                 <Route path="/terms" element={<Terms />} />
+                                <Route path="/delete-account" element={<DeleteAccount />} />
                                 
                                 {/* Protected Routes */}
                                 <Route element={<PrivateRoute />}>

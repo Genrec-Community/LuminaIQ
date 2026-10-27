@@ -45,7 +45,7 @@ export const Privacy = () => (
             <p>Your books and study data are private to your account. If you join a class through an institution, your teacher can see your class progress. We share data only with the providers above, or when the law requires it.</p>
         </Section>
         <Section title="Keeping and deleting your data">
-            <p>We keep your data while your account exists. You can delete a file or a book at any time, and you can delete your whole account in the app (You → Delete account) or by emailing us. Deleting your account permanently removes your files, extracted text, search index, study data and login. Payment records are kept where the law requires it.</p>
+            <p>We keep your data while your account exists. You can delete a file or a book at any time, and you can delete your whole account in the app (You → Delete account) or by emailing us. Deleting your account permanently removes your files, extracted text, search index, study data and login. Payment records are kept where the law requires it. See <a className="font-semibold text-[#C8A288]" href="/delete-account">Delete your account</a> for the steps.</p>
         </Section>
         <Section title="Security">
             <p>Data is sent over encrypted connections (HTTPS) and stored with access controls so only your account can reach your files.</p>
@@ -58,6 +58,30 @@ export const Privacy = () => (
         </Section>
         <Section title="Changes">
             <p>If we change this policy we will update the date above, and tell you in the app for important changes.</p>
+        </Section>
+    </Shell>
+);
+
+export const DeleteAccount = () => (
+    <Shell title="Delete your LuminaIQ account">
+        <p className="mt-6 leading-relaxed text-[#5a4a42]">
+            You can delete your LuminaIQ account and its data at any time, from the app or by email.
+        </p>
+        <Section title="Delete in the app">
+            <p>1. Open the LuminaIQ app and sign in.</p>
+            <p>2. Go to the <b>You</b> tab.</p>
+            <p>3. Tap <b>Delete account</b> and confirm.</p>
+            <p>Your account and its data are deleted straight away.</p>
+        </Section>
+        <Section title="Delete by email">
+            <p>If you can't use the app, email <a className="font-semibold text-[#C8A288]" href={`mailto:${CONTACT}?subject=Delete%20my%20LuminaIQ%20account`}>{CONTACT}</a> from the address you signed up with, with the subject "Delete my LuminaIQ account". We'll delete the account and reply to confirm.</p>
+        </Section>
+        <Section title="Delete only some of your data">
+            <p>You don't have to delete your account to remove data. In the app you can delete any book or file at any time, which removes the file, its extracted text and its search index. To remove other data, such as your chat history or progress, email us and tell us what to delete.</p>
+        </Section>
+        <Section title="What is deleted and what is kept">
+            <p><b>Deleted:</b> your login and profile (name, email, picture), your uploaded files and the text extracted from them, the search index of your material, and everything you made: notes, flashcards, quizzes, chat messages, scores, streaks, XP and settings.</p>
+            <p><b>Kept:</b> payment records (plan, amount and payment reference), only where the law requires us to keep them. Nothing else is kept.</p>
         </Section>
     </Shell>
 );
