@@ -724,7 +724,7 @@ function Pricing() {
             Simple, student-friendly pricing
           </h2>
           <p className="mt-3 text-sm text-muted-foreground sm:text-base">
-            Start free. Upgrade when you're ready. Prices include GST. Exam tomorrow? The Exam Night Pass is just ₹49 for 48 hours.
+            Start free. Upgrade when you're ready. Exam tomorrow? The Exam Night Pass is just ₹49 for 48 hours.
           </p>
         </motion.div>
 

@@ -61,17 +61,18 @@ class RAGService:
             settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY
         )
 
-        # Initialize LLM via centralized llm_service
-        self.llm = llm_service._get_client(temperature=0.1)
-        self._llm_deep = None
+        # Chat clients per model: the model depends on the user's plan
+        # (LLM_TIER_MODELS) and on Deep mode, see llm_service.resolve_model
+        self._clients = {}
 
     def _llm(self, deep: bool = False):
-        """Main chat model, or the Deep model for Topper Deep answers."""
-        if not deep:
-            return self.llm
-        if self._llm_deep is None:
-            self._llm_deep = llm_service._get_client(temperature=0.1, deep=True)
-        return self._llm_deep
+        """The chat model for this request's plan, or the Deep model for Deep answers."""
+        from services.llm_service import resolve_model
+        model = resolve_model(deep=deep)
+        key = (model, deep)
+        if key not in self._clients:
+            self._clients[key] = llm_service._get_client(temperature=0.1, deep=deep, model=model)
+        return self._clients[key]
 
     def _get_retrieval_chain(
         self, collection_name: str, selected_documents: Optional[List[str]] = None, system_prompt: Optional[str] = None, user_context: Optional[str] = None,
@@ -670,7 +671,7 @@ IMPORTANT: Format the output using standard Markdown. Do NOT use any HTML tags l
 
             # Use retry logic for LLM call
             async def invoke_llm():
-                return await self.llm.ainvoke(messages)
+                return await self._llm().ainvoke(messages)
 
             response = await retry_with_backoff(
                 invoke_llm, max_retries=3, base_delay=1.5

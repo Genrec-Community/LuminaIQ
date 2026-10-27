@@ -18,6 +18,7 @@ const PlanUsage = () => {
     const [cancelError, setCancelError] = useState('');
     const native = isNativeApp();
     const subscribed = plan?.source === 'razorpay';
+    const renews = !!plan?.auto_renew;
 
     useEffect(() => {
         if (subscribed) getInvoices().then((r) => setInvoices(r.invoices || [])).catch(() => {});
@@ -53,14 +54,14 @@ const PlanUsage = () => {
                     <p className="text-sm text-[#8a6a5c]">
                         {plan.source === 'pass' && until ? `Exam Night Pass active until ${until}` :
                             plan.source === 'institution' ? 'Provided by your institution' :
-                                until ? `${plan.cancel_at_period_end ? 'Ends' : 'Renews'} on ${until}` :
+                                until ? (renews ? `Renews on ${until}` : `Active until ${until}${subscribed && !plan.cancel_at_period_end ? '. Pay again any time to add more.' : ''}`) :
                                     plan.plan === 'free' ? 'Free forever. Upgrade any time.' : ''}
                     </p>
                 </div>
                 {plan.source !== 'institution' && !native && (
                     <button onClick={() => navigate('/pricing')}
                         className="rounded-xl bg-[#C8A288] px-4 py-2 text-sm font-semibold text-white hover:bg-[#B08B72]">
-                        {plan.plan === 'free' ? 'Upgrade' : 'Manage plan'}
+                        {plan.plan === 'free' ? 'Upgrade' : renews ? 'Manage plan' : 'Add more time'}
                     </button>
                 )}
             </div>
@@ -84,7 +85,7 @@ const PlanUsage = () => {
                 })}
             </div>
 
-            {subscribed && !native && (
+            {subscribed && !native && (invoices.length > 0 || renews) && (
                 <div className="rounded-2xl border border-[#E6D5CC] bg-white p-5 space-y-4">
                     {invoices.length > 0 && (
                         <div>
@@ -99,7 +100,7 @@ const PlanUsage = () => {
                                         {inv.url && (
                                             <a href={inv.url} target="_blank" rel="noopener noreferrer"
                                                 className="flex items-center gap-1 font-semibold text-[#C8A288] hover:underline">
-                                                <FileText className="h-4 w-4" /> GST invoice
+                                                <FileText className="h-4 w-4" /> Invoice
                                             </a>
                                         )}
                                     </li>
@@ -107,7 +108,7 @@ const PlanUsage = () => {
                             </ul>
                         </div>
                     )}
-                    {!plan.cancel_at_period_end && (
+                    {renews && (
                         confirmCancel ? (
                             <div className="rounded-xl bg-rose-50 border border-rose-200 p-4 text-sm text-rose-900">
                                 <p>You'll keep {plan.plan_name} until the end of this billing period, then move to Free. Your books and progress stay.</p>
