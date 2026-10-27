@@ -53,6 +53,7 @@ Students can still join with a class code using their own account, as before.
    | `INSTITUTION_REQUIRE_APPROVAL` | `true` (default) |
    | `INSTITUTION_TRIAL_DAYS` | `14` (default; `0` = pay first) |
    | `STUDENT_LOGIN_DOMAIN` | `luminaiq.fun` (default) |
+   | `INSTITUTION_GSTIN` | empty (default) = no GST on school prices; set your GSTIN to add 18% GST |
 
 3. Razorpay Dashboard → Webhooks (create it once in Test Mode and once in Live Mode):
    URL `https://<backend>/api/v1/billing/webhook`, events `payment.captured`,

@@ -103,6 +103,8 @@ class Settings(BaseSettings):
     INSTITUTION_REQUIRE_APPROVAL: bool = Field(default=True)
     # Free trial given when a school is approved (0 = no trial: pay first).
     INSTITUTION_TRIAL_DAYS: int = Field(default=14)
+    # Our GSTIN. Empty = no GST is added to school prices; set it to add 18% GST.
+    INSTITUTION_GSTIN: str = Field(default="")
     # Comma-separated emails that can use the platform admin console (/platform),
     # in addition to users with the 'owner' or 'admin' role in user_roles.
     PLATFORM_ADMIN_EMAILS: str = Field(default="")

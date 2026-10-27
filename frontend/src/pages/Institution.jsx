@@ -159,7 +159,7 @@ const Setup = ({ onCreated, onJoined }) => {
         <div className="grid gap-5 md:grid-cols-[1.4fr_1fr]">
             <Card>
                 <h2 className="text-xl font-bold text-[#4A3B32] flex items-center gap-2"><Building2 className="h-5 w-5 text-[#C8A288]" /> Set up your institution</h2>
-                <p className="text-sm text-[#8a6a5c] mt-1">We review each new school, then switch on a free trial for up to 25 students. After that it's {inr(179)} per student per month + GST, paid for 1, 3, 6 or 12 months at a time.</p>
+                <p className="text-sm text-[#8a6a5c] mt-1">We review each new school, then switch on a free trial for up to 25 students. After that it's {inr(179)} per student per month, paid for 1, 3, 6 or 12 months at a time.</p>
                 <form onSubmit={submit} className="mt-4 space-y-3">
                     <input required minLength={2} value={form.name} onChange={set('name')} placeholder="School or institute name" className={input} />
                     <input value={form.billing_name} onChange={set('billing_name')} placeholder="Billing name (for invoices, optional)" className={input} />
@@ -195,7 +195,8 @@ const SeatsBox = ({ data, onPaid }) => {
     const [error, setError] = useState('');
     const [done, setDone] = useState('');
     const base = seats * data.pricing.per_seat_inr * months;
-    const gst = Math.round(base * data.pricing.gst_rate);
+    const gstRate = data.pricing.gst_rate || 0;
+    const gst = Math.round(base * gstRate);
     const renewing = inst.state === 'active';
     const pay = async () => {
         setBusy(true); setError(''); setDone('');
@@ -242,7 +243,7 @@ const SeatsBox = ({ data, onPaid }) => {
             </div>
             <div className="mt-3 text-sm text-[#4A3B32] space-y-0.5 tabular-nums">
                 <div className="flex justify-between"><span>Subtotal</span><span>{inr(base)}</span></div>
-                <div className="flex justify-between"><span>GST (18%)</span><span>{inr(gst)}</span></div>
+                {gstRate > 0 && <div className="flex justify-between"><span>GST ({Math.round(gstRate * 100)}%)</span><span>{inr(gst)}</span></div>}
                 <div className="flex justify-between font-bold"><span>Total for {TERM_LABEL[months] || `${months} months`}</span><span>{inr(base + gst)}</span></div>
             </div>
             {seats < min && <p className="mt-2 text-sm text-rose-600">Choose at least {min} students.</p>}

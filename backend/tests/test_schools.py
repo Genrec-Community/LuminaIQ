@@ -68,7 +68,7 @@ def test_state_and_timer():
 def test_price_by_term():
     yearly = isvc.seats_price_paise(100, 12)
     assert yearly["base"] == 100 * 179 * 12 * 100
-    assert yearly["total"] == yearly["base"] + round(yearly["base"] * 0.18)
+    assert yearly["gst"] == 0 and yearly["total"] == yearly["base"]  # no GSTIN yet
     assert isvc.seats_price_paise(100, 3)["base"] == 100 * 179 * 3 * 100
     assert isvc.term_days(12) == 365 and isvc.term_days(6) == 180
 
@@ -264,3 +264,10 @@ def test_student_changes_own_password(svc, monkeypatch):
     run(auth_service.change_password(c["user_id"], "First1234", "Second1234"))
     assert users[c["user_id"]]["password"] == "Second1234"
     assert not run(svc.account_info(c["user_id"]))["must_change_password"]
+
+
+def test_gst_only_with_gstin(monkeypatch):
+    monkeypatch.setattr(isvc.settings, "INSTITUTION_GSTIN", "29ABCDE1234F1Z5")
+    yearly = isvc.seats_price_paise(100, 12)
+    assert yearly["gst"] == round(yearly["base"] * 0.18)
+    assert yearly["total"] == yearly["base"] + yearly["gst"]

@@ -50,7 +50,12 @@ from utils.logger import logger
 
 TRIAL_SEATS = 25
 MIN_PAID_SEATS = 100
-GST_RATE = 0.18
+GST_RATE = 0.18  # charged only once INSTITUTION_GSTIN is set
+
+
+def gst_rate() -> float:
+    """GST added to school prices: 0 until we have a GSTIN (INSTITUTION_GSTIN)."""
+    return GST_RATE if (settings.INSTITUTION_GSTIN or "").strip() else 0.0
 TERM_MONTHS = (1, 3, 6, 12)
 MAX_BULK_STUDENTS = 500
 _ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0/O/1/I
@@ -95,9 +100,9 @@ def term_days(months: int) -> int:
 
 
 def seats_price_paise(seats: int, months: int = 12) -> Dict[str, int]:
-    """Price for `seats` students for `months`: base + 18% GST (B2B, GST on top)."""
+    """Price for `seats` students for `months`: base, plus GST on top once we have a GSTIN."""
     base = seats * PLANS["institution"]["price_inr"] * months * 100
-    gst = round(base * GST_RATE)
+    gst = round(base * gst_rate())
     return {"base": base, "gst": gst, "total": base + gst}
 
 
@@ -782,7 +787,7 @@ class InstitutionService:
                           for c in classes]
         from services import razorpay_service as rzp
         out["pricing"] = {"per_seat_inr": PLANS["institution"]["price_inr"], "min_seats": MIN_PAID_SEATS,
-                          "gst_rate": GST_RATE, "terms": list(TERM_MONTHS),
+                          "gst_rate": gst_rate(), "terms": list(TERM_MONTHS),
                           "payments_enabled": rzp.configured(), "test_mode": rzp.test_mode()}
         return out
 
