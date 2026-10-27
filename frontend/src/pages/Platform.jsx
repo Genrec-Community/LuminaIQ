@@ -99,7 +99,7 @@ const School = ({ s, onChanged }) => {
     );
 };
 
-/** LuminaIQ staff console: approve, pause and extend schools. */
+/** Lumina IQ staff console: approve, pause and extend schools. */
 const Platform = () => {
     const navigate = useNavigate();
     const [allowed, setAllowed] = useState(null);
@@ -130,7 +130,7 @@ const Platform = () => {
             </header>
             <main className="mx-auto max-w-5xl px-4 pb-16">
                 {allowed === null && <div className="flex items-center gap-2 text-[#8a6a5c]"><Loader2 className="h-4 w-4 animate-spin" /> Checking access…</div>}
-                {allowed === false && <p className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-800">This page is for LuminaIQ staff.</p>}
+                {allowed === false && <p className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-800">This page is for Lumina IQ staff.</p>}
                 {allowed && (
                     <>
                         <div className="mb-4 flex flex-wrap items-center gap-2">

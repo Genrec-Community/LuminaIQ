@@ -1,4 +1,4 @@
-# LuminaIQ — Comprehensive Cloud Deployment & Architecture Guide
+# Lumina IQ — Comprehensive Cloud Deployment & Architecture Guide
 
 This guide covers the complete architecture, environment configuration (including a single unified variable for AI Model APIs), step-by-step cloud deployment instructions for **Render**, **Vercel**, **AWS**, and **Azure**, and critical fixes applied to prevent deployment or runtime failures.
 
@@ -23,14 +23,14 @@ This guide covers the complete architecture, environment configuration (includin
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      LuminaIQ Frontend                      │
+│                      Lumina IQ Frontend                      │
 │            React + Vite + TailwindCSS (SPA)                 │
 │              Hosted on: Vercel / Azure SWA                  │
 └──────────────┬──────────────────────────────┬───────────────┘
                │ HTTPS REST / SSE             │ Supabase Auth
                ▼                              ▼
 ┌──────────────────────────────┐    ┌─────────────────────────┐
-│       LuminaIQ Backend       │    │    Supabase Cloud       │
+│       Lumina IQ Backend       │    │    Supabase Cloud       │
 │     FastAPI + Gunicorn       │    │ PostgreSQL + Auth +     │
 │   Hosted on: Render / Azure  │    │      File Storage       │
 │   Container Apps / AWS ECS   │    └─────────────────────────┘

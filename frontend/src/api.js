@@ -1314,7 +1314,7 @@ export const changePassword = async (currentPassword, newPassword) =>
 
 export const getAccount = async () => (await api.get('/auth/account')).data;
 
-// ============== Platform admin (LuminaIQ staff) ==============
+// ============== Platform admin (Lumina IQ staff) ==============
 
 export const getPlatformMe = async () => (await api.get('/platform/me')).data;
 

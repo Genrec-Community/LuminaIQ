@@ -15,7 +15,7 @@ class SchoolInactive(Exception):
     """A school-created account whose school isn't working (or that was switched off)."""
 
     def __init__(self, access: Dict[str, Any]):
-        super().__init__(access.get("message") or "Your school's LuminaIQ access is paused.")
+        super().__init__(access.get("message") or "Your school's Lumina IQ access is paused.")
         self.access = access
 
 # Password Hashing

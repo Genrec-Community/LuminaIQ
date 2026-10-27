@@ -67,9 +67,9 @@ ACTIVE, TRIAL, PENDING, SUSPENDED, EXPIRED = "active", "trial", "pending_approva
 LIVE_STATES = (ACTIVE, TRIAL)
 
 STATE_MESSAGES = {
-    PENDING: "Your school's LuminaIQ account is waiting for approval.",
-    SUSPENDED: "Your school's LuminaIQ access has been paused. Please contact your school.",
-    EXPIRED: "Your school's LuminaIQ plan has ended. Please ask your school to renew.",
+    PENDING: "Your school's Lumina IQ account is waiting for approval.",
+    SUSPENDED: "Your school's Lumina IQ access has been paused. Please contact your school.",
+    EXPIRED: "Your school's Lumina IQ plan has ended. Please ask your school to renew.",
 }
 
 
@@ -233,7 +233,7 @@ class InstitutionService:
 
     async def managed_access(self, user_id: str) -> Dict[str, Any]:
         """
-        For school-created accounts: may this user use LuminaIQ right now?
+        For school-created accounts: may this user use Lumina IQ right now?
         {"ok": bool, "state", "message", "institution_id"}. Cached for a minute.
         Fails open on database errors (our outage shouldn't lock students out).
         """

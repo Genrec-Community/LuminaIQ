@@ -1,5 +1,5 @@
 """
-Create the LuminaIQ subscription plans in your Razorpay account (run once per
+Create the Lumina IQ subscription plans in your Razorpay account (run once per
 account / mode) and print the env vars to paste into Render.
 
     cd backend
@@ -32,10 +32,10 @@ for plan in ("scholar", "topper"):
                 "period": cycle,
                 "interval": 1,
                 "item": {
-                    "name": f"LuminaIQ {PLANS[plan]['name']} ({cycle})",
+                    "name": f"Lumina IQ {PLANS[plan]['name']} ({cycle})",
                     "amount": amount * 100,
                     "currency": "INR",
-                    "description": f"LuminaIQ {PLANS[plan]['name']} plan, billed {cycle}",
+                    "description": f"Lumina IQ {PLANS[plan]['name']} plan, billed {cycle}",
                 },
                 "notes": {"plan": plan, "cycle": cycle},
             },

@@ -169,7 +169,7 @@ async def seats_checkout(request: SeatsRequest, current_user: dict = Depends(get
     inst = await institutions.institution(m["institution_id"], fresh=True)
     if (inst or {}).get("approval_status") == "suspended":
         raise HTTPException(403, {"code": "school_inactive", "state": "suspended",
-                                  "message": "Your institution is paused. Please contact LuminaIQ support."})
+                                  "message": "Your institution is paused. Please contact Lumina IQ support."})
     students = await institutions.student_count(m["institution_id"])
     if request.seats < max(MIN_PAID_SEATS, students):
         raise HTTPException(400, f"Choose at least {max(MIN_PAID_SEATS, students)} seats.")
@@ -196,6 +196,6 @@ async def seats_checkout(request: SeatsRequest, current_user: dict = Depends(get
         "key_id": settings.RAZORPAY_KEY_ID, "order_id": order["id"], "amount_paise": price["total"],
         "base_paise": price["base"], "gst_paise": price["gst"], "seats": request.seats, "months": request.months,
         "test_mode": rzp.test_mode(),
-        "name": "LuminaIQ", "description": f"Institution · {request.seats} students · {term}",
+        "name": "Lumina IQ", "description": f"Institution · {request.seats} students · {term}",
         "prefill": {"email": current_user.get("email") or ""},
     }

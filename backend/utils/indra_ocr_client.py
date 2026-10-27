@@ -1,5 +1,5 @@
 """
-Client for the LuminaIQ OCR service (ocr-service/: Indra OCR on CPU, its own
+Client for the Lumina IQ OCR service (ocr-service/: Indra OCR on CPU, its own
 Render service). Pages are rendered here exactly as for Google Vision (greyscale
 JPEG, long side capped) and sent a few at a time; the service reads them one by
 one and returns markdown per page.

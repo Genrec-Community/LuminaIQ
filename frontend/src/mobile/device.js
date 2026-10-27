@@ -80,7 +80,7 @@ export async function scheduleStudyReminder(enabled, time = '19:00') {
         await LocalNotifications.schedule({
             notifications: [{
                 id: REMINDER_ID,
-                title: 'LuminaIQ',
+                title: 'Lumina IQ',
                 body: NUDGES[Math.floor(Math.random() * NUDGES.length)],
                 schedule: { on: { hour, minute }, repeats: true, allowWhileIdle: true },
                 extra: { route: '/app/feed' },

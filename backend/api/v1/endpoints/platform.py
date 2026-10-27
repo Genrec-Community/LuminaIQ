@@ -1,5 +1,5 @@
 """
-Platform admin console (LuminaIQ staff, not school staff): approve, pause and
+Platform admin console (Lumina IQ staff, not school staff): approve, pause and
 extend schools. Access: users with the 'owner' or 'admin' role in user_roles, or
 an email listed in PLATFORM_ADMIN_EMAILS.
 

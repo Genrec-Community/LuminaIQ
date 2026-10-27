@@ -72,7 +72,7 @@ const Me = () => {
     const setReminder = async (enabled, time = settings.reminderTime || '19:00') => {
         const ok = await scheduleStudyReminder(enabled, time);
         if (enabled && ok === false) {
-            toast.error('Turn on notifications for LuminaIQ in your phone settings to get reminders.');
+            toast.error('Turn on notifications for Lumina IQ in your phone settings to get reminders.');
             updateSettings({ studyReminders: false });
             return;
         }
@@ -154,7 +154,7 @@ const Me = () => {
                 </Group>
 
                 <Group title="About">
-                    <Row icon={Mail} color="#3b8fd6" label="Help & feedback" onClick={() => openUrl('mailto:support@luminaiq.fun?subject=LuminaIQ%20app')} />
+                    <Row icon={Mail} color="#3b8fd6" label="Help & feedback" onClick={() => openUrl('mailto:support@luminaiq.fun?subject=Lumina%20IQ%20app')} />
                     <Row icon={Shield} color="#14b8a6" label="Privacy policy" onClick={() => navigate('/privacy')} />
                     <Row icon={FileText} color="#a16207" label="Terms of use" onClick={() => navigate('/terms')} />
                 </Group>
@@ -163,7 +163,7 @@ const Me = () => {
                     <Row icon={LogOut} color="#8a6a5c" label="Sign out" onClick={() => setSheet('signout')} right={null} />
                     <Row icon={Trash2} color="#ef4444" label="Delete account" danger onClick={() => { setConfirmText(''); setSheet('delete'); }} right={null} />
                 </Group>
-                <p className="pb-2 text-center text-[12px]" style={{ color: 'var(--m-muted)' }}>LuminaIQ · made for curious minds</p>
+                <p className="pb-2 text-center text-[12px]" style={{ color: 'var(--m-muted)' }}>Lumina IQ · made for curious minds</p>
             </div>
 
             <Sheet open={sheet === 'goal'} onClose={() => setSheet(null)} title="Daily goal">

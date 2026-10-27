@@ -1,0 +1,11 @@
+# Lumina IQ
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /project/
+Disallow: /settings
+Disallow: /bookstore
+Disallow: /institution
+Disallow: /join/
+
+Sitemap: https://luminaiq.fun/sitemap.xml

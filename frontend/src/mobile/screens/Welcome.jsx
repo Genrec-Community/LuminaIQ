@@ -21,7 +21,7 @@ const DEMO = {
         { id: 'b', text: 'About half' },
         { id: 'c', text: 'Only a small part', right: true },
     ],
-    why: 'The forgetting curve: most of what we read fades within days unless we recall it. Quick questions like this one are how LuminaIQ makes it stick.',
+    why: 'The forgetting curve: most of what we read fades within days unless we recall it. Quick questions like this one are how Lumina IQ makes it stick.',
 };
 
 const Brand = () => (

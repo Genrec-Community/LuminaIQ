@@ -1,5 +1,5 @@
 """
-LuminaIQ OCR service: Indra OCR (datalab-to/indra-ocr, ONNX on CPU) behind a
+Lumina IQ OCR service: Indra OCR (datalab-to/indra-ocr, ONNX on CPU) behind a
 tiny HTTP API, so scanned books can be read without a paid OCR provider.
 
   GET  /health           {"ok": true, "ready": bool}
@@ -23,7 +23,7 @@ THREADS = int(os.environ.get("OCR_THREADS", "1"))
 MAX_FILES = 8
 MAX_SIDE = int(os.environ.get("OCR_MAX_SIDE", "3000"))
 
-app = FastAPI(title="LuminaIQ OCR")
+app = FastAPI(title="Lumina IQ OCR")
 _conv = None
 _load_error = None
 _lock = threading.Lock()

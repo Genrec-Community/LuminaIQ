@@ -25,7 +25,7 @@ const Shell = ({ title, children }) => (
 export const Privacy = () => (
     <Shell title="Privacy Policy">
         <p className="mt-6 leading-relaxed text-[#5a4a42]">
-            LuminaIQ (the website at luminaiq.fun and the LuminaIQ app) helps you study from your own books and notes.
+            Lumina IQ (the website at luminaiq.fun and the Lumina IQ app) helps you study from your own books and notes.
             This policy explains what we collect, why, and the choices you have.
         </p>
         <Section title="What we collect">
@@ -39,7 +39,7 @@ export const Privacy = () => (
             <p>To provide the service: reading your files, building your study tools, answering your questions about your material, tracking your progress and sending study reminders you turn on. We do not sell your data and we do not use your uploads to advertise to you.</p>
         </Section>
         <Section title="Services that process your data for us">
-            <p>To run LuminaIQ we use trusted providers that process data on our behalf: Supabase (accounts, database and file storage), Qdrant (search index of your material), Render and Vercel (hosting), AI model providers such as Amazon Web Services (Bedrock) for answers and generated study material, Google Cloud Vision and our own OCR service for reading scanned pages, an embeddings provider for search, and Razorpay for payments. They receive only what they need to do that job.</p>
+            <p>To run Lumina IQ we use trusted providers that process data on our behalf: Supabase (accounts, database and file storage), Qdrant (search index of your material), Render and Vercel (hosting), AI model providers such as Amazon Web Services (Bedrock) for answers and generated study material, Google Cloud Vision and our own OCR service for reading scanned pages, an embeddings provider for search, and Razorpay for payments. They receive only what they need to do that job.</p>
         </Section>
         <Section title="Sharing">
             <p>Your books and study data are private to your account. If you join a class through an institution, your teacher can see your class progress. We share data only with the providers above, or when the law requires it.</p>
@@ -51,7 +51,7 @@ export const Privacy = () => (
             <p>Data is sent over encrypted connections (HTTPS) and stored with access controls so only your account can reach your files.</p>
         </Section>
         <Section title="Children">
-            <p>LuminaIQ is meant for learners aged 13 and over. If you are under the age required to consent in your country, use it with a parent's or guardian's permission.</p>
+            <p>Lumina IQ is meant for learners aged 13 and over. If you are under the age required to consent in your country, use it with a parent's or guardian's permission.</p>
         </Section>
         <Section title="Notifications">
             <p>The app sends a daily study reminder only if you turn it on, and you can turn it off at any time in the app or in your phone's settings.</p>
@@ -63,18 +63,18 @@ export const Privacy = () => (
 );
 
 export const DeleteAccount = () => (
-    <Shell title="Delete your LuminaIQ account">
+    <Shell title="Delete your Lumina IQ account">
         <p className="mt-6 leading-relaxed text-[#5a4a42]">
-            You can delete your LuminaIQ account and its data at any time, from the app or by email.
+            You can delete your Lumina IQ account and its data at any time, from the app or by email.
         </p>
         <Section title="Delete in the app">
-            <p>1. Open the LuminaIQ app and sign in.</p>
+            <p>1. Open the Lumina IQ app and sign in.</p>
             <p>2. Go to the <b>You</b> tab.</p>
             <p>3. Tap <b>Delete account</b> and confirm.</p>
             <p>Your account and its data are deleted straight away.</p>
         </Section>
         <Section title="Delete by email">
-            <p>If you can't use the app, email <a className="font-semibold text-[#C8A288]" href={`mailto:${CONTACT}?subject=Delete%20my%20LuminaIQ%20account`}>{CONTACT}</a> from the address you signed up with, with the subject "Delete my LuminaIQ account". We'll delete the account and reply to confirm.</p>
+            <p>If you can't use the app, email <a className="font-semibold text-[#C8A288]" href={`mailto:${CONTACT}?subject=Delete%20my%20Lumina%20IQ%20account`}>{CONTACT}</a> from the address you signed up with, with the subject "Delete my Lumina IQ account". We'll delete the account and reply to confirm.</p>
         </Section>
         <Section title="Delete only some of your data">
             <p>You don't have to delete your account to remove data. In the app you can delete any book or file at any time, which removes the file, its extracted text and its search index. To remove other data, such as your chat history or progress, email us and tell us what to delete.</p>
@@ -88,8 +88,8 @@ export const DeleteAccount = () => (
 
 export const Terms = () => (
     <Shell title="Terms of Use">
-        <Section title="Using LuminaIQ">
-            <p>LuminaIQ gives you study tools built from material you upload. By creating an account you agree to these terms. You must be 13 or older, or have a parent's or guardian's permission.</p>
+        <Section title="Using Lumina IQ">
+            <p>Lumina IQ gives you study tools built from material you upload. By creating an account you agree to these terms. You must be 13 or older, or have a parent's or guardian's permission.</p>
         </Section>
         <Section title="Your content">
             <p>You keep all rights to what you upload. You confirm you have the right to use it for your own study. You give us permission to store and process it only to provide the service to you. Don't upload material that is illegal or that you have no right to use.</p>
@@ -107,7 +107,7 @@ export const Terms = () => (
             <p>You can delete your account at any time from the app. We may suspend accounts that break these terms.</p>
         </Section>
         <Section title="Liability">
-            <p>LuminaIQ is provided as is. To the extent the law allows, we are not liable for indirect losses, or for results based on AI-generated material.</p>
+            <p>Lumina IQ is provided as is. To the extent the law allows, we are not liable for indirect losses, or for results based on AI-generated material.</p>
         </Section>
     </Shell>
 );

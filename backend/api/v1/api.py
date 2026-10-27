@@ -37,7 +37,7 @@ api_router.include_router(learning.router, prefix="/learning", tags=["learning"]
 # Plans, usage and payments
 api_router.include_router(billing.router, prefix="/billing", tags=["billing"])
 api_router.include_router(institutions.router, prefix="/institutions", tags=["institutions"])
-# LuminaIQ staff: approve / pause / extend schools
+# Lumina IQ staff: approve / pause / extend schools
 api_router.include_router(platform.router, prefix="/platform", tags=["platform"])
 # Exam Tonight (crash mode) + Visual Lab
 api_router.include_router(study_modes.router, prefix="/learning", tags=["study-modes"])

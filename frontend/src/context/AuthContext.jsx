@@ -132,7 +132,7 @@ export const AuthProvider = ({ children }) => {
                         // Say why on the sign-in screen instead of failing silently
                         const detail = e?.response?.data?.detail;
                         window.dispatchEvent(new CustomEvent('lumina-auth-error', {
-                            detail: typeof detail === 'string' ? detail : detail?.message ? detail.message : (e?.response ? 'Sign-in failed on our side. Please try again.' : "Couldn't reach LuminaIQ. Check your connection and try again."),
+                            detail: typeof detail === 'string' ? detail : detail?.message ? detail.message : (e?.response ? 'Sign-in failed on our side. Please try again.' : "Couldn't reach Lumina IQ. Check your connection and try again."),
                         }));
                         await supabase.auth.signOut(); // Clear invalid supabase session
                     }

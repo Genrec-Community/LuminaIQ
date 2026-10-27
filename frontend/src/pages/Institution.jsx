@@ -92,7 +92,7 @@ const StatusBanner = ({ inst, role }) => {
                 <Hourglass className="h-5 w-5 shrink-0 mt-0.5" />
                 <div>
                     <div className="font-semibold">Waiting for approval</div>
-                    <p className="text-sm">LuminaIQ checks every new school before switching it on. You can look around now; classes and student accounts open once you're approved{role === 'admin' ? ', and you can pay for seats in the meantime' : ''}.</p>
+                    <p className="text-sm">Lumina IQ checks every new school before switching it on. You can look around now; classes and student accounts open once you're approved{role === 'admin' ? ', and you can pay for seats in the meantime' : ''}.</p>
                 </div>
             </div>
         );
@@ -102,8 +102,8 @@ const StatusBanner = ({ inst, role }) => {
             <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-900 flex gap-3">
                 <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
                 <div>
-                    <div className="font-semibold">Paused by LuminaIQ</div>
-                    <p className="text-sm">Students can't sign in until it's switched back on.{inst.approval_note ? ` Note: ${inst.approval_note}` : ''} Contact LuminaIQ support.</p>
+                    <div className="font-semibold">Paused by Lumina IQ</div>
+                    <p className="text-sm">Students can't sign in until it's switched back on.{inst.approval_note ? ` Note: ${inst.approval_note}` : ''} Contact Lumina IQ support.</p>
                 </div>
             </div>
         );
@@ -247,7 +247,7 @@ const SeatsBox = ({ data, onPaid }) => {
                 <div className="flex justify-between font-bold"><span>Total for {TERM_LABEL[months] || `${months} months`}</span><span>{inr(base + gst)}</span></div>
             </div>
             {seats < min && <p className="mt-2 text-sm text-rose-600">Choose at least {min} students.</p>}
-            {!data.pricing.payments_enabled && <p className="mt-2 text-sm text-[#8a6a5c]">Online payments aren't switched on yet. Contact LuminaIQ to pay by bank transfer.</p>}
+            {!data.pricing.payments_enabled && <p className="mt-2 text-sm text-[#8a6a5c]">Online payments aren't switched on yet. Contact Lumina IQ to pay by bank transfer.</p>}
             {error && <p className="mt-2 text-sm text-rose-600">{error}</p>}
             {done && <p className="mt-2 text-sm text-emerald-700">{done}</p>}
             <button onClick={pay} disabled={busy || seats < min || !data.pricing.payments_enabled}

@@ -1,4 +1,4 @@
-# LuminaIQ on Azure
+# Lumina IQ on Azure
 
 Workflow: `.github/workflows/azure.yml` (branch `jaisamyukth-changes`; `main` is not touched).
 

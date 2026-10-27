@@ -31,7 +31,7 @@ const Login = () => {
             const why = sessionStorage.getItem(SCHOOL_PAUSED_KEY);
             if (why !== null) {
                 sessionStorage.removeItem(SCHOOL_PAUSED_KEY);
-                setMessage({ type: 'error', text: why || "Your school's LuminaIQ access is paused." });
+                setMessage({ type: 'error', text: why || "Your school's Lumina IQ access is paused." });
             }
         } catch { /* ignore */ }
     }, []);
