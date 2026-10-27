@@ -116,6 +116,9 @@ class Settings(BaseSettings):
     # On boot, make one tiny call to the LLM, embeddings, Qdrant and storage and log
     # "[SelfCheck] ..." lines (see services/self_check.py)
     SELF_CHECK_ON_STARTUP: bool = Field(default=True)
+    # Hourly sweep that marks schools whose paid term ended as expired.
+    # Off on the test backend, which shares the live database.
+    SCHOOL_EXPIRY_SWEEP: bool = Field(default=True)
 
     # Webhook
     MAIN_API_WEBHOOK_SECRET: str = Field(default="supersecretwebhook")

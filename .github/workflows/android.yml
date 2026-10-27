@@ -1,6 +1,6 @@
 # Builds the Lumina IQ Android app (Capacitor wrapper of frontend/).
 #
-# Every push to jaisamyukth-changes that touches frontend/ produces, as a
+# Every push to main that touches frontend/ produces, as a
 # downloadable artifact of the run:
 #   - LuminaIQ-debug.apk     installable on any phone for testing
 #   - LuminaIQ-release.apk   signed (only when the signing secrets are set)
@@ -16,7 +16,7 @@ name: Android app
 
 on:
   push:
-    branches: [jaisamyukth-changes]
+    branches: [main]
     paths: ["frontend/**", ".github/workflows/android.yml"]
   workflow_dispatch:
     inputs:
