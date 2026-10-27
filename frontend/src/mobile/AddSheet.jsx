@@ -79,7 +79,7 @@ const AddSheet = ({ open, onClose }) => {
         </button>
     );
 
-    const titles = { source: 'Add to LuminaIQ', paste: 'Paste text', where: 'Which book?' };
+    const titles = { source: 'Add to Lumina IQ', paste: 'Paste text', where: 'Which book?' };
 
     return (
         <Sheet open={open} onClose={onClose} title={titles[step]}>

@@ -348,7 +348,7 @@ vite.config.ts.timestamp-*
 
 nul
 
-# LuminaIQ temp files
+# Lumina IQ temp files
 backend/temp/
 *.pdf
 

@@ -59,7 +59,7 @@ Because the architecture cleanly separates the frontend (Vercel), the database/a
 
 You can deploy the backend code directly from your local machine using the Azure CLI.
 
-1. Open PowerShell or Terminal in the `backend` folder of the LuminaIQ repository.
+1. Open PowerShell or Terminal in the `backend` folder of the Lumina IQ repository.
 2. Ensure you are logged into the new Azure account:
    ```bash
    az login

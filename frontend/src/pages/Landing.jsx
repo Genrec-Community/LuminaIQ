@@ -47,7 +47,7 @@ const benefits = [
     icon: Clock,
     title: "Save hours of study time",
     description:
-      "Upload your textbook or notes once. LuminaIQ instantly creates quizzes, summaries, and flashcards — no more manual prep.",
+      "Upload your textbook or notes once. Lumina IQ instantly creates quizzes, summaries, and flashcards — no more manual prep.",
     color: "text-chart-3",
   },
   {
@@ -99,7 +99,7 @@ const features = [
     icon: FileQuestion,
     title: "Auto-generated quizzes",
     description:
-      "Pick a topic and difficulty. LuminaIQ generates MCQs and subjective questions from your documents, then grades them instantly.",
+      "Pick a topic and difficulty. Lumina IQ generates MCQs and subjective questions from your documents, then grades them instantly.",
     outcome: "Test yourself before the real exam",
   },
   {
@@ -120,7 +120,7 @@ const features = [
     icon: Network,
     title: "Visual mindmaps",
     description:
-      "See how concepts connect. LuminaIQ builds interactive mindmaps from your documents — zoom, pan, and explore.",
+      "See how concepts connect. Lumina IQ builds interactive mindmaps from your documents — zoom, pan, and explore.",
     outcome: "Understand the big picture, not just facts",
   },
   {
@@ -152,14 +152,14 @@ const howItWorks = [
     icon: Upload,
     title: "Upload your document",
     description:
-      "Drag and drop a PDF, DOCX, or TXT. LuminaIQ extracts the text, chunks it, and embeds it into a vector database in seconds.",
+      "Drag and drop a PDF, DOCX, or TXT. Lumina IQ extracts the text, chunks it, and embeds it into a vector database in seconds.",
   },
   {
     step: 2,
     icon: Brain,
     title: "AI builds your study kit",
     description:
-      "LuminaIQ auto-generates topics, a knowledge graph, and unlocks chat, quizzes, notes, flashcards, and a learning path — instantly.",
+      "Lumina IQ auto-generates topics, a knowledge graph, and unlocks chat, quizzes, notes, flashcards, and a learning path — instantly.",
   },
   {
     step: 3,
@@ -182,7 +182,7 @@ const testimonials = [
     name: "Priya Sharma",
     role: "Medical Student, AIIMS",
     quote:
-      "I uploaded my entire anatomy textbook and LuminaIQ generated quizzes that were shockingly accurate. I went from cramming the night before to studying a little every day — and actually remembering it.",
+      "I uploaded my entire anatomy textbook and Lumina IQ generated quizzes that were shockingly accurate. I went from cramming the night before to studying a little every day — and actually remembering it.",
     rating: 5,
     avatar: "PS",
   },
@@ -206,7 +206,7 @@ const testimonials = [
     name: "Diego Ramirez",
     role: "High School Teacher",
     quote:
-      "I use LuminaIQ to create quiz sets for my students from textbook chapters. What used to take me an hour now takes two minutes. The notes types are genuinely useful for different learning styles.",
+      "I use Lumina IQ to create quiz sets for my students from textbook chapters. What used to take me an hour now takes two minutes. The notes types are genuinely useful for different learning styles.",
     rating: 5,
     avatar: "DR",
   },
@@ -245,7 +245,7 @@ const faqs = [
   },
   {
     q: "How accurate are the AI-generated quizzes?",
-    a: "LuminaIQ retrieves the most relevant passages from your actual document before generating questions, so answers are grounded in your source material — not hallucinated. You can always click a source to verify.",
+    a: "Lumina IQ retrieves the most relevant passages from your actual document before generating questions, so answers are grounded in your source material — not hallucinated. You can always click a source to verify.",
   },
   {
     q: "Is my data private?",
@@ -257,7 +257,7 @@ const faqs = [
   },
   {
     q: "Can I use it offline?",
-    a: "LuminaIQ requires an internet connection for AI processing (chat, quiz generation, embeddings). Spaced-repetition reviews work offline once cards are loaded.",
+    a: "Lumina IQ requires an internet connection for AI processing (chat, quiz generation, embeddings). Spaced-repetition reviews work offline once cards are loaded.",
   },
 ];
 
@@ -279,6 +279,7 @@ function Header() {
     { label: "Testimonials", href: "#testimonials" },
     { label: "Pricing", href: "#pricing" },
     { label: "FAQ", href: "#faq" },
+    { label: "Blog", href: "/blog/" },
   ];
 
   return (
@@ -293,7 +294,7 @@ function Header() {
             <Sparkles className="h-5 w-5 text-primary-foreground" />
           </div>
           <span className="font-display text-lg font-700 tracking-tight">
-            Lumina<span className="text-gradient-liq">IQ</span>
+            Lumina <span className="text-gradient-liq">IQ</span>
           </span>
         </a>
 
@@ -389,7 +390,7 @@ function Hero() {
           </h1>
 
           <p className="mx-auto mt-6 max-w-2xl text-base text-muted-foreground sm:text-lg">
-            Exams come faster than textbooks can be read. LuminaIQ turns any book into
+            Exams come faster than textbooks can be read. Lumina IQ turns any book into
             the shortest, smartest path to exam-ready: foundations first, the biggest
             topics next, every step something you actually understand.
           </p>
@@ -467,7 +468,7 @@ function Benefits() {
             Turn any document into mastery
           </h2>
           <p className="mt-3 text-sm text-muted-foreground sm:text-base">
-            LuminaIQ handles the boring prep so you can focus on actually learning.
+            Lumina IQ handles the boring prep so you can focus on actually learning.
           </p>
         </motion.div>
 
@@ -859,7 +860,7 @@ function FinalCTA() {
             Ready to actually <span className="text-gradient-liq">remember</span> what you learn?
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-base text-muted-foreground sm:text-lg">
-            Join 12,000+ students who study smarter with LuminaIQ. Upload your first
+            Join 12,000+ students who study smarter with Lumina IQ. Upload your first
             document and get a quiz in 30 seconds — free.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
@@ -885,18 +886,18 @@ function Footer() {
   return (
     <footer className="border-t border-border/50 bg-card/30">
       <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="grid gap-8 md:grid-cols-4">
+        <div className="grid gap-8 md:grid-cols-5">
           <div className="md:col-span-2">
             <div className="flex items-center gap-2.5">
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent shadow-lg shadow-primary/20">
                 <Sparkles className="h-5 w-5 text-primary-foreground" />
               </div>
               <span className="font-display text-lg font-700">
-                Lumina<span className="text-gradient-liq">IQ</span>
+                Lumina <span className="text-gradient-liq">IQ</span>
               </span>
             </div>
             <p className="mt-4 max-w-md text-sm text-muted-foreground">
-              Exams come faster than textbooks can be read. LuminaIQ turns any
+              Exams come faster than textbooks can be read. Lumina IQ turns any
               book into the shortest, smartest path to exam-ready.
             </p>
             <div className="mt-4 flex gap-2">
@@ -913,6 +914,16 @@ function Footer() {
               <li><a href="#how" className="hover:text-foreground transition-colors">How it works</a></li>
               <li><a href="#pricing" className="hover:text-foreground transition-colors">Pricing</a></li>
               <li><a href="#faq" className="hover:text-foreground transition-colors">FAQ</a></li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="font-display text-sm font-600">Study guides</h4>
+            <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+              <li><a href="/blog/how-to-study-for-exams/" className="hover:text-foreground transition-colors">How to study for exams</a></li>
+              <li><a href="/blog/how-to-learn-fast/" className="hover:text-foreground transition-colors">How to learn fast</a></li>
+              <li><a href="/blog/study-the-night-before-exam/" className="hover:text-foreground transition-colors">Exam tomorrow?</a></li>
+              <li><a href="/blog/" className="hover:text-foreground transition-colors">All articles</a></li>
             </ul>
           </div>
 
@@ -935,7 +946,7 @@ function Footer() {
 
         <div className="mt-10 flex flex-col items-center justify-between gap-3 border-t border-border/40 pt-6 sm:flex-row">
           <p className="text-xs text-muted-foreground">
-            © {new Date().getFullYear()} LuminaIQ. Built for students, by students.
+            © {new Date().getFullYear()} Lumina IQ. Built for students, by students.
           </p>
           <p className="text-xs text-muted-foreground">
             Powered by Azure OpenAI · Supabase · Qdrant

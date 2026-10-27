@@ -8,6 +8,7 @@ import { GamificationProvider } from './context/GamificationContext';
 import PrivateRoute from './components/PrivateRoute';
 import XPToast from './components/XPToast';
 import LimitModal from './components/LimitModal';
+import RouteMeta from './components/RouteMeta';
 
 // Route-level code splitting: each page loads only when visited
 const Login = lazy(() => import('./pages/Login'));
@@ -38,6 +39,7 @@ function App() {
                 <GamificationProvider>
                     <ToastProvider>
                         <Router>
+                            {!APP_SHELL && <RouteMeta />}
                             <Suspense fallback={<PageLoader />}>
                             {APP_SHELL ? <MobileApp /> : (
                             <Routes>

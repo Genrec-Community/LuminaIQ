@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">LuminaIQ</string>
-    <string name="title_activity_main">LuminaIQ</string>
+    <string name="app_name">Lumina IQ</string>
+    <string name="title_activity_main">Lumina IQ</string>
     <string name="package_name">fun.luminaiq.app</string>
     <string name="custom_url_scheme">fun.luminaiq.app</string>
 </resources>

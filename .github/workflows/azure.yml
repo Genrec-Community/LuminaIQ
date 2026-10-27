@@ -1,4 +1,4 @@
-# Deploys LuminaIQ to Azure from branch jaisamyukth-changes:
+# Deploys Lumina IQ to Azure from branch jaisamyukth-changes:
 #   - backend  → Azure Container Apps (Central India), always-on, autoscaling 1-10 replicas
 #   - frontend → Azure Static Web Apps (global CDN)
 # Everything is created on the first run (idempotent after that).
@@ -14,7 +14,7 @@ name: Deploy to Azure
 on:
   push:
     branches: [jaisamyukth-changes]
-    paths: ["backend/**", "frontend/src/**", "frontend/public/**", "frontend/index.html", "frontend/package.json", ".github/workflows/azure.yml"]
+    paths: ["backend/**", "frontend/src/**", "frontend/scripts/**", "frontend/public/**", "frontend/index.html", "frontend/package.json", ".github/workflows/azure.yml"]
   workflow_dispatch:
 
 permissions:

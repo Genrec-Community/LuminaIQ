@@ -1,5 +1,5 @@
 """
-Run script for LuminaIQ Main API (backend)
+Run script for Lumina IQ Main API (backend)
 
 Development  : python run.py
 Production   : gunicorn -c gunicorn.conf.py main:app

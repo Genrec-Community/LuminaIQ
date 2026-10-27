@@ -1,1 +1,1 @@
-"# LuminaIQ" 
+"# Lumina IQ" 

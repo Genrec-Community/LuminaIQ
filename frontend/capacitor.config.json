@@ -1,6 +1,6 @@
 {
   "appId": "fun.luminaiq.app",
-  "appName": "LuminaIQ",
+  "appName": "Lumina IQ",
   "webDir": "dist",
   "android": {
     "allowMixedContent": false,

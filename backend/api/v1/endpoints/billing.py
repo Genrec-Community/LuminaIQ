@@ -84,7 +84,7 @@ async def checkout(request: CheckoutRequest, current_user: dict = Depends(get_cu
         "plan": request.plan,
         "cycle": request.cycle,
         "amount_inr": amount,
-        "name": "LuminaIQ",
+        "name": "Lumina IQ",
         "description": f"{PLANS[request.plan]['name']} · {request.cycle}",
         "prefill": {"email": current_user.get("email") or ""},
     }
@@ -108,7 +108,7 @@ async def pass_checkout(current_user: dict = Depends(get_current_user)):
         "key_id": settings.RAZORPAY_KEY_ID,
         "order_id": order["id"],
         "amount_paise": amount,
-        "name": "LuminaIQ",
+        "name": "Lumina IQ",
         "description": f"{EXAM_NIGHT_PASS['name']} · {EXAM_NIGHT_PASS['hours']} hours of Topper",
         "prefill": {"email": current_user.get("email") or ""},
     }

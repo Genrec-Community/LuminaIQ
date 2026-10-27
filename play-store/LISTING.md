@@ -1,4 +1,4 @@
-# LuminaIQ — Google Play listing
+# Lumina IQ — Google Play listing
 
 Everything Play Console asks for, ready to paste. Graphics are in this folder.
 
@@ -11,7 +11,7 @@ Everything Play Console asks for, ready to paste. Graphics are in this folder.
 ## Store listing
 
 **App name** (30 max)
-LuminaIQ: Study Smarter
+Lumina IQ: Study Smarter
 
 **Short description** (80 max)
 Turn your books and notes into quick questions, flashcards and a daily habit.
@@ -19,7 +19,7 @@ Turn your books and notes into quick questions, flashcards and a daily habit.
 **Full description**
 Your books, turned into a daily habit.
 
-LuminaIQ reads your study material and turns it into short, swipeable practice you'll actually keep up with. Add a PDF, your notes, a scanned textbook or just paste text, and in about a minute you get questions, flashcards and a study buddy that knows your book.
+Lumina IQ reads your study material and turns it into short, swipeable practice you'll actually keep up with. Add a PDF, your notes, a scanned textbook or just paste text, and in about a minute you get questions, flashcards and a study buddy that knows your book.
 
 LEARN IN MINUTES A DAY
 • A swipeable feed of quick questions and flashcards made from YOUR material
@@ -73,13 +73,13 @@ Built for students preparing for school, college and competitive exams, professi
 | App activity → Other user-generated content (chat messages, notes) | Yes | No* | App functionality | Optional |
 | App info and performance → Crash logs | Yes | No | App functionality | Required |
 
-\* Processed by service providers on LuminaIQ's behalf (AI models, OCR, hosting). Google counts processing by service providers as **not sharing**.
+\* Processed by service providers on Lumina IQ's behalf (AI models, OCR, hosting). Google counts processing by service providers as **not sharing**.
 Not collected: location, contacts, photos/videos (only files the user picks), audio, financial info, health, messages, calendar, device IDs for ads.
 
 ## Publishing steps
 
 1. **Signing (once):** add the 4 GitHub secrets from `play-store-keys/SECRETS.txt` (Settings → Secrets and variables → Actions). The next build produces `LuminaIQ-release.aab`. Back up the keystore; Play App Signing protects you if it's ever lost (Google can reset the upload key).
-2. **Create the app** in Play Console: *Create app* → name LuminaIQ, App, Free, accept declarations.
+2. **Create the app** in Play Console: *Create app* → name Lumina IQ, App, Free, accept declarations.
 3. **First upload by hand** (Google requires this for a new app): Testing → Internal testing → Create release → upload `LuminaIQ-release.aab` from the latest build's Artifacts → add your testers' emails → Roll out.
 4. **Automatic uploads from then on:** Play Console → Setup → API access → create a service account in Google Cloud with the *Release manager* permission on this app, download its JSON key, and save it as the GitHub secret `PLAY_SERVICE_ACCOUNT_JSON`. Every build then goes to Internal testing automatically. Set the repository variable `PLAY_TRACK` to `alpha` (closed testing) or `production` when you're ready.
 5. **New personal developer accounts:** run a closed test with at least 12 testers for 14 days before applying for production. Organisation accounts can go straight to production.

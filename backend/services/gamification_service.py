@@ -1,5 +1,5 @@
 """
-Gamification Service — XP, Levels, and Badges system for LuminaIQ.
+Gamification Service — XP, Levels, and Badges system for Lumina IQ.
 
 Required Supabase table:
 

@@ -1,6 +1,6 @@
-# LuminaIQ Android app (Google Play)
+# Lumina IQ Android app (Google Play)
 
-The app is the LuminaIQ web app packaged with [Capacitor](https://capacitorjs.com) 8:
+The app is the Lumina IQ web app packaged with [Capacitor](https://capacitorjs.com) 8:
 `frontend/android/` is the native project, `frontend/capacitor.config.json` its config.
 App ID **`fun.luminaiq.app`** (permanent once published), targets Android 16 (API 36),
 runs on Android 7+ (API 24).
@@ -59,7 +59,7 @@ providers, payments via Razorpay, and how to delete an account.
 ### 4. Google Play Console
 
 1. Create a developer account (one-time US$25) at play.google.com/console.
-2. **Create app** → name *LuminaIQ*, app, free.
+2. **Create app** → name *Lumina IQ*, app, free.
 3. Store listing: short description (the pitch: *"Turn any textbook into the shortest
    path to exam-ready, even overnight."*), full description, icon 512×512
    (`frontend/assets/logo.png` resized), feature graphic 1024×500, at least 2 phone

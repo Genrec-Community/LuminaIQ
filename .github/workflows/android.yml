@@ -1,4 +1,4 @@
-# Builds the LuminaIQ Android app (Capacitor wrapper of frontend/).
+# Builds the Lumina IQ Android app (Capacitor wrapper of frontend/).
 #
 # Every push to jaisamyukth-changes that touches frontend/ produces, as a
 # downloadable artifact of the run:

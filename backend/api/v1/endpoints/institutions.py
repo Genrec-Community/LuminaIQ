@@ -127,6 +127,6 @@ async def seats_checkout(request: SeatsRequest, current_user: dict = Depends(get
     return {
         "key_id": settings.RAZORPAY_KEY_ID, "order_id": order["id"], "amount_paise": price["total"],
         "base_paise": price["base"], "gst_paise": price["gst"], "seats": request.seats,
-        "name": "LuminaIQ", "description": f"Institution · {request.seats} students · 1 year",
+        "name": "Lumina IQ", "description": f"Institution · {request.seats} students · 1 year",
         "prefill": {"email": current_user.get("email") or ""},
     }
