@@ -28,7 +28,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail={"code": "school_inactive", "state": access.get("state"),
-                        "message": access.get("message") or "Your school's LuminaIQ access is paused."},
+                        "message": access.get("message") or "Your school's Lumina IQ access is paused."},
             )
     return {"id": user_id, "email": payload.get("email"), "managed": bool(payload.get("mgd"))}
 
