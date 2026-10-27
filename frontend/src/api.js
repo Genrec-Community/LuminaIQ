@@ -45,8 +45,13 @@ api.interceptors.response.use(
         const config = error.config;
         const status = error.response?.status;
 
+        // Sign-in calls answer 401 for a wrong password or an unconfirmed email.
+        // That is the answer to show, not an expired session to refresh: refreshing
+        // here replaced it with "No active session", shown as "Unable to reach the server".
+        const isAuthCall = (config?.url || '').includes('auth/');
+
         // ── 401 Unauthorized: try to refresh the app JWT via Supabase ──
-        if (status === 401 && config && !config._retried) {
+        if (status === 401 && config && !config._retried && !isAuthCall) {
             config._retried = true; // mark so we don't loop
 
             if (isRefreshing) {
@@ -132,8 +137,20 @@ api.interceptors.response.use(
 );
 
 export const login = async (email, password) => {
-    const response = await api.post('/auth/login', { email, password });
-    return response.data;
+    try {
+        const response = await api.post('/auth/login', { email, password });
+        return response.data;
+    } catch (error) {
+        // Turn Supabase's terse answers into something a person can act on
+        const data = error.response?.data;
+        const detail = typeof data?.detail === 'string' ? data.detail : '';
+        if (/email not confirmed/i.test(detail)) {
+            data.detail = 'Please confirm your email first. Check your inbox (and spam) for the confirmation link, or sign in with an email code.';
+        } else if (/invalid login credentials/i.test(detail)) {
+            data.detail = 'Incorrect email or password.';
+        }
+        throw error;
+    }
 };
 
 export const signup = async (email, password, fullName) => {
