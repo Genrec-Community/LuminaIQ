@@ -5,6 +5,7 @@ import { Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { onboardedKey } from '../components/Onboarding';
+import ForcePasswordChange from '../components/ForcePasswordChange';
 import { isNativeApp } from '../utils/platform';
 import { TabBar } from './ui';
 import AddSheet from './AddSheet';
@@ -26,6 +27,7 @@ const Settings = lazy(() => import('../pages/Settings'));
 const BookStore = lazy(() => import('../pages/BookStore'));
 const JoinClass = lazy(() => import('../pages/JoinClass'));
 const Institution = lazy(() => import('../pages/Institution'));
+const Platform = lazy(() => import('../pages/Platform'));
 const Privacy = lazy(() => import('../pages/Legal').then((m) => ({ default: m.Privacy })));
 const Terms = lazy(() => import('../pages/Legal').then((m) => ({ default: m.Terms })));
 
@@ -43,6 +45,7 @@ const Guard = () => {
     const { settings, loaded } = useSettings();
     const location = useLocation();
     if (!user) return <Navigate to="/signin" replace state={{ from: location.pathname }} />;
+    if (user.must_change_password) return <ForcePasswordChange />;
     let onboarded = settings.onboardingComplete;
     try { onboarded = onboarded || localStorage.getItem(onboardedKey(user.id)) === '1'; } catch { /* ignore */ }
     return (
@@ -161,6 +164,7 @@ const MobileApp = () => {
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/bookstore" element={<BookStore />} />
                     <Route path="/institution" element={<Institution />} />
+                    <Route path="/platform" element={<Platform />} />
                     <Route path="/join/:code" element={<JoinClass />} />
                 </Route>
                 <Route path="*" element={<Navigate to="/" replace />} />

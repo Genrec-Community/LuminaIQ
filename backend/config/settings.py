@@ -95,6 +95,19 @@ class Settings(BaseSettings):
     RAZORPAY_PLAN_SCHOLAR_YEARLY: str = Field(default="")
     RAZORPAY_PLAN_TOPPER_MONTHLY: str = Field(default="")
     RAZORPAY_PLAN_TOPPER_YEARLY: str = Field(default="")
+    # ── Schools (institution plan) ──
+    # Domain of school-created student sign-in IDs (studentname-07@luminaiq.fun).
+    # These are sign-in names only: no mailbox exists and no email is ever sent to them.
+    STUDENT_LOGIN_DOMAIN: str = Field(default="luminaiq.fun")
+    # New schools wait for a platform admin to approve them before anything works.
+    INSTITUTION_REQUIRE_APPROVAL: bool = Field(default=True)
+    # Free trial given when a school is approved (0 = no trial: pay first).
+    INSTITUTION_TRIAL_DAYS: int = Field(default=14)
+    # Our GSTIN. Empty = no GST is added to school prices; set it to add 18% GST.
+    INSTITUTION_GSTIN: str = Field(default="")
+    # Comma-separated emails that can use the platform admin console (/platform),
+    # in addition to users with the 'owner' or 'admin' role in user_roles.
+    PLATFORM_ADMIN_EMAILS: str = Field(default="")
     # Day boundary for daily plan limits
     PLAN_TIMEZONE: str = Field(default="Asia/Kolkata")
     # Plan limits are switched off for now: usage is still counted, nothing is blocked.

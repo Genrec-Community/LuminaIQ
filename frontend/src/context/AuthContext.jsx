@@ -132,7 +132,7 @@ export const AuthProvider = ({ children }) => {
                         // Say why on the sign-in screen instead of failing silently
                         const detail = e?.response?.data?.detail;
                         window.dispatchEvent(new CustomEvent('lumina-auth-error', {
-                            detail: typeof detail === 'string' ? detail : (e?.response ? 'Sign-in failed on our side. Please try again.' : "Couldn't reach LuminaIQ. Check your connection and try again."),
+                            detail: typeof detail === 'string' ? detail : detail?.message ? detail.message : (e?.response ? 'Sign-in failed on our side. Please try again.' : "Couldn't reach LuminaIQ. Check your connection and try again."),
                         }));
                         await supabase.auth.signOut(); // Clear invalid supabase session
                     }
@@ -220,6 +220,15 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    // Merge fields into the signed-in user (e.g. after a password change)
+    const updateUser = (patch) => {
+        setUser((u) => {
+            const next = { ...(u || {}), ...patch };
+            try { localStorage.setItem('user', JSON.stringify(next)); } catch { /* ignore */ }
+            return next;
+        });
+    };
+
     const logout = async () => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
@@ -229,7 +238,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, login, signup, loginWithGoogle, requestOtp, verifyOtpCode, logout, loading }}>
+        <AuthContext.Provider value={{ user, login, signup, loginWithGoogle, requestOtp, verifyOtpCode, logout, loading, updateUser }}>
 
             {loading ? (
                 // Not a blank screen while the saved sign-in is checked

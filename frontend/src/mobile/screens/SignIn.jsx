@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Loader2, ChevronLeft, KeyRound } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { apiErrorText } from '../../api';
 import { tap, notify } from '../device';
 import logo from '../logo.png';
 
@@ -50,7 +51,7 @@ const SignIn = () => {
 
     const fail = (e, fallback) => {
         notify('error');
-        setError(e?.response?.data?.detail || e?.message || fallback);
+        setError(apiErrorText(e, fallback));
     };
 
     const google = async () => {
@@ -188,8 +189,9 @@ const SignIn = () => {
                     {step === 'password' && (
                         <motion.form key="password" onSubmit={passwordLogin} className="flex flex-1 flex-col" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}>
                             <h1 className="text-[30px] font-extrabold tracking-tight">Welcome back</h1>
-                            <input type="email" inputMode="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                                placeholder="Email" className={`${field} mt-8`} style={fieldStyle} />
+                            <input type="text" inputMode="email" autoCapitalize="none" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)}
+                                placeholder="Email or school ID" className={`${field} mt-8`} style={fieldStyle} />
+                            <p className="mt-2 text-[13px]" style={{ color: 'var(--m-muted)' }}>School students: use the ID your school gave you, like arun-07@luminaiq.fun.</p>
                             <input type="password" autoComplete="current-password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)}
                                 placeholder="Password" className={`${field} mt-3`} style={fieldStyle} />
                             {error && <p className="mt-3 text-sm font-medium text-red-500">{error}</p>}

@@ -201,11 +201,39 @@ async def invoices(current_user: dict = Depends(get_current_user)):
     ]}
 
 
+def parse_seats_plan(plan: str):
+    """'institution:<id>:<seats>[:<months>]' -> (id, seats, months). Older orders were yearly."""
+    parts = plan.split(":")
+    months = int(parts[3]) if len(parts) > 3 else 12
+    return parts[1], int(parts[2]), months
+
+
 async def _apply_seats(record: dict, payment_id: str, order_id: str, raw: dict = None) -> None:
     from services.institution_service import institutions
 
-    _, institution_id, seats = record["plan"].split(":")
-    await institutions.activate_seats(institution_id, int(seats))
+    institution_id, seats, months = parse_seats_plan(record["plan"])
+    paid = (raw or {}).get("amount")
+    if paid is not None and record.get("amount_paise") and int(paid) < int(record["amount_paise"]):
+        logger.error(f"[Billing] seats payment {payment_id} paid {paid} < expected {record['amount_paise']}; not applied")
+        await billing.record_payment({
+            "user_id": record["user_id"], "kind": "seats", "plan": record["plan"], "amount_paise": paid,
+            "status": "failed", "razorpay_payment_id": payment_id, "razorpay_order_id": order_id, "raw": raw,
+        })
+        return
+    # /verify and the webhook can arrive together: only the first one extends the term
+    client = get_supabase_client()
+    claim = f"apply:{payment_id}"
+    try:
+        await async_db(lambda: client.table("billing_events").insert({"event_id": claim, "event": "seats.apply"}).execute())
+    except Exception:
+        logger.info(f"[Billing] seats payment {payment_id} already applied")
+        return
+    try:
+        await institutions.activate_seats(institution_id, seats, months, actor=record.get("user_id"),
+                                          source="razorpay", payment_id=payment_id)
+    except Exception:
+        await async_db(lambda: client.table("billing_events").delete().eq("event_id", claim).execute())
+        raise
     await billing.record_payment({
         "user_id": record["user_id"], "kind": "seats", "plan": record["plan"],
         "amount_paise": record.get("amount_paise"), "status": "paid",
@@ -221,7 +249,9 @@ async def webhook(request: Request):
     Razorpay → us. Configure in Razorpay Dashboard → Webhooks with URL
     https://<backend>/api/v1/billing/webhook, the secret in RAZORPAY_WEBHOOK_SECRET and
     events: subscription.activated, subscription.charged, subscription.pending,
-    subscription.halted, subscription.cancelled, subscription.completed, payment.captured.
+    subscription.halted, subscription.cancelled, subscription.completed, payment.captured,
+    order.paid, payment.failed. Test mode works the same with rzp_test_ keys and a
+    webhook created while the Dashboard is in Test Mode.
     """
     body = await request.body()
     if not rzp.verify_webhook(body, request.headers.get("x-razorpay-signature", "")):
@@ -235,6 +265,13 @@ async def webhook(request: Request):
         await async_db(lambda: client.table("billing_events").insert({"event_id": event_id, "event": name}).execute())
     except Exception:
         return {"status": "duplicate"}  # already processed (Razorpay retries deliveries)
+
+    async def _forget_event():
+        # Processing failed: drop the marker so Razorpay's retry is processed, not skipped
+        try:
+            await async_db(lambda: client.table("billing_events").delete().eq("event_id", event_id).execute())
+        except Exception as e:
+            logger.error(f"[Billing] could not clear event {event_id}: {e}")
 
     payload = event.get("payload", {})
     sub = (payload.get("subscription") or {}).get("entity") or {}
@@ -257,8 +294,16 @@ async def webhook(request: Request):
         elif name == "subscription.pending":
             # A renewal payment failed and is being retried: keep access during the retries
             await billing.subscription_status(sub["id"], "active", sub.get("current_end"))
-        elif name == "payment.captured" and pay.get("order_id"):
-            # Backup for the Exam Night Pass if the browser closed before /verify ran
+        elif name == "payment.failed" and pay.get("order_id"):
+            record = await billing.checkout_record(order_id=pay["order_id"])
+            if record:
+                await billing.record_payment({
+                    "user_id": record["user_id"], "kind": record["kind"], "plan": record.get("plan"),
+                    "amount_paise": pay.get("amount"), "status": "failed",
+                    "razorpay_payment_id": pay.get("id"), "razorpay_order_id": pay["order_id"], "raw": pay,
+                })
+        elif name in ("payment.captured", "order.paid") and pay.get("order_id"):
+            # Backup for seats and the Exam Night Pass if the browser closed before /verify ran
             record = await billing.checkout_record(order_id=pay["order_id"])
             if record and record["kind"] == "seats" and not await billing.payment_paid(pay["id"]):
                 await _apply_seats(record, pay["id"], pay["order_id"], raw=pay)
@@ -271,5 +316,6 @@ async def webhook(request: Request):
                 })
     except Exception as e:
         logger.error(f"[Billing] webhook {name} failed: {e}")
+        await _forget_event()
         raise HTTPException(500, "Webhook processing failed")  # Razorpay will retry
     return {"status": "ok"}

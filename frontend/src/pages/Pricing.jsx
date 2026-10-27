@@ -203,7 +203,7 @@ const Pricing = () => {
                 <div className="mt-8 rounded-3xl border-2 border-[#E6D5CC] bg-white p-6 md:p-8 grid md:grid-cols-[1fr_auto] gap-6 items-center">
                     <div>
                         <h2 className="text-2xl font-bold flex items-center gap-2"><Building2 className="h-6 w-6 text-[#C8A288]" /> {INSTITUTION_PLAN.name}</h2>
-                        <p className="text-[#8a6a5c]">{INSTITUTION_PLAN.tagline} · {inr(INSTITUTION_PLAN.perSeat)} per student per month + GST, billed yearly, from {INSTITUTION_PLAN.minSeats} students</p>
+                        <p className="text-[#8a6a5c]">{INSTITUTION_PLAN.tagline} · {inr(INSTITUTION_PLAN.perSeat)} per student per month, billed yearly, from {INSTITUTION_PLAN.minSeats} students</p>
                         <ul className="mt-4 grid sm:grid-cols-2 gap-2">
                             {INSTITUTION_PLAN.features.map((f) => (
                                 <li key={f} className="flex gap-2 text-sm"><Check className="h-4 w-4 mt-0.5 shrink-0 text-emerald-600" />{f}</li>

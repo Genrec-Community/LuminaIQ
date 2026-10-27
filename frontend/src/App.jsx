@@ -18,6 +18,7 @@ const BookStore = lazy(() => import('./pages/BookStore'));
 const Landing = lazy(() => import('./pages/Landing'));
 const Pricing = lazy(() => import('./pages/Pricing'));
 const Institution = lazy(() => import('./pages/Institution'));
+const Platform = lazy(() => import('./pages/Platform'));
 const JoinClass = lazy(() => import('./pages/JoinClass'));
 const Privacy = lazy(() => import('./pages/Legal').then((m) => ({ default: m.Privacy })));
 const Terms = lazy(() => import('./pages/Legal').then((m) => ({ default: m.Terms })));
@@ -54,6 +55,7 @@ function App() {
                                     <Route path="/settings" element={<Settings />} />
                                     <Route path="/bookstore" element={<BookStore />} />
                                     <Route path="/institution" element={<Institution />} />
+                                    <Route path="/platform" element={<Platform />} />
                                     <Route path="/join/:code" element={<JoinClass />} />
                                 </Route>
                             </Routes>
