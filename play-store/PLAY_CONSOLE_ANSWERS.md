@@ -1,6 +1,6 @@
-# LuminaIQ — Play Console answers (copy-paste)
+# Lumina IQ — Play Console answers (copy-paste)
 
-App: **LuminaIQ** · package `fun.luminaiq.app` · developer **GenrecAI Labs** (personal account)
+App: **Lumina IQ** · package `fun.luminaiq.app` · developer **GenrecAI Labs** (personal account)
 Support email: **support@luminaiq.fun** · Website: **https://luminaiq.fun** · Privacy policy: **https://luminaiq.fun/privacy**
 Graphics are in this folder: `icon-512.png`, `feature-graphic.png`, `screenshots/01…07.png`.
 
@@ -77,7 +77,7 @@ Expected result: **Everyone / PEGI 3 / 3+** with an "Users Interact" note.
 | Is all of the user data collected by your app encrypted in transit? | **Yes** |
 | Which of the following methods of account creation does your app support? | **Username and password** + **OAuth (Sign in with Google)** |
 | Do you provide a way for users to request that their data is deleted? | **Yes** |
-| Delete account URL | **https://luminaiq.fun/privacy** *(section "Keeping and deleting your data": delete in-app via You → Delete account, or email support@luminaiq.fun)* |
+| Delete account URL | **https://luminaiq.fun/delete-account** once the branch with that page is deployed to the live site (it is not on `main` yet). Until then use **https://luminaiq.fun/privacy** (section "Keeping and deleting your data": delete in-app via You → Delete account, or email support@luminaiq.fun). |
 
 ### Data types — tick exactly these
 
@@ -124,7 +124,7 @@ For **every** type below: **Collected = Yes**, **Shared = No**, **Processed ephe
 
 **App name** (max 30)
 ```
-LuminaIQ: Study Smarter
+Lumina IQ: Study Smarter
 ```
 
 **Short description** (max 80)
@@ -136,10 +136,10 @@ Turn your books and notes into quick questions, flashcards and a daily habit.
 ```
 Your books, turned into a daily habit.
 
-LuminaIQ reads your study material and turns it into short, swipeable practice you'll actually keep up with. Add a PDF, your notes, a scanned textbook or just paste text, and in about a minute you get questions, flashcards and a study buddy that knows your book.
+Lumina IQ reads your study material and turns it into short, swipeable practice you'll actually keep up with. Add a PDF, your notes, a scanned textbook or just paste text, and in about a minute you get questions, flashcards and a study buddy that knows your book.
 
 LEARN THE RIGHT THINGS IN THE RIGHT ORDER
-• LuminaIQ maps how the ideas in your material depend on each other and starts with the ones that unlock the most
+• Lumina IQ maps how the ideas in your material depend on each other and starts with the ones that unlock the most
 • It tracks what you really know, topic by topic, and adapts the plan after every answer
 • Topics you're starting to forget come back for review just in time
 
@@ -189,7 +189,7 @@ Google requires: **a closed test with at least 12 testers opted in, running for 
 ### 9a. Set up the track
 1. **Testing → Closed testing → Create track** (or use the default "Alpha" track) → **Manage track**.
 2. **Countries / regions:** add **India** (add any other countries where your testers are).
-3. **Testers:** choose **Email lists** → **Create email list** → name `LuminaIQ closed test` → add **at least 15 Gmail addresses** (a few extra in case some don't opt in) → Save.
+3. **Testers:** choose **Email lists** → **Create email list** → name `Lumina IQ closed test` → add **at least 15 Gmail addresses** (a few extra in case some don't opt in) → Save.
    - Feedback URL / email: `support@luminaiq.fun`
 4. Copy the **opt-in link** shown on the Testers tab and send it to every tester. They must open it **while signed in with the same Gmail**, tap **Become a tester**, then install from the Play Store link. Only people who do this count as "opted in".
 
@@ -199,7 +199,7 @@ Google requires: **a closed test with at least 12 testers opted in, running for 
 3. **Release notes:**
 ```
 <en-US>
-First closed test of LuminaIQ.
+First closed test of Lumina IQ.
 • Add a PDF, notes or pasted text and get questions, flashcards and lessons from it
 • Swipeable Learn feed with spaced repetition
 • Adaptive learning path that starts with the ideas that unlock the most
@@ -218,6 +218,6 @@ Dashboard → **Apply for access to production** and answer the questions about 
 
 ## 10. Things Google may check (heads-up)
 
-- **AI-generated content policy:** apps with generative AI must let users **report offensive AI output inside the app**. LuminaIQ doesn't have a "Report" button on AI answers yet — worth adding before production (ask Claude to add it; it's small).
+- **AI-generated content policy:** apps with generative AI must let users **report offensive AI output inside the app**. Lumina IQ doesn't have a "Report" button on AI answers yet — worth adding before production (ask Claude to add it; it's small).
 - **User-generated content policy:** because users can publish books publicly, Google expects a way to **report** public content. Same fix: a Report option on public library books.
-- **Account deletion:** already covered — in-app (You → Delete account) and the privacy page.
+- **Account deletion:** covered in-app (You → Delete account) and on the web (privacy page now; the dedicated /delete-account page once it is live).
