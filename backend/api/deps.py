@@ -30,7 +30,17 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
                 detail={"code": "school_inactive", "state": access.get("state"),
                         "message": access.get("message") or "Your school's Lumina IQ access is paused."},
             )
+    await _remember_plan(user_id)
     return {"id": user_id, "email": payload.get("email"), "managed": bool(payload.get("mgd"))}
+
+
+async def _remember_plan(user_id: str) -> None:
+    """Note the user's plan for this request so AI calls use that plan's model."""
+    try:
+        from services.usage_service import current_plan, usage
+        current_plan.set(await usage.plan(user_id))
+    except Exception:
+        pass  # never block a request over this; the default model is used
 
 async def get_current_user_with_role(current_user: dict = Depends(get_current_user)):
     from db.client import get_supabase_client

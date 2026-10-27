@@ -26,12 +26,15 @@ from fastapi import HTTPException
 
 from config.settings import settings
 from db.client import async_db, get_supabase_client
-from services.plans import FEATURE_LABELS, FEATURE_NAMES, FEATURE_PERIOD, PLANS, plan_limits as _plan_limits
+from services.plans import (FEATURE_LABELS, FEATURE_NAMES, FEATURE_PERIOD, PLANS, RENEWAL_GRACE,
+                           plan_limits as _plan_limits)
 from utils.logger import logger
 
 # Who the current request is for; read by the LLM token recorder
 current_user_id: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar("current_user_id", default=None)
 current_feature: contextvars.ContextVar[str] = contextvars.ContextVar("current_feature", default="other")
+# The signed-in user's plan for this request (set in api/deps.py); picks the LLM model
+current_plan: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar("current_plan", default=None)
 
 _PLAN_TTL = 60  # seconds a resolved plan is cached in-process
 
@@ -113,7 +116,10 @@ class UsageService:
                 active = r.get("status") in ("active", "authenticated", "trialing")
                 if end:
                     try:
-                        active = active and datetime.fromisoformat(end.replace("Z", "+00:00")) > datetime.now(timezone.utc)
+                        ends = datetime.fromisoformat(end.replace("Z", "+00:00"))
+                        if r.get("razorpay_subscription_id") and not r.get("cancel_at_period_end"):
+                            ends += RENEWAL_GRACE  # the renewal charge may land a little late
+                        active = active and ends > datetime.now(timezone.utc)
                     except ValueError:
                         pass
                 if active and r.get("plan") in PLANS:
@@ -252,6 +258,12 @@ class UsageService:
             "source": row.get("source"),
             "current_period_end": row.get("current_period_end"),
             "cancel_at_period_end": row.get("cancel_at_period_end", False),
+            "current_period_start": row.get("current_period_start"),
+            "billing_cycle": row.get("billing_cycle"),
+            # Renews by itself (Razorpay subscription) or ends unless paid again (one-time)
+            "auto_renew": bool(row.get("source") == "razorpay" and row.get("razorpay_subscription_id")
+                               and not row.get("cancel_at_period_end")),
+            "pass_until": row.get("pass_until"),
             "institution_id": row.get("institution_id"),
             "usage": usage,
             "limits_enabled": bool(getattr(settings, "PLAN_LIMITS_ENABLED", False)),

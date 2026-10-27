@@ -25,9 +25,12 @@ async def _timed(name: str, coro, timeout: float = 60.0):
         return False
 
 
-async def _llm(light: bool = False, deep: bool = False) -> str:
+async def _llm(light: bool = False, deep: bool = False, plan: str = None) -> str:
     from services.llm_service import llm_service
+    from services.usage_service import current_plan
 
+    if plan:
+        current_plan.set(plan)  # this check runs in its own task, so this stays local
     answer = await llm_service.chat_completion(_PROMPT, temperature=0, max_tokens=2000, light=light, deep=deep)
     if not answer.strip():
         raise RuntimeError("empty answer")
@@ -173,6 +176,12 @@ async def run_self_check():
         checks.append((f"llm.light ({settings.LLM_LIGHT_MODEL})", _llm(light=True)))
     if settings.LLM_DEEP_MODEL or settings.LLM_DEEP_BASE_URL:
         checks.append((f"llm.deep ({settings.LLM_DEEP_MODEL or settings.LLM_MODEL})", _llm(deep=True)))
+    from services.llm_service import tier_models
+    seen = {settings.LLM_MODEL, settings.LLM_LIGHT_MODEL, settings.LLM_DEEP_MODEL}
+    for plan, model in tier_models().items():
+        if model not in seen:
+            seen.add(model)
+            checks.append((f"llm.{plan} ({model})", _llm(plan=plan)))
     results = await asyncio.gather(*(_timed(n, c, 240 if n == "ocr.indra" else 60) for n, c in checks))
     failed = [n for (n, _), ok in zip(checks, results) if not ok]
     if failed:

@@ -7,11 +7,12 @@ export const STUDENT_PLANS = [
         yearly: 0,
         tagline: 'Try the whole thing',
         features: [
-            '2 books',
-            '10 chat answers a day',
-            '40 quiz & Power Hour questions a day',
-            'Exam Tonight plans + 20 cram cards a month',
-            '2 Visual Lab simulations a month',
+            '3 books',
+            '20 chat answers a day',
+            '60 quiz & Power Hour questions a day',
+            '20 notes, flashcards & summaries a day',
+            'Exam Tonight plans + 30 cram cards a month',
+            '3 Visual Lab simulations a month',
             'Learning path, themes and your AI buddy',
         ],
     },
@@ -23,6 +24,7 @@ export const STUDENT_PLANS = [
         tagline: 'For steady, everyday study',
         popular: true,
         features: [
+            'A smarter AI model than Free',
             '15 books',
             '60 chat answers a day',
             '300 quiz & Power Hour questions a day',
@@ -38,6 +40,7 @@ export const STUDENT_PLANS = [
         yearly: 8499,
         tagline: 'For aiming at the top rank',
         features: [
+            'Our best AI model for every answer',
             'Unlimited books',
             'Deep mode: 200 answers a month from our most capable model',
             '100 chat answers a day',
@@ -58,7 +61,7 @@ export const INSTITUTION_PLAN = {
         'Every student gets Scholar-level access plus 50 Deep answers a month',
         'Teachers publish books to whole classes',
         'Class dashboard: progress, weak topics and activity',
-        'Invite codes, seat management and GST invoices',
+        'Student sign-ins, invite codes and seat management',
     ],
 };
 
