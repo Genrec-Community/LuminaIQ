@@ -84,9 +84,18 @@ const Login = () => {
                 errorMsg = "This email is already registered. Please log in.";
             } else if (status === 503 || errorMsg.includes('timed out') || errorMsg.includes('timeout') || err.code === 'ECONNABORTED') {
                 errorMsg = "Connection to authentication service timed out. Please check your internet connection and try again.";
-            } else if (!err.response && err.message) {
+            } else if (err.name === 'AuthApiError' || err.name === 'AuthUnknownError' || (err.__isAuthError && err.status)) {
+                // Supabase answered with an error (OTP / password login): show what it said
+                errorMsg = err.status === 429
+                    ? "Too many attempts. Please wait a minute and try again."
+                    : /sending .*email/i.test(err.message)
+                        ? "We couldn't send the email right now. Please try again shortly or use another sign-in option."
+                        : err.message;
+            } else if (!err.response && (err.code === 'ERR_NETWORK' || err.name === 'AuthRetryableFetchError' || err instanceof TypeError)) {
                 // Network error (no response at all)
                 errorMsg = "Unable to reach the server. Please check your connection and try again.";
+            } else if (!err.response && err.message) {
+                errorMsg = err.message;
             }
 
             setMessage({ type: 'error', text: errorMsg });
