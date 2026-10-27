@@ -56,6 +56,9 @@ async def startup_event():
     if settings.SELF_CHECK_ON_STARTUP:
         from services.self_check import run_self_check
         app.state.self_check = asyncio.create_task(run_self_check())
+    # Label schools whose paid term has ended (access already stops by date on its own)
+    from services.institution_service import expiry_loop
+    app.state.school_expiry = asyncio.create_task(expiry_loop())
 
 
 @app.on_event("shutdown")

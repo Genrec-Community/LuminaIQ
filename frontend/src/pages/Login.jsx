@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AFTER_LOGIN_KEY } from '../utils/afterLogin';
 import { BookOpen, Loader2, ArrowRight, Mail, Lock, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { apiErrorText, SCHOOL_PAUSED_KEY } from '../api';
 
 const Login = () => {
     const navigate = useNavigate();
@@ -23,6 +24,17 @@ const Login = () => {
     const [fullName, setFullName] = useState('');
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState(null); // { type: 'success' | 'error', text: '' }
+
+    // A school-created student who was signed out because their school is paused
+    React.useEffect(() => {
+        try {
+            const why = sessionStorage.getItem(SCHOOL_PAUSED_KEY);
+            if (why !== null) {
+                sessionStorage.removeItem(SCHOOL_PAUSED_KEY);
+                setMessage({ type: 'error', text: why || "Your school's LuminaIQ access is paused." });
+            }
+        } catch { /* ignore */ }
+    }, []);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -77,7 +89,7 @@ const Login = () => {
         } catch (err) {
             console.error("Auth error:", err);
             // Extract meaningful message
-            let errorMsg = err.response?.data?.detail || 'An error occurred. Please try again.';
+            let errorMsg = apiErrorText(err, 'An error occurred. Please try again.');
             const status = err.response?.status;
 
             if (errorMsg.includes('already registered')) {
@@ -146,12 +158,14 @@ const Login = () => {
                                     <Mail className="h-5 w-5 text-[#8a6a5c] group-focus-within:text-[#C8A288] transition-colors" />
                                 </div>
                                 <input
-                                    type="email"
+                                    type={isLogin && !isOtpMode ? 'text' : 'email'}
+                                    autoCapitalize="none"
+                                    autoComplete="username"
                                     required
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     className="w-full pl-12 pr-4 py-4 bg-white border-2 border-[#E6D5CC] rounded-xl outline-none focus:border-[#C8A288] focus:ring-4 focus:ring-[#C8A288]/10 transition-all text-[#4A3B32] placeholder-[#d2bab0] font-medium"
-                                    placeholder="name@example.com"
+                                    placeholder={isLogin && !isOtpMode ? 'Email or school ID' : 'name@example.com'}
                                     disabled={loading || (isOtpMode && otpSent)}
                                 />
                             </div>
@@ -171,6 +185,12 @@ const Login = () => {
                                         disabled={loading}
                                     />
                                 </div>
+                            )}
+
+                            {isLogin && !isOtpMode && (
+                                <p className="text-xs text-[#8a6a5c] leading-relaxed">
+                                    School students: sign in with the ID your school gave you, like <span className="font-mono">arun-07@luminaiq.fun</span>. Forgot your password? Ask your school to reset it.
+                                </p>
                             )}
 
                             {isOtpMode && otpSent && (

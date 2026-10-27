@@ -28,10 +28,12 @@ import {
     Eye,
     Zap,
     Trophy,
-    Type
+    Type,
+    KeyRound
 } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
 import PlanUsage from '../components/PlanUsage';
+import ChangePasswordForm from '../components/ChangePasswordForm';
 import { useGamification } from '../context/GamificationContext';
 import { useAuth } from '../context/AuthContext';
 import { AI_CHARACTERS, USER_AVATARS, AI_AVATARS, AGE_GROUPS, getCharacter, displayName } from '../utils/persona';
@@ -133,6 +135,7 @@ const Settings = () => {
         { id: 'appearance', label: 'Display', icon: Sun },
         { id: 'notifications', label: 'Alerts', icon: Bell },
         { id: 'plan', label: 'Plan', icon: Crown },
+        { id: 'account', label: 'Password', icon: KeyRound },
     ];
 
     // --- Reusable Components ---
@@ -903,6 +906,18 @@ const Settings = () => {
         </div>
     );
 
+    const renderAccount = () => (
+        <div className="space-y-5">
+            <SectionHeader icon={KeyRound} title="Password" subtitle="Change the password you sign in with" />
+            <div className="max-w-md">
+                <ChangePasswordForm />
+                <p className="mt-3 text-xs" style={{ color: muted }}>
+                    Signed in with Google or an email code? You don't have a password here. School students who forgot theirs can ask their school to reset it.
+                </p>
+            </div>
+        </div>
+    );
+
     const renderNotifications = () => (
         <div className="space-y-5">
             <SectionHeader icon={Bell} title="Notifications & Alerts" subtitle="Control what you see and hear" />
@@ -961,6 +976,7 @@ const Settings = () => {
             case 'appearance': return renderAppearance();
             case 'notifications': return renderNotifications();
             case 'plan': return renderPlan();
+            case 'account': return renderAccount();
             default: return renderProfile();
         }
     };

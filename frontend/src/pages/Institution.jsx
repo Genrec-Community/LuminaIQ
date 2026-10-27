@@ -2,18 +2,20 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     ArrowLeft, Building2, Copy, Check, Loader2, Plus, Users, BookOpen, ChevronRight, UserMinus,
-    KeyRound, AlertTriangle, GraduationCap,
+    KeyRound, AlertTriangle, GraduationCap, Clock, ShieldCheck, Hourglass,
 } from 'lucide-react';
 import {
     getMyInstitution, createInstitution, joinWithCode, createClass, getClassDashboard,
     publishBookToClass, getPublishableBooks, removeInstitutionMember, startSeatsCheckout, verifyPayment,
+    apiErrorText,
 } from '../api';
+import StudentsPanel from '../components/institution/StudentsPanel';
 import { emitPlanChanged } from '../utils/plan';
 import { openCheckout } from '../utils/razorpay';
 import { inr } from '../utils/pricing';
 import { isNativeApp } from '../utils/platform';
 
-const errText = (e) => e?.response?.data?.detail?.message || e?.response?.data?.detail || e?.message || 'Something went wrong.';
+const errText = (e) => apiErrorText(e);
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) : '');
 
 const Card = ({ children, className = '' }) => (
@@ -64,6 +66,75 @@ const JoinBox = ({ onJoined }) => {
     );
 };
 
+// ------------------------------------------------------- status and timer
+
+/** Time left on the school's term, ticking every minute. */
+const useCountdown = (endsAt) => {
+    const [now, setNow] = useState(() => Date.now());
+    useEffect(() => {
+        const t = setInterval(() => setNow(Date.now()), 60000);
+        return () => clearInterval(t);
+    }, []);
+    if (!endsAt) return null;
+    const ms = Math.max(0, new Date(endsAt).getTime() - now);
+    const days = Math.floor(ms / 86400000);
+    const hours = Math.floor((ms % 86400000) / 3600000);
+    const mins = Math.floor((ms % 3600000) / 60000);
+    return { ms, days, hours, mins };
+};
+
+const StatusBanner = ({ inst, role }) => {
+    const left = useCountdown(inst.timer?.ends_at || inst.paid_until);
+    const st = inst.state;
+    if (st === 'pending_approval') {
+        return (
+            <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sky-900 flex gap-3">
+                <Hourglass className="h-5 w-5 shrink-0 mt-0.5" />
+                <div>
+                    <div className="font-semibold">Waiting for approval</div>
+                    <p className="text-sm">LuminaIQ checks every new school before switching it on. You can look around now; classes and student accounts open once you're approved{role === 'admin' ? ', and you can pay for seats in the meantime' : ''}.</p>
+                </div>
+            </div>
+        );
+    }
+    if (st === 'suspended') {
+        return (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-900 flex gap-3">
+                <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
+                <div>
+                    <div className="font-semibold">Paused by LuminaIQ</div>
+                    <p className="text-sm">Students can't sign in until it's switched back on.{inst.approval_note ? ` Note: ${inst.approval_note}` : ''} Contact LuminaIQ support.</p>
+                </div>
+            </div>
+        );
+    }
+    if (st === 'expired') {
+        return (
+            <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-900 flex gap-3">
+                <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
+                <div>
+                    <div className="font-semibold">Your plan has ended</div>
+                    <p className="text-sm">{inst.paid_until ? `It ended on ${fmtDate(inst.paid_until)}. ` : ''}School student accounts can't sign in and members lose the Institution plan until {role === 'admin' ? 'you renew' : 'your admin renews'}.</p>
+                </div>
+            </div>
+        );
+    }
+    if (!left) return null;
+    const soon = left.days < 7;
+    return (
+        <div className={`rounded-2xl border p-4 flex flex-wrap items-center gap-3 ${soon ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900'}`}>
+            {soon ? <Clock className="h-5 w-5 shrink-0" /> : <ShieldCheck className="h-5 w-5 shrink-0" />}
+            <div className="flex-1 min-w-0">
+                <span className="font-semibold">{st === 'trial' ? 'Free trial' : 'Active'}</span>
+                <span className="text-sm"> · ends {fmtDate(inst.paid_until)}</span>
+            </div>
+            <div className="font-mono text-sm font-bold tabular-nums" aria-label="Time left">
+                {left.days}d {String(left.hours).padStart(2, '0')}h {String(left.mins).padStart(2, '0')}m left
+            </div>
+        </div>
+    );
+};
+
 // ------------------------------------------------------------------ setup
 
 const Setup = ({ onCreated, onJoined }) => {
@@ -88,7 +159,7 @@ const Setup = ({ onCreated, onJoined }) => {
         <div className="grid gap-5 md:grid-cols-[1.4fr_1fr]">
             <Card>
                 <h2 className="text-xl font-bold text-[#4A3B32] flex items-center gap-2"><Building2 className="h-5 w-5 text-[#C8A288]" /> Set up your institution</h2>
-                <p className="text-sm text-[#8a6a5c] mt-1">Free 14-day trial for up to 25 students. Then {inr(179)} per student per month + GST, billed yearly.</p>
+                <p className="text-sm text-[#8a6a5c] mt-1">We review each new school, then switch on a free trial for up to 25 students. After that it's {inr(179)} per student per month + GST, paid for 1, 3, 6 or 12 months at a time.</p>
                 <form onSubmit={submit} className="mt-4 space-y-3">
                     <input required minLength={2} value={form.name} onChange={set('name')} placeholder="School or institute name" className={input} />
                     <input value={form.billing_name} onChange={set('billing_name')} placeholder="Billing name (for invoices, optional)" className={input} />
@@ -98,7 +169,7 @@ const Setup = ({ onCreated, onJoined }) => {
                     </div>
                     {error && <p className="text-sm text-rose-600">{error}</p>}
                     <button disabled={busy} className="w-full rounded-2xl bg-[#4A3B32] px-4 py-3 font-semibold text-white hover:bg-[#3a2e27] disabled:opacity-60">
-                        {busy ? 'Creating…' : 'Start free trial'}
+                        {busy ? 'Sending…' : 'Request access'}
                     </button>
                 </form>
             </Card>
@@ -113,23 +184,30 @@ const Setup = ({ onCreated, onJoined }) => {
 
 // -------------------------------------------------------------- staff home
 
+const TERM_LABEL = { 1: '1 month', 3: '3 months', 6: '6 months', 12: '1 year' };
+
 const SeatsBox = ({ data, onPaid }) => {
     const min = Math.max(data.pricing.min_seats, data.students);
-    const [seats, setSeats] = useState(Math.max(min, data.institution.status === 'active' ? data.institution.seats : min));
+    const inst = data.institution;
+    const [seats, setSeats] = useState(Math.max(min, inst.status === 'active' ? inst.seats : min));
+    const [months, setMonths] = useState(12);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
-    const base = seats * data.pricing.per_seat_inr * 12;
+    const [done, setDone] = useState('');
+    const base = seats * data.pricing.per_seat_inr * months;
     const gst = Math.round(base * data.pricing.gst_rate);
+    const renewing = inst.state === 'active';
     const pay = async () => {
-        setBusy(true); setError('');
+        setBusy(true); setError(''); setDone('');
         try {
-            const co = await startSeatsCheckout(seats);
+            const co = await startSeatsCheckout(seats, months);
             const resp = await openCheckout({
                 key: co.key_id, order_id: co.order_id, amount: co.amount_paise, currency: 'INR',
                 name: co.name, description: co.description, prefill: co.prefill,
             });
             await verifyPayment({ kind: 'seats', ...resp });
             emitPlanChanged();
+            setDone('Payment received. Your new end date is shown above.');
             onPaid();
         } catch (e) {
             if (!e?.dismissed) setError(errText(e));
@@ -137,25 +215,41 @@ const SeatsBox = ({ data, onPaid }) => {
             setBusy(false);
         }
     };
-    if (isNativeApp()) return null;
+    if (isNativeApp() || inst.state === 'suspended') return null;
     return (
         <Card>
-            <h3 className="font-bold text-[#4A3B32]">{data.institution.status === 'active' ? 'Renew or add seats' : 'Activate for a full year'}</h3>
+            <div className="flex items-center justify-between gap-2">
+                <h3 className="font-bold text-[#4A3B32]">{renewing ? 'Renew or add seats' : 'Pay for student seats'}</h3>
+                {data.pricing.test_mode && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">Test mode</span>}
+            </div>
+            <p className="mt-1 text-xs text-[#8a6a5c]">
+                {renewing ? 'Renewing early adds the new term after your current end date.' : 'The term starts the moment you pay.'}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label="Term">
+                {(data.pricing.terms || [12]).map((m) => (
+                    <button key={m} type="button" role="radio" aria-checked={months === m} onClick={() => setMonths(m)}
+                        className={`rounded-xl border px-3 py-1.5 text-sm font-semibold ${months === m ? 'border-[#C8A288] bg-[#C8A288] text-white' : 'border-[#E6D5CC] bg-[#FDF6F0] text-[#4A3B32]'}`}>
+                        {TERM_LABEL[m] || `${m} months`}
+                    </button>
+                ))}
+            </div>
             <div className="mt-3 flex flex-wrap items-center gap-3">
                 <label className="text-sm text-[#8a6a5c]" htmlFor="seats">Students</label>
                 <input id="seats" type="number" min={min} step={10} value={seats}
                     onChange={(e) => setSeats(Math.max(1, Number(e.target.value) || 0))}
                     className="w-28 rounded-xl border border-[#E6D5CC] bg-[#FDF6F0] px-3 py-2 tabular-nums" />
-                <span className="text-sm text-[#8a6a5c]">× {inr(data.pricing.per_seat_inr)} × 12 months</span>
+                <span className="text-sm text-[#8a6a5c]">× {inr(data.pricing.per_seat_inr)} × {months} month{months > 1 ? 's' : ''}</span>
             </div>
             <div className="mt-3 text-sm text-[#4A3B32] space-y-0.5 tabular-nums">
                 <div className="flex justify-between"><span>Subtotal</span><span>{inr(base)}</span></div>
                 <div className="flex justify-between"><span>GST (18%)</span><span>{inr(gst)}</span></div>
-                <div className="flex justify-between font-bold"><span>Total for 1 year</span><span>{inr(base + gst)}</span></div>
+                <div className="flex justify-between font-bold"><span>Total for {TERM_LABEL[months] || `${months} months`}</span><span>{inr(base + gst)}</span></div>
             </div>
             {seats < min && <p className="mt-2 text-sm text-rose-600">Choose at least {min} students.</p>}
+            {!data.pricing.payments_enabled && <p className="mt-2 text-sm text-[#8a6a5c]">Online payments aren't switched on yet. Contact LuminaIQ to pay by bank transfer.</p>}
             {error && <p className="mt-2 text-sm text-rose-600">{error}</p>}
-            <button onClick={pay} disabled={busy || seats < min}
+            {done && <p className="mt-2 text-sm text-emerald-700">{done}</p>}
+            <button onClick={pay} disabled={busy || seats < min || !data.pricing.payments_enabled}
                 className="mt-4 w-full rounded-2xl bg-[#C8A288] px-4 py-3 font-semibold text-white hover:bg-[#B08B72] disabled:opacity-50">
                 {busy ? <Loader2 className="mx-auto h-5 w-5 animate-spin" /> : `Pay ${inr(base + gst)}`}
             </button>
@@ -164,6 +258,7 @@ const SeatsBox = ({ data, onPaid }) => {
 };
 
 const StaffHome = ({ data, reload, openClass }) => {
+    const [tab, setTab] = useState('classes');
     const [name, setName] = useState('');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
@@ -191,21 +286,25 @@ const StaffHome = ({ data, reload, openClass }) => {
             <Card className="flex flex-wrap items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-[#4A3B32]">{inst.name}</h1>
-                    <p className="text-sm text-[#8a6a5c]">
-                        {inst.status === 'trial' ? `Free trial until ${fmtDate(inst.paid_until)}` : `Active until ${fmtDate(inst.paid_until)}`}
-                        {' · '}{data.students} / {inst.seats} students
-                    </p>
+                    <p className="text-sm text-[#8a6a5c]">{data.students} / {inst.seats} student seats used</p>
                 </div>
                 <div className="text-right">
                     <div className="text-xs font-semibold uppercase tracking-wide text-[#8a6a5c] mb-1">Teacher code</div>
                     <CopyCode code={inst.teacher_code} label="teacher code" />
                 </div>
             </Card>
-            {!data.live && (
-                <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-900 flex gap-2">
-                    <AlertTriangle className="h-5 w-5 shrink-0" /> Your plan has ended. Students keep their books but lose institution access until you renew.
-                </div>
-            )}
+            <StatusBanner inst={inst} role={data.role} />
+            <div className="flex gap-2" role="tablist">
+                {[['classes', 'Classes'], ['students', 'Student accounts']].map(([id, label]) => (
+                    <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
+                        className={`rounded-2xl px-4 py-2 text-sm font-semibold ${tab === id ? 'bg-[#4A3B32] text-white' : 'bg-white border border-[#E6D5CC] text-[#4A3B32]'}`}>
+                        {label}
+                    </button>
+                ))}
+            </div>
+            {tab === 'students' ? (
+                <StudentsPanel data={data} onChanged={reload} />
+            ) : (
             <div className="grid gap-5 lg:grid-cols-[1.5fr_1fr]">
                 <Card>
                     <div className="flex items-center justify-between mb-3">
@@ -250,6 +349,7 @@ const StaffHome = ({ data, reload, openClass }) => {
                     </Card>
                 </div>
             </div>
+            )}
         </div>
     );
 };
@@ -283,7 +383,7 @@ const ClassView = ({ classId, role, back }) => {
         }
     };
     const remove = async (uid) => {
-        if (!window.confirm('Remove this student? Their seat becomes free.')) return;
+        if (!window.confirm('Remove this student? Their seat becomes free. (School-created accounts are switched off, not deleted.)')) return;
         await removeInstitutionMember(uid).catch(() => {});
         load();
     };
@@ -348,7 +448,7 @@ const ClassView = ({ classId, role, back }) => {
                             <tbody className="divide-y divide-[#E6D5CC]">
                                 {data.students.map((s) => (
                                     <tr key={s.user_id} className="align-top">
-                                        <td className="py-2 pr-3"><div className="font-semibold text-[#4A3B32]">{s.name}</div><div className="text-xs text-[#8a6a5c]">{s.email}</div></td>
+                                        <td className="py-2 pr-3"><div className="font-semibold text-[#4A3B32]">{s.name}{s.disabled && <span className="ml-1 text-xs font-normal text-rose-600">(off)</span>}</div><div className="text-xs text-[#8a6a5c] font-mono">{s.login_id || s.email}</div></td>
                                         <td className="py-2 pr-3 tabular-nums">{s.mastered}{s.total_topics ? ` / ${s.total_topics}` : ''}</td>
                                         <td className={`py-2 pr-3 tabular-nums ${s.accuracy != null && s.accuracy < 60 ? 'text-rose-600 font-semibold' : ''}`}>{s.accuracy != null ? `${s.accuracy}%` : '–'}</td>
                                         <td className="py-2 pr-3 tabular-nums">{s.active_days_7}</td>
@@ -374,7 +474,7 @@ const StudentHome = ({ data }) => {
     return (
         <Card>
             <h1 className="text-2xl font-bold text-[#4A3B32]">{data.institution.name}</h1>
-            <p className="text-sm text-[#8a6a5c]">Your school gives you the Institution plan{data.live ? '' : ' (currently paused, so ask your school to renew)'}.</p>
+            <p className="text-sm text-[#8a6a5c]">{data.live ? 'Your school gives you the Institution plan.' : (data.state_message || 'Your school\'s plan is paused. Ask your school.')}</p>
             <h2 className="mt-5 font-bold text-[#4A3B32]">Your classes</h2>
             <div className="mt-2 divide-y divide-[#E6D5CC]">
                 {data.classes.map((c) => (
@@ -383,7 +483,7 @@ const StudentHome = ({ data }) => {
                     </button>
                 ))}
             </div>
-            <div className="mt-5"><JoinBox onJoined={(r) => r.project_id && navigate(`/project/${r.project_id}`)} /></div>
+            {data.live && <div className="mt-5"><JoinBox onJoined={(r) => r.project_id && navigate(`/project/${r.project_id}`)} /></div>}
         </Card>
     );
 };

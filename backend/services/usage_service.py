@@ -118,6 +118,11 @@ class UsageService:
                         pass
                 if active and r.get("plan") in PLANS:
                     row = r
+                # An institution plan only applies while the school is approved and paid up
+                if row.get("source") == "institution" and row.get("institution_id"):
+                    from services.institution_service import institutions
+                    if not await institutions.plan_is_live(row["institution_id"]):
+                        row = {"plan": "free", "status": "active", "source": "default"}
                 # An Exam Night Pass lifts anyone below Topper to Topper until it ends
                 pass_until = r.get("pass_until")
                 if pass_until and row["plan"] != "topper":

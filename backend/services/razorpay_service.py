@@ -28,6 +28,11 @@ def configured() -> bool:
     return bool(settings.RAZORPAY_KEY_ID and settings.RAZORPAY_KEY_SECRET)
 
 
+def test_mode() -> bool:
+    """Razorpay test keys (rzp_test_...): no real money moves."""
+    return (settings.RAZORPAY_KEY_ID or "").startswith("rzp_test_")
+
+
 def plan_id(plan: str, cycle: str) -> str:
     return getattr(settings, f"RAZORPAY_PLAN_{plan.upper()}_{cycle.upper()}", "") or ""
 

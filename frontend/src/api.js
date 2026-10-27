@@ -27,6 +27,18 @@ api.interceptors.request.use(async (config) => {
 });
 
 // Flag to prevent multiple simultaneous refresh attempts
+// Why a school-created student was signed out (shown on the sign-in page)
+export const SCHOOL_PAUSED_KEY = 'lumina_school_paused';
+
+/** Error text from an API error (detail can be a string or { message }). */
+export const apiErrorText = (e, fallback = 'Something went wrong.') => {
+    const d = e?.response?.data?.detail;
+    if (typeof d === 'string') return d;
+    if (d?.message) return d.message;
+    if (Array.isArray(d) && d[0]?.msg) return d[0].msg;
+    return e?.message || fallback;
+};
+
 let isRefreshing = false;
 let refreshQueue = []; // pending requests waiting on the refresh
 
@@ -98,6 +110,21 @@ api.interceptors.response.use(
             } finally {
                 isRefreshing = false;
             }
+        }
+
+        // ── 403 school_inactive on a school-created student account: the school is
+        //    paused, unpaid or switched this account off. Sign out and explain. ──
+        if (status === 403 && error.response?.data?.detail?.code === 'school_inactive') {
+            let managed = false;
+            try { managed = !!JSON.parse(localStorage.getItem('user') || '{}').managed; } catch { /* ignore */ }
+            if (managed) {
+                try { sessionStorage.setItem(SCHOOL_PAUSED_KEY, error.response.data.detail.message || ''); } catch { /* ignore */ }
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                delete api.defaults.headers.common['Authorization'];
+                if (!['/login', '/signin'].includes(window.location.pathname)) window.location.href = '/login';
+            }
+            return Promise.reject(error);
         }
 
         // ── 402: a plan limit was reached — show the upgrade prompt ──
@@ -1246,7 +1273,44 @@ export const getPublishableBooks = async () => (await api.get('/institutions/pub
 
 export const removeInstitutionMember = async (userId) => (await api.delete(`/institutions/members/${userId}`)).data;
 
-export const startSeatsCheckout = async (seats) => (await api.post('/institutions/seats/checkout', { seats })).data;
+export const startSeatsCheckout = async (seats, months = 12) =>
+    (await api.post('/institutions/seats/checkout', { seats, months })).data;
+
+// School-created student sign-ins (studentname-NN@luminaiq.fun)
+export const listStudents = async ({ q = '', classId = '', page = 1, pageSize = 50 } = {}) =>
+    (await api.get('/institutions/students', { params: { q, class_id: classId || undefined, page, page_size: pageSize } })).data;
+
+export const createStudents = async (students) => (await api.post('/institutions/students', { students })).data;
+
+export const resetStudentPassword = async (userId, password) =>
+    (await api.post(`/institutions/students/${userId}/password`, { password: password || null })).data;
+
+export const setStudentDisabled = async (userId, disabled) =>
+    (await api.post(`/institutions/students/${userId}/disabled`, { disabled })).data;
+
+export const addStudentToClass = async (userId, classId) =>
+    (await api.post(`/institutions/students/${userId}/classes`, { class_id: classId })).data;
+
+// Own account: change password, school account details
+export const changePassword = async (currentPassword, newPassword) =>
+    (await api.post('/auth/change-password', { current_password: currentPassword, new_password: newPassword })).data;
+
+export const getAccount = async () => (await api.get('/auth/account')).data;
+
+// ============== Platform admin (LuminaIQ staff) ==============
+
+export const getPlatformMe = async () => (await api.get('/platform/me')).data;
+
+export const listPlatformSchools = async ({ status = '', q = '', page = 1 } = {}) =>
+    (await api.get('/platform/institutions', { params: { status, q, page } })).data;
+
+export const approveSchool = async (id, note = '') => (await api.post(`/platform/institutions/${id}/approve`, { note })).data;
+
+export const suspendSchool = async (id, note = '') => (await api.post(`/platform/institutions/${id}/suspend`, { note })).data;
+
+export const extendSchool = async (id, body) => (await api.post(`/platform/institutions/${id}/extend`, body)).data;
+
+export const getSchoolAudit = async (id) => (await api.get(`/platform/institutions/${id}/audit`)).data;
 
 // Full extracted text of a document (reader fallback when there's no original PDF)
 export const getDocumentText = async (projectId, documentId) =>
