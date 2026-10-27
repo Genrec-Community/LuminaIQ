@@ -16,6 +16,7 @@ Metered features
 
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import Any, Dict, Optional
 
 FEATURE_PERIOD = {
@@ -48,8 +49,8 @@ PLANS: Dict[str, Dict[str, Any]] = {
     "free": {
         "name": "Free",
         "price_inr": 0,
-        "limits": {"chat": 10, "questions": 40, "tools": 10, "deep": 0,
-                   "cram": 20, "visual": 2, "books": 2},
+        "limits": {"chat": 20, "questions": 60, "tools": 20, "deep": 0,
+                   "cram": 30, "visual": 3, "books": 3},
     },
     "scholar": {
         "name": "Scholar",
@@ -69,14 +70,27 @@ PLANS: Dict[str, Dict[str, Any]] = {
     },
     "institution": {
         "name": "Institution",
-        "price_inr": 179,          # per seat per month, + GST
+        "price_inr": 179,          # per seat per month (+ GST once INSTITUTION_GSTIN is set)
         "limits": {"chat": 60, "questions": 500, "tools": 100, "deep": 50,
                    "cram": 500, "visual": 15, "books": None},
     },
 }
 
+# Paid personal plans (bought by students themselves)
+PAID_PLANS = ("scholar", "topper")
+
+# A renewing subscription's charge can land a little after the period ends:
+# access continues this long past current_period_end while Razorpay retries.
+RENEWAL_GRACE = timedelta(days=2)
+
 # One-time 48-hour pass that unlocks Topper features
 EXAM_NIGHT_PASS = {"name": "Exam Night Pass", "price_inr": 49, "hours": 48, "plan": "topper"}
+
+
+def plan_price(plan: str, cycle: str) -> int:
+    """Price in rupees for one term of a paid plan."""
+    p = PLANS[plan]
+    return p["price_inr"] if cycle == "monthly" else p["price_inr_yearly"]
 
 
 def plan_limits(plan: str) -> Dict[str, Optional[int]]:

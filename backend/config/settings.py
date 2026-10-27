@@ -86,11 +86,20 @@ class Settings(BaseSettings):
     LLM_DEEP_MODEL: str = Field(default="")
     LLM_DEEP_BASE_URL: str = Field(default="")
     LLM_DEEP_API_KEY: str = Field(default="")
+    # Model per plan, so paying users get better models. Comma-separated plan=model
+    # pairs on the main provider (with Azure, the values are deployment names), e.g.
+    #   free=gpt-4.1-nano,scholar=gpt-4.1-mini,topper=gpt-4.1,institution=gpt-4.1-mini
+    # A plan left out uses LLM_MODEL (or LLM_LIGHT_MODEL for bulk work). Deep answers
+    # always use LLM_DEEP_MODEL.
+    LLM_TIER_MODELS: str = Field(default="")
     # ── Razorpay (payments) ── fill these in Render; empty = payments disabled
     RAZORPAY_KEY_ID: str = Field(default="")            # rzp_test_... / rzp_live_...
     RAZORPAY_KEY_SECRET: str = Field(default="")
     RAZORPAY_WEBHOOK_SECRET: str = Field(default="")    # set when creating the webhook
-    # Plan IDs from Razorpay (scripts/create_razorpay_plans.py creates them)
+    # Optional Razorpay Subscription plan IDs. When set, Scholar / Topper renew
+    # automatically. When empty, students pay once for a month or a year (one-time
+    # order, no auto-renewal), which needs no setup beyond the keys.
+    # scripts/create_razorpay_plans.py creates the plans and prints the IDs.
     RAZORPAY_PLAN_SCHOLAR_MONTHLY: str = Field(default="")
     RAZORPAY_PLAN_SCHOLAR_YEARLY: str = Field(default="")
     RAZORPAY_PLAN_TOPPER_MONTHLY: str = Field(default="")
@@ -110,9 +119,9 @@ class Settings(BaseSettings):
     PLATFORM_ADMIN_EMAILS: str = Field(default="")
     # Day boundary for daily plan limits
     PLAN_TIMEZONE: str = Field(default="Asia/Kolkata")
-    # Plan limits are switched off for now: usage is still counted, nothing is blocked.
-    # Set PLAN_LIMITS_ENABLED=true (env) to enforce the limits in services/plans.py again.
-    PLAN_LIMITS_ENABLED: bool = Field(default=False)
+    # Enforce the per-plan limits in services/plans.py. With false, usage is still
+    # counted but nothing is blocked (every plan is effectively unlimited).
+    PLAN_LIMITS_ENABLED: bool = Field(default=True)
     # On boot, make one tiny call to the LLM, embeddings, Qdrant and storage and log
     # "[SelfCheck] ..." lines (see services/self_check.py)
     SELF_CHECK_ON_STARTUP: bool = Field(default=True)

@@ -182,17 +182,61 @@ def _reasoning_free(base_cls):
     return ReasoningFree
 
 
+_tier_cache: Dict[str, Dict[str, str]] = {}
+
+
+def tier_models() -> Dict[str, str]:
+    """LLM_TIER_MODELS ("free=a,scholar=b,...") as {plan: model}."""
+    raw = settings.LLM_TIER_MODELS or ""
+    if raw not in _tier_cache:
+        pairs = {}
+        for part in raw.split(","):
+            plan, _, model = part.partition("=")
+            if plan.strip() and model.strip():
+                pairs[plan.strip().lower()] = model.strip()
+        _tier_cache[raw] = pairs
+    return _tier_cache[raw]
+
+
+def _request_plan() -> str:
+    try:
+        from services.usage_service import current_plan
+        return current_plan.get() or ""
+    except Exception:
+        return ""
+
+
+def resolve_model(light: bool = False, deep: bool = False, plan: str = None) -> str:
+    """
+    The model (Azure: deployment) for a call. Deep answers use the Deep model;
+    otherwise the signed-in user's plan picks its model from LLM_TIER_MODELS;
+    otherwise bulk work uses LLM_LIGHT_MODEL and the rest LLM_MODEL.
+    """
+    azure = _use_azure()
+    default = (settings.AZURE_OPENAI_DEPLOYMENT if azure else settings.LLM_MODEL) or "gpt-4.1-mini"
+    if deep and settings.LLM_DEEP_MODEL and not azure:
+        return settings.LLM_DEEP_MODEL
+    tier = tier_models().get((plan if plan is not None else _request_plan()) or "")
+    if tier:
+        return tier
+    if light and settings.LLM_LIGHT_MODEL and not azure:
+        return settings.LLM_LIGHT_MODEL
+    return default
+
+
 def _build_client(
     temperature: float = 0.7,
     max_tokens: int = 4000,
     light: bool = False,
     deep: bool = False,
+    model: str = None,
 ):
     """
     Returns either:
     - AzureChatOpenAI (preferred)
     - ChatOpenAI fallback for legacy providers
     """
+    model = model or resolve_model(light=light, deep=deep)
 
     # Resolve API Key: support unified MODEL_API_KEY or explicit keys
     azure_api_key = settings.AZURE_OPENAI_API_KEY or settings.MODEL_API_KEY
@@ -201,51 +245,44 @@ def _build_client(
     if _use_azure():
         from langchain_openai import AzureChatOpenAI
 
-        logger.debug(
-            f"[LLMService] Using Azure OpenAI | "
-            f"deployment={settings.AZURE_OPENAI_DEPLOYMENT}"
-        )
+        logger.debug(f"[LLMService] Using Azure OpenAI | deployment={model}")
 
         kwargs = {
             "azure_endpoint": settings.AZURE_OPENAI_ENDPOINT,
             "api_key": azure_api_key,
-            "azure_deployment": settings.AZURE_OPENAI_DEPLOYMENT,
+            "azure_deployment": model,
             "api_version": settings.AZURE_OPENAI_API_VERSION,
             "max_tokens": max_tokens,
             "callbacks": [_TokenRecorder()],
             "stream_usage": True,
         }
-        
-        # Models like gpt-5-mini and o1 do not support custom temperatures
-        if "gpt-5-mini" in settings.AZURE_OPENAI_DEPLOYMENT.lower() or "o1" in settings.AZURE_OPENAI_DEPLOYMENT.lower():
+
+        # Reasoning models (gpt-5 family except -chat, o1/o3/o4) only accept the default temperature
+        name = model.lower()
+        if "o1" in name or name.startswith(("o3", "o4")) or ("gpt-5" in name and "chat" not in name):
             kwargs["temperature"] = 1.0
         else:
             kwargs["temperature"] = temperature
-            
+
         return _reasoning_free(AzureChatOpenAI)(**kwargs)
 
     # Fallback OpenAI-compatible providers
     from langchain_openai import ChatOpenAI
-
-    logger.debug(
-        f"[LLMService] Using OpenAI-compatible provider | model={settings.LLM_MODEL} "
-        f"| base={settings.LLM_BASE_URL or 'api.openai.com'}"
-    )
 
     fallback_api_key = (
         settings.LLM_API_KEY
         or settings.MODEL_API_KEY
         or settings.AZURE_OPENAI_API_KEY
     )
-
-    model = settings.LLM_MODEL or "gpt-4.1-mini"
     base_url = settings.LLM_BASE_URL or None
-    if deep and settings.LLM_DEEP_MODEL:
-        model = settings.LLM_DEEP_MODEL
+    if deep and settings.LLM_DEEP_MODEL and model == settings.LLM_DEEP_MODEL:
         base_url = settings.LLM_DEEP_BASE_URL or base_url
         fallback_api_key = settings.LLM_DEEP_API_KEY or fallback_api_key
-    elif light and settings.LLM_LIGHT_MODEL:
-        model = settings.LLM_LIGHT_MODEL
+
+    logger.debug(
+        f"[LLMService] Using OpenAI-compatible provider | model={model} "
+        f"| base={base_url or 'api.openai.com'}"
+    )
     kwargs = {
         "model": model,
         "openai_api_key": fallback_api_key,
@@ -298,8 +335,8 @@ class LLMService:
             )
 
     def _get_client(self, temperature: float = 0.7, max_tokens: int = 4000,
-                    light: bool = False, deep: bool = False):
-        return _build_client(temperature=temperature, max_tokens=max_tokens, light=light, deep=deep)
+                    light: bool = False, deep: bool = False, model: str = None):
+        return _build_client(temperature=temperature, max_tokens=max_tokens, light=light, deep=deep, model=model)
 
     async def chat_completion(
         self,

@@ -10,6 +10,8 @@ import { openCheckout } from '../utils/razorpay';
 import { STUDENT_PLANS, INSTITUTION_PLAN, EXAM_NIGHT_PASS, yearlySaving, inr } from '../utils/pricing';
 import { isNativeApp } from '../utils/platform';
 
+const fmtDate = (iso) => new Date(iso).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+
 const errText = (e) => e?.response?.data?.detail?.message || e?.response?.data?.detail || e?.message || 'Something went wrong.';
 
 /**
@@ -23,6 +25,8 @@ const Pricing = () => {
     const { plan: myPlan } = usePlan();
     const [cycle, setCycle] = useState(params.get('cycle') === 'yearly' ? 'yearly' : 'monthly');
     const [enabled, setEnabled] = useState(true);
+    const [mode, setMode] = useState('one_time');
+    const [testMode, setTestMode] = useState(false);
     const [busy, setBusy] = useState('');
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(null);
@@ -30,7 +34,11 @@ const Pricing = () => {
     const native = isNativeApp();
 
     useEffect(() => {
-        getPlans().then((c) => setEnabled(c.payments_enabled !== false)).catch(() => {});
+        getPlans().then((c) => {
+            setEnabled(c.payments_enabled !== false);
+            if (c.payment_mode) setMode(c.payment_mode);
+            setTestMode(!!c.test_mode);
+        }).catch(() => {});
     }, []);
 
     const requireLogin = (next) => {
@@ -45,13 +53,23 @@ const Pricing = () => {
         setBusy(key);
         try {
             const co = await startCheckout(key, cycle);
-            const resp = await openCheckout({
+            const renewing = co.mode === 'subscription';
+            const resp = await openCheckout(renewing ? {
                 key: co.key_id, subscription_id: co.subscription_id,
                 name: co.name, description: co.description, prefill: co.prefill,
+            } : {
+                key: co.key_id, order_id: co.order_id, amount: co.amount_paise, currency: 'INR',
+                name: co.name, description: co.description, prefill: co.prefill,
             });
-            const summary = await verifyPayment({ kind: 'subscription', ...resp });
+            const summary = await verifyPayment({ kind: renewing ? 'subscription' : 'plan', ...resp });
             emitPlanChanged();
-            setSuccess({ title: `Welcome to ${summary.plan_name}!`, body: 'Your new limits are active right now.' });
+            const until = summary.current_period_end ? fmtDate(summary.current_period_end) : null;
+            setSuccess({
+                title: `Welcome to ${summary.plan_name}!`,
+                body: renewing
+                    ? 'Your new limits are active right now.'
+                    : `Your new limits are active right now${until ? `, until ${until}` : ''}. Nothing renews by itself.`,
+            });
         } catch (e) {
             if (!e?.dismissed) setError(errText(e));
         } finally {
@@ -80,7 +98,8 @@ const Pricing = () => {
     };
 
     const current = myPlan?.plan;
-    const subscribed = myPlan?.source === 'razorpay';
+    const paidByMe = myPlan?.source === 'razorpay';
+    const school = myPlan?.source === 'institution';
 
     if (success) {
         return (
@@ -116,7 +135,14 @@ const Pricing = () => {
             <main className="mx-auto max-w-6xl px-4 pb-16">
                 <div className="text-center max-w-2xl mx-auto">
                     <h1 className="text-3xl md:text-5xl font-bold tracking-tight">Pick your plan</h1>
-                    <p className="mt-3 text-[#8a6a5c]">Prices include GST. Pay by UPI, card or netbanking. Cancel any time.</p>
+                    <p className="mt-3 text-[#8a6a5c]">
+                        {mode === 'subscription'
+                            ? 'Pay by UPI, card or netbanking. Cancel any time.'
+                            : 'Pay once for a month or a year by UPI, card or netbanking. Nothing renews by itself.'}
+                    </p>
+                    {testMode && enabled && !native && (
+                        <span className="mt-2 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">Test mode: no real money is charged</span>
+                    )}
                     {!native && (
                         <div className="mt-6 inline-flex rounded-full border border-[#E6D5CC] bg-white p-1" role="tablist" aria-label="Billing cycle">
                             {['monthly', 'yearly'].map((c) => (
@@ -139,6 +165,11 @@ const Pricing = () => {
                         Payments are being switched on. You can explore everything on the Free plan meanwhile.
                     </p>
                 )}
+                {school && !native && (
+                    <p className="mt-6 mx-auto max-w-xl rounded-2xl border border-[#E6D5CC] bg-white p-4 text-center text-sm text-[#8a6a5c]">
+                        Your school gives you the {myPlan.plan_name} plan. The Exam Night Pass still works on top of it.
+                    </p>
+                )}
                 {error && (
                     <p className="mt-6 mx-auto max-w-xl rounded-2xl border border-rose-200 bg-rose-50 p-4 text-center text-sm text-rose-800">{error}</p>
                 )}
@@ -146,7 +177,10 @@ const Pricing = () => {
                 <div className="mt-10 grid gap-5 md:grid-cols-3">
                     {STUDENT_PLANS.map((p) => {
                         const price = cycle === 'monthly' ? p.monthly : p.yearly;
-                        const isCurrent = current === p.key && (p.key === 'free' || subscribed || myPlan?.source === 'manual');
+                        const mine = current === p.key && (paidByMe || myPlan?.source === 'manual');
+                        // A renewing plan can't be bought twice; a one-time plan can be extended
+                        const isCurrent = mine && (myPlan?.auto_renew || myPlan?.source === 'manual');
+                        const extend = mine && !isCurrent;
                         const featured = highlight ? highlight === p.key : p.popular;
                         return (
                             <div key={p.key}
@@ -176,9 +210,10 @@ const Pricing = () => {
                                         {current === 'free' ? 'Your plan' : user ? 'Go to dashboard' : 'Start free'}
                                     </Link>
                                 ) : native ? null : (
-                                    <button onClick={() => buyPlan(p.key)} disabled={!enabled || !!busy || isCurrent}
+                                    <button onClick={() => buyPlan(p.key)} disabled={!enabled || !!busy || isCurrent || school}
                                         className={`mt-6 flex items-center justify-center gap-2 rounded-2xl px-4 py-3 font-semibold transition-colors disabled:opacity-60 ${featured ? 'bg-[#C8A288] text-white hover:bg-[#B08B72]' : 'border-2 border-[#C8A288] hover:bg-[#FDF6F0]'}`}>
-                                        {busy === p.key ? <Loader2 className="h-5 w-5 animate-spin" /> : isCurrent ? 'Your plan' : `Get ${p.name}`}
+                                        {busy === p.key ? <Loader2 className="h-5 w-5 animate-spin" /> : isCurrent ? 'Your plan'
+                                            : extend ? `Add 1 ${cycle === 'monthly' ? 'month' : 'year'}` : `Get ${p.name}`}
                                     </button>
                                 )}
                             </div>
@@ -203,7 +238,7 @@ const Pricing = () => {
                 <div className="mt-8 rounded-3xl border-2 border-[#E6D5CC] bg-white p-6 md:p-8 grid md:grid-cols-[1fr_auto] gap-6 items-center">
                     <div>
                         <h2 className="text-2xl font-bold flex items-center gap-2"><Building2 className="h-6 w-6 text-[#C8A288]" /> {INSTITUTION_PLAN.name}</h2>
-                        <p className="text-[#8a6a5c]">{INSTITUTION_PLAN.tagline} · {inr(INSTITUTION_PLAN.perSeat)} per student per month, billed yearly, from {INSTITUTION_PLAN.minSeats} students</p>
+                        <p className="text-[#8a6a5c]">{INSTITUTION_PLAN.tagline} · {inr(INSTITUTION_PLAN.perSeat)} per student per month, paid for 1, 3, 6 or 12 months, from {INSTITUTION_PLAN.minSeats} students</p>
                         <ul className="mt-4 grid sm:grid-cols-2 gap-2">
                             {INSTITUTION_PLAN.features.map((f) => (
                                 <li key={f} className="flex gap-2 text-sm"><Check className="h-4 w-4 mt-0.5 shrink-0 text-emerald-600" />{f}</li>
