@@ -77,7 +77,8 @@ Expected result: **Everyone / PEGI 3 / 3+** with an "Users Interact" note.
 | Is all of the user data collected by your app encrypted in transit? | **Yes** |
 | Which of the following methods of account creation does your app support? | **Username and password** + **OAuth (Sign in with Google)** |
 | Do you provide a way for users to request that their data is deleted? | **Yes** |
-| Delete account URL | **https://luminaiq.fun/delete-account** once the branch with that page is deployed to the live site (it is not on `main` yet). Until then use **https://luminaiq.fun/privacy** (section "Keeping and deleting your data": delete in-app via You → Delete account, or email support@luminaiq.fun). |
+| Delete account URL | **https://luminaiq.fun/delete-account** (must be live on `main` before you submit; until then **https://luminaiq.fun/privacy** works as a stopgap). |
+| Delete some data without deleting the account? (optional) | **Yes** — users can delete any book or file in the app, and request other data be removed by email. Both are on the /delete-account page. |
 
 ### Data types — tick exactly these
 

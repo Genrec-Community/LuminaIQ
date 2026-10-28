@@ -72,16 +72,18 @@ export const DeleteAccount = () => (
             <p>2. Go to the <b>You</b> tab.</p>
             <p>3. Tap <b>Delete account</b> and confirm.</p>
             <p>Your account and its data are deleted straight away.</p>
+            <p>On the website, sign in at luminaiq.fun and go to <b>Settings → Account → Delete account</b>.</p>
         </Section>
         <Section title="Delete by email">
-            <p>If you can't use the app, email <a className="font-semibold text-[#C8A288]" href={`mailto:${CONTACT}?subject=Delete%20my%20Lumina%20IQ%20account`}>{CONTACT}</a> from the address you signed up with, with the subject "Delete my Lumina IQ account". We'll delete the account and reply to confirm.</p>
+            <p>If you can't use the app, email <a className="font-semibold text-[#C8A288]" href={`mailto:${CONTACT}?subject=Delete%20my%20Lumina%20IQ%20account`}>{CONTACT}</a> from the address you signed up with, with the subject "Delete my Lumina IQ account". We'll delete the account within 30 days and reply to confirm.</p>
         </Section>
         <Section title="Delete only some of your data">
             <p>You don't have to delete your account to remove data. In the app you can delete any book or file at any time, which removes the file, its extracted text and its search index. To remove other data, such as your chat history or progress, email us and tell us what to delete.</p>
         </Section>
         <Section title="What is deleted and what is kept">
             <p><b>Deleted:</b> your login and profile (name, email, picture), your uploaded files and the text extracted from them, the search index of your material, and everything you made: notes, flashcards, quizzes, chat messages, scores, streaks, XP and settings.</p>
-            <p><b>Kept:</b> payment records (plan, amount and payment reference), only where the law requires us to keep them. Nothing else is kept.</p>
+            <p><b>Kept:</b> payment records (plan, amount, date and payment reference), unlinked from your account, for up to 8 years because tax and accounting law requires it. Nothing else is kept.</p>
+            <p><b>Backups:</b> deleted data can stay in our encrypted backups for up to 30 days, until those backups expire.</p>
         </Section>
     </Shell>
 );
