@@ -141,11 +141,24 @@ class UsageService:
                         pass
         except Exception as e:
             logger.debug(f"Plan lookup failed, treating as free: {e}")
+        # Testers and staff on the unlimited-access list (migration 016) skip every
+        # limit, whatever their plan
+        try:
+            res = await async_db(lambda: self.client.rpc("is_unlimited", {"p_user": user_id}).execute())
+            if res.data is True:
+                row = {**row, "unlimited": True}
+        except Exception as e:
+            logger.debug(f"Unlimited-access check skipped: {e}")
         self._plans[user_id] = (time.time() + _PLAN_TTL, row)
         return row
 
     async def plan(self, user_id: str) -> str:
         return (await self.plan_row(user_id))["plan"]
+
+    async def limits(self, user_id: str) -> Dict[str, Optional[int]]:
+        """Limits for this user: none for accounts on the unlimited-access list."""
+        row = await self.plan_row(user_id)
+        return {} if row.get("unlimited") else plan_limits(row["plan"])
 
     def forget(self, user_id: str) -> None:
         """Drop the cached plan (after a purchase or cancellation)."""
@@ -171,7 +184,7 @@ class UsageService:
         if not user_id or amount <= 0:
             return
         plan = await self.plan(user_id)
-        limit = plan_limits(plan).get(feature)
+        limit = (await self.limits(user_id)).get(feature)
         try:
             new_count = await self._add(user_id, feature, amount, limit)
         except Exception as e:
@@ -190,7 +203,7 @@ class UsageService:
         if not user_id:
             return
         plan = await self.plan(user_id)
-        limit = plan_limits(plan).get(feature)
+        limit = (await self.limits(user_id)).get(feature)
         if limit is None:
             return
         try:
@@ -222,7 +235,7 @@ class UsageService:
 
     async def check_books(self, user_id: str, adding: int = 1) -> None:
         plan = await self.plan(user_id)
-        limit = plan_limits(plan).get("books")
+        limit = (await self.limits(user_id)).get("books")
         if limit is None:
             return
         try:
@@ -238,7 +251,7 @@ class UsageService:
     async def summary(self, user_id: str) -> Dict[str, Any]:
         row = await self.plan_row(user_id)
         plan = row["plan"]
-        limits = plan_limits(plan)
+        limits = {} if row.get("unlimited") else plan_limits(plan)
         usage: Dict[str, Any] = {}
         for feature in FEATURE_PERIOD:
             try:
@@ -266,7 +279,8 @@ class UsageService:
             "pass_until": row.get("pass_until"),
             "institution_id": row.get("institution_id"),
             "usage": usage,
-            "limits_enabled": bool(getattr(settings, "PLAN_LIMITS_ENABLED", False)),
+            "limits_enabled": bool(getattr(settings, "PLAN_LIMITS_ENABLED", False)) and not row.get("unlimited"),
+            "unlimited": bool(row.get("unlimited")),
         }
 
     # --------------------------------------------------------------- tokens
