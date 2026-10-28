@@ -12,6 +12,7 @@ import RouteMeta from './components/RouteMeta';
 
 // Route-level code splitting: each page loads only when visited
 const Login = lazy(() => import('./pages/Login'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const ProjectView = lazy(() => import('./pages/ProjectView'));
 const Settings = lazy(() => import('./pages/Settings'));
@@ -47,6 +48,7 @@ function App() {
                             <Routes>
                                 <Route path="/" element={<Landing />} />
                                 <Route path="/login" element={<Login />} />
+                                <Route path="/reset-password" element={<ResetPassword />} />
                                 <Route path="/pricing" element={<Pricing />} />
                                 <Route path="/privacy" element={<Privacy />} />
                                 <Route path="/terms" element={<Terms />} />

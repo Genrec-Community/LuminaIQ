@@ -912,7 +912,7 @@ const Settings = () => {
             <div className="max-w-md">
                 <ChangePasswordForm />
                 <p className="mt-3 text-xs" style={{ color: muted }}>
-                    Signed in with Google or an email code? You don't have a password here. School students who forgot theirs can ask their school to reset it.
+                    Signed in with Google or an email code? You don't have a password here. Forgot your password? Use "Forgot password?" on the sign-in page. School students can ask their school to reset theirs.
                 </p>
             </div>
         </div>

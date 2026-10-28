@@ -26,13 +26,14 @@ const fieldStyle = { background: 'var(--m-soft)', color: 'var(--m-text)', '--tw-
  */
 const SignIn = () => {
     const navigate = useNavigate();
-    const { user, loginWithGoogle, requestOtp, verifyOtpCode, login } = useAuth();
+    const { user, loginWithGoogle, requestOtp, verifyOtpCode, login, requestPasswordReset } = useAuth();
     const [step, setStep] = useState('choose'); // choose | email | code | password
     const [email, setEmail] = useState('');
     const [code, setCode] = useState('');
     const [password, setPassword] = useState('');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
+    const [notice, setNotice] = useState('');
     const [resendIn, setResendIn] = useState(0);
     const codeRef = useRef(null);
 
@@ -93,6 +94,21 @@ const SignIn = () => {
         e.preventDefault();
         tap('medium'); setError(''); setBusy(true);
         try { await login(email.trim(), password); notify('success'); } catch (err) { fail(err, 'Wrong email or password.'); setBusy(false); }
+    };
+
+    const forgotPassword = async () => {
+        const id = email.trim();
+        setError(''); setNotice('');
+        if (!id.includes('@') || id.toLowerCase().endsWith('@luminaiq.fun')) {
+            setError(id ? "School IDs can't receive email. Ask your school to reset your password." : 'Enter your email first, then tap Forgot password.');
+            return;
+        }
+        tap(); setBusy(true);
+        try {
+            await requestPasswordReset(id);
+            setNotice(`If ${id} has an account, we've emailed it a link to choose a new password.`);
+        } catch (err) { fail(err, "Couldn't send the reset email. Try again in a minute."); }
+        setBusy(false);
     };
 
     const back = () => { tap(); setError(''); setStep(step === 'code' || step === 'password' ? 'email' : 'choose'); };
@@ -190,11 +206,16 @@ const SignIn = () => {
                         <motion.form key="password" onSubmit={passwordLogin} className="flex flex-1 flex-col" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}>
                             <h1 className="text-[30px] font-extrabold tracking-tight">Welcome back</h1>
                             <input type="text" inputMode="email" autoCapitalize="none" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)}
-                                placeholder="Email or school ID" className={`${field} mt-8`} style={fieldStyle} />
-                            <p className="mt-2 text-[13px]" style={{ color: 'var(--m-muted)' }}>School students: use the ID your school gave you, like arun-07@luminaiq.fun.</p>
+                                placeholder="Email" className={`${field} mt-8`} style={fieldStyle} />
                             <input type="password" autoComplete="current-password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)}
                                 placeholder="Password" className={`${field} mt-3`} style={fieldStyle} />
+                            <button type="button" onClick={forgotPassword} disabled={busy}
+                                className="mt-3 self-end text-[14px] font-semibold" style={{ color: 'var(--m-accent)' }}>
+                                Forgot password?
+                            </button>
                             {error && <p className="mt-3 text-sm font-medium text-red-500">{error}</p>}
+                            {notice && <p className="mt-3 text-sm font-medium text-green-600">{notice}</p>}
+                            <p className="mt-4 text-[13px]" style={{ color: 'var(--m-muted)' }}>From a school or institution? Use the sign-in ID they gave you (like arun-07@luminaiq.fun) as your email. Forgot it? Ask your school to reset it.</p>
                             <div className="mt-auto pb-6 pt-6">
                                 <button type="submit" disabled={busy || !email || !password}
                                     className="m-pressable flex h-14 w-full items-center justify-center rounded-2xl text-[16px] font-bold text-white disabled:opacity-50"

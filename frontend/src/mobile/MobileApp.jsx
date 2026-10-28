@@ -26,6 +26,7 @@ const ProjectView = lazy(() => import('../pages/ProjectView'));
 const Settings = lazy(() => import('../pages/Settings'));
 const BookStore = lazy(() => import('../pages/BookStore'));
 const JoinClass = lazy(() => import('../pages/JoinClass'));
+const ResetPassword = lazy(() => import('../pages/ResetPassword'));
 const Institution = lazy(() => import('../pages/Institution'));
 const Platform = lazy(() => import('../pages/Platform'));
 const Privacy = lazy(() => import('../pages/Legal').then((m) => ({ default: m.Privacy })));
@@ -147,6 +148,7 @@ const MobileApp = () => {
                 <Route path="/welcome" element={<Public><Welcome /></Public>} />
                 <Route path="/signin" element={<Public><SignIn /></Public>} />
                 <Route path="/login" element={<Navigate to="/signin" replace />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/dashboard" element={<Navigate to="/app/home" replace />} />
                 <Route path="/pricing" element={<Navigate to="/app/me" replace />} />
                 <Route path="/privacy" element={<Privacy />} />
