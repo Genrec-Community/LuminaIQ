@@ -220,6 +220,24 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    // Email a link to choose a new password. The link opens /reset-password.
+    // The Android app sends people to the website, which can finish the reset.
+    const requestPasswordReset = async (email) => {
+        const origin = isNativeApp() ? 'https://luminaiq.fun' : window.location.origin;
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: `${origin}/reset-password`,
+        });
+        if (error) throw error;
+        return true;
+    };
+
+    // Set a new password for the account opened from a reset link
+    const setNewPassword = async (password) => {
+        const { data, error } = await supabase.auth.updateUser({ password });
+        if (error) throw error;
+        return data?.user;
+    };
+
     // Merge fields into the signed-in user (e.g. after a password change)
     const updateUser = (patch) => {
         setUser((u) => {
@@ -238,7 +256,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, login, signup, loginWithGoogle, requestOtp, verifyOtpCode, logout, loading, updateUser }}>
+        <AuthContext.Provider value={{ user, login, signup, loginWithGoogle, requestOtp, verifyOtpCode, requestPasswordReset, setNewPassword, logout, loading, updateUser }}>
 
             {loading ? (
                 // Not a blank screen while the saved sign-in is checked

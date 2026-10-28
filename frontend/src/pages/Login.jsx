@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AFTER_LOGIN_KEY } from '../utils/afterLogin';
-import { BookOpen, Loader2, ArrowRight, Mail, Lock, User } from 'lucide-react';
+import { BookOpen, Loader2, ArrowRight, Mail, Lock, User, School, ChevronDown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { apiErrorText, SCHOOL_PAUSED_KEY } from '../api';
 
@@ -14,9 +14,11 @@ const Login = () => {
     React.useEffect(() => {
         if (next) sessionStorage.setItem(AFTER_LOGIN_KEY, next);
     }, [next]);
-    const { login, signup, loginWithGoogle, requestOtp, verifyOtpCode } = useAuth();
+    const { login, signup, loginWithGoogle, requestOtp, verifyOtpCode, requestPasswordReset } = useAuth();
     const [isLogin, setIsLogin] = useState(true);
     const [isOtpMode, setIsOtpMode] = useState(false);
+    const [isForgot, setIsForgot] = useState(false); // "Forgot password?" form
+    const [showSchoolHelp, setShowSchoolHelp] = useState(false);
     const [otpSent, setOtpSent] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -42,7 +44,22 @@ const Login = () => {
         setMessage(null);
 
         try {
-            if (isOtpMode) {
+            if (isForgot) {
+                const id = email.trim();
+                // School sign-in IDs have no mailbox behind them, so a reset email can't reach anyone
+                if (!id.includes('@') || id.toLowerCase().endsWith('@luminaiq.fun')) {
+                    setMessage({
+                        type: 'error',
+                        text: "That looks like a school sign-in ID. These can't receive email, so please ask your school to reset your password.",
+                    });
+                    return;
+                }
+                await requestPasswordReset(id);
+                setMessage({
+                    type: 'success',
+                    text: `If ${id} has a Lumina IQ account, we've sent it a link to choose a new password. Check your inbox (and spam).`,
+                });
+            } else if (isOtpMode) {
                 if (!otpSent) {
                     await requestOtp(email);
                     setOtpSent(true);
@@ -125,10 +142,10 @@ const Login = () => {
                             <BookOpen className="h-8 w-8" />
                         </div>
                         <h1 className="text-3xl font-bold mb-2 text-[#4A3B32]">
-                            {isOtpMode ? 'Passwordless Login' : isLogin ? 'Welcome Back' : 'Join Lumina IQ'}
+                            {isForgot ? 'Reset your password' : isOtpMode ? 'Passwordless Login' : isLogin ? 'Welcome Back' : 'Join Lumina IQ'}
                         </h1>
                         <p className="text-[#8a6a5c] text-sm">
-                            {isOtpMode ? 'We will send a one-time code to your email' : isLogin ? 'Pick up right where your learning path left off' : 'Turn any book into the shortest path to exam-ready'}
+                            {isForgot ? "Enter your email and we'll send you a link to choose a new password" : isOtpMode ? 'We will send a one-time code to your email' : isLogin ? 'Pick up right where your learning path left off' : 'Turn any book into the shortest path to exam-ready'}
                         </p>
                     </div>
 
@@ -167,19 +184,19 @@ const Login = () => {
                                     <Mail className="h-5 w-5 text-[#8a6a5c] group-focus-within:text-[#C8A288] transition-colors" />
                                 </div>
                                 <input
-                                    type={isLogin && !isOtpMode ? 'text' : 'email'}
+                                    type={isLogin && !isOtpMode && !isForgot ? 'text' : 'email'}
                                     autoCapitalize="none"
                                     autoComplete="username"
                                     required
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     className="w-full pl-12 pr-4 py-4 bg-white border-2 border-[#E6D5CC] rounded-xl outline-none focus:border-[#C8A288] focus:ring-4 focus:ring-[#C8A288]/10 transition-all text-[#4A3B32] placeholder-[#d2bab0] font-medium"
-                                    placeholder={isLogin && !isOtpMode ? 'Email or school ID' : 'name@example.com'}
+                                    placeholder={isLogin && !isOtpMode && !isForgot ? 'Email' : 'name@example.com'}
                                     disabled={loading || (isOtpMode && otpSent)}
                                 />
                             </div>
 
-                            {!isOtpMode && (
+                            {!isOtpMode && !isForgot && (
                                 <div className="relative group">
                                     <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
                                         <Lock className="h-5 w-5 text-[#8a6a5c] group-focus-within:text-[#C8A288] transition-colors" />
@@ -196,10 +213,16 @@ const Login = () => {
                                 </div>
                             )}
 
-                            {isLogin && !isOtpMode && (
-                                <p className="text-xs text-[#8a6a5c] leading-relaxed">
-                                    School students: sign in with the ID your school gave you, like <span className="font-mono">arun-07@luminaiq.fun</span>. Forgot your password? Ask your school to reset it.
-                                </p>
+                            {isLogin && !isOtpMode && !isForgot && (
+                                <div className="flex justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={() => { setIsForgot(true); setMessage(null); }}
+                                        className="text-sm font-semibold text-[#C8A288] hover:text-[#B08B72] hover:underline"
+                                    >
+                                        Forgot password?
+                                    </button>
+                                </div>
                             )}
 
                             {isOtpMode && otpSent && (
@@ -230,13 +253,24 @@ const Login = () => {
                                 <Loader2 className="h-6 w-6 animate-spin" />
                             ) : (
                                 <>
-                                    {isOtpMode ? (otpSent ? 'Verify OTP' : 'Send Code') : isLogin ? 'Sign In' : 'Create Account'}
+                                    {isForgot ? 'Send reset link' : isOtpMode ? (otpSent ? 'Verify OTP' : 'Send Code') : isLogin ? 'Sign In' : 'Create Account'}
                                     <ArrowRight className="h-5 w-5" />
                                 </>
                             )}
                         </button>
                     </form>
 
+                    {isForgot ? (
+                        <div className="mt-6 text-center">
+                            <button
+                                type="button"
+                                onClick={() => { setIsForgot(false); setMessage(null); }}
+                                className="text-sm font-bold text-[#C8A288] hover:text-[#B08B72] hover:underline"
+                            >
+                                Back to sign in
+                            </button>
+                        </div>
+                    ) : (<>
                     <div className="relative my-6">
                         <div className="absolute inset-0 flex items-center">
                             <div className="w-full border-t border-[#E6D5CC]"></div>
@@ -294,6 +328,29 @@ const Login = () => {
                             </p>
                         )}
                     </div>
+
+                    {isLogin && !isOtpMode && (
+                        <div className="mt-4 rounded-xl border border-[#E6D5CC] bg-[#FDF6F0]/60">
+                            <button
+                                type="button"
+                                onClick={() => setShowSchoolHelp(!showSchoolHelp)}
+                                aria-expanded={showSchoolHelp}
+                                className="w-full flex items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-[#4A3B32]"
+                            >
+                                <span className="flex items-center gap-2">
+                                    <School className="h-4 w-4 text-[#8a6a5c]" />
+                                    Signing in through your school or institution?
+                                </span>
+                                <ChevronDown className={`h-4 w-4 text-[#8a6a5c] transition-transform ${showSchoolHelp ? 'rotate-180' : ''}`} />
+                            </button>
+                            {showSchoolHelp && (
+                                <p className="px-4 pb-4 text-xs text-[#8a6a5c] leading-relaxed text-left">
+                                    Type the sign-in ID your school gave you, like <span className="font-mono">arun-07@luminaiq.fun</span>, in the email box above, with the password they gave you. School IDs can't receive email, so if you forget that password, ask your school to reset it.
+                                </p>
+                            )}
+                        </div>
+                    )}
+                    </>)}
                 </div>
             </div>
         </div>
