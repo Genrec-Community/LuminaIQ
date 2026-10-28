@@ -209,8 +209,8 @@ export const CommandPicker = ({ filter, onSelect, onClose, visible }) => {
             className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-2xl border border-[#E6D5CC] shadow-xl overflow-hidden z-30 animate-in fade-in slide-in-from-bottom-2 duration-200"
         >
             <div className="px-4 py-2.5 border-b border-[#E6D5CC]/50 flex items-center gap-2">
-                <Sparkles className="h-3.5 w-3.5 text-[#C8A288]" />
-                <span className="text-xs font-bold text-[#8a6a5c] uppercase tracking-wider">AI Tools</span>
+                <Sparkles className="h-3.5 w-3.5 text-[#1E5C42]" />
+                <span className="text-xs font-bold text-[#5E5046] uppercase tracking-wider">AI Tools</span>
             </div>
             <div className="py-1.5 max-h-[280px] overflow-y-auto">
                 {groupOrder.map(group => {
@@ -218,7 +218,7 @@ export const CommandPicker = ({ filter, onSelect, onClose, visible }) => {
                     if (groupCmds.length === 0) return null;
                     return (
                         <div key={group} className="mb-1">
-                            <div className="px-5 py-1.5 text-[10px] font-bold text-[#8a6a5c]/60 uppercase tracking-widest">
+                            <div className="px-5 py-1.5 text-[10px] font-bold text-[#5E5046]/60 uppercase tracking-widest">
                                 {group}
                             </div>
                             {groupCmds.map(cmd => {
@@ -237,11 +237,11 @@ export const CommandPicker = ({ filter, onSelect, onClose, visible }) => {
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2">
-                                                <span className="font-semibold text-[#4A3B32] text-sm">@{cmd.label}</span>
+                                                <span className="font-semibold text-[#163628] text-sm">@{cmd.label}</span>
                                             </div>
-                                            <p className="text-xs text-[#8a6a5c] truncate">{cmd.description}</p>
+                                            <p className="text-xs text-[#5E5046] truncate">{cmd.description}</p>
                                         </div>
-                                        <ArrowRight className="h-3 w-3 text-[#C8A288] opacity-0 group-hover:opacity-100 shrink-0" />
+                                        <ArrowRight className="h-3 w-3 text-[#1E5C42] opacity-0 group-hover:opacity-100 shrink-0" />
                                     </button>
                                 );
                             })}
@@ -302,8 +302,8 @@ export const CommandParamForm = ({ command, availableTopics, onExecute, onCancel
                             <Icon className={`h-4 w-4 ${command.color}`} />
                         </div>
                         <div>
-                            <span className="font-bold text-sm text-[#4A3B32]">@{command.label}</span>
-                            <p className="text-xs text-[#8a6a5c]">{command.description}</p>
+                            <span className="font-bold text-sm text-[#163628]">@{command.label}</span>
+                            <p className="text-xs text-[#5E5046]">{command.description}</p>
                         </div>
                     </div>
                     <button
@@ -311,7 +311,7 @@ export const CommandParamForm = ({ command, availableTopics, onExecute, onCancel
                         onClick={onCancel}
                         className="p-1.5 rounded-lg hover:bg-black/5 transition-colors"
                     >
-                        <X className="h-4 w-4 text-[#8a6a5c]" />
+                        <X className="h-4 w-4 text-[#5E5046]" />
                     </button>
                 </div>
 
@@ -321,7 +321,7 @@ export const CommandParamForm = ({ command, availableTopics, onExecute, onCancel
                         if (param.type === 'topic') {
                             return (
                                 <div key={param.key}>
-                                    <label className="block text-xs font-bold text-[#4A3B32] uppercase tracking-wide mb-1.5 opacity-80">
+                                    <label className="block text-xs font-bold text-[#163628] uppercase tracking-wide mb-1.5 opacity-80">
                                         {param.label} {param.required && <span className="text-red-400">*</span>}
                                     </label>
                                     {availableTopics.length > 0 ? (
@@ -332,8 +332,8 @@ export const CommandParamForm = ({ command, availableTopics, onExecute, onCancel
                                                     onClick={() => setTopicMode('select')}
                                                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                                                         topicMode === 'select'
-                                                            ? 'bg-[#C8A288] text-white'
-                                                            : 'bg-gray-100 text-[#8a6a5c] hover:bg-gray-200'
+                                                            ? 'bg-[#1E5C42] text-white'
+                                                            : 'bg-gray-100 text-[#5E5046] hover:bg-gray-200'
                                                     }`}
                                                 >
                                                     From Documents
@@ -343,8 +343,8 @@ export const CommandParamForm = ({ command, availableTopics, onExecute, onCancel
                                                     onClick={() => setTopicMode('custom')}
                                                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                                                         topicMode === 'custom'
-                                                            ? 'bg-[#C8A288] text-white'
-                                                            : 'bg-gray-100 text-[#8a6a5c] hover:bg-gray-200'
+                                                            ? 'bg-[#1E5C42] text-white'
+                                                            : 'bg-gray-100 text-[#5E5046] hover:bg-gray-200'
                                                     }`}
                                                 >
                                                     Custom
@@ -355,14 +355,14 @@ export const CommandParamForm = ({ command, availableTopics, onExecute, onCancel
                                                     <select
                                                         value={params[param.key] || ''}
                                                         onChange={(e) => setParams(p => ({ ...p, [param.key]: e.target.value }))}
-                                                        className="w-full px-3.5 py-2.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#C8A288] text-[#4A3B32] text-sm font-medium appearance-none"
+                                                        className="w-full px-3.5 py-2.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#1E5C42] text-[#163628] text-sm font-medium appearance-none"
                                                     >
                                                         <option value="">{param.required ? 'Select a topic...' : 'General (all topics)'}</option>
                                                         {availableTopics.map((t, i) => (
                                                             <option key={i} value={t}>{t}</option>
                                                         ))}
                                                     </select>
-                                                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#8a6a5c] pointer-events-none" />
+                                                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#5E5046] pointer-events-none" />
                                                 </div>
                                             ) : (
                                                 <input
@@ -370,7 +370,7 @@ export const CommandParamForm = ({ command, availableTopics, onExecute, onCancel
                                                     value={customTopic}
                                                     onChange={(e) => setCustomTopic(e.target.value)}
                                                     placeholder={param.placeholder || 'Type a custom topic...'}
-                                                    className="w-full px-3.5 py-2.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#C8A288] text-sm text-[#4A3B32]"
+                                                    className="w-full px-3.5 py-2.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#1E5C42] text-sm text-[#163628]"
                                                     autoFocus
                                                 />
                                             )}
@@ -381,7 +381,7 @@ export const CommandParamForm = ({ command, availableTopics, onExecute, onCancel
                                             value={customTopic}
                                             onChange={(e) => { setCustomTopic(e.target.value); setTopicMode('custom'); }}
                                             placeholder={param.placeholder || 'Type a topic...'}
-                                            className="w-full px-3.5 py-2.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#C8A288] text-sm text-[#4A3B32]"
+                                            className="w-full px-3.5 py-2.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#1E5C42] text-sm text-[#163628]"
                                         />
                                     )}
                                 </div>
@@ -392,7 +392,7 @@ export const CommandParamForm = ({ command, availableTopics, onExecute, onCancel
                         if (param.type === 'select') {
                             return (
                                 <div key={param.key}>
-                                    <label className="block text-xs font-bold text-[#4A3B32] uppercase tracking-wide mb-1.5 opacity-80">
+                                    <label className="block text-xs font-bold text-[#163628] uppercase tracking-wide mb-1.5 opacity-80">
                                         {param.label}
                                     </label>
                                     <div className="flex flex-wrap gap-1.5">
@@ -404,7 +404,7 @@ export const CommandParamForm = ({ command, availableTopics, onExecute, onCancel
                                                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                                                     params[param.key] === opt
                                                         ? `${command.bgColor} ${command.color} ring-1 ring-current`
-                                                        : 'bg-gray-50 text-[#8a6a5c] hover:bg-gray-100'
+                                                        : 'bg-gray-50 text-[#5E5046] hover:bg-gray-100'
                                                 }`}
                                             >
                                                 {opt.charAt(0).toUpperCase() + opt.slice(1)}
@@ -419,7 +419,7 @@ export const CommandParamForm = ({ command, availableTopics, onExecute, onCancel
                         if (param.type === 'text') {
                             return (
                                 <div key={param.key}>
-                                    <label className="block text-xs font-bold text-[#4A3B32] uppercase tracking-wide mb-1.5 opacity-80">
+                                    <label className="block text-xs font-bold text-[#163628] uppercase tracking-wide mb-1.5 opacity-80">
                                         {param.label} {param.required && <span className="text-red-400">*</span>}
                                     </label>
                                     <input
@@ -427,7 +427,7 @@ export const CommandParamForm = ({ command, availableTopics, onExecute, onCancel
                                         value={params[param.key] || ''}
                                         onChange={(e) => setParams(p => ({ ...p, [param.key]: e.target.value }))}
                                         placeholder={param.placeholder || ''}
-                                        className="w-full px-3.5 py-2.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#C8A288] text-sm text-[#4A3B32]"
+                                        className="w-full px-3.5 py-2.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#1E5C42] text-sm text-[#163628]"
                                     />
                                 </div>
                             );
@@ -460,7 +460,7 @@ export const CommandParamForm = ({ command, availableTopics, onExecute, onCancel
                         type="button"
                         onClick={onCancel}
                         disabled={loading}
-                        className="px-4 py-2.5 bg-gray-100 text-[#8a6a5c] rounded-xl font-medium text-sm hover:bg-gray-200 transition-colors disabled:opacity-40"
+                        className="px-4 py-2.5 bg-gray-100 text-[#5E5046] rounded-xl font-medium text-sm hover:bg-gray-200 transition-colors disabled:opacity-40"
                     >
                         Cancel
                     </button>

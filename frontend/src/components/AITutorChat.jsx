@@ -295,7 +295,7 @@ Guidelines:
         >
             {/* Draggable Header */}
             <div
-                className={`p-4 border-b border-[#E6D5CC] bg-gradient-to-r from-[#C8A288] to-[#A08072] text-white shrink-0 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                className={`p-4 border-b border-[#E6D5CC] bg-gradient-to-r from-[#1E5C42] to-[#163628] text-white shrink-0 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
                 onMouseDown={handleMouseDown}
                 onTouchStart={handleTouchStart}
             >
@@ -349,7 +349,7 @@ Guidelines:
                                     onClick={() => changeStyle(key)}
                                     className={`p-3 rounded-xl text-left transition-all ${
                                         tutorStyle === key
-                                            ? 'bg-white text-[#4A3B32]'
+                                            ? 'bg-white text-[#163628]'
                                             : 'bg-white/20 hover:bg-white/30'
                                     }`}
                                 >
@@ -375,8 +375,8 @@ Guidelines:
                         <div
                             className={`max-w-[85%] rounded-2xl px-4 py-3 ${
                                 msg.role === 'user'
-                                    ? 'bg-[#C8A288] text-white rounded-br-none'
-                                    : 'bg-[#FDF6F0] text-[#4A3B32] rounded-bl-none'
+                                    ? 'bg-[#1E5C42] text-white rounded-br-none'
+                                    : 'bg-[#FDF6F0] text-[#163628] rounded-bl-none'
                             }`}
                         >
                             {msg.content ? (
@@ -399,7 +399,7 @@ Guidelines:
             {/* Quick Prompts */}
             {messages.length <= 2 && (
                 <div className="px-4 pb-2 shrink-0">
-                    <p className="text-xs text-[#8a6a5c] mb-2">Quick questions:</p>
+                    <p className="text-xs text-[#5E5046] mb-2">Quick questions:</p>
                     <div className="flex flex-wrap gap-2">
                         {quickPrompts.map((prompt, idx) => {
                             const Icon = prompt.icon;
@@ -408,7 +408,7 @@ Guidelines:
                                     key={idx}
                                     onClick={() => handleSend(prompt.prompt)}
                                     disabled={loading}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#FDF6F0] text-[#4A3B32] rounded-full text-xs font-medium hover:bg-[#E6D5CC] transition-colors disabled:opacity-50"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#FDF6F0] text-[#163628] rounded-full text-xs font-medium hover:bg-[#E6D5CC] transition-colors disabled:opacity-50"
                                 >
                                     <Icon className="h-3 w-3" />
                                     {prompt.text}
@@ -430,14 +430,14 @@ Guidelines:
                             onKeyDown={handleKeyDown}
                             placeholder="Ask me anything..."
                             rows={1}
-                            className="w-full px-4 py-2.5 bg-[#FDF6F0] border-none rounded-xl focus:ring-2 focus:ring-[#C8A288] outline-none text-[#4A3B32] placeholder-[#8a6a5c] resize-none text-sm"
+                            className="w-full px-4 py-2.5 bg-[#FDF6F0] border-none rounded-xl focus:ring-2 focus:ring-[#1E5C42] outline-none text-[#163628] placeholder-[#5E5046] resize-none text-sm"
                             disabled={loading}
                         />
                     </div>
                     <button
                         onClick={() => handleSend()}
                         disabled={loading || !input.trim()}
-                        className="px-3 py-2.5 bg-[#C8A288] text-white rounded-xl hover:bg-[#B08B72] transition-colors disabled:opacity-50 flex items-center gap-2"
+                        className="px-3 py-2.5 bg-[#1E5C42] text-white rounded-xl hover:bg-[#163628] transition-colors disabled:opacity-50 flex items-center gap-2"
                     >
                         {loading ? (
                             <Loader2 className="h-5 w-5 animate-spin" />

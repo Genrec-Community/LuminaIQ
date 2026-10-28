@@ -74,7 +74,7 @@ const BookStoreModal = ({ projectId, onClose, onImported }) => {
 
     return (
         <div
-            className="fixed inset-0 bg-[#4A3B32]/30 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+            className="fixed inset-0 bg-[#163628]/30 backdrop-blur-sm flex items-center justify-center p-4 z-50"
             onClick={(e) => e.target === e.currentTarget && onClose()}
         >
             <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col animate-in fade-in zoom-in duration-200">
@@ -82,43 +82,43 @@ const BookStoreModal = ({ projectId, onClose, onImported }) => {
                 <div className="p-6 border-b border-[#E6D5CC] shrink-0">
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 bg-gradient-to-br from-[#C8A288] to-[#B08B72] rounded-xl flex items-center justify-center">
+                            <div className="h-10 w-10 bg-gradient-to-br from-[#1E5C42] to-[#163628] rounded-xl flex items-center justify-center">
                                 <Globe className="h-5 w-5 text-white" />
                             </div>
                             <div>
-                                <h2 className="text-xl font-bold text-[#4A3B32]">Book Store</h2>
-                                <p className="text-xs text-[#8a6a5c]">Import books shared by the community</p>
+                                <h2 className="text-xl font-bold text-[#163628]">Book Store</h2>
+                                <p className="text-xs text-[#5E5046]">Import books shared by the community</p>
                             </div>
                         </div>
                         <button
                             onClick={onClose}
                             className="p-2 hover:bg-[#FDF6F0] rounded-full transition-colors"
                         >
-                            <X className="h-5 w-5 text-[#8a6a5c]" />
+                            <X className="h-5 w-5 text-[#5E5046]" />
                         </button>
                     </div>
 
                     {/* Search */}
                     <form onSubmit={handleSearch} className="flex gap-2">
                         <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8a6a5c]" />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#5E5046]" />
                             <input
                                 type="text"
                                 value={searchInput}
                                 onChange={e => setSearchInput(e.target.value)}
                                 placeholder="Search books..."
-                                className="w-full pl-9 pr-3 py-2.5 bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl text-sm focus:ring-2 focus:ring-[#C8A288] outline-none"
+                                className="w-full pl-9 pr-3 py-2.5 bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl text-sm focus:ring-2 focus:ring-[#1E5C42] outline-none"
                                 autoFocus
                             />
                         </div>
-                        <button type="submit" className="px-4 py-2.5 bg-[#C8A288] text-white rounded-xl text-sm font-medium hover:bg-[#B08B72] transition-colors">
+                        <button type="submit" className="px-4 py-2.5 bg-[#1E5C42] text-white rounded-xl text-sm font-medium hover:bg-[#163628] transition-colors">
                             Search
                         </button>
                         {search && (
                             <button
                                 type="button"
                                 onClick={() => { setSearch(''); setSearchInput(''); setPage(1); }}
-                                className="p-2.5 border border-[#E6D5CC] rounded-xl text-[#8a6a5c] hover:bg-[#FDF6F0]"
+                                className="p-2.5 border border-[#E6D5CC] rounded-xl text-[#5E5046] hover:bg-[#FDF6F0]"
                             >
                                 <X className="h-4 w-4" />
                             </button>
@@ -126,7 +126,7 @@ const BookStoreModal = ({ projectId, onClose, onImported }) => {
                     </form>
 
                     {!loading && (
-                        <p className="text-xs text-[#8a6a5c] mt-2">
+                        <p className="text-xs text-[#5E5046] mt-2">
                             {search ? `${total} result${total !== 1 ? 's' : ''} for "${search}"` : `${total} books available`}
                         </p>
                     )}
@@ -150,8 +150,8 @@ const BookStoreModal = ({ projectId, onClose, onImported }) => {
                         </div>
                     ) : books.length === 0 ? (
                         <div className="text-center py-12">
-                            <BookOpen className="h-12 w-12 text-[#C8A288] mx-auto mb-3 opacity-40" />
-                            <p className="text-[#8a6a5c]">{search ? 'No books match your search' : 'No public books available yet'}</p>
+                            <BookOpen className="h-12 w-12 text-[#1E5C42] mx-auto mb-3 opacity-40" />
+                            <p className="text-[#5E5046]">{search ? 'No books match your search' : 'No public books available yet'}</p>
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -162,20 +162,20 @@ const BookStoreModal = ({ projectId, onClose, onImported }) => {
                                 return (
                                     <div
                                         key={book.id}
-                                        className="flex flex-col p-4 bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl hover:border-[#C8A288] transition-all"
+                                        className="flex flex-col p-4 bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl hover:border-[#1E5C42] transition-all"
                                     >
                                         <div className="flex items-start gap-3 mb-3">
-                                            <div className="h-10 w-8 bg-gradient-to-br from-[#C8A288] to-[#B08B72] rounded-lg flex items-center justify-center shrink-0">
+                                            <div className="h-10 w-8 bg-gradient-to-br from-[#1E5C42] to-[#163628] rounded-lg flex items-center justify-center shrink-0">
                                                 <BookOpen className="h-4 w-4 text-white" />
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <h4 className="font-semibold text-sm text-[#4A3B32] line-clamp-1">{book.title}</h4>
-                                                {book.author && <p className="text-xs text-[#8a6a5c]">by {book.author}</p>}
+                                                <h4 className="font-semibold text-sm text-[#163628] line-clamp-1">{book.title}</h4>
+                                                {book.author && <p className="text-xs text-[#5E5046]">by {book.author}</p>}
                                             </div>
                                         </div>
 
                                         {book.description && (
-                                            <p className="text-xs text-[#8a6a5c] line-clamp-2 mb-3 leading-relaxed">
+                                            <p className="text-xs text-[#5E5046] line-clamp-2 mb-3 leading-relaxed">
                                                 {book.description}
                                             </p>
                                         )}
@@ -183,7 +183,7 @@ const BookStoreModal = ({ projectId, onClose, onImported }) => {
                                         {book.tags && book.tags.length > 0 && (
                                             <div className="flex flex-wrap gap-1 mb-3">
                                                 {book.tags.slice(0, 3).map((tag, i) => (
-                                                    <span key={i} className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-white text-[#8a6a5c] rounded-full text-xs border border-[#E6D5CC]">
+                                                    <span key={i} className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-white text-[#5E5046] rounded-full text-xs border border-[#E6D5CC]">
                                                         <Tag className="h-2.5 w-2.5" />
                                                         {tag}
                                                     </span>
@@ -192,7 +192,7 @@ const BookStoreModal = ({ projectId, onClose, onImported }) => {
                                         )}
 
                                         <div className="flex items-center justify-between mt-auto pt-3 border-t border-[#E6D5CC]">
-                                            <span className="text-xs text-[#8a6a5c] flex items-center gap-1">
+                                            <span className="text-xs text-[#5E5046] flex items-center gap-1">
                                                 <Download className="h-3 w-3" />
                                                 {book.import_count || 0} imports
                                             </span>
@@ -201,7 +201,7 @@ const BookStoreModal = ({ projectId, onClose, onImported }) => {
                                                 disabled={isImporting || isImported}
                                                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${isImported
                                                     ? 'bg-emerald-50 text-emerald-600 cursor-default'
-                                                    : 'bg-[#C8A288] text-white hover:bg-[#B08B72] disabled:opacity-60'
+                                                    : 'bg-[#1E5C42] text-white hover:bg-[#163628] disabled:opacity-60'
                                                     }`}
                                             >
                                                 {isImporting ? (
@@ -230,7 +230,7 @@ const BookStoreModal = ({ projectId, onClose, onImported }) => {
                         >
                             <ChevronLeft className="h-4 w-4" />
                         </button>
-                        <span className="text-sm text-[#8a6a5c]">Page {page} of {totalPages}</span>
+                        <span className="text-sm text-[#5E5046]">Page {page} of {totalPages}</span>
                         <button
                             onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                             disabled={page === totalPages}

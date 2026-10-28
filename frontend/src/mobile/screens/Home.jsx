@@ -98,7 +98,7 @@ const Home = () => {
                     whileTap={{ scale: 0.97 }}
                     onClick={() => { tap('medium'); navigate('/app/feed'); }}
                     className="relative w-full overflow-hidden rounded-[28px] p-5 text-left text-white"
-                    style={{ background: 'linear-gradient(135deg, #2a1d15 0%, var(--m-accent-deep) 55%, var(--m-accent) 100%)', boxShadow: '0 20px 40px -18px color-mix(in srgb, var(--m-accent) 80%, black)' }}
+                    style={{ background: 'linear-gradient(135deg, #142A1F 0%, var(--m-accent-deep) 55%, var(--m-accent) 100%)', boxShadow: '0 20px 40px -18px color-mix(in srgb, var(--m-accent) 80%, black)' }}
                 >
                     <motion.span className="absolute -right-6 -top-8 text-[120px] opacity-25" animate={{ rotate: [0, 8, 0] }} transition={{ duration: 6, repeat: Infinity }}>🔥</motion.span>
                     <p className="text-[12px] font-bold uppercase tracking-[0.14em] text-white/70">Your feed is ready</p>
@@ -106,7 +106,7 @@ const Home = () => {
                     <p className="mt-1 max-w-[80%] text-[14px] text-white/80">
                         {due > 0 ? `${due} review card${due === 1 ? '' : 's'} due, plus fresh questions from your books.` : 'Quick questions and flashcards from your books, one swipe at a time.'}
                     </p>
-                    <span className="mt-4 inline-flex items-center gap-2 rounded-full m-white px-4 py-2 text-[14px] font-bold text-[#2a1d15]">
+                    <span className="mt-4 inline-flex items-center gap-2 rounded-full m-white px-4 py-2 text-[14px] font-bold text-[#142A1F]">
                         <Play className="h-4 w-4" fill="currentColor" /> Start
                     </span>
                 </motion.button>

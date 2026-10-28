@@ -134,17 +134,17 @@ const Login = () => {
     };
 
     return (
-        <div className="min-h-screen bg-[#FDF6F0] flex items-center justify-center p-4 font-sans text-[#4A3B32]">
-            <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl shadow-[#C8A288]/10 overflow-hidden border border-[#E6D5CC]">
+        <div className="min-h-screen bg-[#FDF6F0] flex items-center justify-center p-4 font-sans text-[#163628]">
+            <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl shadow-[#1E5C42]/10 overflow-hidden border border-[#E6D5CC]">
                 <div className="p-6 sm:p-12">
                     <div className="text-center mb-10">
-                        <div className="h-16 w-16 bg-[#C8A288] rounded-2xl flex items-center justify-center text-white mx-auto mb-6 shadow-lg shadow-[#C8A288]/20 transform rotate-3 transition-transform hover:rotate-6">
+                        <div className="h-16 w-16 bg-[#1E5C42] rounded-2xl flex items-center justify-center text-white mx-auto mb-6 shadow-lg shadow-[#1E5C42]/20 transform rotate-3 transition-transform hover:rotate-6">
                             <BookOpen className="h-8 w-8" />
                         </div>
-                        <h1 className="text-3xl font-bold mb-2 text-[#4A3B32]">
+                        <h1 className="text-3xl font-bold mb-2 text-[#163628]">
                             {isForgot ? 'Reset your password' : isOtpMode ? 'Passwordless Login' : isLogin ? 'Welcome Back' : 'Join Lumina IQ'}
                         </h1>
-                        <p className="text-[#8a6a5c] text-sm">
+                        <p className="text-[#5E5046] text-sm">
                             {isForgot ? "Enter your email and we'll send you a link to choose a new password" : isOtpMode ? 'We will send a one-time code to your email' : isLogin ? 'Pick up right where your learning path left off' : 'Turn any book into the shortest path to exam-ready'}
                         </p>
                     </div>
@@ -165,14 +165,14 @@ const Login = () => {
                             {!isLogin && !isOtpMode && (
                                 <div className="relative group">
                                     <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                                        <User className="h-5 w-5 text-[#8a6a5c] group-focus-within:text-[#C8A288] transition-colors" />
+                                        <User className="h-5 w-5 text-[#5E5046] group-focus-within:text-[#1E5C42] transition-colors" />
                                     </div>
                                     <input
                                         type="text"
                                         required
                                         value={fullName}
                                         onChange={(e) => setFullName(e.target.value)}
-                                        className="w-full pl-12 pr-4 py-4 bg-white border-2 border-[#E6D5CC] rounded-xl outline-none focus:border-[#C8A288] focus:ring-4 focus:ring-[#C8A288]/10 transition-all text-[#4A3B32] placeholder-[#d2bab0] font-medium"
+                                        className="w-full pl-12 pr-4 py-4 bg-white border-2 border-[#E6D5CC] rounded-xl outline-none focus:border-[#1E5C42] focus:ring-4 focus:ring-[#1E5C42]/10 transition-all text-[#163628] placeholder-[#d2bab0] font-medium"
                                         placeholder="Full Name"
                                         disabled={loading}
                                     />
@@ -181,7 +181,7 @@ const Login = () => {
 
                             <div className="relative group">
                                 <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                                    <Mail className="h-5 w-5 text-[#8a6a5c] group-focus-within:text-[#C8A288] transition-colors" />
+                                    <Mail className="h-5 w-5 text-[#5E5046] group-focus-within:text-[#1E5C42] transition-colors" />
                                 </div>
                                 <input
                                     type={isLogin && !isOtpMode && !isForgot ? 'text' : 'email'}
@@ -190,7 +190,7 @@ const Login = () => {
                                     required
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full pl-12 pr-4 py-4 bg-white border-2 border-[#E6D5CC] rounded-xl outline-none focus:border-[#C8A288] focus:ring-4 focus:ring-[#C8A288]/10 transition-all text-[#4A3B32] placeholder-[#d2bab0] font-medium"
+                                    className="w-full pl-12 pr-4 py-4 bg-white border-2 border-[#E6D5CC] rounded-xl outline-none focus:border-[#1E5C42] focus:ring-4 focus:ring-[#1E5C42]/10 transition-all text-[#163628] placeholder-[#d2bab0] font-medium"
                                     placeholder={isLogin && !isOtpMode && !isForgot ? 'Email' : 'name@example.com'}
                                     disabled={loading || (isOtpMode && otpSent)}
                                 />
@@ -199,14 +199,14 @@ const Login = () => {
                             {!isOtpMode && !isForgot && (
                                 <div className="relative group">
                                     <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                                        <Lock className="h-5 w-5 text-[#8a6a5c] group-focus-within:text-[#C8A288] transition-colors" />
+                                        <Lock className="h-5 w-5 text-[#5E5046] group-focus-within:text-[#1E5C42] transition-colors" />
                                     </div>
                                     <input
                                         type="password"
                                         required
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
-                                        className="w-full pl-12 pr-4 py-4 bg-white border-2 border-[#E6D5CC] rounded-xl outline-none focus:border-[#C8A288] focus:ring-4 focus:ring-[#C8A288]/10 transition-all text-[#4A3B32] placeholder-[#d2bab0] font-medium"
+                                        className="w-full pl-12 pr-4 py-4 bg-white border-2 border-[#E6D5CC] rounded-xl outline-none focus:border-[#1E5C42] focus:ring-4 focus:ring-[#1E5C42]/10 transition-all text-[#163628] placeholder-[#d2bab0] font-medium"
                                         placeholder="••••••••"
                                         disabled={loading}
                                     />
@@ -218,7 +218,7 @@ const Login = () => {
                                     <button
                                         type="button"
                                         onClick={() => { setIsForgot(true); setMessage(null); }}
-                                        className="text-sm font-semibold text-[#C8A288] hover:text-[#B08B72] hover:underline"
+                                        className="text-sm font-semibold text-[#1E5C42] hover:text-[#163628] hover:underline"
                                     >
                                         Forgot password?
                                     </button>
@@ -228,14 +228,14 @@ const Login = () => {
                             {isOtpMode && otpSent && (
                                 <div className="relative group">
                                     <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                                        <Lock className="h-5 w-5 text-[#8a6a5c] group-focus-within:text-[#C8A288] transition-colors" />
+                                        <Lock className="h-5 w-5 text-[#5E5046] group-focus-within:text-[#1E5C42] transition-colors" />
                                     </div>
                                     <input
                                         type="text"
                                         required
                                         value={otpCode}
                                         onChange={(e) => setOtpCode(e.target.value)}
-                                        className="w-full pl-12 pr-4 py-4 bg-white border-2 border-[#E6D5CC] rounded-xl outline-none focus:border-[#C8A288] focus:ring-4 focus:ring-[#C8A288]/10 transition-all text-[#4A3B32] placeholder-[#d2bab0] font-medium tracking-widest text-center"
+                                        className="w-full pl-12 pr-4 py-4 bg-white border-2 border-[#E6D5CC] rounded-xl outline-none focus:border-[#1E5C42] focus:ring-4 focus:ring-[#1E5C42]/10 transition-all text-[#163628] placeholder-[#d2bab0] font-medium tracking-widest text-center"
                                         placeholder="123456"
                                         maxLength={6}
                                         disabled={loading}
@@ -247,7 +247,7 @@ const Login = () => {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full py-4 bg-[#C8A288] text-white rounded-xl font-bold text-lg hover:bg-[#B08B72] focus:ring-4 focus:ring-[#C8A288]/30 transition-all disabled:opacity-70 flex items-center justify-center gap-2 shadow-xl shadow-[#C8A288]/20 transform active:scale-[0.98]"
+                            className="w-full py-4 bg-[#1E5C42] text-white rounded-xl font-bold text-lg hover:bg-[#163628] focus:ring-4 focus:ring-[#1E5C42]/30 transition-all disabled:opacity-70 flex items-center justify-center gap-2 shadow-xl shadow-[#1E5C42]/20 transform active:scale-[0.98]"
                         >
                             {loading ? (
                                 <Loader2 className="h-6 w-6 animate-spin" />
@@ -265,7 +265,7 @@ const Login = () => {
                             <button
                                 type="button"
                                 onClick={() => { setIsForgot(false); setMessage(null); }}
-                                className="text-sm font-bold text-[#C8A288] hover:text-[#B08B72] hover:underline"
+                                className="text-sm font-bold text-[#1E5C42] hover:text-[#163628] hover:underline"
                             >
                                 Back to sign in
                             </button>
@@ -276,7 +276,7 @@ const Login = () => {
                             <div className="w-full border-t border-[#E6D5CC]"></div>
                         </div>
                         <div className="relative flex justify-center text-sm">
-                            <span className="px-2 bg-white text-[#8a6a5c]">Or continue with</span>
+                            <span className="px-2 bg-white text-[#5E5046]">Or continue with</span>
                         </div>
                     </div>
 
@@ -292,7 +292,7 @@ const Login = () => {
                             }
                         }}
                         disabled={loading}
-                        className="w-full py-4 bg-white border-2 border-[#E6D5CC] text-[#4A3B32] rounded-xl font-bold text-lg hover:bg-[#FDF6F0] focus:ring-4 focus:ring-[#C8A288]/10 transition-all flex items-center justify-center gap-3 active:scale-[0.98]"
+                        className="w-full py-4 bg-white border-2 border-[#E6D5CC] text-[#163628] rounded-xl font-bold text-lg hover:bg-[#FDF6F0] focus:ring-4 focus:ring-[#1E5C42]/10 transition-all flex items-center justify-center gap-3 active:scale-[0.98]"
                     >
                         <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="h-6 w-6" alt="Google" />
                         Google
@@ -306,22 +306,22 @@ const Login = () => {
                             setMessage(null);
                         }}
                         disabled={loading}
-                        className="w-full mt-4 py-4 bg-white border-2 border-[#E6D5CC] text-[#4A3B32] rounded-xl font-bold text-lg hover:bg-[#FDF6F0] focus:ring-4 focus:ring-[#C8A288]/10 transition-all flex items-center justify-center gap-3 active:scale-[0.98]"
+                        className="w-full mt-4 py-4 bg-white border-2 border-[#E6D5CC] text-[#163628] rounded-xl font-bold text-lg hover:bg-[#FDF6F0] focus:ring-4 focus:ring-[#1E5C42]/10 transition-all flex items-center justify-center gap-3 active:scale-[0.98]"
                     >
-                        <Mail className="h-5 w-5 text-[#8a6a5c]" />
+                        <Mail className="h-5 w-5 text-[#5E5046]" />
                         {isOtpMode ? 'Use Password Instead' : 'Login with Email Code'}
                     </button>
 
                     <div className="mt-8 pt-6 border-t border-[#FDF6F0] text-center">
                         {!isOtpMode && (
-                            <p className="text-[#8a6a5c] text-sm">
+                            <p className="text-[#5E5046] text-sm">
                                 {isLogin ? "New to Lumina IQ? " : "Already have an account? "}
                                 <button
                                     onClick={() => {
                                         setIsLogin(!isLogin);
                                         setMessage(null);
                                     }}
-                                    className="text-[#C8A288] font-bold hover:text-[#B08B72] hover:underline transition-colors ml-1"
+                                    className="text-[#1E5C42] font-bold hover:text-[#163628] hover:underline transition-colors ml-1"
                                 >
                                     {isLogin ? 'Create an account' : 'Sign in'}
                                 </button>
@@ -335,16 +335,16 @@ const Login = () => {
                                 type="button"
                                 onClick={() => setShowSchoolHelp(!showSchoolHelp)}
                                 aria-expanded={showSchoolHelp}
-                                className="w-full flex items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-[#4A3B32]"
+                                className="w-full flex items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-[#163628]"
                             >
                                 <span className="flex items-center gap-2">
-                                    <School className="h-4 w-4 text-[#8a6a5c]" />
+                                    <School className="h-4 w-4 text-[#5E5046]" />
                                     Signing in through your school or institution?
                                 </span>
-                                <ChevronDown className={`h-4 w-4 text-[#8a6a5c] transition-transform ${showSchoolHelp ? 'rotate-180' : ''}`} />
+                                <ChevronDown className={`h-4 w-4 text-[#5E5046] transition-transform ${showSchoolHelp ? 'rotate-180' : ''}`} />
                             </button>
                             {showSchoolHelp && (
-                                <p className="px-4 pb-4 text-xs text-[#8a6a5c] leading-relaxed text-left">
+                                <p className="px-4 pb-4 text-xs text-[#5E5046] leading-relaxed text-left">
                                     Type the sign-in ID your school gave you, like <span className="font-mono">arun-07@luminaiq.fun</span>, in the email box above, with the password they gave you. School IDs can't receive email, so if you forget that password, ask your school to reset it.
                                 </p>
                             )}

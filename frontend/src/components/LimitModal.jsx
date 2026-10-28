@@ -41,40 +41,40 @@ const LimitModal = () => {
                         className="relative w-full max-w-md rounded-3xl border border-[#E6D5CC] bg-white p-6 shadow-2xl"
                         initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 30, opacity: 0 }}
                         onClick={(e) => e.stopPropagation()}>
-                        <button onClick={close} className="absolute right-4 top-4 rounded-full p-1.5 text-[#8a6a5c] hover:bg-[#FDF6F0]" aria-label="Close">
+                        <button onClick={close} className="absolute right-4 top-4 rounded-full p-1.5 text-[#5E5046] hover:bg-[#FDF6F0]" aria-label="Close">
                             <X className="h-5 w-5" />
                         </button>
                         <div className="h-12 w-12 rounded-2xl bg-[#FDF6F0] flex items-center justify-center">
-                            <Sparkles className="h-6 w-6 text-[#C8A288]" />
+                            <Sparkles className="h-6 w-6 text-[#1E5C42]" />
                         </div>
-                        <h2 id="limit-title" className="mt-4 text-xl font-bold text-[#4A3B32]">
+                        <h2 id="limit-title" className="mt-4 text-xl font-bold text-[#163628]">
                             {detail.limit === 0 ? (isNativeApp() ? 'Not included in your plan' : 'Unlock this with an upgrade') : "You've hit your limit"}
                         </h2>
-                        <p className="mt-1 text-[#4A3B32]">{detail.message}</p>
+                        <p className="mt-1 text-[#163628]">{detail.message}</p>
                         {detail.resets_at && (
-                            <p className="mt-2 text-sm text-[#8a6a5c] flex items-center gap-1.5">
+                            <p className="mt-2 text-sm text-[#5E5046] flex items-center gap-1.5">
                                 <Clock className="h-4 w-4" /> {formatReset(detail.resets_at)}
                             </p>
                         )}
                         {next ? (
                             <div className="mt-4 rounded-2xl border border-[#E6D5CC] bg-[#FDF6F0] p-4">
-                                <div className="flex items-center gap-2 font-semibold text-[#4A3B32]">
-                                    <Crown className="h-4 w-4 text-[#C8A288]" /> {next.name}
+                                <div className="flex items-center gap-2 font-semibold text-[#163628]">
+                                    <Crown className="h-4 w-4 text-[#1E5C42]" /> {next.name}
                                 </div>
-                                <p className="text-sm text-[#8a6a5c] mt-0.5">{next.pitch}.</p>
+                                <p className="text-sm text-[#5E5046] mt-0.5">{next.pitch}.</p>
                             </div>
                         ) : (
-                            <p className="mt-4 text-sm text-[#8a6a5c]">This limit keeps the service fair for everyone. It resets automatically.</p>
+                            <p className="mt-4 text-sm text-[#5E5046]">This limit keeps the service fair for everyone. It resets automatically.</p>
                         )}
                         <div className="mt-5 flex flex-col sm:flex-row gap-2">
                             {next && (
                                 <button onClick={() => { close(); navigate(`/pricing?plan=${next.key}`); }}
-                                    className="flex-1 rounded-2xl bg-[#C8A288] px-4 py-3 font-semibold text-white hover:bg-[#B08B72]">
+                                    className="flex-1 rounded-2xl bg-[#1E5C42] px-4 py-3 font-semibold text-white hover:bg-[#163628]">
                                     See {next.name}
                                 </button>
                             )}
                             <button onClick={close}
-                                className="flex-1 rounded-2xl border-2 border-[#E6D5CC] px-4 py-3 font-semibold text-[#4A3B32] hover:border-[#C8A288]">
+                                className="flex-1 rounded-2xl border-2 border-[#E6D5CC] px-4 py-3 font-semibold text-[#163628] hover:border-[#1E5C42]">
                                 Maybe later
                             </button>
                         </div>

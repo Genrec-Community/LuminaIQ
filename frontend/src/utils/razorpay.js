@@ -26,7 +26,7 @@ export const openCheckout = async (options) => {
     return new Promise((resolve, reject) => {
         const rzp = new window.Razorpay({
             ...options,
-            theme: { color: '#C8A288' },
+            theme: { color: 'var(--lumina-accent)' },
             handler: (response) => resolve(response),
             modal: { ondismiss: () => reject({ dismissed: true }), confirm_close: true },
         });

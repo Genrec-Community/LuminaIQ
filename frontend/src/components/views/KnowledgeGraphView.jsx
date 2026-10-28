@@ -39,28 +39,28 @@ const LIGHT = {
     toolbarBg: 'rgba(0,0,0,0.6)',   // gradient overlay
     orbFill: '#FFFFFF',
     orbGradient: '#FFFFFF #FFF8DC #FFD700',
-    orbBorder: '#D4A373',
-    orbLabel: '#4A3728',
-    edgeContains: '#BC9A71',
-    edgePrereq: '#BC9A71',
-    edgeRelated: '#BC9A71',
+    orbBorder: '#7FA08C',
+    orbLabel: '#294B3A',
+    edgeContains: '#A9BBAE',
+    edgePrereq: '#A9BBAE',
+    edgeRelated: '#A9BBAE',
     legendBg: 'rgba(62,47,40,0.95)',
     legendBorder: 'rgba(188,154,113,0.30)',
     glowColor: 'rgba(200,162,136,0.18)',
 };
 
 const DARK = {
-    canvas: '#221810',
-    toolbarBg: '#2e1f12',           // solid, per spec
-    orbFill: '#3a2c1e',
-    orbGradient: '#3a2c1e #4a3520 #5a4028',
-    orbBorder: '#7a5c3a',
-    orbLabel: '#a08060',
-    edgeContains: '#7a5030',
-    edgePrereq: '#7a5030',
-    edgeRelated: '#7a5030',
-    legendBg: '#2e1f12',
-    legendBorder: '#5a3a20',
+    canvas: '#10231A',
+    toolbarBg: '#142D21',           // solid, per spec
+    orbFill: '#24402F',
+    orbGradient: '#24402F #224B36 #295B42',
+    orbBorder: '#3B7C5C',
+    orbLabel: '#8FA093',
+    edgeContains: '#367857',
+    edgePrereq: '#367857',
+    edgeRelated: '#367857',
+    legendBg: '#142D21',
+    legendBorder: '#2C4A38',
     glowColor: 'rgba(122,80,48,0.22)',
 };
 
@@ -260,8 +260,8 @@ const KnowledgeGraphView = ({ projectId, zenMode }) => {
         {
             selector: 'node:selected',
             style: {
-                'background-color': '#C8A288',
-                'border-color': '#7B5B4E',
+                'background-color': '#1E5C42',
+                'border-color': '#507D67',
                 'border-width': 3,
                 'color': p.orbLabel,
                 'text-outline-width': 0,
@@ -272,8 +272,8 @@ const KnowledgeGraphView = ({ projectId, zenMode }) => {
         {
             selector: 'node.hover',
             style: {
-                'background-color': isDark ? '#4a3828' : '#E6D5CC',
-                'border-color': isDark ? '#9a7050' : '#C8A288',
+                'background-color': isDark ? '#294B3A' : '#E6D5CC',
+                'border-color': isDark ? '#8FA093' : '#1E5C42',
                 'border-width': 2.5,
                 'z-index': 15
             }
@@ -282,8 +282,8 @@ const KnowledgeGraphView = ({ projectId, zenMode }) => {
         {
             selector: 'node.neighbor',
             style: {
-                'background-color': isDark ? '#3e3020' : '#F0E4DA',
-                'border-color': isDark ? '#8a6040' : '#C8A288',
+                'background-color': isDark ? '#213F30' : '#F0E4DA',
+                'border-color': isDark ? '#418D67' : '#1E5C42',
                 'border-width': 2.5,
                 'z-index': 12
             }
@@ -722,14 +722,14 @@ const KnowledgeGraphView = ({ projectId, zenMode }) => {
     };
 
     // ── Loading / error / empty states ────────────────────────────────────────
-    const stateContainerCls = `flex items-center justify-center h-[600px] rounded-2xl border transition-colors duration-300 ${isDark ? 'bg-[#221810] border-[#5a3a20]' : 'bg-[#FFF5ED] border-white/10'
+    const stateContainerCls = `flex items-center justify-center h-[600px] rounded-2xl border transition-colors duration-300 ${isDark ? 'bg-[#10231A] border-[#2C4A38]' : 'bg-[#FFF5ED] border-white/10'
         }`;
 
     if (loading) return (
         <div className={stateContainerCls}>
             <div className="text-center">
                 <Loader2 className="w-12 h-12 text-[#FFD700] animate-spin mx-auto mb-4" />
-                <p className={isDark ? 'text-[#a08060]' : 'text-[#A0A0A0]'}>Igniting knowledge core…</p>
+                <p className={isDark ? 'text-[#8FA093]' : 'text-[#A0A0A0]'}>Igniting knowledge core…</p>
             </div>
         </div>
     );
@@ -752,9 +752,9 @@ const KnowledgeGraphView = ({ projectId, zenMode }) => {
     if (!graphData?.nodes?.length) return (
         <div className={stateContainerCls}>
             <div className="text-center">
-                <Network className={`w-12 h-12 mx-auto mb-4 ${isDark ? 'text-[#5a3a20]' : 'text-[#3A3A3A]'}`} />
-                <p className={`font-semibold mb-2 ${isDark ? 'text-[#a08060]' : 'text-white'}`}>No Cosmic Entities Found</p>
-                <p className={`text-sm mb-4 ${isDark ? 'text-[#7a5c3a]' : 'text-[#A0A0A0]'}`}>Upload documents to ignite the central sun.</p>
+                <Network className={`w-12 h-12 mx-auto mb-4 ${isDark ? 'text-[#2C4A38]' : 'text-[#3A3A3A]'}`} />
+                <p className={`font-semibold mb-2 ${isDark ? 'text-[#8FA093]' : 'text-white'}`}>No Cosmic Entities Found</p>
+                <p className={`text-sm mb-4 ${isDark ? 'text-[#3B7C5C]' : 'text-[#A0A0A0]'}`}>Upload documents to ignite the central sun.</p>
                 <button onClick={fetchGraphData} className="px-4 py-2 bg-[#FFD700] text-[#0A0A0C] font-semibold rounded-lg hover:bg-yellow-500 transition-colors">
                     Refresh Cosmos
                 </button>
@@ -767,7 +767,7 @@ const KnowledgeGraphView = ({ projectId, zenMode }) => {
         <div
             ref={wrapRef}
             className="flex h-full min-h-[600px] relative p-0 overflow-hidden md:rounded-2xl border-y md:border shadow-inner transition-colors duration-300"
-            style={{ borderColor: isDark ? '#5a3a20' : '#EED9CA' }}
+            style={{ borderColor: isDark ? '#2C4A38' : '#EED9CA' }}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
         >
@@ -834,7 +834,7 @@ const KnowledgeGraphView = ({ projectId, zenMode }) => {
                             className={`p-2 rounded-lg transition-colors border shadow-lg backdrop-blur-md ${active
                                     ? 'bg-[#FFD700]/20 border-[#FFD700]/50 text-[#FFD700]'
                                     : isDark
-                                        ? 'bg-[#3a2c1e]/80 border-[#7a5c3a]/40 text-[#a08060] hover:bg-[#4a3828] hover:text-[#c09060]'
+                                        ? 'bg-[#24402F]/80 border-[#3B7C5C]/40 text-[#8FA093] hover:bg-[#294B3A] hover:text-[#D3EE6A]'
                                         : 'bg-black/40 border-white/10 text-white/70 hover:bg-white/10 hover:text-white'
                                 }`}
                         >{icon}</button>
@@ -856,7 +856,7 @@ const KnowledgeGraphView = ({ projectId, zenMode }) => {
                             className="w-64 sm:w-72 backdrop-blur-xl shadow-xl rounded-2xl p-4 border"
                             style={{
                                 background: isDark ? 'rgba(46,31,18,0.95)' : 'rgba(62,47,40,0.95)',
-                                borderColor: isDark ? '#5a3a20' : 'rgba(188,154,113,0.30)'
+                                borderColor: isDark ? '#2C4A38' : 'rgba(188,154,113,0.30)'
                             }}
                         >
                             <div className="flex flex-col gap-1.5">
@@ -892,7 +892,7 @@ const KnowledgeGraphView = ({ projectId, zenMode }) => {
                     }}
                 >
                     <p className="text-[10px] uppercase tracking-wider font-bold text-white/60 mb-2">Constellations</p>
-                    <div className="flex flex-col gap-2 text-xs" style={{ color: isDark ? '#a08060' : 'rgba(255,255,255,0.8)' }}>
+                    <div className="flex flex-col gap-2 text-xs" style={{ color: isDark ? '#8FA093' : 'rgba(255,255,255,0.8)' }}>
                         <div className="flex items-center gap-2">
                             <div className="w-4 h-4 bg-[radial-gradient(ellipse_at_center,_#FFFFFF,_#FFA500,_#8B0000)] rounded-full shadow-[0_0_8px_rgba(255,0,0,0.8)] shrink-0" />
                             <span>Core Sun (Doc)</span>
@@ -902,9 +902,9 @@ const KnowledgeGraphView = ({ projectId, zenMode }) => {
                                 className="w-3 h-3 rounded-full shrink-0"
                                 style={{
                                     background: isDark
-                                        ? 'radial-gradient(ellipse at center, #4a3520, #3a2c1e)'
+                                        ? 'radial-gradient(ellipse at center, #224B36, #24402F)'
                                         : 'radial-gradient(ellipse at center, #FFF8DC, #FFD700, #DAA520)',
-                                    border: `1.5px solid ${isDark ? '#7a5c3a' : '#D4A373'}`,
+                                    border: `1.5px solid ${isDark ? '#3B7C5C' : '#7FA08C'}`,
                                     boxShadow: isDark
                                         ? '0 0 6px rgba(122,80,48,0.6)'
                                         : '0 0 6px rgba(255,215,0,0.8)'
@@ -917,9 +917,9 @@ const KnowledgeGraphView = ({ projectId, zenMode }) => {
                                 className="w-4 h-4 rounded-full shrink-0"
                                 style={{
                                     background: isDark
-                                        ? 'radial-gradient(ellipse at center, #5a4028, #3a2c1e)'
+                                        ? 'radial-gradient(ellipse at center, #295B42, #24402F)'
                                         : 'radial-gradient(ellipse at center, #FFF8DC, #FFD700, #DAA520)',
-                                    border: `2px solid ${isDark ? '#9a7050' : '#D4A373'}`,
+                                    border: `2px solid ${isDark ? '#8FA093' : '#7FA08C'}`,
                                     boxShadow: isDark
                                         ? '0 0 10px rgba(154,112,80,0.8)'
                                         : '0 0 12px rgba(255,215,0,1)'
@@ -935,8 +935,8 @@ const KnowledgeGraphView = ({ projectId, zenMode }) => {
                     <div
                         className="absolute bottom-4 right-4 backdrop-blur-md rounded-xl p-3 shadow-lg"
                         style={{
-                            background: isDark ? '#2e1f12' : 'rgba(62,47,40,0.95)',
-                            border: `1px solid ${isDark ? '#5a3a20' : 'rgba(188,154,113,0.30)'}`
+                            background: isDark ? '#142D21' : 'rgba(62,47,40,0.95)',
+                            border: `1px solid ${isDark ? '#2C4A38' : 'rgba(188,154,113,0.30)'}`
                         }}
                     >
                         <div className="flex items-center gap-2 mb-2">
@@ -963,7 +963,7 @@ const KnowledgeGraphView = ({ projectId, zenMode }) => {
                 )}
 
                 <div className={`h-full backdrop-blur-2xl md:backdrop-blur-3xl rounded-t-3xl md:rounded-none md:border-l overflow-hidden flex flex-col ${zenMode ? 'pt-12' : ''} ${isDark
-                        ? 'bg-[#1e140c]/90 border-[#5a3a20] md:shadow-[-20px_0_40px_rgba(10,6,2,0.9)]'
+                        ? 'bg-[#0D1E15]/90 border-[#2C4A38] md:shadow-[-20px_0_40px_rgba(10,6,2,0.9)]'
                         : 'bg-black/60 border-white/10 md:shadow-[-20px_0_40px_rgba(0,0,0,0.8)]'
                     }`}>
                     {selectedTopic ? (

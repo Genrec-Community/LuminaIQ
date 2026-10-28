@@ -51,7 +51,7 @@ const Demo = ({ picked, onPick }) => {
         <div className="flex flex-1 flex-col justify-center">
             <p className="text-[13px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--m-accent-text)' }}>Try one</p>
             <div className="mt-3 overflow-hidden rounded-[26px] p-5 text-white shadow-xl"
-                style={{ background: 'radial-gradient(120% 80% at 90% 0%, #8f6a52cc 0%, transparent 60%), #1d140e' }}>
+                style={{ background: 'radial-gradient(120% 80% at 90% 0%, #8f6a52cc 0%, transparent 60%), #0F1D16' }}>
                 <p className="text-[18px] font-bold leading-snug">{DEMO.q}</p>
                 <div className="mt-4 space-y-2.5">
                     {DEMO.options.map((o) => {

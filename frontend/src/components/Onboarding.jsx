@@ -19,8 +19,8 @@ const Chip = ({ active, onClick, children, className = '' }) => (
         type="button"
         onClick={onClick}
         className={`rounded-2xl border-2 transition-all active:scale-95 ${active
-            ? 'border-[#C8A288] bg-[#C8A288]/10 shadow-md shadow-[#C8A288]/20'
-            : 'border-[#E6D5CC] hover:border-[#C8A288]/60 bg-white'} ${className}`}
+            ? 'border-[#1E5C42] bg-[#1E5C42]/10 shadow-md shadow-[#1E5C42]/20'
+            : 'border-[#E6D5CC] hover:border-[#1E5C42]/60 bg-white'} ${className}`}
     >
         {children}
     </button>
@@ -28,13 +28,13 @@ const Chip = ({ active, onClick, children, className = '' }) => (
 
 const Field = ({ label, hint, children }) => (
     <label className="block">
-        <span className="block text-sm font-semibold text-[#4A3B32] mb-1.5">{label}</span>
+        <span className="block text-sm font-semibold text-[#163628] mb-1.5">{label}</span>
         {children}
-        {hint && <span className="block text-xs text-[#8a6a5c] mt-1">{hint}</span>}
+        {hint && <span className="block text-xs text-[#5E5046] mt-1">{hint}</span>}
     </label>
 );
 
-const inputCls = 'w-full px-4 py-3 bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl focus:ring-2 focus:ring-[#C8A288] outline-none text-base text-[#4A3B32]';
+const inputCls = 'w-full px-4 py-3 bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl focus:ring-2 focus:ring-[#1E5C42] outline-none text-base text-[#163628]';
 
 /**
  * First-run experience: the learner introduces themselves, designs their AI
@@ -85,30 +85,30 @@ const Onboarding = ({ onDone, fullScreen = false }) => {
                 initial={{ scale: 0, rotate: -30 }}
                 animate={{ scale: 1, rotate: 0 }}
                 transition={{ type: 'spring', stiffness: 200, damping: 12 }}
-                className="mx-auto mb-6 h-28 w-28 rounded-full bg-gradient-to-br from-[#C8A288] to-[#e8c9a8] flex items-center justify-center text-6xl shadow-xl shadow-[#C8A288]/30"
+                className="mx-auto mb-6 h-28 w-28 rounded-full bg-gradient-to-br from-[#1E5C42] to-[#D3EE6A] flex items-center justify-center text-6xl shadow-xl shadow-[#1E5C42]/30"
             >
                 ✨
             </motion.div>
-            <h2 className="text-3xl md:text-4xl font-bold text-[#4A3B32] mb-3">Welcome to Lumina IQ</h2>
-            <p className="text-[#8a6a5c] text-lg max-w-md mx-auto">
+            <h2 className="text-3xl md:text-4xl font-bold text-[#163628] mb-3">Welcome to Lumina IQ</h2>
+            <p className="text-[#5E5046] text-lg max-w-md mx-auto">
                 Turn any textbook into bite-sized lessons, quizzes and a study buddy that actually gets you.
             </p>
             <div className="grid grid-cols-3 gap-3 mt-8 max-w-md mx-auto text-sm">
                 {[['⚡', 'Learn in 60 min'], ['🎯', 'Ace your exams'], ['🔥', 'Build a streak']].map(([e, t]) => (
                     <div key={t} className="bg-[#FDF6F0] border border-[#E6D5CC] rounded-2xl p-3">
                         <div className="text-2xl mb-1">{e}</div>
-                        <div className="font-medium text-[#4A3B32]">{t}</div>
+                        <div className="font-medium text-[#163628]">{t}</div>
                     </div>
                 ))}
             </div>
-            <p className="text-xs text-[#8a6a5c] mt-6">Takes about 40 seconds. Let&apos;s set things up!</p>
+            <p className="text-xs text-[#5E5046] mt-6">Takes about 40 seconds. Let&apos;s set things up!</p>
         </div>,
 
         // 1 — About you
         <div key="you" className="space-y-5">
             <div>
-                <h2 className="text-2xl font-bold text-[#4A3B32]">First, who are you? 👋</h2>
-                <p className="text-[#8a6a5c]">So your companion knows what to call you.</p>
+                <h2 className="text-2xl font-bold text-[#163628]">First, who are you? 👋</h2>
+                <p className="text-[#5E5046]">So your companion knows what to call you.</p>
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
                 <Field label="Your name">
@@ -131,8 +131,8 @@ const Onboarding = ({ onDone, fullScreen = false }) => {
                 <div className="grid grid-cols-2 gap-2">
                     {Object.entries(AGE_GROUPS).map(([k, g]) => (
                         <Chip key={k} active={form.ageGroup === k} onClick={() => set('ageGroup')(k)} className="p-3 text-left">
-                            <div className="font-semibold text-[#4A3B32] text-sm">{g.label}</div>
-                            <div className="text-xs text-[#8a6a5c]">{g.hint}</div>
+                            <div className="font-semibold text-[#163628] text-sm">{g.label}</div>
+                            <div className="text-xs text-[#5E5046]">{g.hint}</div>
                         </Chip>
                     ))}
                 </div>
@@ -142,8 +142,8 @@ const Onboarding = ({ onDone, fullScreen = false }) => {
         // 2 — Companion
         <div key="ai" className="space-y-5">
             <div>
-                <h2 className="text-2xl font-bold text-[#4A3B32]">Design your study companion 🎨</h2>
-                <p className="text-[#8a6a5c]">Give them a name and a personality. You can change this anytime.</p>
+                <h2 className="text-2xl font-bold text-[#163628]">Design your study companion 🎨</h2>
+                <p className="text-[#5E5046]">Give them a name and a personality. You can change this anytime.</p>
             </div>
             <div className="grid sm:grid-cols-[1fr_auto] gap-4 items-end">
                 <Field label="Companion's name">
@@ -162,24 +162,24 @@ const Onboarding = ({ onDone, fullScreen = false }) => {
                     <Chip key={k} active={form.aiCharacter === k} onClick={() => set('aiCharacter')(k)} className="p-3 text-left flex gap-3 items-start">
                         <span className="text-2xl">{c.emoji}</span>
                         <span>
-                            <span className="block font-semibold text-[#4A3B32] text-sm">{c.label}</span>
-                            <span className="block text-xs text-[#8a6a5c]">{c.tagline}</span>
+                            <span className="block font-semibold text-[#163628] text-sm">{c.label}</span>
+                            <span className="block text-xs text-[#5E5046]">{c.tagline}</span>
                         </span>
                     </Chip>
                 ))}
             </div>
             <div className="flex items-center gap-2 text-sm">
-                <span className="font-semibold text-[#4A3B32]">Humour:</span>
+                <span className="font-semibold text-[#163628]">Humour:</span>
                 {[['none', 'Serious'], ['some', 'A little'], ['lots', 'Lots! 😂']].map(([k, l]) => (
-                    <Chip key={k} active={form.aiHumor === k} onClick={() => set('aiHumor')(k)} className="px-3 py-1.5 text-[#4A3B32]">{l}</Chip>
+                    <Chip key={k} active={form.aiHumor === k} onClick={() => set('aiHumor')(k)} className="px-3 py-1.5 text-[#163628]">{l}</Chip>
                 ))}
             </div>
             <motion.div key={form.aiCharacter + form.aiName} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
                 className="flex items-start gap-3 bg-[#FDF6F0] border border-[#E6D5CC] rounded-2xl p-4">
                 <span className="text-3xl">{form.aiAvatar}</span>
                 <div>
-                    <div className="text-xs font-semibold text-[#C8A288]">{form.aiName || 'Lumi'} says</div>
-                    <div className="text-[#4A3B32]">{character.greet(callName)}</div>
+                    <div className="text-xs font-semibold text-[#1E5C42]">{form.aiName || 'Lumi'} says</div>
+                    <div className="text-[#163628]">{character.greet(callName)}</div>
                 </div>
             </motion.div>
         </div>,
@@ -187,8 +187,8 @@ const Onboarding = ({ onDone, fullScreen = false }) => {
         // 3 — Mission
         <div key="goal" className="space-y-5">
             <div>
-                <h2 className="text-2xl font-bold text-[#4A3B32]">What&apos;s the mission? 🎯</h2>
-                <p className="text-[#8a6a5c]">We&apos;ll count down to your exam and keep you on track.</p>
+                <h2 className="text-2xl font-bold text-[#163628]">What&apos;s the mission? 🎯</h2>
+                <p className="text-[#5E5046]">We&apos;ll count down to your exam and keep you on track.</p>
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
                 <Field label="Exam or goal (optional)">
@@ -203,8 +203,8 @@ const Onboarding = ({ onDone, fullScreen = false }) => {
                     {DAILY_GOALS.map((g) => (
                         <Chip key={g.minutes} active={form.dailyStudyGoal === g.minutes} onClick={() => set('dailyStudyGoal')(g.minutes)} className="p-3 text-center">
                             <div className="text-2xl">{g.emoji}</div>
-                            <div className="font-bold text-[#4A3B32]">{g.minutes} min</div>
-                            <div className="text-xs text-[#8a6a5c]">{g.label}</div>
+                            <div className="font-bold text-[#163628]">{g.minutes} min</div>
+                            <div className="text-xs text-[#5E5046]">{g.label}</div>
                         </Chip>
                     ))}
                 </div>
@@ -212,7 +212,7 @@ const Onboarding = ({ onDone, fullScreen = false }) => {
             <Field label="How well do you know your subject right now?">
                 <div className="grid grid-cols-3 gap-2">
                     {[['beginner', '🐣 Just starting'], ['intermediate', '🙂 Know the basics'], ['advanced', '🧠 Polishing up']].map(([k, l]) => (
-                        <Chip key={k} active={form.selfLevel === k} onClick={() => set('selfLevel')(k)} className="p-3 text-sm font-medium text-[#4A3B32]">{l}</Chip>
+                        <Chip key={k} active={form.selfLevel === k} onClick={() => set('selfLevel')(k)} className="p-3 text-sm font-medium text-[#163628]">{l}</Chip>
                     ))}
                 </div>
             </Field>
@@ -224,15 +224,15 @@ const Onboarding = ({ onDone, fullScreen = false }) => {
                 initial={{ scale: 0.5, opacity: 0 }}
                 animate={{ scale: [0.5, 1.15, 1], opacity: 1 }}
                 transition={{ duration: 0.6 }}
-                className="mx-auto mb-5 h-24 w-24 rounded-full bg-gradient-to-br from-[#C8A288] to-[#e8c9a8] flex items-center justify-center text-5xl shadow-xl shadow-[#C8A288]/30"
+                className="mx-auto mb-5 h-24 w-24 rounded-full bg-gradient-to-br from-[#1E5C42] to-[#D3EE6A] flex items-center justify-center text-5xl shadow-xl shadow-[#1E5C42]/30"
             >
                 {form.aiAvatar}
             </motion.div>
-            <h2 className="text-3xl font-bold text-[#4A3B32] mb-2">You&apos;re all set, {callName}! {form.userAvatar}</h2>
-            <p className="text-lg text-[#4A3B32] max-w-md mx-auto mb-6">
-                <span className="font-semibold text-[#C8A288]">{form.aiName || 'Lumi'}:</span> {character.greet(callName)}
+            <h2 className="text-3xl font-bold text-[#163628] mb-2">You&apos;re all set, {callName}! {form.userAvatar}</h2>
+            <p className="text-lg text-[#163628] max-w-md mx-auto mb-6">
+                <span className="font-semibold text-[#1E5C42]">{form.aiName || 'Lumi'}:</span> {character.greet(callName)}
             </p>
-            <div className="bg-[#FDF6F0] border border-[#E6D5CC] rounded-2xl p-4 max-w-md mx-auto text-left text-sm text-[#4A3B32] space-y-2">
+            <div className="bg-[#FDF6F0] border border-[#E6D5CC] rounded-2xl p-4 max-w-md mx-auto text-left text-sm text-[#163628] space-y-2">
                 <div className="font-semibold">Your first hour plan:</div>
                 <div>1. 📚 Add a textbook (or grab one from the Book Store)</div>
                 <div>2. ⚡ Hit <b>Power Hour</b> — swipe through every topic with quick checks</div>
@@ -242,7 +242,7 @@ const Onboarding = ({ onDone, fullScreen = false }) => {
     ];
 
     return (
-        <div className={`fixed inset-0 z-[9999] flex items-center justify-center ${fullScreen ? 'bg-white' : 'bg-[#2A1F18]/50 backdrop-blur-md p-3 md:p-6'}`}>
+        <div className={`fixed inset-0 z-[9999] flex items-center justify-center ${fullScreen ? 'bg-white' : 'bg-[#182B22]/50 backdrop-blur-md p-3 md:p-6'}`}>
             <motion.div
                 initial={{ opacity: 0, y: 30, scale: 0.97 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -252,10 +252,10 @@ const Onboarding = ({ onDone, fullScreen = false }) => {
             >
                 <div className="flex items-center gap-2 px-6 pt-5">
                     {Array.from({ length: STEPS + 1 }).map((_, i) => (
-                        <div key={i} className={`h-1.5 rounded-full transition-all duration-300 ${i <= step ? 'bg-[#C8A288] flex-[2]' : 'bg-[#E6D5CC] flex-1'}`} />
+                        <div key={i} className={`h-1.5 rounded-full transition-all duration-300 ${i <= step ? 'bg-[#1E5C42] flex-[2]' : 'bg-[#E6D5CC] flex-1'}`} />
                     ))}
                     {step < STEPS && (
-                        <button onClick={skip} className="ml-3 text-xs text-[#8a6a5c] hover:text-[#4A3B32] whitespace-nowrap">Skip</button>
+                        <button onClick={skip} className="ml-3 text-xs text-[#5E5046] hover:text-[#163628] whitespace-nowrap">Skip</button>
                     )}
                 </div>
 
@@ -275,7 +275,7 @@ const Onboarding = ({ onDone, fullScreen = false }) => {
 
                 <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-[#E6D5CC]">
                     {step > 0 ? (
-                        <button onClick={() => setStep(step - 1)} className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-[#8a6a5c] hover:bg-[#FDF6F0]">
+                        <button onClick={() => setStep(step - 1)} className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-[#5E5046] hover:bg-[#FDF6F0]">
                             <ArrowLeft className="h-4 w-4" /> Back
                         </button>
                     ) : <span />}
@@ -283,14 +283,14 @@ const Onboarding = ({ onDone, fullScreen = false }) => {
                         <button
                             disabled={!canNext}
                             onClick={() => setStep(step + 1)}
-                            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[#C8A288] text-white font-semibold hover:bg-[#B08B72] disabled:opacity-40 shadow-lg shadow-[#C8A288]/30 active:scale-95 transition-all"
+                            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[#1E5C42] text-white font-semibold hover:bg-[#163628] disabled:opacity-40 shadow-lg shadow-[#1E5C42]/30 active:scale-95 transition-all"
                         >
                             {step === 0 ? "Let's go" : 'Next'} <ArrowRight className="h-4 w-4" />
                         </button>
                     ) : (
                         <button
                             onClick={finish}
-                            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[#C8A288] text-white font-semibold hover:bg-[#B08B72] shadow-lg shadow-[#C8A288]/30 active:scale-95 transition-all"
+                            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[#1E5C42] text-white font-semibold hover:bg-[#163628] shadow-lg shadow-[#1E5C42]/30 active:scale-95 transition-all"
                         >
                             <Sparkles className="h-4 w-4" /> Start learning <Check className="h-4 w-4" />
                         </button>

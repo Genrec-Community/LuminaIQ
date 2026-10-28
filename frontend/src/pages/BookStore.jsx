@@ -23,26 +23,26 @@ const BookCard = ({ book, onImport, onPreview }) => {
     return (
         <div
             onClick={() => onPreview(book)}
-            className="group bg-white border border-[#E6D5CC] rounded-2xl p-5 hover:border-[#C8A288] hover:shadow-lg hover:shadow-[#C8A288]/10 transition-all cursor-pointer"
+            className="group bg-white border border-[#E6D5CC] rounded-2xl p-5 hover:border-[#1E5C42] hover:shadow-lg hover:shadow-[#1E5C42]/10 transition-all cursor-pointer"
         >
             {/* Book header */}
             <div className="flex items-start gap-3 mb-4">
-                <div className="h-12 w-10 bg-gradient-to-br from-[#C8A288] to-[#B08B72] rounded-lg flex items-center justify-center shrink-0 shadow-md shadow-[#C8A288]/20">
+                <div className="h-12 w-10 bg-gradient-to-br from-[#1E5C42] to-[#163628] rounded-lg flex items-center justify-center shrink-0 shadow-md shadow-[#1E5C42]/20">
                     <BookOpen className="h-5 w-5 text-white" />
                 </div>
                 <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-[#4A3B32] text-sm leading-tight line-clamp-2 group-hover:text-[#C8A288] transition-colors">
+                    <h3 className="font-bold text-[#163628] text-sm leading-tight line-clamp-2 group-hover:text-[#1E5C42] transition-colors">
                         {book.title}
                     </h3>
                     {book.author && (
-                        <p className="text-xs text-[#8a6a5c] mt-0.5">by {book.author}</p>
+                        <p className="text-xs text-[#5E5046] mt-0.5">by {book.author}</p>
                     )}
                 </div>
             </div>
 
             {/* Description */}
             {book.description && (
-                <p className="text-xs text-[#8a6a5c] leading-relaxed line-clamp-3 mb-4">
+                <p className="text-xs text-[#5E5046] leading-relaxed line-clamp-3 mb-4">
                     {book.description}
                 </p>
             )}
@@ -51,13 +51,13 @@ const BookCard = ({ book, onImport, onPreview }) => {
             {book.tags && book.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1 mb-4">
                     {book.tags.slice(0, 3).map((tag, i) => (
-                        <span key={i} className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-[#FDF6F0] text-[#8a6a5c] rounded-full text-xs border border-[#E6D5CC]">
+                        <span key={i} className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-[#FDF6F0] text-[#5E5046] rounded-full text-xs border border-[#E6D5CC]">
                             <Tag className="h-2.5 w-2.5" />
                             {tag}
                         </span>
                     ))}
                     {book.tags.length > 3 && (
-                        <span className="px-2 py-0.5 bg-[#FDF6F0] text-[#8a6a5c] rounded-full text-xs">
+                        <span className="px-2 py-0.5 bg-[#FDF6F0] text-[#5E5046] rounded-full text-xs">
                             +{book.tags.length - 3}
                         </span>
                     )}
@@ -66,7 +66,7 @@ const BookCard = ({ book, onImport, onPreview }) => {
 
             {/* Footer stats */}
             <div className="flex items-center justify-between pt-3 border-t border-[#F5EBE4]">
-                <div className="flex items-center gap-3 text-xs text-[#8a6a5c]">
+                <div className="flex items-center gap-3 text-xs text-[#5E5046]">
                     <span className="flex items-center gap-1">
                         <Download className="h-3 w-3" />
                         {book.import_count || 0}
@@ -88,7 +88,7 @@ const BookCard = ({ book, onImport, onPreview }) => {
                             onPreview(book);
                         }}
                         disabled={importing}
-                        className="px-3 py-1.5 bg-[#C8A288] text-white rounded-lg text-xs font-medium hover:bg-[#B08B72] transition-colors flex items-center gap-1.5"
+                        className="px-3 py-1.5 bg-[#1E5C42] text-white rounded-lg text-xs font-medium hover:bg-[#163628] transition-colors flex items-center gap-1.5"
                     >
                         {importing ? (
                             <Loader2 className="h-3 w-3 animate-spin" />
@@ -135,28 +135,28 @@ const ImportModal = ({ book, onClose, onImport }) => {
 
     return (
         <div
-            className="fixed inset-0 bg-[#4A3B32]/30 backdrop-blur-sm flex items-center justify-center p-4 z-[60]"
+            className="fixed inset-0 bg-[#163628]/30 backdrop-blur-sm flex items-center justify-center p-4 z-[60]"
             onClick={(e) => e.target === e.currentTarget && onClose()}
         >
             <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl animate-in fade-in zoom-in duration-200">
                 <div className="flex items-start justify-between mb-6">
                     <div>
-                        <h3 className="text-xl font-bold text-[#4A3B32]">Import Book</h3>
-                        <p className="text-sm text-[#8a6a5c] mt-1">Select a project to add this book to</p>
+                        <h3 className="text-xl font-bold text-[#163628]">Import Book</h3>
+                        <p className="text-sm text-[#5E5046] mt-1">Select a project to add this book to</p>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-[#FDF6F0] rounded-full transition-colors">
-                        <X className="h-5 w-5 text-[#8a6a5c]" />
+                        <X className="h-5 w-5 text-[#5E5046]" />
                     </button>
                 </div>
 
                 {/* Book info */}
                 <div className="flex items-center gap-3 p-4 bg-[#FDF6F0] rounded-xl mb-6">
-                    <div className="h-10 w-8 bg-gradient-to-br from-[#C8A288] to-[#B08B72] rounded-lg flex items-center justify-center">
+                    <div className="h-10 w-8 bg-gradient-to-br from-[#1E5C42] to-[#163628] rounded-lg flex items-center justify-center">
                         <BookOpen className="h-4 w-4 text-white" />
                     </div>
                     <div>
-                        <p className="font-semibold text-[#4A3B32] text-sm">{book.title}</p>
-                        {book.author && <p className="text-xs text-[#8a6a5c]">by {book.author}</p>}
+                        <p className="font-semibold text-[#163628] text-sm">{book.title}</p>
+                        {book.author && <p className="text-xs text-[#5E5046]">by {book.author}</p>}
                     </div>
                 </div>
 
@@ -165,17 +165,17 @@ const ImportModal = ({ book, onClose, onImport }) => {
                         <div className="h-14 w-14 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-3">
                             <Check className="h-7 w-7 text-emerald-500" />
                         </div>
-                        <p className="font-bold text-[#4A3B32]">Import started!</p>
-                        <p className="text-sm text-[#8a6a5c] mt-1">Processing in background...</p>
+                        <p className="font-bold text-[#163628]">Import started!</p>
+                        <p className="text-sm text-[#5E5046] mt-1">Processing in background...</p>
                     </div>
                 ) : (
                     <>
                         {loading ? (
                             <div className="flex items-center justify-center py-8">
-                                <Loader2 className="h-6 w-6 animate-spin text-[#C8A288]" />
+                                <Loader2 className="h-6 w-6 animate-spin text-[#1E5C42]" />
                             </div>
                         ) : projects.length === 0 ? (
-                            <div className="text-center py-6 text-[#8a6a5c]">
+                            <div className="text-center py-6 text-[#5E5046]">
                                 <BookOpen className="h-10 w-10 mx-auto mb-2 opacity-40" />
                                 <p className="text-sm">No projects yet. Create a project first.</p>
                             </div>
@@ -186,16 +186,16 @@ const ImportModal = ({ book, onClose, onImport }) => {
                                         key={p.id}
                                         onClick={() => setSelectedProject(p.id)}
                                         className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all ${selectedProject === p.id
-                                            ? 'border-[#C8A288] bg-[#FDF6F0]'
-                                            : 'border-[#E6D5CC] hover:border-[#C8A288] hover:bg-[#FDF6F0]/50'
+                                            ? 'border-[#1E5C42] bg-[#FDF6F0]'
+                                            : 'border-[#E6D5CC] hover:border-[#1E5C42] hover:bg-[#FDF6F0]/50'
                                             }`}
                                     >
-                                        <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${selectedProject === p.id ? 'bg-[#C8A288]' : 'bg-[#F5EBE4]'}`}>
-                                            <BookOpen className={`h-4 w-4 ${selectedProject === p.id ? 'text-white' : 'text-[#C8A288]'}`} />
+                                        <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${selectedProject === p.id ? 'bg-[#1E5C42]' : 'bg-[#F5EBE4]'}`}>
+                                            <BookOpen className={`h-4 w-4 ${selectedProject === p.id ? 'text-white' : 'text-[#1E5C42]'}`} />
                                         </div>
-                                        <span className="text-sm font-medium text-[#4A3B32] truncate">{p.name}</span>
+                                        <span className="text-sm font-medium text-[#163628] truncate">{p.name}</span>
                                         {selectedProject === p.id && (
-                                            <Check className="h-4 w-4 text-[#C8A288] ml-auto shrink-0" />
+                                            <Check className="h-4 w-4 text-[#1E5C42] ml-auto shrink-0" />
                                         )}
                                     </button>
                                 ))}
@@ -205,7 +205,7 @@ const ImportModal = ({ book, onClose, onImport }) => {
                         <button
                             onClick={handleImport}
                             disabled={!selectedProject || importing}
-                            className="w-full py-3 bg-[#C8A288] text-white rounded-xl font-medium hover:bg-[#B08B72] disabled:opacity-50 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-[#C8A288]/20"
+                            className="w-full py-3 bg-[#1E5C42] text-white rounded-xl font-medium hover:bg-[#163628] disabled:opacity-50 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-[#1E5C42]/20"
                         >
                             {importing ? (
                                 <>
@@ -273,30 +273,30 @@ const BookStore = () => {
             <div className="bg-white border-b border-[#E6D5CC]">
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
                     <div className="flex items-center gap-4 mb-4">
-                        <div className="h-12 w-12 bg-gradient-to-br from-[#C8A288] to-[#B08B72] rounded-2xl flex items-center justify-center shadow-lg shadow-[#C8A288]/20">
+                        <div className="h-12 w-12 bg-gradient-to-br from-[#1E5C42] to-[#163628] rounded-2xl flex items-center justify-center shadow-lg shadow-[#1E5C42]/20">
                             <Globe className="h-6 w-6 text-white" />
                         </div>
                         <div>
-                            <h1 className="text-3xl font-bold text-[#4A3B32]">Book Store</h1>
-                            <p className="text-[#8a6a5c]">Discover and import books shared by the community</p>
+                            <h1 className="text-3xl font-bold text-[#163628]">Book Store</h1>
+                            <p className="text-[#5E5046]">Discover and import books shared by the community</p>
                         </div>
                     </div>
 
                     {/* Search bar */}
                     <form onSubmit={handleSearch} className="flex gap-3 mt-6">
                         <div className="relative flex-1 max-w-xl">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-[#8a6a5c]" />
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-[#5E5046]" />
                             <input
                                 type="text"
                                 value={searchInput}
                                 onChange={e => setSearchInput(e.target.value)}
                                 placeholder="Search by title, author, or description..."
-                                className="w-full pl-12 pr-4 py-3 bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl focus:ring-2 focus:ring-[#C8A288] outline-none text-sm"
+                                className="w-full pl-12 pr-4 py-3 bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl focus:ring-2 focus:ring-[#1E5C42] outline-none text-sm"
                             />
                         </div>
                         <button
                             type="submit"
-                            className="px-6 py-3 bg-[#C8A288] text-white rounded-xl font-medium hover:bg-[#B08B72] transition-colors shadow-lg shadow-[#C8A288]/20"
+                            className="px-6 py-3 bg-[#1E5C42] text-white rounded-xl font-medium hover:bg-[#163628] transition-colors shadow-lg shadow-[#1E5C42]/20"
                         >
                             Search
                         </button>
@@ -304,7 +304,7 @@ const BookStore = () => {
                             <button
                                 type="button"
                                 onClick={() => { setSearch(''); setSearchInput(''); setPage(1); }}
-                                className="px-4 py-3 border border-[#E6D5CC] rounded-xl text-[#8a6a5c] hover:bg-[#FDF6F0] transition-colors"
+                                className="px-4 py-3 border border-[#E6D5CC] rounded-xl text-[#5E5046] hover:bg-[#FDF6F0] transition-colors"
                             >
                                 <X className="h-4 w-4" />
                             </button>
@@ -312,7 +312,7 @@ const BookStore = () => {
                     </form>
 
                     {!loading && (
-                        <p className="text-sm text-[#8a6a5c] mt-3">
+                        <p className="text-sm text-[#5E5046] mt-3">
                             {search
                                 ? `${total} result${total !== 1 ? 's' : ''} for "${search}"`
                                 : `${total} book${total !== 1 ? 's' : ''} available`}
@@ -352,10 +352,10 @@ const BookStore = () => {
                 ) : books.length === 0 ? (
                     <div className="text-center py-24">
                         <div className="h-20 w-20 bg-[#FDF6F0] border-2 border-[#E6D5CC] rounded-3xl flex items-center justify-center mx-auto mb-4">
-                            <BookOpen className="h-10 w-10 text-[#C8A288]" />
+                            <BookOpen className="h-10 w-10 text-[#1E5C42]" />
                         </div>
-                        <h3 className="text-xl font-bold text-[#4A3B32] mb-2">No books found</h3>
-                        <p className="text-[#8a6a5c]">
+                        <h3 className="text-xl font-bold text-[#163628] mb-2">No books found</h3>
+                        <p className="text-[#5E5046]">
                             {search ? 'Try a different search term' : 'Be the first to share a book!'}
                         </p>
                     </div>
@@ -378,18 +378,18 @@ const BookStore = () => {
                         <button
                             onClick={() => setPage(p => Math.max(1, p - 1))}
                             disabled={page === 1}
-                            className="flex items-center gap-2 px-4 py-2 border border-[#E6D5CC] rounded-xl text-sm text-[#8a6a5c] hover:bg-[#FDF6F0] disabled:opacity-40 transition-colors"
+                            className="flex items-center gap-2 px-4 py-2 border border-[#E6D5CC] rounded-xl text-sm text-[#5E5046] hover:bg-[#FDF6F0] disabled:opacity-40 transition-colors"
                         >
                             <ChevronLeft className="h-4 w-4" />
                             Previous
                         </button>
-                        <span className="text-sm text-[#8a6a5c]">
+                        <span className="text-sm text-[#5E5046]">
                             Page {page} of {totalPages}
                         </span>
                         <button
                             onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                             disabled={page === totalPages}
-                            className="flex items-center gap-2 px-4 py-2 border border-[#E6D5CC] rounded-xl text-sm text-[#8a6a5c] hover:bg-[#FDF6F0] disabled:opacity-40 transition-colors"
+                            className="flex items-center gap-2 px-4 py-2 border border-[#E6D5CC] rounded-xl text-sm text-[#5E5046] hover:bg-[#FDF6F0] disabled:opacity-40 transition-colors"
                         >
                             Next
                             <ChevronRight className="h-4 w-4" />

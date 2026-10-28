@@ -31,7 +31,7 @@ const APP_SHELL = isAppShell();
 
 const PageLoader = () => (
     <div className="min-h-screen flex items-center justify-center bg-[#FDF6F0]">
-        <div className="h-12 w-12 rounded-2xl bg-[#C8A288] animate-pulse shadow-lg shadow-[#C8A288]/30" />
+        <div className="h-12 w-12 rounded-2xl bg-[#1E5C42] animate-pulse shadow-lg shadow-[#1E5C42]/30" />
     </div>
 );
 

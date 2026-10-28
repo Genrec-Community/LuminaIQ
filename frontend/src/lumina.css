@@ -1,0 +1,128 @@
+/*
+ * Lumina design layer: the same language as the luminaiq.fun landing site.
+ * Warm paper, forest ink, a lime highlighter. Motion verb: mark and settle.
+ *  - mark:   primary buttons fill with a lime highlighter swipe from the left;
+ *            the active nav item carries a lime band; text selection is lime.
+ *  - settle: surfaces ease in with one curve (--lumina-ease).
+ * Display type is Newsreader (italic carries the emotional word); text and UI
+ * are Atkinson Hyperlegible Next, so I, l and 1 never blur.
+ */
+
+:root {
+  --lumina-ink: #163628;
+  --lumina-deep: #0f271c;
+  --lumina-lime: #D3EE6A;
+  --lumina-paper: #FDF6F0;
+  --lumina-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  /* Accent for inline styles: forest on paper, lime on the dark forest */
+  --lumina-accent: #1E5C42;
+  --lumina-on-accent: #ffffff;
+}
+html.dark {
+  --lumina-accent: var(--dm-accent, #D3EE6A);
+  --lumina-on-accent: #0f271c;
+}
+
+/* Dark mode turns accent fills lime, so the text on them turns to ink */
+html.dark :is(.bg-\[\#1E5C42\], .bg-\[\#1E5C42\]\/90, .bg-\[\#163628\]):is(.text-white, .text-\[\#f4eee2\]),
+html.dark :is(.bg-\[\#1E5C42\], .bg-\[\#1E5C42\]\/90) :is(.text-white, svg),
+html.dark .from-\[\#1E5C42\].text-white { color: var(--lumina-deep) !important; }
+
+::selection { background: var(--lumina-lime); color: var(--lumina-ink); }
+
+/* Keyboard focus: an ink ring with a lime halo, visible on paper and forest */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--lumina-ink);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--lumina-lime) 70%, transparent);
+}
+html.dark :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline-color: var(--lumina-lime);
+  box-shadow: none;
+}
+
+/* ── Display type ─────────────────────────────────────────── */
+:where(h1, h2),
+.font-display {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+:where(h1, h2) em,
+.font-display em {
+  font-style: italic;
+  background: linear-gradient(transparent 62%, color-mix(in srgb, var(--lumina-lime) 85%, transparent) 62%, color-mix(in srgb, var(--lumina-lime) 85%, transparent) 92%, transparent 92%);
+  padding: 0 0.06em;
+}
+/* On a forest field the word turns lime instead of being marked */
+.text-white :where(h1, h2) em,
+:where(h1, h2).text-white em,
+html.dark :where(h1, h2) em,
+html.dark .font-display em { background: none; color: var(--lumina-lime); }
+
+/* A user-picked font style (Bookish, Coder, ...) wins over the display face */
+html[data-font] :where(h1, h2) { font-family: inherit; letter-spacing: normal; }
+
+/* ── Highlighter swipe on primary buttons ─────────────────── */
+:is(button, a, label).bg-\[\#163628\]:not(:disabled),
+:is(button, a, label).bg-\[\#1E5C42\]:not(:disabled) {
+  background-image: linear-gradient(var(--lumina-lime), var(--lumina-lime));
+  background-repeat: no-repeat;
+  background-position: left center;
+  background-size: 0% 100%;
+  transition: background-size 0.5s var(--lumina-ease), color 0.3s var(--lumina-ease), box-shadow 0.3s var(--lumina-ease), transform 0.3s var(--lumina-ease);
+}
+@media (hover: hover) {
+  :is(button, a, label).bg-\[\#163628\]:not(:disabled):not(.lumina-nav-active):hover,
+  :is(button, a, label).bg-\[\#1E5C42\]:not(:disabled):hover {
+    background-size: 100% 100%;
+    color: var(--lumina-ink) !important;
+  }
+  :is(button, a, label).bg-\[\#163628\]:not(:disabled):not(.lumina-nav-active):hover :is(.text-white, .text-white\/90, .text-white\/80, svg),
+  :is(button, a, label).bg-\[\#1E5C42\]:not(:disabled):hover :is(.text-white, .text-white\/90, .text-white\/80, svg) {
+    color: var(--lumina-ink) !important;
+  }
+}
+
+/* ── Active navigation: a lime band on the leading edge ───── */
+.lumina-nav-active { position: relative; }
+.lumina-nav-active::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 22%;
+  bottom: 22%;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--lumina-lime);
+  transform-origin: top;
+  animation: lumina-mark-y 0.45s var(--lumina-ease) both;
+}
+html.dark .lumina-nav-active::before { background: var(--lumina-deep); }
+
+/* Progress and meter fills in the accent read as a highlighter stroke */
+.lumina-mark { background: var(--lumina-lime) !important; }
+
+/* ── Settle: cards enter like paper set down ──────────────── */
+.lumina-settle { animation: lumina-settle 0.7s var(--lumina-ease) both; }
+
+@keyframes lumina-settle {
+  from { opacity: 0; transform: translateY(18px) rotate(0.8deg); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes lumina-mark-y {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lumina-settle, .lumina-nav-active::before { animation: none; }
+  :is(button, a, label).bg-\[\#163628\],
+  :is(button, a, label).bg-\[\#1E5C42\] { transition: none; }
+}
+
+/* Dark mode: accent gradients (Add Document, hero cards) glow lime too */
+html.dark .bg-gradient-to-r.from-\[\#1E5C42\],
+html.dark .bg-gradient-to-br.from-\[\#1E5C42\] { --tw-gradient-from: var(--dm-accent) !important; --tw-gradient-to: var(--dm-accent-hover) !important; }
+html.dark :is(.bg-gradient-to-r, .bg-gradient-to-br).from-\[\#1E5C42\] :is(.text-white, svg) { color: var(--lumina-deep) !important; }

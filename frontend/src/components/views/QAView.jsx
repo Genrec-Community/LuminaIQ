@@ -195,7 +195,7 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
             {onBack && !qaLoading && viewMode === 'list' && (
                 <button
                     onClick={onBack}
-                    className="flex items-center gap-2 px-4 py-2 mb-4 text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30 rounded-lg font-medium transition-colors"
+                    className="flex items-center gap-2 px-4 py-2 mb-4 text-[#5E5046] hover:text-[#163628] hover:bg-[#E6D5CC]/30 rounded-lg font-medium transition-colors"
                 >
                     <ArrowLeft className="h-4 w-4" />
                     Back to Chat
@@ -207,18 +207,18 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
                 <div className="h-full flex flex-col items-center justify-center animate-in fade-in duration-300">
                     <div className="relative mb-6">
                         <div className="h-20 w-20 border-4 border-[#E6D5CC] rounded-full"></div>
-                        <div className="absolute inset-0 h-20 w-20 border-4 border-[#C8A288] rounded-full border-t-transparent animate-spin"></div>
-                        <HelpCircle className="absolute inset-0 m-auto h-8 w-8 text-[#C8A288]" />
+                        <div className="absolute inset-0 h-20 w-20 border-4 border-[#1E5C42] rounded-full border-t-transparent animate-spin"></div>
+                        <HelpCircle className="absolute inset-0 m-auto h-8 w-8 text-[#1E5C42]" />
                     </div>
-                    <h3 className="text-xl font-bold text-[#4A3B32] mb-2">Loading Q&A</h3>
-                    <p className="text-[#8a6a5c] text-center max-w-xs">
+                    <h3 className="text-xl font-bold text-[#163628] mb-2">Loading Q&A</h3>
+                    <p className="text-[#5E5046] text-center max-w-xs">
                         {viewMode === 'viewing' && !qaTest ? 'Loading saved session...' : `Creating ${qaNumQuestions} ${answerSizeConfig[answerSize].label.toLowerCase()} questions about `}
                         {viewMode !== 'viewing' || qaTest ? <span className="font-semibold">{qaTopic || 'your documents'}</span> : null}
                     </p>
                     <div className="flex gap-1.5 mt-6">
-                        <div className="h-2 w-2 bg-[#C8A288] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                        <div className="h-2 w-2 bg-[#C8A288] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                        <div className="h-2 w-2 bg-[#C8A288] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                        <div className="h-2 w-2 bg-[#1E5C42] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                        <div className="h-2 w-2 bg-[#1E5C42] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                        <div className="h-2 w-2 bg-[#1E5C42] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                     </div>
                 </div>
             )}
@@ -228,12 +228,12 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
                 <div className="animate-in fade-in slide-in-from-bottom-4">
                     <div className="flex items-center justify-between mb-8">
                         <div>
-                            <h2 className="text-2xl font-bold text-[#4A3B32]">Q&A Sessions</h2>
-                            <p className="text-[#8a6a5c]">Generate study questions and reveal answers</p>
+                            <h2 className="text-2xl font-bold text-[#163628]">Q&A Sessions</h2>
+                            <p className="text-[#5E5046]">Generate study questions and reveal answers</p>
                         </div>
                         <button
                             onClick={() => setViewMode('form')}
-                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#C8A288] to-[#A08072] text-white rounded-lg hover:opacity-90 transition-opacity shadow-sm"
+                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#1E5C42] to-[#163628] text-white rounded-lg hover:opacity-90 transition-opacity shadow-sm"
                         >
                             <Plus className="h-4 w-4" />
                             New Q&A
@@ -242,18 +242,18 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
 
                     {savedLoading ? (
                         <div className="flex items-center justify-center py-16">
-                            <Loader2 className="h-8 w-8 text-[#C8A288] animate-spin" />
+                            <Loader2 className="h-8 w-8 text-[#1E5C42] animate-spin" />
                         </div>
                     ) : savedTests.length === 0 ? (
                         <div className="text-center py-16">
                             <div className="h-20 w-20 bg-[#FDF6F0] rounded-full flex items-center justify-center mx-auto mb-6">
-                                <HelpCircle className="h-10 w-10 text-[#C8A288]" />
+                                <HelpCircle className="h-10 w-10 text-[#1E5C42]" />
                             </div>
-                            <h3 className="text-xl font-bold text-[#4A3B32] mb-2">No Q&A Sessions Yet</h3>
-                            <p className="text-[#8a6a5c] mb-6">Generate your first set of study questions</p>
+                            <h3 className="text-xl font-bold text-[#163628] mb-2">No Q&A Sessions Yet</h3>
+                            <p className="text-[#5E5046] mb-6">Generate your first set of study questions</p>
                             <button
                                 onClick={() => setViewMode('form')}
-                                className="px-6 py-3 bg-gradient-to-r from-[#C8A288] to-[#A08072] text-white rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2 mx-auto"
+                                className="px-6 py-3 bg-gradient-to-r from-[#1E5C42] to-[#163628] text-white rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2 mx-auto"
                             >
                                 <HelpCircle className="h-5 w-5" />
                                 Generate Q&A
@@ -269,8 +269,8 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
                                 >
                                     <div className="flex items-start justify-between mb-3">
                                         <div className="flex-1 min-w-0">
-                                            <h3 className="font-bold text-[#4A3B32] mb-1 truncate">{test.topic || 'General Q&A'}</h3>
-                                            <div className="flex items-center gap-1.5 text-xs text-[#8a6a5c]">
+                                            <h3 className="font-bold text-[#163628] mb-1 truncate">{test.topic || 'General Q&A'}</h3>
+                                            <div className="flex items-center gap-1.5 text-xs text-[#5E5046]">
                                                 <Clock className="h-3 w-3" />
                                                 {formatDate(test.created_at)}
                                             </div>
@@ -291,7 +291,7 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
                                     )}
                                     <button
                                         onClick={(e) => { e.stopPropagation(); handleViewSavedTest(test.id); }}
-                                        className="w-full py-2 bg-[#C8A288] text-white rounded-lg hover:bg-[#B08B72] transition-colors text-sm font-medium flex items-center justify-center gap-1.5"
+                                        className="w-full py-2 bg-[#1E5C42] text-white rounded-lg hover:bg-[#163628] transition-colors text-sm font-medium flex items-center justify-center gap-1.5"
                                     >
                                         <Eye className="h-3.5 w-3.5" />
                                         View
@@ -308,22 +308,22 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
                 <div className="text-center py-12 animate-in fade-in slide-in-from-bottom-4">
                     <button
                         onClick={() => setViewMode('list')}
-                        className="flex items-center gap-2 px-4 py-2 mb-4 text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30 rounded-lg font-medium transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 mb-4 text-[#5E5046] hover:text-[#163628] hover:bg-[#E6D5CC]/30 rounded-lg font-medium transition-colors"
                     >
                         <ArrowLeft className="h-4 w-4" />
                         Back to Saved
                     </button>
 
                     <div className="h-20 w-20 bg-[#FDF6F0] rounded-full flex items-center justify-center mx-auto mb-6">
-                        <HelpCircle className="h-10 w-10 text-[#C8A288]" />
+                        <HelpCircle className="h-10 w-10 text-[#1E5C42]" />
                     </div>
-                    <h3 className="text-2xl font-bold mb-2 text-[#4A3B32]">Q&A Generation</h3>
-                    <p className="text-[#8a6a5c] mb-8">Generate study questions and reveal answers one by one.</p>
+                    <h3 className="text-2xl font-bold mb-2 text-[#163628]">Q&A Generation</h3>
+                    <p className="text-[#5E5046] mb-8">Generate study questions and reveal answers one by one.</p>
 
                     <div className="max-w-md mx-auto space-y-5 bg-white p-6 md:p-8 rounded-3xl border border-[#E6D5CC] shadow-sm text-left">
                         {/* Topic Selection */}
                         <div>
-                            <label className="block text-sm font-bold mb-2 text-[#4A3B32] uppercase tracking-wide opacity-80">Topic</label>
+                            <label className="block text-sm font-bold mb-2 text-[#163628] uppercase tracking-wide opacity-80">Topic</label>
                             {availableTopics.length > 0 ? (
                                 <div className="relative">
                                     <select
@@ -334,7 +334,7 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
                                             if (val !== '__custom__') setQaTopic(val);
                                             else setQaTopic('');
                                         }}
-                                        className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#C8A288] text-[#4A3B32] font-medium appearance-none"
+                                        className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#1E5C42] text-[#163628] font-medium appearance-none"
                                     >
                                         <option value="">Select a topic...</option>
                                         {availableTopics.map((topic, idx) => (
@@ -342,14 +342,14 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
                                         ))}
                                         <option value="__custom__">Custom Topic...</option>
                                     </select>
-                                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8a6a5c] pointer-events-none" />
+                                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#5E5046] pointer-events-none" />
                                     {qaTopicSelection === '__custom__' && (
                                         <input
                                             type="text"
                                             value={qaTopic}
                                             onChange={(e) => setQaTopic(e.target.value)}
                                             placeholder="Enter custom topic..."
-                                            className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#C8A288] mt-3 animate-in fade-in"
+                                            className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#1E5C42] mt-3 animate-in fade-in"
                                             autoFocus
                                         />
                                     )}
@@ -360,14 +360,14 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
                                     value={qaTopic}
                                     onChange={(e) => setQaTopic(e.target.value)}
                                     placeholder="Enter custom topic..."
-                                    className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#C8A288]"
+                                    className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#1E5C42]"
                                 />
                             )}
                         </div>
 
                         {/* Answer Size Selection */}
                         <div>
-                            <label className="block text-sm font-bold mb-2 text-[#4A3B32] uppercase tracking-wide opacity-80">Answer Size</label>
+                            <label className="block text-sm font-bold mb-2 text-[#163628] uppercase tracking-wide opacity-80">Answer Size</label>
                             <div className="grid grid-cols-3 gap-2">
                                 {Object.entries(answerSizeConfig).map(([size, config]) => {
                                     const Icon = config.icon;
@@ -379,25 +379,25 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
                                             onClick={() => handleAnswerSizeChange(size)}
                                             className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center gap-1 ${
                                                 isSelected
-                                                    ? 'border-[#C8A288] bg-[#FDF6F0] text-[#4A3B32]'
-                                                    : 'border-transparent bg-gray-50 text-[#8a6a5c] hover:bg-gray-100'
+                                                    ? 'border-[#1E5C42] bg-[#FDF6F0] text-[#163628]'
+                                                    : 'border-transparent bg-gray-50 text-[#5E5046] hover:bg-gray-100'
                                             }`}
                                         >
-                                            <Icon className={`h-5 w-5 ${isSelected ? 'text-[#C8A288]' : ''}`} />
+                                            <Icon className={`h-5 w-5 ${isSelected ? 'text-[#1E5C42]' : ''}`} />
                                             <span className="font-bold text-sm">{config.label}</span>
                                             <span className="text-xs opacity-70">Max {config.maxQuestions}</span>
                                         </button>
                                     );
                                 })}
                             </div>
-                            <p className="text-xs text-[#8a6a5c] mt-2 text-center">
+                            <p className="text-xs text-[#5E5046] mt-2 text-center">
                                 {answerSizeConfig[answerSize].description}
                             </p>
                         </div>
 
                         {/* Number of Questions */}
                         <div>
-                            <label className="block text-sm font-bold mb-2 text-[#4A3B32] uppercase tracking-wide opacity-80">
+                            <label className="block text-sm font-bold mb-2 text-[#163628] uppercase tracking-wide opacity-80">
                                 Number of Questions
                                 <span className="text-xs font-normal ml-2 opacity-60">
                                     (max {answerSizeConfig[answerSize].maxQuestions} for {answerSizeConfig[answerSize].label.toLowerCase()} answers)
@@ -407,20 +407,20 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
                                 <select
                                     value={qaNumQuestions}
                                     onChange={(e) => setQaNumQuestions(parseInt(e.target.value))}
-                                    className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#C8A288] text-[#4A3B32] font-medium appearance-none"
+                                    className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#1E5C42] text-[#163628] font-medium appearance-none"
                                 >
                                     {getQuestionOptions().map(num => (
                                         <option key={num} value={num}>{num} Questions</option>
                                     ))}
                                 </select>
-                                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8a6a5c] pointer-events-none" />
+                                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#5E5046] pointer-events-none" />
                             </div>
                         </div>
 
                         <button
                             onClick={handleGenerateQA}
                             disabled={qaLoading}
-                            className="w-full py-4 bg-[#C8A288] text-white rounded-xl hover:bg-[#B08B72] font-bold shadow-lg shadow-[#C8A288]/20 disabled:opacity-50 transition-colors mt-4 flex items-center justify-center gap-2"
+                            className="w-full py-4 bg-[#1E5C42] text-white rounded-xl hover:bg-[#163628] font-bold shadow-lg shadow-[#1E5C42]/20 disabled:opacity-50 transition-colors mt-4 flex items-center justify-center gap-2"
                         >
                             {qaLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <HelpCircle className="h-5 w-5" />}
                             {qaLoading ? 'Generating...' : 'Generate Questions'}
@@ -436,32 +436,32 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
                         <div>
                             <button
                                 onClick={() => { setQaTest(null); setViewMode('list'); }}
-                                className="flex items-center gap-1.5 text-sm text-[#8a6a5c] hover:text-[#4A3B32] mb-2 transition-colors"
+                                className="flex items-center gap-1.5 text-sm text-[#5E5046] hover:text-[#163628] mb-2 transition-colors"
                             >
                                 <ArrowLeft className="h-3.5 w-3.5" />
                                 Back to Saved
                             </button>
-                            <h3 className="text-2xl font-bold text-[#4A3B32]">{qaTest.topic || 'General'} Q&A</h3>
-                            <p className="text-sm text-[#8a6a5c]">
+                            <h3 className="text-2xl font-bold text-[#163628]">{qaTest.topic || 'General'} Q&A</h3>
+                            <p className="text-sm text-[#5E5046]">
                                 {qaTest.questions?.length} questions
                             </p>
                         </div>
                         <div className="flex gap-2">
                             <button
                                 onClick={revealAll}
-                                className="px-3 py-1.5 text-sm border border-[#E6D5CC] rounded-lg hover:bg-[#FDF6F0] text-[#8a6a5c] font-medium transition-colors"
+                                className="px-3 py-1.5 text-sm border border-[#E6D5CC] rounded-lg hover:bg-[#FDF6F0] text-[#5E5046] font-medium transition-colors"
                             >
                                 Reveal All
                             </button>
                             <button
                                 onClick={hideAll}
-                                className="px-3 py-1.5 text-sm border border-[#E6D5CC] rounded-lg hover:bg-[#FDF6F0] text-[#8a6a5c] font-medium transition-colors"
+                                className="px-3 py-1.5 text-sm border border-[#E6D5CC] rounded-lg hover:bg-[#FDF6F0] text-[#5E5046] font-medium transition-colors"
                             >
                                 Hide All
                             </button>
                             <button
                                 onClick={() => { setQaTest(null); setViewMode('form'); }}
-                                className="px-4 py-1.5 text-sm bg-[#C8A288] text-white rounded-lg hover:bg-[#B08B72] font-medium transition-colors"
+                                className="px-4 py-1.5 text-sm bg-[#1E5C42] text-white rounded-lg hover:bg-[#163628] font-medium transition-colors"
                             >
                                 New Q&A
                             </button>
@@ -475,22 +475,22 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
                                 className="w-full p-6 text-left flex justify-between items-center gap-4 hover:bg-gray-50 transition-colors group"
                             >
                                 <div className="flex gap-4">
-                                    <span className="flex-shrink-0 h-8 w-8 bg-[#FDF6F0] text-[#C8A288] rounded-full flex items-center justify-center font-bold text-sm">
+                                    <span className="flex-shrink-0 h-8 w-8 bg-[#FDF6F0] text-[#1E5C42] rounded-full flex items-center justify-center font-bold text-sm">
                                         Q{idx + 1}
                                     </span>
-                                    <h4 className="font-bold text-lg text-[#4A3B32] group-hover:text-[#C8A288] transition-colors">
+                                    <h4 className="font-bold text-lg text-[#163628] group-hover:text-[#1E5C42] transition-colors">
                                         {pair.question}
                                     </h4>
                                 </div>
                                 <div className={`transform transition-transform duration-300 ${qaRevealed[idx] ? 'rotate-90' : ''}`}>
-                                    <ChevronRight className="h-5 w-5 text-[#8a6a5c]" />
+                                    <ChevronRight className="h-5 w-5 text-[#5E5046]" />
                                 </div>
                             </button>
 
                             {qaRevealed[idx] && (
                                 <div className="px-6 pb-6 pt-0 animate-in fade-in slide-in-from-top-2">
                                     <div className="pl-12">
-                                        <div className="p-4 bg-[#FDF6F0] rounded-xl text-[#4A3B32] leading-relaxed border border-[#E6D5CC] prose prose-sm max-w-none overflow-x-auto">
+                                        <div className="p-4 bg-[#FDF6F0] rounded-xl text-[#163628] leading-relaxed border border-[#E6D5CC] prose prose-sm max-w-none overflow-x-auto">
                                             <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                                 {pair.answer}
                                             </ReactMarkdown>

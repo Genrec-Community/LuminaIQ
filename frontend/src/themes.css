@@ -16,71 +16,71 @@ html[data-accent] {
   --th-accent-hover: color-mix(in srgb, var(--th-accent) 82%, black);
   --th-accent-soft: color-mix(in srgb, var(--th-accent) 12%, transparent);
 }
-html[data-accent] .bg-\[\#C8A288\],
-html[data-accent] .hover\:bg-\[\#C8A288\]:hover,
-html[data-accent] .group:hover .group-hover\:bg-\[\#C8A288\],
-html[data-accent] .prose-th\:bg-\[\#C8A288\] th,
-html[data-accent] .selection\:bg-\[\#C8A288\] ::selection { background-color: var(--th-accent) !important; }
-html[data-accent] .hover\:bg-\[\#B08B72\]:hover,
-html[data-accent] .hover\:bg-\[\#A08072\]:hover,
-html[data-accent] .bg-\[\#a08072\] { background-color: var(--th-accent-hover) !important; }
-html[data-accent] .bg-\[\#C8A288\]\/90 { background-color: color-mix(in srgb, var(--th-accent) 90%, transparent) !important; }
-html[data-accent] .bg-\[\#C8A288\]\/70 { background-color: color-mix(in srgb, var(--th-accent) 70%, transparent) !important; }
-html[data-accent] .bg-\[\#C8A288\]\/20,
-html[data-accent] .hover\:bg-\[\#C8A288\]\/20:hover { background-color: color-mix(in srgb, var(--th-accent) 20%, transparent) !important; }
-html[data-accent] .bg-\[\#C8A288\]\/15 { background-color: color-mix(in srgb, var(--th-accent) 15%, transparent) !important; }
-html[data-accent] .bg-\[\#C8A288\]\/10,
-html[data-accent] .group:hover .group-hover\:bg-\[\#C8A288\]\/10,
-html[data-accent] .bg-\[\#C8A288\]\/5 { background-color: var(--th-accent-soft) !important; }
+html[data-accent] .bg-\[\#1E5C42\],
+html[data-accent] .hover\:bg-\[\#1E5C42\]:hover,
+html[data-accent] .group:hover .group-hover\:bg-\[\#1E5C42\],
+html[data-accent] .prose-th\:bg-\[\#1E5C42\] th,
+html[data-accent] .selection\:bg-\[\#1E5C42\] ::selection { background-color: var(--th-accent) !important; }
+html[data-accent] .hover\:bg-\[\#163628\]:hover,
+html[data-accent] .hover\:bg-\[\#6B5F55\]:hover,
+html[data-accent] .bg-\[\#6B5F55\] { background-color: var(--th-accent-hover) !important; }
+html[data-accent] .bg-\[\#1E5C42\]\/90 { background-color: color-mix(in srgb, var(--th-accent) 90%, transparent) !important; }
+html[data-accent] .bg-\[\#1E5C42\]\/70 { background-color: color-mix(in srgb, var(--th-accent) 70%, transparent) !important; }
+html[data-accent] .bg-\[\#1E5C42\]\/20,
+html[data-accent] .hover\:bg-\[\#1E5C42\]\/20:hover { background-color: color-mix(in srgb, var(--th-accent) 20%, transparent) !important; }
+html[data-accent] .bg-\[\#1E5C42\]\/15 { background-color: color-mix(in srgb, var(--th-accent) 15%, transparent) !important; }
+html[data-accent] .bg-\[\#1E5C42\]\/10,
+html[data-accent] .group:hover .group-hover\:bg-\[\#1E5C42\]\/10,
+html[data-accent] .bg-\[\#1E5C42\]\/5 { background-color: var(--th-accent-soft) !important; }
 
-html[data-accent] .text-\[\#C8A288\],
-html[data-accent] .hover\:text-\[\#C8A288\]:hover,
-html[data-accent] .group:hover .group-hover\:text-\[\#C8A288\],
-html[data-accent] .group:focus-within .group-focus-within\:text-\[\#C8A288\],
-html[data-accent] .prose-a\:text-\[\#C8A288\] a,
-html[data-accent] .prose-code\:text-\[\#C8A288\] code { color: var(--th-accent) !important; }
-html[data-accent] .text-\[\#C8A288\]\/60 { color: color-mix(in srgb, var(--th-accent) 60%, transparent) !important; }
-html[data-accent] .hover\:text-\[\#B08B72\]:hover,
-html[data-accent] .hover\:text-\[\#A08072\]:hover,
-html[data-accent] .text-\[\#a08072\] { color: var(--th-accent-hover) !important; }
+html[data-accent] .text-\[\#1E5C42\],
+html[data-accent] .hover\:text-\[\#1E5C42\]:hover,
+html[data-accent] .group:hover .group-hover\:text-\[\#1E5C42\],
+html[data-accent] .group:focus-within .group-focus-within\:text-\[\#1E5C42\],
+html[data-accent] .prose-a\:text-\[\#1E5C42\] a,
+html[data-accent] .prose-code\:text-\[\#1E5C42\] code { color: var(--th-accent) !important; }
+html[data-accent] .text-\[\#1E5C42\]\/60 { color: color-mix(in srgb, var(--th-accent) 60%, transparent) !important; }
+html[data-accent] .hover\:text-\[\#163628\]:hover,
+html[data-accent] .hover\:text-\[\#6B5F55\]:hover,
+html[data-accent] .text-\[\#6B5F55\] { color: var(--th-accent-hover) !important; }
 
-html[data-accent] .border-\[\#C8A288\],
-html[data-accent] .hover\:border-\[\#C8A288\]:hover,
-html[data-accent] .focus\:border-\[\#C8A288\]:focus,
-html[data-accent] .group:hover .group-hover\:border-\[\#C8A288\],
-html[data-accent] .prose-blockquote\:border-\[\#C8A288\] blockquote { border-color: var(--th-accent) !important; }
-html[data-accent] .border-\[\#C8A288\]\/60,
-html[data-accent] .hover\:border-\[\#C8A288\]\/60:hover,
-html[data-accent] .hover\:border-\[\#C8A288\]\/50:hover,
-html[data-accent] .hover\:border-\[\#C8A288\]\/40:hover,
-html[data-accent] .border-\[\#C8A288\]\/40 { border-color: color-mix(in srgb, var(--th-accent) 55%, transparent) !important; }
+html[data-accent] .border-\[\#1E5C42\],
+html[data-accent] .hover\:border-\[\#1E5C42\]:hover,
+html[data-accent] .focus\:border-\[\#1E5C42\]:focus,
+html[data-accent] .group:hover .group-hover\:border-\[\#1E5C42\],
+html[data-accent] .prose-blockquote\:border-\[\#1E5C42\] blockquote { border-color: var(--th-accent) !important; }
+html[data-accent] .border-\[\#1E5C42\]\/60,
+html[data-accent] .hover\:border-\[\#1E5C42\]\/60:hover,
+html[data-accent] .hover\:border-\[\#1E5C42\]\/50:hover,
+html[data-accent] .hover\:border-\[\#1E5C42\]\/40:hover,
+html[data-accent] .border-\[\#1E5C42\]\/40 { border-color: color-mix(in srgb, var(--th-accent) 55%, transparent) !important; }
 
-html[data-accent] .focus\:ring-\[\#C8A288\]:focus,
-html[data-accent] .ring-\[\#C8A288\] { --tw-ring-color: var(--th-accent) !important; }
-html[data-accent] .focus\:ring-\[\#C8A288\]\/30:focus,
-html[data-accent] .focus\:ring-\[\#C8A288\]\/10:focus,
-html[data-accent] .ring-\[\#C8A288\]\/40,
-html[data-accent] .hover\:ring-\[\#C8A288\]\/40:hover { --tw-ring-color: color-mix(in srgb, var(--th-accent) 35%, transparent) !important; }
+html[data-accent] .focus\:ring-\[\#1E5C42\]:focus,
+html[data-accent] .ring-\[\#1E5C42\] { --tw-ring-color: var(--th-accent) !important; }
+html[data-accent] .focus\:ring-\[\#1E5C42\]\/30:focus,
+html[data-accent] .focus\:ring-\[\#1E5C42\]\/10:focus,
+html[data-accent] .ring-\[\#1E5C42\]\/40,
+html[data-accent] .hover\:ring-\[\#1E5C42\]\/40:hover { --tw-ring-color: color-mix(in srgb, var(--th-accent) 35%, transparent) !important; }
 
-html[data-accent] .shadow-\[\#C8A288\]\/30,
-html[data-accent] .shadow-\[\#C8A288\]\/20,
-html[data-accent] .shadow-\[\#C8A288\]\/10,
-html[data-accent] .hover\:shadow-\[\#C8A288\]\/25:hover,
-html[data-accent] .hover\:shadow-\[\#C8A288\]\/10:hover { --tw-shadow-color: color-mix(in srgb, var(--th-accent) 25%, transparent) !important; }
+html[data-accent] .shadow-\[\#1E5C42\]\/30,
+html[data-accent] .shadow-\[\#1E5C42\]\/20,
+html[data-accent] .shadow-\[\#1E5C42\]\/10,
+html[data-accent] .hover\:shadow-\[\#1E5C42\]\/25:hover,
+html[data-accent] .hover\:shadow-\[\#1E5C42\]\/10:hover { --tw-shadow-color: color-mix(in srgb, var(--th-accent) 25%, transparent) !important; }
 
 /* Gradients built from the brand colours */
-html[data-accent] .from-\[\#C8A288\] { --tw-gradient-from: var(--th-accent) !important; }
-html[data-accent] .from-\[\#C8A288\]\/20,
-html[data-accent] .from-\[\#C8A288\]\/15 { --tw-gradient-from: color-mix(in srgb, var(--th-accent) 18%, transparent) !important; }
-html[data-accent] .via-\[\#B08B72\] { --tw-gradient-via: var(--th-accent-hover) !important; }
-html[data-accent] .to-\[\#A08072\],
-html[data-accent] .to-\[\#B08B72\],
-html[data-accent] .to-\[\#8a6a5c\],
-html[data-accent] .to-\[\#a8824a\] { --tw-gradient-to: var(--th-accent-hover) !important; }
-html[data-accent] .to-\[\#e8c9a8\],
-html[data-accent] .to-\[\#e0b48a\] { --tw-gradient-to: color-mix(in srgb, var(--th-accent) 55%, white) !important; }
-html[data-accent] .to-\[\#B08B72\]\/10,
-html[data-accent] .to-\[\#B08B72\]\/5 { --tw-gradient-to: color-mix(in srgb, var(--th-accent) 8%, transparent) !important; }
+html[data-accent] .from-\[\#1E5C42\] { --tw-gradient-from: var(--th-accent) !important; }
+html[data-accent] .from-\[\#1E5C42\]\/20,
+html[data-accent] .from-\[\#1E5C42\]\/15 { --tw-gradient-from: color-mix(in srgb, var(--th-accent) 18%, transparent) !important; }
+html[data-accent] .via-\[\#163628\] { --tw-gradient-via: var(--th-accent-hover) !important; }
+html[data-accent] .to-\[\#6B5F55\],
+html[data-accent] .to-\[\#163628\],
+html[data-accent] .to-\[\#5E5046\],
+html[data-accent] .to-\[\#B9D94F\] { --tw-gradient-to: var(--th-accent-hover) !important; }
+html[data-accent] .to-\[\#D3EE6A\],
+html[data-accent] .to-\[\#C5E35A\] { --tw-gradient-to: color-mix(in srgb, var(--th-accent) 55%, white) !important; }
+html[data-accent] .to-\[\#163628\]\/10,
+html[data-accent] .to-\[\#163628\]\/5 { --tw-gradient-to: color-mix(in srgb, var(--th-accent) 8%, transparent) !important; }
 
 html[data-accent] .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--th-accent) !important; }
 
@@ -131,20 +131,20 @@ html[data-theme][data-theme-mode="light"] .divide-\[\#E6D5CC\] > * + *,
 html[data-theme][data-theme-mode="light"] .prose-td\:border-\[\#E6D5CC\] td,
 html[data-theme][data-theme-mode="light"] .prose-pre\:border-\[\#E6D5CC\] pre { border-color: var(--th-border) !important; }
 
-html[data-theme][data-theme-mode="light"] .text-\[\#4A3B32\],
-html[data-theme][data-theme-mode="light"] .hover\:text-\[\#4A3B32\]:hover,
-html[data-theme][data-theme-mode="light"] .prose-headings\:text-\[\#4A3B32\] :is(h1, h2, h3, h4),
-html[data-theme][data-theme-mode="light"] .prose-strong\:text-\[\#4A3B32\] strong { color: var(--th-text) !important; }
-html[data-theme][data-theme-mode="light"] .text-\[\#8a6a5c\],
-html[data-theme][data-theme-mode="light"] .text-\[\#5a4a42\],
-html[data-theme][data-theme-mode="light"] .text-\[\#8a6a5c\]\/80,
-html[data-theme][data-theme-mode="light"] .prose-blockquote\:text-\[\#8a6a5c\] blockquote { color: var(--th-muted) !important; }
-html[data-theme][data-theme-mode="light"] .text-\[\#8a6a5c\]\/60,
-html[data-theme][data-theme-mode="light"] .text-\[\#8a6a5c\]\/50 { color: color-mix(in srgb, var(--th-muted) 60%, transparent) !important; }
+html[data-theme][data-theme-mode="light"] .text-\[\#163628\],
+html[data-theme][data-theme-mode="light"] .hover\:text-\[\#163628\]:hover,
+html[data-theme][data-theme-mode="light"] .prose-headings\:text-\[\#163628\] :is(h1, h2, h3, h4),
+html[data-theme][data-theme-mode="light"] .prose-strong\:text-\[\#163628\] strong { color: var(--th-text) !important; }
+html[data-theme][data-theme-mode="light"] .text-\[\#5E5046\],
+html[data-theme][data-theme-mode="light"] .text-\[\#2B3F35\],
+html[data-theme][data-theme-mode="light"] .text-\[\#5E5046\]\/80,
+html[data-theme][data-theme-mode="light"] .prose-blockquote\:text-\[\#5E5046\] blockquote { color: var(--th-muted) !important; }
+html[data-theme][data-theme-mode="light"] .text-\[\#5E5046\]\/60,
+html[data-theme][data-theme-mode="light"] .text-\[\#5E5046\]\/50 { color: color-mix(in srgb, var(--th-muted) 60%, transparent) !important; }
 html[data-theme][data-theme-mode="light"] .text-\[\#E6D5CC\] { color: var(--th-border) !important; }
-html[data-theme][data-theme-mode="light"] .bg-\[\#4A3B32\],
-html[data-theme][data-theme-mode="light"] .hover\:bg-\[\#4A3B32\]:hover { background-color: var(--th-text) !important; }
-html[data-theme][data-theme-mode="light"] .placeholder-\[\#8a6a5c\]::placeholder { color: var(--th-muted) !important; }
+html[data-theme][data-theme-mode="light"] .bg-\[\#163628\],
+html[data-theme][data-theme-mode="light"] .hover\:bg-\[\#163628\]:hover { background-color: var(--th-text) !important; }
+html[data-theme][data-theme-mode="light"] .placeholder-\[\#5E5046\]::placeholder { color: var(--th-muted) !important; }
 html[data-theme][data-theme-mode="light"] .prose { color: var(--th-text); }
 html[data-theme][data-theme-mode="light"] .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--th-border) !important; }
 
@@ -157,17 +157,17 @@ html[data-accent] .prose thead th,
 html[data-accent] .markdown-content thead th { background: var(--th-accent); border-color: var(--th-accent-hover); }
 
 /* ── Dark themes: warm-gold dark-mode details used in the workspace ── */
-html.dark[data-theme] .text-\[\#e8b870\],
-html.dark[data-theme] .hover\:text-\[\#e8c898\]:hover,
-html.dark[data-theme] .text-\[\#c4a882\],
-html.dark[data-theme] .text-\[\#e8d8c0\],
-html.dark[data-theme] .hover\:text-\[\#c09060\]:hover { color: var(--dm-accent) !important; }
-html.dark[data-theme] .text-\[\#a08060\],
-html.dark[data-theme] .text-\[\#9a7858\],
-html.dark[data-theme] .text-\[\#9b7055\],
-html.dark[data-theme] .text-\[\#7a6050\] { color: var(--dm-text-secondary) !important; }
-html.dark[data-theme] .bg-\[\#2e2010\]\/80 { background-color: var(--dm-accent-bg) !important; }
-html.dark[data-theme] .hover\:bg-\[\#2e2318\]\/60:hover,
-html.dark[data-theme] .hover\:bg-\[\#2e2318\]\/80:hover,
-html.dark[data-theme] .hover\:bg-\[\#2e2520\]:hover { background-color: var(--dm-surface-hover) !important; }
-html.dark[data-theme] .border-\[\#5a3a20\] { border-color: var(--dm-border-strong) !important; }
+html.dark[data-theme] .text-\[\#D3EE6A\],
+html.dark[data-theme] .hover\:text-\[\#E0F590\]:hover,
+html.dark[data-theme] .text-\[\#B7C2B4\],
+html.dark[data-theme] .text-\[\#E9EFD6\],
+html.dark[data-theme] .hover\:text-\[\#D3EE6A\]:hover { color: var(--dm-accent) !important; }
+html.dark[data-theme] .text-\[\#8FA093\],
+html.dark[data-theme] .text-\[\#8FA093\],
+html.dark[data-theme] .text-\[\#8FA093\],
+html.dark[data-theme] .text-\[\#7F8F82\] { color: var(--dm-text-secondary) !important; }
+html.dark[data-theme] .bg-\[\#1E3A16\]\/80 { background-color: var(--dm-accent-bg) !important; }
+html.dark[data-theme] .hover\:bg-\[\#20382B\]\/60:hover,
+html.dark[data-theme] .hover\:bg-\[\#20382B\]\/80:hover,
+html.dark[data-theme] .hover\:bg-\[\#20382B\]:hover { background-color: var(--dm-surface-hover) !important; }
+html.dark[data-theme] .border-\[\#2C4A38\] { border-color: var(--dm-border-strong) !important; }

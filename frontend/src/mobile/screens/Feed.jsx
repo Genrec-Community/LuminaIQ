@@ -54,7 +54,7 @@ const Md = ({ children, className = '' }) => (
 
 const bg = (projectId) => {
     const [a, b] = coverFor(projectId || '');
-    return `radial-gradient(120% 70% at 85% 0%, ${a}cc 0%, transparent 60%), radial-gradient(90% 60% at 0% 100%, ${b}aa 0%, transparent 65%), #120c08`;
+    return `radial-gradient(120% 70% at 85% 0%, ${a}cc 0%, transparent 60%), radial-gradient(90% 60% at 0% 100%, ${b}aa 0%, transparent 65%), #08120D`;
 };
 
 /** Right-hand actions, Reels style. */
@@ -219,7 +219,7 @@ const InfoCard = ({ emoji, title, body, action, onAction, icon: Icon }) => (
         <h2 className="mt-4 text-[26px] font-extrabold leading-tight">{title}</h2>
         <p className="mt-2 max-w-xs text-[15px] text-white/75">{body}</p>
         {action && (
-            <button onClick={() => { tap('medium'); onAction?.(); }} className="m-pressable mt-7 flex h-13 items-center gap-2 rounded-2xl m-white px-6 py-3.5 text-[15px] font-bold text-[#1d140e]">
+            <button onClick={() => { tap('medium'); onAction?.(); }} className="m-pressable mt-7 flex h-13 items-center gap-2 rounded-2xl m-white px-6 py-3.5 text-[15px] font-bold text-[#0F1D16]">
                 {Icon && <Icon className="h-5 w-5" />} {action}
             </button>
         )}
@@ -274,7 +274,7 @@ const Feed = () => {
 
     const pool = useMemo(() => (filter === 'all' ? books : books.filter((b) => b.id === filter)), [books, filter]);
 
-    useEffect(() => { setStatusBar(true, '#120c08'); return () => setStatusBar(settings.darkMode, null); }, [settings.darkMode]);
+    useEffect(() => { setStatusBar(true, '#08120D'); return () => setStatusBar(settings.darkMode, null); }, [settings.darkMode]);
 
     const activeRef = useRef(0);
     activeRef.current = active;
@@ -508,7 +508,7 @@ const Feed = () => {
     }
 
     return (
-        <div className="m-app fixed inset-0 overflow-hidden" style={{ background: '#120c08' }}>
+        <div className="m-app fixed inset-0 overflow-hidden" style={{ background: '#08120D' }}>
             {/* Top bar */}
             <div className="m-safe-top pointer-events-none absolute inset-x-0 top-0 z-20" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.5), transparent)' }}>
                 <div className="pointer-events-auto flex h-14 items-center gap-2 px-4 text-white">
@@ -531,7 +531,7 @@ const Feed = () => {
             <AnimatePresence>
                 {toast && (
                     <motion.div key={toast.id} initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -20, opacity: 0 }}
-                        className="absolute left-1/2 top-[calc(var(--m-safe-top)+64px)] z-30 -translate-x-1/2 rounded-full m-white px-4 py-2 text-[13px] font-bold text-[#1d140e] shadow-xl">
+                        className="absolute left-1/2 top-[calc(var(--m-safe-top)+64px)] z-30 -translate-x-1/2 rounded-full m-white px-4 py-2 text-[13px] font-bold text-[#0F1D16] shadow-xl">
                         {toast.text}
                     </motion.div>
                 )}

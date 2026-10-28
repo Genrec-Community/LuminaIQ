@@ -5,14 +5,15 @@
     --m-surface: var(--th-surface, #ffffff);
     --m-soft: var(--th-alt, #F6EBE2);
     --m-border: var(--th-border, #EEDFD5);
-    --m-text: var(--th-text, #4A3B32);
-    --m-muted: var(--th-muted, #8a6a5c);
-    --m-accent: var(--th-accent, #C8A288);
-    --m-accent-deep: color-mix(in srgb, var(--m-accent) 78%, #3a2418);
+    --m-text: var(--th-text, #163628);
+    --m-muted: var(--th-muted, #5E5046);
+    --m-accent: var(--th-accent, #1E5C42);
+    --m-accent-deep: color-mix(in srgb, var(--m-accent) 78%, #0a1a12);
+    --m-mark: #D3EE6A;
     /* Accent for text on light backgrounds: darker, so it stays readable (WCAG AA) */
-    --m-accent-text: color-mix(in srgb, var(--m-accent) 55%, #3a2418);
+    --m-accent-text: color-mix(in srgb, var(--m-accent) 80%, #0a1a12);
     --m-on-accent: #ffffff;
-    --m-shadow: 0 10px 30px -12px rgba(74, 59, 50, 0.28);
+    --m-shadow: 0 10px 30px -12px rgba(22, 54, 40, 0.22);
     --m-tabbar-h: 64px;
     --m-safe-top: var(--sat);
     --m-safe-bottom: var(--sab);
@@ -31,14 +32,14 @@
 }
 
 html.dark .m-app {
-    --m-bg: var(--dm-bg, #1c1814);
-    --m-surface: var(--dm-surface, #2b2620);
-    --m-soft: var(--dm-surface-elevated, #332c25);
+    --m-bg: var(--dm-bg, #0f1d16);
+    --m-surface: var(--dm-surface, #182c21);
+    --m-soft: var(--dm-surface-elevated, #26342D);
     --m-border: color-mix(in srgb, var(--dm-text-muted, #8f8273) 28%, transparent);
     --m-text: var(--dm-text-primary, #f0ece6);
     --m-muted: var(--dm-text-secondary, #b9ab9b);
-    --m-accent: var(--dm-accent, #d4aa82);
-    --m-on-accent: #1c1410;
+    --m-accent: var(--dm-accent, #D3EE6A);
+    --m-on-accent: #0f271c;
     --m-accent-text: var(--m-accent);
     --m-shadow: 0 12px 32px -14px rgba(0, 0, 0, 0.7);
 }
@@ -59,7 +60,7 @@ html.dark .m-app {
 }
 
 .m-app .m-white { background-color: #ffffff !important; }
-.m-app .m-white.text-\[\#2a1d15\], .m-app .m-white.text-\[\#1d140e\], .m-app .m-white.text-\[\#1f1f1f\] { color: #2a1d15 !important; }
+.m-app .m-white.text-\[\#142A1F\], .m-app .m-white.text-\[\#0F1D16\], .m-app .m-white.text-\[\#1f1f1f\] { color: #142A1F !important; }
 
 .m-group > * + * { border-top: 1px solid var(--m-border); }
 

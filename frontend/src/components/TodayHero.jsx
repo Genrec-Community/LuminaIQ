@@ -24,7 +24,7 @@ const Ring = ({ value, size = 112, stroke = 10, children }) => {
             <svg width={size} height={size} className="-rotate-90">
                 <circle cx={size / 2} cy={size / 2} r={r} stroke="#E6D5CC" strokeWidth={stroke} fill="none" opacity="0.6" />
                 <motion.circle
-                    cx={size / 2} cy={size / 2} r={r} stroke="#C8A288" strokeWidth={stroke} fill="none" strokeLinecap="round"
+                    cx={size / 2} cy={size / 2} r={r} stroke="var(--lumina-accent)" strokeWidth={stroke} fill="none" strokeLinecap="round"
                     strokeDasharray={c}
                     initial={{ strokeDashoffset: c }}
                     animate={{ strokeDashoffset: c * (1 - Math.min(1, value)) }}
@@ -74,23 +74,23 @@ const TodayHero = ({ onContinue, continueLabel, onCram }) => {
                 initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
                 className="relative overflow-hidden rounded-3xl border border-[#E6D5CC] bg-white p-6 md:p-8"
             >
-                <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-[#C8A288]/15 blur-2xl" />
-                <p className="text-sm font-medium text-[#8a6a5c]">{timeGreeting()},</p>
-                <h2 className="mt-1 text-3xl md:text-4xl font-bold text-[#4A3B32]">
+                <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-[#1E5C42]/15 blur-2xl" />
+                <p className="text-sm font-medium text-[#5E5046]">{timeGreeting()},</p>
+                <h2 className="mt-1 text-3xl md:text-4xl font-bold text-[#163628]">
                     {name} <span className="inline-block">{settings.userAvatar || '👋'}</span>
                 </h2>
 
                 <div className="mt-5 flex items-start gap-3">
                     <motion.div
                         animate={{ y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 3, ease: 'easeInOut' }}
-                        className="h-12 w-12 shrink-0 rounded-2xl bg-gradient-to-br from-[#C8A288] to-[#e8c9a8] flex items-center justify-center text-2xl shadow-md shadow-[#C8A288]/30"
+                        className="h-12 w-12 shrink-0 rounded-2xl bg-gradient-to-br from-[#1E5C42] to-[#D3EE6A] flex items-center justify-center text-2xl shadow-md shadow-[#1E5C42]/30"
                     >
                         {settings.aiAvatar || '✨'}
                     </motion.div>
-                    <div className="rounded-2xl rounded-tl-sm border border-[#E6D5CC] bg-[#FDF6F0] px-4 py-3 text-[#4A3B32]">
-                        <div className="text-xs font-semibold text-[#C8A288]">{aiName(settings)}</div>
+                    <div className="rounded-2xl rounded-tl-sm border border-[#E6D5CC] bg-[#FDF6F0] px-4 py-3 text-[#163628]">
+                        <div className="text-xs font-semibold text-[#1E5C42]">{aiName(settings)}</div>
                         <div>{companionLine}</div>
-                        <div className="mt-1.5 text-xs text-[#8a6a5c]">💡 {tip}</div>
+                        <div className="mt-1.5 text-xs text-[#5E5046]">💡 {tip}</div>
                     </div>
                 </div>
 
@@ -98,7 +98,7 @@ const TodayHero = ({ onContinue, continueLabel, onCram }) => {
                     {onContinue && (
                         <button
                             onClick={onContinue}
-                            className="group flex items-center gap-2 rounded-2xl bg-[#C8A288] px-6 py-3.5 font-semibold text-white shadow-lg shadow-[#C8A288]/30 transition-all hover:bg-[#B08B72] active:scale-95"
+                            className="group flex items-center gap-2 rounded-2xl bg-[#1E5C42] px-6 py-3.5 font-semibold text-white shadow-lg shadow-[#1E5C42]/30 transition-all hover:bg-[#163628] active:scale-95"
                         >
                             <Play className="h-5 w-5 fill-white" />
                             {continueLabel}
@@ -107,15 +107,15 @@ const TodayHero = ({ onContinue, continueLabel, onCram }) => {
                     {onCram && (
                         <button
                             onClick={onCram}
-                            className="flex items-center gap-2 rounded-2xl border-2 border-[#C8A288] px-5 py-3 font-semibold text-[#4A3B32] transition-all hover:bg-[#FDF6F0] active:scale-95"
+                            className="flex items-center gap-2 rounded-2xl border-2 border-[#1E5C42] px-5 py-3 font-semibold text-[#163628] transition-all hover:bg-[#FDF6F0] active:scale-95"
                         >
-                            <Moon className="h-5 w-5 text-[#C8A288]" />
+                            <Moon className="h-5 w-5 text-[#1E5C42]" />
                             {examDays !== null && examDays >= 0 && examDays <= 1 ? 'Cram for it now' : 'Exam tonight?'}
                         </button>
                     )}
                     {examDays !== null && examDays >= 0 && (
-                        <div className="flex items-center gap-2 rounded-2xl border border-[#E6D5CC] bg-[#FDF6F0] px-4 py-3 text-sm text-[#4A3B32]">
-                            <CalendarClock className="h-4 w-4 text-[#C8A288]" />
+                        <div className="flex items-center gap-2 rounded-2xl border border-[#E6D5CC] bg-[#FDF6F0] px-4 py-3 text-sm text-[#163628]">
+                            <CalendarClock className="h-4 w-4 text-[#1E5C42]" />
                             <span><b>{examDays === 0 ? 'Today!' : `${examDays} day${examDays === 1 ? '' : 's'}`}</b> to {settings.examName || 'your exam'}</span>
                         </div>
                     )}
@@ -129,33 +129,33 @@ const TodayHero = ({ onContinue, continueLabel, onCram }) => {
             >
                 <div className="flex items-center gap-5">
                     <Ring value={goalPct}>
-                        <span className="text-2xl font-bold text-[#4A3B32]">{progress.minutes}</span>
-                        <span className="text-[11px] text-[#8a6a5c]">/ {goal} min</span>
+                        <span className="text-2xl font-bold text-[#163628]">{progress.minutes}</span>
+                        <span className="text-[11px] text-[#5E5046]">/ {goal} min</span>
                     </Ring>
                     <div className="flex-1 space-y-3">
                         <div className="flex items-center gap-2">
                             <motion.span animate={streak > 0 ? { scale: [1, 1.15, 1] } : {}} transition={{ repeat: Infinity, duration: 1.8 }}>
-                                <Flame className={`h-6 w-6 ${streak > 0 ? 'text-orange-500 fill-orange-400' : 'text-[#8a6a5c]'}`} />
+                                <Flame className={`h-6 w-6 ${streak > 0 ? 'text-orange-500 fill-orange-400' : 'text-[#5E5046]'}`} />
                             </motion.span>
-                            <span className="text-lg font-bold text-[#4A3B32]">{streak}</span>
-                            <span className="text-sm text-[#8a6a5c]">day streak</span>
+                            <span className="text-lg font-bold text-[#163628]">{streak}</span>
+                            <span className="text-sm text-[#5E5046]">day streak</span>
                         </div>
                         <div>
                             <div className="flex items-center justify-between text-sm">
-                                <span className="flex items-center gap-1.5 font-semibold text-[#4A3B32]">
-                                    <Trophy className="h-4 w-4 text-[#C8A288]" /> Lv {g?.level ?? 1}
+                                <span className="flex items-center gap-1.5 font-semibold text-[#163628]">
+                                    <Trophy className="h-4 w-4 text-[#1E5C42]" /> Lv {g?.level ?? 1}
                                 </span>
-                                <span className="text-xs text-[#8a6a5c]">{g?.level_title || 'Curious Reader'}</span>
+                                <span className="text-xs text-[#5E5046]">{g?.level_title || 'Curious Reader'}</span>
                             </div>
                             <div className="mt-1 h-2 overflow-hidden rounded-full bg-[#E6D5CC]/60">
                                 <motion.div
-                                    className="h-full rounded-full bg-gradient-to-r from-[#C8A288] to-[#e0b48a]"
+                                    className="h-full rounded-full bg-gradient-to-r from-[#1E5C42] to-[#C5E35A]"
                                     initial={{ width: 0 }}
                                     animate={{ width: `${Math.min(100, g?.level_progress ?? 0)}%` }}
                                     transition={{ duration: 1 }}
                                 />
                             </div>
-                            <div className="mt-1 flex items-center gap-1 text-xs text-[#8a6a5c]">
+                            <div className="mt-1 flex items-center gap-1 text-xs text-[#5E5046]">
                                 <Zap className="h-3 w-3" /> {(g?.total_xp ?? 0).toLocaleString()} XP total
                             </div>
                         </div>
@@ -164,8 +164,8 @@ const TodayHero = ({ onContinue, continueLabel, onCram }) => {
 
                 <div className="mt-5">
                     <div className="mb-2 flex items-center justify-between">
-                        <span className="text-sm font-semibold text-[#4A3B32]">Daily quests</span>
-                        <span className="text-xs text-[#8a6a5c]">{questsDone}/{quests.length} done</span>
+                        <span className="text-sm font-semibold text-[#163628]">Daily quests</span>
+                        <span className="text-xs text-[#5E5046]">{questsDone}/{quests.length} done</span>
                     </div>
                     <div className="space-y-2">
                         {quests.map((q) => {
@@ -174,12 +174,12 @@ const TodayHero = ({ onContinue, continueLabel, onCram }) => {
                                 <div key={q.id} className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${done ? 'border-emerald-300 bg-emerald-50' : 'border-[#E6D5CC] bg-[#FDF6F0]'}`}>
                                     <span className="text-lg">{done ? '✅' : q.emoji}</span>
                                     <div className="flex-1">
-                                        <div className={`text-sm ${done ? 'text-emerald-700 line-through' : 'text-[#4A3B32]'}`}>{q.label}</div>
+                                        <div className={`text-sm ${done ? 'text-emerald-700 line-through' : 'text-[#163628]'}`}>{q.label}</div>
                                         <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[#E6D5CC]/60">
-                                            <div className={`h-full rounded-full ${done ? 'bg-emerald-500' : 'bg-[#C8A288]'}`} style={{ width: `${(q.value / q.target) * 100}%` }} />
+                                            <div className={`h-full rounded-full ${done ? 'bg-emerald-500' : 'bg-[#1E5C42]'}`} style={{ width: `${(q.value / q.target) * 100}%` }} />
                                         </div>
                                     </div>
-                                    <span className="text-xs tabular-nums text-[#8a6a5c]">{done ? <Check className="h-4 w-4 text-emerald-600" /> : `${q.value}/${q.target}`}</span>
+                                    <span className="text-xs tabular-nums text-[#5E5046]">{done ? <Check className="h-4 w-4 text-emerald-600" /> : `${q.value}/${q.target}`}</span>
                                 </div>
                             );
                         })}

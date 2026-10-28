@@ -201,7 +201,7 @@ const PomodoroTimer = ({
     };
 
     const modeColors = {
-        work: { bg: 'from-[#C8A288] to-[#A08072]', text: 'text-white', ring: 'ring-[#C8A288]' },
+        work: { bg: 'from-[#1E5C42] to-[#163628]', text: 'text-white', ring: 'ring-[#1E5C42]' },
         break: { bg: 'from-green-500 to-emerald-600', text: 'text-white', ring: 'ring-green-500' },
         longBreak: { bg: 'from-blue-500 to-indigo-600', text: 'text-white', ring: 'ring-blue-500' },
     };
@@ -213,8 +213,8 @@ const PomodoroTimer = ({
                     {mode === 'work' ? <Brain className="h-5 w-5 text-white" /> : <Coffee className="h-5 w-5 text-white" />}
                 </div>
                 <div className="flex-1">
-                    <p className="text-lg font-bold text-[#4A3B32] font-mono">{formatTime(timeLeft)}</p>
-                    <p className="text-xs text-[#8a6a5c]">{mode === 'work' ? 'Focus' : 'Break'}</p>
+                    <p className="text-lg font-bold text-[#163628] font-mono">{formatTime(timeLeft)}</p>
+                    <p className="text-xs text-[#5E5046]">{mode === 'work' ? 'Focus' : 'Break'}</p>
                 </div>
                 <button
                     onClick={() => setIsRunning(!isRunning)}
@@ -268,7 +268,7 @@ const PomodoroTimer = ({
                         className={`flex-1 py-2 px-3 rounded-lg font-medium text-sm transition-all flex items-center justify-center gap-2 ${
                             mode === id 
                                 ? `bg-gradient-to-r ${modeColors[id].bg} text-white shadow-md` 
-                                : 'text-[#8a6a5c] hover:bg-white'
+                                : 'text-[#5E5046] hover:bg-white'
                         }`}
                     >
                         <Icon className="h-4 w-4" />
@@ -295,7 +295,7 @@ const PomodoroTimer = ({
                             cy="96"
                             r="88"
                             fill="none"
-                            stroke={mode === 'work' ? '#C8A288' : mode === 'break' ? '#22c55e' : '#3b82f6'}
+                            stroke={mode === 'work' ? '#1E5C42' : mode === 'break' ? '#22c55e' : '#3b82f6'}
                             strokeWidth="8"
                             strokeLinecap="round"
                             strokeDasharray={2 * Math.PI * 88}
@@ -304,10 +304,10 @@ const PomodoroTimer = ({
                         />
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <span className="text-5xl font-bold text-[#4A3B32] font-mono">
+                        <span className="text-5xl font-bold text-[#163628] font-mono">
                             {formatTime(timeLeft)}
                         </span>
-                        <span className="text-sm text-[#8a6a5c] mt-1 capitalize">
+                        <span className="text-sm text-[#5E5046] mt-1 capitalize">
                             {mode === 'work' ? 'Focus Time' : mode === 'break' ? 'Short Break' : 'Long Break'}
                         </span>
                     </div>
@@ -317,7 +317,7 @@ const PomodoroTimer = ({
                 <div className="flex items-center gap-4">
                     <button
                         onClick={resetTimer}
-                        className="p-3 bg-[#FDF6F0] hover:bg-[#E6D5CC] rounded-xl text-[#8a6a5c] transition-colors"
+                        className="p-3 bg-[#FDF6F0] hover:bg-[#E6D5CC] rounded-xl text-[#5E5046] transition-colors"
                     >
                         <RotateCcw className="h-6 w-6" />
                     </button>
@@ -339,7 +339,7 @@ const PomodoroTimer = ({
                     </button>
                     <button
                         onClick={() => switchMode(mode === 'work' ? 'break' : 'work')}
-                        className="p-3 bg-[#FDF6F0] hover:bg-[#E6D5CC] rounded-xl text-[#8a6a5c] transition-colors"
+                        className="p-3 bg-[#FDF6F0] hover:bg-[#E6D5CC] rounded-xl text-[#5E5046] transition-colors"
                     >
                         {mode === 'work' ? <Coffee className="h-6 w-6" /> : <Brain className="h-6 w-6" />}
                     </button>
@@ -349,25 +349,25 @@ const PomodoroTimer = ({
             {/* Stats */}
             <div className="grid grid-cols-3 gap-4 p-4 bg-[#FDF6F0] border-t border-[#E6D5CC]">
                 <div className="text-center">
-                    <div className="flex items-center justify-center gap-1 text-[#C8A288] mb-1">
+                    <div className="flex items-center justify-center gap-1 text-[#1E5C42] mb-1">
                         <Target className="h-4 w-4" />
                     </div>
-                    <p className="text-2xl font-bold text-[#4A3B32]">{sessionsCompleted}</p>
-                    <p className="text-xs text-[#8a6a5c]">Sessions</p>
+                    <p className="text-2xl font-bold text-[#163628]">{sessionsCompleted}</p>
+                    <p className="text-xs text-[#5E5046]">Sessions</p>
                 </div>
                 <div className="text-center">
-                    <div className="flex items-center justify-center gap-1 text-[#C8A288] mb-1">
+                    <div className="flex items-center justify-center gap-1 text-[#1E5C42] mb-1">
                         <Timer className="h-4 w-4" />
                     </div>
-                    <p className="text-2xl font-bold text-[#4A3B32]">{formatFocusTime(totalFocusTime)}</p>
-                    <p className="text-xs text-[#8a6a5c]">Focus Time</p>
+                    <p className="text-2xl font-bold text-[#163628]">{formatFocusTime(totalFocusTime)}</p>
+                    <p className="text-xs text-[#5E5046]">Focus Time</p>
                 </div>
                 <div className="text-center">
-                    <div className="flex items-center justify-center gap-1 text-[#C8A288] mb-1">
+                    <div className="flex items-center justify-center gap-1 text-[#1E5C42] mb-1">
                         <TrendingUp className="h-4 w-4" />
                     </div>
-                    <p className="text-2xl font-bold text-[#4A3B32]">{Math.round(totalFocusTime / 60 / (sessionsCompleted || 1))}m</p>
-                    <p className="text-xs text-[#8a6a5c]">Avg Session</p>
+                    <p className="text-2xl font-bold text-[#163628]">{Math.round(totalFocusTime / 60 / (sessionsCompleted || 1))}m</p>
+                    <p className="text-xs text-[#5E5046]">Avg Session</p>
                 </div>
             </div>
 
@@ -375,12 +375,12 @@ const PomodoroTimer = ({
             {showSettings && (
                 <div className="p-4 border-t border-[#E6D5CC] bg-white">
                     <div className="flex items-center justify-between mb-4">
-                        <h4 className="font-bold text-[#4A3B32]">Timer Settings</h4>
+                        <h4 className="font-bold text-[#163628]">Timer Settings</h4>
                         <button
                             onClick={() => setShowSettings(false)}
                             className="p-1 hover:bg-[#FDF6F0] rounded-lg"
                         >
-                            <X className="h-5 w-5 text-[#8a6a5c]" />
+                            <X className="h-5 w-5 text-[#5E5046]" />
                         </button>
                     </div>
                     <div className="space-y-3">
@@ -390,18 +390,18 @@ const PomodoroTimer = ({
                             { label: 'Long Break', value: longBreakDuration, setter: setLongBreakDuration },
                         ].map(({ label, value, setter }) => (
                             <div key={label} className="flex items-center justify-between">
-                                <span className="text-sm text-[#4A3B32]">{label}</span>
+                                <span className="text-sm text-[#163628]">{label}</span>
                                 <div className="flex items-center gap-2">
                                     <button
                                         onClick={() => setter(Math.max(1, value - 5))}
-                                        className="h-8 w-8 bg-[#FDF6F0] rounded-lg flex items-center justify-center text-[#4A3B32] hover:bg-[#E6D5CC] font-bold"
+                                        className="h-8 w-8 bg-[#FDF6F0] rounded-lg flex items-center justify-center text-[#163628] hover:bg-[#E6D5CC] font-bold"
                                     >
                                         -
                                     </button>
-                                    <span className="w-12 text-center font-bold text-[#4A3B32]">{value}m</span>
+                                    <span className="w-12 text-center font-bold text-[#163628]">{value}m</span>
                                     <button
                                         onClick={() => setter(Math.min(60, value + 5))}
-                                        className="h-8 w-8 bg-[#FDF6F0] rounded-lg flex items-center justify-center text-[#4A3B32] hover:bg-[#E6D5CC] font-bold"
+                                        className="h-8 w-8 bg-[#FDF6F0] rounded-lg flex items-center justify-center text-[#163628] hover:bg-[#E6D5CC] font-bold"
                                     >
                                         +
                                     </button>
@@ -414,7 +414,7 @@ const PomodoroTimer = ({
                             resetTimer();
                             setShowSettings(false);
                         }}
-                        className="w-full mt-4 py-2 bg-[#C8A288] text-white rounded-lg font-medium hover:bg-[#B08B72] transition-colors flex items-center justify-center gap-2"
+                        className="w-full mt-4 py-2 bg-[#1E5C42] text-white rounded-lg font-medium hover:bg-[#163628] transition-colors flex items-center justify-center gap-2"
                     >
                         <Check className="h-4 w-4" />
                         Apply & Reset Timer

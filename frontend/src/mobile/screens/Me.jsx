@@ -160,7 +160,7 @@ const Me = () => {
                 </Group>
 
                 <Group>
-                    <Row icon={LogOut} color="#8a6a5c" label="Sign out" onClick={() => setSheet('signout')} right={null} />
+                    <Row icon={LogOut} color="#5E5046" label="Sign out" onClick={() => setSheet('signout')} right={null} />
                     <Row icon={Trash2} color="#ef4444" label="Delete account" danger onClick={() => { setConfirmText(''); setSheet('delete'); }} right={null} />
                 </Group>
                 <p className="pb-2 text-center text-[12px]" style={{ color: 'var(--m-muted)' }}>Lumina IQ · made for curious minds</p>

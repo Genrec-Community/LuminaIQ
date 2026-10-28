@@ -67,7 +67,7 @@ const inline = (text) => {
         if (part.startsWith('**') && part.endsWith('**')) return <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong>;
         if (i === 0) {
             const m = part.match(/^([^—:]{1,40}?)\s*(—|–|:)\s+(.+)$/s);
-            if (m) return <React.Fragment key={i}><strong className="font-semibold">{m[1]}</strong> <span className="text-[#8a6a5c]">{m[2] === ':' ? '' : '— '}</span>{m[3]}</React.Fragment>;
+            if (m) return <React.Fragment key={i}><strong className="font-semibold">{m[1]}</strong> <span className="text-[#5E5046]">{m[2] === ':' ? '' : '— '}</span>{m[3]}</React.Fragment>;
         }
         return <React.Fragment key={i}>{part}</React.Fragment>;
     });
@@ -97,7 +97,7 @@ const RichText = ({ text, className = '' }) => {
         return (
             <ul className={`space-y-1.5 ${className}`}>
                 {lines.map((l, i) => (
-                    <li key={i} className="flex gap-2 leading-relaxed"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#C8A288]" /><span>{inline(l)}</span></li>
+                    <li key={i} className="flex gap-2 leading-relaxed"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#1E5C42]" /><span>{inline(l)}</span></li>
                 ))}
             </ul>
         );
@@ -110,8 +110,8 @@ const RichText = ({ text, className = '' }) => {
                     const parts = splitParts(sec.body);
                     return (
                         <div key={i} className="px-3.5 py-2.5 sm:flex sm:gap-4">
-                            {sec.label && <div className="mb-1 shrink-0 text-sm font-bold text-[#4A3B32] sm:mb-0 sm:w-40">{sec.label}</div>}
-                            <div className="min-w-0 flex-1 space-y-1 text-[15px] leading-relaxed text-[#4A3B32]">
+                            {sec.label && <div className="mb-1 shrink-0 text-sm font-bold text-[#163628] sm:mb-0 sm:w-40">{sec.label}</div>}
+                            <div className="min-w-0 flex-1 space-y-1 text-[15px] leading-relaxed text-[#163628]">
                                 {parts.length > 1
                                     ? parts.map((p, j) => <div key={j}>{inline(p)}</div>)
                                     : <div>{inline(sec.body)}</div>}
@@ -127,7 +127,7 @@ const RichText = ({ text, className = '' }) => {
         return (
             <ul className={`space-y-1.5 ${className}`}>
                 {parts.map((p, i) => (
-                    <li key={i} className="flex gap-2 leading-relaxed"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#C8A288]" /><span>{inline(p)}</span></li>
+                    <li key={i} className="flex gap-2 leading-relaxed"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#1E5C42]" /><span>{inline(p)}</span></li>
                 ))}
             </ul>
         );
@@ -139,29 +139,29 @@ const RichText = ({ text, className = '' }) => {
 const CramCard = ({ card, tier, onVisualize }) => (
     <div className="space-y-4">
         {card.tldr && (
-            <div className="rounded-2xl bg-[#FDF6F0] border border-[#E6D5CC] p-4 text-[#4A3B32] leading-relaxed">
-                <span className="text-xs font-bold uppercase tracking-wide text-[#C8A288] block mb-1">In a nutshell</span>
+            <div className="rounded-2xl bg-[#FDF6F0] border border-[#E6D5CC] p-4 text-[#163628] leading-relaxed">
+                <span className="text-xs font-bold uppercase tracking-wide text-[#1E5C42] block mb-1">In a nutshell</span>
                 {card.tldr}
             </div>
         )}
         {card.key_points?.length > 0 && (
             <div>
-                <h4 className="text-sm font-bold text-[#4A3B32] mb-2 flex items-center gap-1.5"><Target className="h-4 w-4 text-[#C8A288]" /> What carries the marks</h4>
+                <h4 className="text-sm font-bold text-[#163628] mb-2 flex items-center gap-1.5"><Target className="h-4 w-4 text-[#1E5C42]" /> What carries the marks</h4>
                 <ul className="space-y-1.5">
                     {card.key_points.map((p, i) => (
-                        <li key={i} className="flex gap-2 leading-relaxed text-[#4A3B32]"><span className="text-[#C8A288] font-bold">{i + 1}.</span><span>{inline(p)}</span></li>
+                        <li key={i} className="flex gap-2 leading-relaxed text-[#163628]"><span className="text-[#1E5C42] font-bold">{i + 1}.</span><span>{inline(p)}</span></li>
                     ))}
                 </ul>
             </div>
         )}
         {card.formulas?.length > 0 && (
             <div>
-                <h4 className="text-sm font-bold text-[#4A3B32] mb-2">Formulas</h4>
+                <h4 className="text-sm font-bold text-[#163628] mb-2">Formulas</h4>
                 <div className="grid gap-2 sm:grid-cols-2">
                     {card.formulas.map((f, i) => (
                         <div key={i} className="rounded-xl border border-[#E6D5CC] bg-white p-3">
-                            <div className="font-mono text-base font-semibold text-[#4A3B32] break-words">{f.expr}</div>
-                            {f.meaning && <div className="text-xs text-[#8a6a5c] mt-1">{f.meaning}</div>}
+                            <div className="font-mono text-base font-semibold text-[#163628] break-words">{f.expr}</div>
+                            {f.meaning && <div className="text-xs text-[#5E5046] mt-1">{f.meaning}</div>}
                         </div>
                     ))}
                 </div>
@@ -169,8 +169,8 @@ const CramCard = ({ card, tier, onVisualize }) => (
         )}
         {tier === 'learn' && card.example && (
             <div>
-                <h4 className="text-sm font-bold text-[#4A3B32] mb-2 flex items-center gap-1.5"><BookOpen className="h-4 w-4 text-[#C8A288]" /> Example</h4>
-                <RichText text={card.example} className="text-[#4A3B32]" />
+                <h4 className="text-sm font-bold text-[#163628] mb-2 flex items-center gap-1.5"><BookOpen className="h-4 w-4 text-[#1E5C42]" /> Example</h4>
+                <RichText text={card.example} className="text-[#163628]" />
             </div>
         )}
         <div className="grid gap-2 sm:grid-cols-2">
@@ -195,8 +195,8 @@ const CramCard = ({ card, tier, onVisualize }) => (
         )}
         {onVisualize && (
             <button onClick={onVisualize}
-                className="inline-flex items-center gap-2 rounded-xl border border-[#E6D5CC] px-3 py-2 text-sm font-semibold text-[#4A3B32] hover:border-[#C8A288] hover:bg-[#FDF6F0]">
-                <FlaskConical className="h-4 w-4 text-[#C8A288]" /> See it in the Visual Lab
+                className="inline-flex items-center gap-2 rounded-xl border border-[#E6D5CC] px-3 py-2 text-sm font-semibold text-[#163628] hover:border-[#1E5C42] hover:bg-[#FDF6F0]">
+                <FlaskConical className="h-4 w-4 text-[#1E5C42]" /> See it in the Visual Lab
             </button>
         )}
     </div>
@@ -223,18 +223,18 @@ const QuickCheck = ({ questions, onDone, onAnswer }) => {
     };
     return (
         <div className="rounded-2xl border border-[#E6D5CC] bg-white p-4">
-            <div className="text-xs font-bold uppercase tracking-wide text-[#C8A288] mb-1">Quick check {i + 1}/{questions.length}</div>
-            <p className="font-semibold text-[#4A3B32] mb-3">{q.q}</p>
+            <div className="text-xs font-bold uppercase tracking-wide text-[#1E5C42] mb-1">Quick check {i + 1}/{questions.length}</div>
+            <p className="font-semibold text-[#163628] mb-3">{q.q}</p>
             <div className="grid gap-2">
                 {q.options.map((opt, idx) => {
                     const isRight = idx === q.answer_index;
                     const cls = !answered
-                        ? 'border-[#E6D5CC] hover:border-[#C8A288] bg-white'
+                        ? 'border-[#E6D5CC] hover:border-[#1E5C42] bg-white'
                         : isRight ? 'border-emerald-400 bg-emerald-50 text-emerald-900'
                             : idx === picked ? 'border-rose-400 bg-rose-50 text-rose-900' : 'border-[#E6D5CC] bg-white opacity-60';
                     return (
                         <button key={idx} onClick={() => choose(idx)} disabled={answered}
-                            className={`text-left rounded-xl border-2 px-3 py-2 text-[#4A3B32] transition-colors ${cls}`}>
+                            className={`text-left rounded-xl border-2 px-3 py-2 text-[#163628] transition-colors ${cls}`}>
                             <span className="font-bold mr-2">{String.fromCharCode(65 + idx)}.</span>{opt}
                             {answered && isRight && <CheckCircle2 className="inline h-4 w-4 ml-2 text-emerald-600" />}
                             {answered && idx === picked && !isRight && <XCircle className="inline h-4 w-4 ml-2 text-rose-600" />}
@@ -244,8 +244,8 @@ const QuickCheck = ({ questions, onDone, onAnswer }) => {
             </div>
             {answered && (
                 <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
-                    <p className="text-sm text-[#8a6a5c]">{q.why}</p>
-                    <button onClick={next} className="shrink-0 inline-flex items-center gap-1 rounded-xl bg-[#C8A288] px-4 py-2 text-sm font-semibold text-white hover:bg-[#B08B72]">
+                    <p className="text-sm text-[#5E5046]">{q.why}</p>
+                    <button onClick={next} className="shrink-0 inline-flex items-center gap-1 rounded-xl bg-[#1E5C42] px-4 py-2 text-sm font-semibold text-white hover:bg-[#163628]">
                         {i + 1 >= questions.length ? 'Done' : 'Next'} <ArrowRight className="h-4 w-4" />
                     </button>
                 </div>
@@ -261,39 +261,39 @@ const RevisionSheet = ({ timeline, cards, onBack, onRestart }) => {
         <div className="h-full overflow-y-auto p-4 md:p-8">
             <div className="max-w-4xl mx-auto">
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-4 print:hidden">
-                    <button onClick={onBack} className="inline-flex items-center gap-1 rounded-xl border border-[#E6D5CC] px-3 py-2 text-sm font-semibold text-[#4A3B32] hover:border-[#C8A288]">
+                    <button onClick={onBack} className="inline-flex items-center gap-1 rounded-xl border border-[#E6D5CC] px-3 py-2 text-sm font-semibold text-[#163628] hover:border-[#1E5C42]">
                         <ArrowLeft className="h-4 w-4" /> Back
                     </button>
                     <div className="flex gap-2">
                         {onRestart && (
-                            <button onClick={onRestart} className="inline-flex items-center gap-1 rounded-xl border border-[#E6D5CC] px-3 py-2 text-sm font-semibold text-[#4A3B32] hover:border-[#C8A288]">
+                            <button onClick={onRestart} className="inline-flex items-center gap-1 rounded-xl border border-[#E6D5CC] px-3 py-2 text-sm font-semibold text-[#163628] hover:border-[#1E5C42]">
                                 <RotateCcw className="h-4 w-4" /> New plan
                             </button>
                         )}
-                        <button onClick={() => window.print()} className="inline-flex items-center gap-1 rounded-xl bg-[#C8A288] px-3 py-2 text-sm font-semibold text-white hover:bg-[#B08B72]">
+                        <button onClick={() => window.print()} className="inline-flex items-center gap-1 rounded-xl bg-[#1E5C42] px-3 py-2 text-sm font-semibold text-white hover:bg-[#163628]">
                             <Printer className="h-4 w-4" /> Print / save PDF
                         </button>
                     </div>
                 </div>
                 <div id="cram-revision-sheet" className="rounded-3xl border border-[#E6D5CC] bg-white p-5 md:p-8">
-                    <h2 className="text-2xl font-bold text-[#4A3B32]">Rapid revision sheet</h2>
-                    <p className="text-sm text-[#8a6a5c] mb-4">Read this top to bottom right before the exam. Topics are in the order they build on each other.</p>
+                    <h2 className="text-2xl font-bold text-[#163628]">Rapid revision sheet</h2>
+                    <p className="text-sm text-[#5E5046] mb-4">Read this top to bottom right before the exam. Topics are in the order they build on each other.</p>
                     <div className="grid gap-4 md:grid-cols-2">
                         {topics.map((e, n) => {
                             const c = cards[e.topic];
                             return (
                                 <div key={e.topic} className="break-inside-avoid rounded-2xl border border-[#E6D5CC] p-3">
-                                    <div className="font-bold text-[#4A3B32]">{n + 1}. {e.topic}</div>
+                                    <div className="font-bold text-[#163628]">{n + 1}. {e.topic}</div>
                                     {c ? (
                                         <>
-                                            {c.tldr && <p className="text-sm text-[#4A3B32] mt-1">{c.tldr}</p>}
+                                            {c.tldr && <p className="text-sm text-[#163628] mt-1">{c.tldr}</p>}
                                             {c.formulas?.length > 0 && (
-                                                <div className="mt-1 font-mono text-sm text-[#4A3B32]">{c.formulas.map((f) => f.expr).join('   ·   ')}</div>
+                                                <div className="mt-1 font-mono text-sm text-[#163628]">{c.formulas.map((f) => f.expr).join('   ·   ')}</div>
                                             )}
                                             {c.memory_hook && <p className="text-xs text-amber-800 mt-1">💡 {c.memory_hook}</p>}
                                         </>
                                     ) : (
-                                        <p className="text-xs text-[#8a6a5c] mt-1">Not studied yet: open it in the plan to fill this in.</p>
+                                        <p className="text-xs text-[#5E5046] mt-1">Not studied yet: open it in the plan to fill this in.</p>
                                     )}
                                 </div>
                             );
@@ -467,13 +467,13 @@ const ExamTonightView = ({ projectId, selectedDocuments = [], onTopicMastered, o
             <div className="h-full overflow-y-auto p-4 md:p-8">
                 <div className="max-w-3xl mx-auto">
                     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-                        className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#2a1f3d] via-[#3b2a52] to-[#1f2a44] p-6 md:p-8 text-white shadow-xl">
-                        <div className="absolute -right-10 -top-10 h-48 w-48 rounded-full bg-amber-300/20 blur-3xl" />
-                        <div className="relative flex items-center gap-2 text-amber-200 text-sm font-semibold">
+                        className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#163628] via-[#1b4331] to-[#0f271c] p-6 md:p-8 text-white shadow-xl">
+                        <div className="absolute -right-10 -top-10 h-48 w-48 rounded-full bg-[#D3EE6A]/20 blur-3xl" />
+                        <div className="relative flex items-center gap-2 text-[#D3EE6A] text-sm font-semibold">
                             <Moon className="h-4 w-4" /> Exam Tonight
                         </div>
                         <h2 className="relative mt-2 text-3xl md:text-4xl font-bold leading-tight">
-                            Short on time? Learn what matters, in the right order.
+                            Short on time? Learn what <em>matters</em>, in the right order.
                         </h2>
                         <p className="relative mt-2 text-white/80 max-w-xl">
                             Tell {companion} how long you have. You&apos;ll get a plan that starts with the foundations everything else
@@ -487,31 +487,31 @@ const ExamTonightView = ({ projectId, selectedDocuments = [], onTopicMastered, o
                     </motion.div>
 
                     <div className="mt-5 rounded-3xl border border-[#E6D5CC] bg-white p-5 md:p-6">
-                        <h3 className="text-lg font-bold text-[#4A3B32]">How much time do you have?</h3>
+                        <h3 className="text-lg font-bold text-[#163628]">How much time do you have?</h3>
                         <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
                             {BUDGETS.map((b) => (
                                 <button key={b.minutes} onClick={() => setMinutes(b.minutes)}
-                                    className={`rounded-2xl border-2 px-3 py-3 text-left transition-colors ${minutes === b.minutes ? 'border-[#C8A288] bg-[#FDF6F0]' : 'border-[#E6D5CC] bg-white hover:border-[#C8A288]'}`}>
-                                    <div className="font-bold text-[#4A3B32]">{b.label}</div>
-                                    <div className="text-xs text-[#8a6a5c]">{b.hint}</div>
+                                    className={`rounded-2xl border-2 px-3 py-3 text-left transition-colors ${minutes === b.minutes ? 'border-[#1E5C42] bg-[#FDF6F0]' : 'border-[#E6D5CC] bg-white hover:border-[#1E5C42]'}`}>
+                                    <div className="font-bold text-[#163628]">{b.label}</div>
+                                    <div className="text-xs text-[#5E5046]">{b.hint}</div>
                                 </button>
                             ))}
                         </div>
-                        <label className="mt-4 block text-sm text-[#8a6a5c]">
-                            Or set it exactly: <b className="text-[#4A3B32]">{fmtMin(minutes)}</b>
+                        <label className="mt-4 block text-sm text-[#5E5046]">
+                            Or set it exactly: <b className="text-[#163628]">{fmtMin(minutes)}</b>
                             <input type="range" min={20} max={720} step={10} value={minutes}
                                 onChange={(e) => setMinutes(Number(e.target.value))}
-                                className="mt-2 w-full accent-[#C8A288]" aria-label="Study time in minutes" />
+                                className="mt-2 w-full accent-[#1E5C42]" aria-label="Study time in minutes" />
                         </label>
                         {error && <p className="mt-3 text-sm text-rose-600">{error}</p>}
-                        {message && <p className="mt-3 text-sm text-[#8a6a5c]">{message}</p>}
+                        {message && <p className="mt-3 text-sm text-[#5E5046]">{message}</p>}
                         <button onClick={buildPlan} disabled={loadingPlan}
-                            className="mt-4 w-full flex items-center justify-center gap-2 rounded-2xl bg-[#C8A288] px-4 py-3.5 font-semibold text-white hover:bg-[#B08B72] disabled:opacity-60 active:scale-[0.99]">
+                            className="mt-4 w-full flex items-center justify-center gap-2 rounded-2xl bg-[#1E5C42] px-4 py-3.5 font-semibold text-white hover:bg-[#163628] disabled:opacity-60 active:scale-[0.99]">
                             {loadingPlan ? <><Loader2 className="h-5 w-5 animate-spin" /> Weighing every topic in your book…</> : <>Build my plan <ArrowRight className="h-5 w-5" /></>}
                         </button>
                         {offerPass && (
-                            <Link to="/pricing#pass" className="mt-3 flex items-center justify-center gap-2 rounded-2xl border border-dashed border-[#C8A288] px-4 py-2.5 text-sm text-[#4A3B32] hover:bg-[#FDF6F0]">
-                                <Moon className="h-4 w-4 text-[#C8A288]" /> Big night? Get Deep cram cards and Topper limits for 48 hours: <b>Exam Night Pass ₹49</b>
+                            <Link to="/pricing#pass" className="mt-3 flex items-center justify-center gap-2 rounded-2xl border border-dashed border-[#1E5C42] px-4 py-2.5 text-sm text-[#163628] hover:bg-[#FDF6F0]">
+                                <Moon className="h-4 w-4 text-[#1E5C42]" /> Big night? Get Deep cram cards and Topper limits for 48 hours: <b>Exam Night Pass ₹49</b>
                             </Link>
                         )}
                     </div>
@@ -523,8 +523,8 @@ const ExamTonightView = ({ projectId, selectedDocuments = [], onTopicMastered, o
                             ['No wasted minutes', 'What you already know gets a 90-second refresh, not a full lesson.'],
                         ].map(([t, d]) => (
                             <div key={t} className="rounded-2xl border border-[#E6D5CC] bg-white p-4">
-                                <div className="font-semibold text-[#4A3B32]">{t}</div>
-                                <div className="text-sm text-[#8a6a5c] mt-1">{d}</div>
+                                <div className="font-semibold text-[#163628]">{t}</div>
+                                <div className="text-sm text-[#5E5046] mt-1">{d}</div>
                             </div>
                         ))}
                     </div>
@@ -553,20 +553,20 @@ const ExamTonightView = ({ projectId, selectedDocuments = [], onTopicMastered, o
                     <div className="rounded-3xl border border-[#E6D5CC] bg-white p-5 md:p-6">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>
-                                <div className="text-sm font-semibold text-[#C8A288] flex items-center gap-1"><Moon className="h-4 w-4" /> Your {fmtMin(plan.budget_minutes)} plan</div>
-                                <h2 className="text-2xl font-bold text-[#4A3B32] mt-1">
+                                <div className="text-sm font-semibold text-[#1E5C42] flex items-center gap-1"><Moon className="h-4 w-4" /> Your {fmtMin(plan.budget_minutes)} plan</div>
+                                <h2 className="text-2xl font-bold text-[#163628] mt-1">
                                     {s.coverage_percent}% of what matters in your book
                                 </h2>
-                                <p className="text-sm text-[#8a6a5c] mt-1">
+                                <p className="text-sm text-[#5E5046] mt-1">
                                     {character.greet(name)} Learn {s.learn}, skim {s.skim}{s.skip ? `, leave ${s.skip} for later` : ''}. Every topic comes after the ones it builds on.
                                 </p>
                             </div>
-                            <button onClick={resetPlan} className="text-sm font-semibold text-[#8a6a5c] hover:text-[#4A3B32] inline-flex items-center gap-1">
+                            <button onClick={resetPlan} className="text-sm font-semibold text-[#5E5046] hover:text-[#163628] inline-flex items-center gap-1">
                                 <RotateCcw className="h-4 w-4" /> Change time
                             </button>
                         </div>
                         <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-                            {[['Learn', s.learn, 'bg-[#C8A288] text-white'], ['Skim', s.skim, 'bg-[#FDF6F0] text-[#4A3B32]'], ['Later', s.skip, 'bg-white text-[#8a6a5c] border border-[#E6D5CC]']].map(([l, v, c]) => (
+                            {[['Learn', s.learn, 'bg-[#1E5C42] text-white'], ['Skim', s.skim, 'bg-[#FDF6F0] text-[#163628]'], ['Later', s.skip, 'bg-white text-[#5E5046] border border-[#E6D5CC]']].map(([l, v, c]) => (
                                 <div key={l} className={`rounded-2xl p-3 ${c}`}>
                                     <div className="text-2xl font-bold">{v}</div>
                                     <div className="text-xs opacity-90">{l}</div>
@@ -575,28 +575,28 @@ const ExamTonightView = ({ projectId, selectedDocuments = [], onTopicMastered, o
                         </div>
                         <div className="mt-4 flex flex-col sm:flex-row gap-2">
                             <button onClick={() => startStudy(resumeAt >= 0 ? resumeAt : 0)}
-                                className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-[#C8A288] px-4 py-3 font-semibold text-white hover:bg-[#B08B72] active:scale-[0.99]">
+                                className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-[#1E5C42] px-4 py-3 font-semibold text-white hover:bg-[#163628] active:scale-[0.99]">
                                 {studied ? `Continue (${studied}/${totalTopics} done)` : 'Start cramming'} <ArrowRight className="h-5 w-5" />
                             </button>
                             <button onClick={() => setPhase('revision')}
-                                className="flex items-center justify-center gap-2 rounded-2xl border-2 border-[#E6D5CC] px-4 py-3 font-semibold text-[#4A3B32] hover:border-[#C8A288]">
-                                <Layers className="h-4 w-4 text-[#C8A288]" /> Revision sheet
+                                className="flex items-center justify-center gap-2 rounded-2xl border-2 border-[#E6D5CC] px-4 py-3 font-semibold text-[#163628] hover:border-[#1E5C42]">
+                                <Layers className="h-4 w-4 text-[#1E5C42]" /> Revision sheet
                             </button>
                         </div>
                     </div>
 
                     <div className="mt-4 rounded-3xl border border-[#E6D5CC] bg-white p-4 md:p-6">
-                        <h3 className="text-lg font-bold text-[#4A3B32] mb-2">Tonight&apos;s timeline</h3>
+                        <h3 className="text-lg font-bold text-[#163628] mb-2">Tonight&apos;s timeline</h3>
                         <ol className="relative border-l-2 border-[#E6D5CC] ml-3 space-y-3">
                             {timeline.map((e, i) => {
                                 if (e.type === 'break') return (
-                                    <li key={`b${i}`} className="ml-5 text-sm text-[#8a6a5c] flex items-center gap-2">
+                                    <li key={`b${i}`} className="ml-5 text-sm text-[#5E5046] flex items-center gap-2">
                                         <span className="absolute -left-[9px] h-4 w-4 rounded-full bg-white border-2 border-[#E6D5CC]" />
                                         <Coffee className="h-4 w-4" /> {fmtMin(e.minutes)} break
                                     </li>
                                 );
                                 if (e.type === 'revision') return (
-                                    <li key="rev" className="ml-5 text-sm text-[#4A3B32] flex items-center gap-2 font-semibold">
+                                    <li key="rev" className="ml-5 text-sm text-[#163628] flex items-center gap-2 font-semibold">
                                         <span className="absolute -left-[9px] h-4 w-4 rounded-full bg-emerald-500" />
                                         <Layers className="h-4 w-4 text-emerald-600" /> {fmtMin(e.minutes)} rapid revision
                                     </li>
@@ -604,14 +604,14 @@ const ExamTonightView = ({ projectId, selectedDocuments = [], onTopicMastered, o
                                 const isDone = done.has(e.topic);
                                 return (
                                     <li key={e.topic} className="ml-5">
-                                        <span className={`absolute -left-[9px] h-4 w-4 rounded-full ${isDone ? 'bg-emerald-500' : e.tier === 'learn' ? 'bg-[#C8A288]' : 'bg-white border-2 border-[#C8A288]'}`} />
+                                        <span className={`absolute -left-[9px] h-4 w-4 rounded-full ${isDone ? 'bg-emerald-500' : e.tier === 'learn' ? 'bg-[#1E5C42]' : 'bg-white border-2 border-[#1E5C42]'}`} />
                                         <button onClick={() => startStudy(i)} className="w-full text-left group">
                                             <div className="flex items-center gap-2 flex-wrap">
-                                                <span className={`font-semibold text-[#4A3B32] group-hover:underline ${isDone ? 'line-through opacity-60' : ''}`}>{e.topic}</span>
-                                                <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${e.tier === 'learn' ? 'bg-[#C8A288] text-white' : 'bg-[#FDF6F0] text-[#8a6a5c] border border-[#E6D5CC]'}`}>{e.tier}</span>
-                                                <span className="text-xs text-[#8a6a5c] tabular-nums">{fmtMin(e.minutes)}{startedAt ? ` · ${clockAt(startedAt, e.start)}` : ''}</span>
+                                                <span className={`font-semibold text-[#163628] group-hover:underline ${isDone ? 'line-through opacity-60' : ''}`}>{e.topic}</span>
+                                                <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${e.tier === 'learn' ? 'bg-[#1E5C42] text-white' : 'bg-[#FDF6F0] text-[#5E5046] border border-[#E6D5CC]'}`}>{e.tier}</span>
+                                                <span className="text-xs text-[#5E5046] tabular-nums">{fmtMin(e.minutes)}{startedAt ? ` · ${clockAt(startedAt, e.start)}` : ''}</span>
                                             </div>
-                                            <div className="text-xs text-[#8a6a5c] mt-0.5">
+                                            <div className="text-xs text-[#5E5046] mt-0.5">
                                                 {e.reason}{e.prerequisites?.length ? ` · builds on ${e.prerequisites.join(', ')}` : ''}
                                             </div>
                                         </button>
@@ -621,10 +621,10 @@ const ExamTonightView = ({ projectId, selectedDocuments = [], onTopicMastered, o
                         </ol>
                         {plan.skipped?.length > 0 && (
                             <details className="mt-4 text-sm">
-                                <summary className="cursor-pointer font-semibold text-[#8a6a5c]">Left for later ({plan.skipped.length})</summary>
-                                <p className="mt-2 text-[#8a6a5c]">These carry the fewest marks for the time they take. Add more time to include them.</p>
+                                <summary className="cursor-pointer font-semibold text-[#5E5046]">Left for later ({plan.skipped.length})</summary>
+                                <p className="mt-2 text-[#5E5046]">These carry the fewest marks for the time they take. Add more time to include them.</p>
                                 <div className="mt-2 flex flex-wrap gap-1.5">
-                                    {plan.skipped.map((t) => <span key={t} className="rounded-full border border-dashed border-[#E6D5CC] px-2.5 py-1 text-xs text-[#8a6a5c]">{t}</span>)}
+                                    {plan.skipped.map((t) => <span key={t} className="rounded-full border border-dashed border-[#E6D5CC] px-2.5 py-1 text-xs text-[#5E5046]">{t}</span>)}
                                 </div>
                             </details>
                         )}
@@ -643,29 +643,29 @@ const ExamTonightView = ({ projectId, selectedDocuments = [], onTopicMastered, o
         <div ref={scrollRef} className="h-full overflow-y-auto p-4 md:p-8">
             <div className="max-w-3xl mx-auto">
                 <div className="flex items-center gap-3 mb-4">
-                    <button onClick={() => setPhase('plan')} className="inline-flex items-center gap-1 rounded-xl border border-[#E6D5CC] px-3 py-1.5 text-sm font-semibold text-[#4A3B32] hover:border-[#C8A288]">
+                    <button onClick={() => setPhase('plan')} className="inline-flex items-center gap-1 rounded-xl border border-[#E6D5CC] px-3 py-1.5 text-sm font-semibold text-[#163628] hover:border-[#1E5C42]">
                         <ArrowLeft className="h-4 w-4" /> Plan
                     </button>
                     <div className="flex-1 h-2 rounded-full bg-[#E6D5CC]/60 overflow-hidden">
-                        <div className="h-full bg-[#C8A288] transition-all" style={{ width: `${progress}%` }} />
+                        <div className="h-full bg-[#1E5C42] transition-all" style={{ width: `${progress}%` }} />
                     </div>
-                    <span className="text-xs text-[#8a6a5c] tabular-nums">{done.size}/{topicEntries.length}</span>
+                    <span className="text-xs text-[#5E5046] tabular-nums">{done.size}/{topicEntries.length}</span>
                 </div>
 
                 <AnimatePresence mode="wait">
                     {entry?.type === 'break' ? (
                         <motion.div key={`break-${step}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                             className="rounded-3xl border border-[#E6D5CC] bg-white p-8 text-center">
-                            <Coffee className="mx-auto h-12 w-12 text-[#C8A288]" />
-                            <h2 className="mt-3 text-2xl font-bold text-[#4A3B32]">{fmtMin(entry.minutes)} break</h2>
-                            <p className="mt-1 text-[#8a6a5c]">Stand up, drink water, look away from the screen. Your brain files away what you just learned while you rest.</p>
+                            <Coffee className="mx-auto h-12 w-12 text-[#1E5C42]" />
+                            <h2 className="mt-3 text-2xl font-bold text-[#163628]">{fmtMin(entry.minutes)} break</h2>
+                            <p className="mt-1 text-[#5E5046]">Stand up, drink water, look away from the screen. Your brain files away what you just learned while you rest.</p>
                             <div className="mt-5 flex flex-wrap justify-center gap-2">
                                 {prevTopicIndex >= 0 && (
-                                    <button onClick={goBack} className="inline-flex items-center gap-1.5 rounded-2xl border border-[#E6D5CC] px-5 py-3 font-semibold text-[#4A3B32] hover:border-[#C8A288]">
+                                    <button onClick={goBack} className="inline-flex items-center gap-1.5 rounded-2xl border border-[#E6D5CC] px-5 py-3 font-semibold text-[#163628] hover:border-[#1E5C42]">
                                         <ArrowLeft className="h-4 w-4" /> Previous
                                     </button>
                                 )}
-                                <button onClick={() => advance(false)} className="inline-flex items-center gap-2 rounded-2xl bg-[#C8A288] px-6 py-3 font-semibold text-white hover:bg-[#B08B72]">
+                                <button onClick={() => advance(false)} className="inline-flex items-center gap-2 rounded-2xl bg-[#1E5C42] px-6 py-3 font-semibold text-white hover:bg-[#163628]">
                                     I&apos;m back <ArrowRight className="h-4 w-4" />
                                 </button>
                             </div>
@@ -673,14 +673,14 @@ const ExamTonightView = ({ projectId, selectedDocuments = [], onTopicMastered, o
                     ) : entry?.type === 'topic' ? (
                         <motion.div key={entry.topic} initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}
                             className="rounded-3xl border border-[#E6D5CC] bg-white p-5 md:p-7">
-                            <div className="flex flex-wrap items-center gap-2 text-xs text-[#8a6a5c]">
-                                <span className={`rounded-full px-2 py-0.5 font-bold uppercase ${entry.tier === 'learn' ? 'bg-[#C8A288] text-white' : 'bg-[#FDF6F0] border border-[#E6D5CC]'}`}>{entry.tier}</span>
+                            <div className="flex flex-wrap items-center gap-2 text-xs text-[#5E5046]">
+                                <span className={`rounded-full px-2 py-0.5 font-bold uppercase ${entry.tier === 'learn' ? 'bg-[#1E5C42] text-white' : 'bg-[#FDF6F0] border border-[#E6D5CC]'}`}>{entry.tier}</span>
                                 <span>Topic {position} of {topicEntries.length}</span>
                                 <span>· {fmtMin(entry.minutes)}</span>
                                 {entry.chapter && <span className="flex items-center gap-1">· <BookOpen className="h-3 w-3" /> {entry.chapter}</span>}
                             </div>
-                            <h2 className="mt-2 text-2xl md:text-3xl font-bold text-[#4A3B32]">{entry.topic}</h2>
-                            <p className="text-sm text-[#8a6a5c] mt-1">{entry.reason}{entry.prerequisites?.length ? ` · builds on ${entry.prerequisites.join(', ')}` : ''}</p>
+                            <h2 className="mt-2 text-2xl md:text-3xl font-bold text-[#163628]">{entry.topic}</h2>
+                            <p className="text-sm text-[#5E5046] mt-1">{entry.reason}{entry.prerequisites?.length ? ` · builds on ${entry.prerequisites.join(', ')}` : ''}</p>
 
                             <div className="mt-5">
                                 {cards[entry.topic] ? (
@@ -700,19 +700,19 @@ const ExamTonightView = ({ projectId, selectedDocuments = [], onTopicMastered, o
                                                 <div className="flex flex-col sm:flex-row gap-2">
                                                     {prevTopicIndex >= 0 && (
                                                         <button onClick={goBack}
-                                                            className="order-last sm:order-first flex items-center justify-center gap-1.5 rounded-2xl border border-[#E6D5CC] px-4 py-3 font-semibold text-[#4A3B32] hover:border-[#C8A288] hover:bg-[#FDF6F0]">
+                                                            className="order-last sm:order-first flex items-center justify-center gap-1.5 rounded-2xl border border-[#E6D5CC] px-4 py-3 font-semibold text-[#163628] hover:border-[#1E5C42] hover:bg-[#FDF6F0]">
                                                             <ArrowLeft className="h-4 w-4" /> Previous
                                                         </button>
                                                     )}
-                                                    {cheer && <p className="flex-1 self-center text-sm font-semibold text-[#C8A288]">{companion}: {cheer}</p>}
+                                                    {cheer && <p className="flex-1 self-center text-sm font-semibold text-[#1E5C42]">{companion}: {cheer}</p>}
                                                     {!cheer && entry.tier === 'learn' && cards[entry.topic].quick_check?.length > 0 && (
                                                         <button onClick={() => setChecking(true)}
-                                                            className="flex-1 rounded-2xl border-2 border-[#C8A288] px-4 py-3 font-semibold text-[#4A3B32] hover:bg-[#FDF6F0]">
+                                                            className="flex-1 rounded-2xl border-2 border-[#1E5C42] px-4 py-3 font-semibold text-[#163628] hover:bg-[#FDF6F0]">
                                                             Quick check ({cards[entry.topic].quick_check.length} Qs)
                                                         </button>
                                                     )}
                                                     <button onClick={() => advance(true)}
-                                                        className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-[#C8A288] px-4 py-3 font-semibold text-white hover:bg-[#B08B72]">
+                                                        className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-[#1E5C42] px-4 py-3 font-semibold text-white hover:bg-[#163628]">
                                                         Got it, next <ArrowRight className="h-4 w-4" />
                                                     </button>
                                                 </div>
@@ -728,8 +728,8 @@ const ExamTonightView = ({ projectId, selectedDocuments = [], onTopicMastered, o
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="flex items-center gap-3 rounded-2xl bg-[#FDF6F0] p-5 text-[#8a6a5c]">
-                                        <Loader2 className="h-5 w-5 animate-spin text-[#C8A288]" /> {companion} is boiling this topic down to what matters…
+                                    <div className="flex items-center gap-3 rounded-2xl bg-[#FDF6F0] p-5 text-[#5E5046]">
+                                        <Loader2 className="h-5 w-5 animate-spin text-[#1E5C42]" /> {companion} is boiling this topic down to what matters…
                                     </div>
                                 )}
                             </div>

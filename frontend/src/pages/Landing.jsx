@@ -364,8 +364,8 @@ function Hero() {
   return (
     <section id="top" className="relative overflow-hidden bg-dotted">
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        <div className="aurora-blob animate-aurora-1" style={{ width: 420, height: 420, top: -100, left: -80, background: "oklch(0.72 0.07 60)" }} />
-        <div className="aurora-blob animate-aurora-2" style={{ width: 380, height: 380, top: 60, right: -60, background: "oklch(0.75 0.16 75)" }} />
+        <div className="aurora-blob animate-aurora-1" style={{ width: 420, height: 420, top: -100, left: -80, background: "oklch(0.88 0.06 140)" }} />
+        <div className="aurora-blob animate-aurora-2" style={{ width: 380, height: 380, top: 60, right: -60, background: "oklch(0.92 0.15 118)" }} />
       </div>
 
       <div className="mx-auto max-w-6xl px-4 pb-20 pt-16 sm:px-6 sm:pt-24 lg:px-8">
@@ -844,7 +844,7 @@ function FinalCTA() {
   return (
     <section className="relative overflow-hidden bg-dotted py-20 sm:py-28">
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        <div className="aurora-blob animate-aurora-1" style={{ width: 400, height: 400, top: -80, left: "20%", background: "oklch(0.72 0.07 60)" }} />
+        <div className="aurora-blob animate-aurora-1" style={{ width: 400, height: 400, top: -80, left: "20%", background: "oklch(0.88 0.06 140)" }} />
       </div>
       <div className="mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
         <motion.div

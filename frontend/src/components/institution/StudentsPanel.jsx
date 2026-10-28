@@ -5,7 +5,7 @@ import {
 } from '../../api';
 
 const card = 'rounded-3xl border border-[#E6D5CC] bg-white p-5 md:p-6';
-const input = 'w-full rounded-2xl border border-[#E6D5CC] bg-[#FDF6F0] px-4 py-2.5 outline-none focus:ring-2 focus:ring-[#C8A288]';
+const input = 'w-full rounded-2xl border border-[#E6D5CC] bg-[#FDF6F0] px-4 py-2.5 outline-none focus:ring-2 focus:ring-[#1E5C42]';
 
 /** Minimal CSV reader: commas or tabs, quoted fields, first row may be a header. */
 export const parseStudentCsv = (text, classes = []) => {
@@ -74,7 +74,7 @@ const Credentials = ({ result, onClose }) => {
     return (
         <div className={`${card} border-emerald-300`}>
             <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="font-bold text-[#4A3B32]">{rows.length} account{rows.length === 1 ? '' : 's'} ready</h3>
+                <h3 className="font-bold text-[#163628]">{rows.length} account{rows.length === 1 ? '' : 's'} ready</h3>
                 <div className="flex gap-2">
                     {rows.length > 0 && (
                         <>
@@ -83,12 +83,12 @@ const Credentials = ({ result, onClose }) => {
                                 {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />} Copy
                             </button>
                             <button onClick={() => download('student-sign-ins.csv', csv)}
-                                className="inline-flex items-center gap-1 rounded-xl bg-[#4A3B32] px-3 py-1.5 text-sm font-semibold text-white">
+                                className="inline-flex items-center gap-1 rounded-xl bg-[#163628] px-3 py-1.5 text-sm font-semibold text-white">
                                 <Download className="h-4 w-4" /> Download CSV
                             </button>
                         </>
                     )}
-                    <button onClick={onClose} className="rounded-xl px-3 py-1.5 text-sm font-semibold text-[#8a6a5c]">Done</button>
+                    <button onClick={onClose} className="rounded-xl px-3 py-1.5 text-sm font-semibold text-[#5E5046]">Done</button>
                 </div>
             </div>
             {rows.length > 0 && (
@@ -97,7 +97,7 @@ const Credentials = ({ result, onClose }) => {
             {rows.length > 0 && (
                 <div className="mt-3 max-h-72 overflow-auto">
                     <table className="w-full text-sm">
-                        <thead><tr className="text-left text-xs uppercase tracking-wide text-[#8a6a5c]"><th className="pb-2 pr-3">Student</th><th className="pb-2 pr-3">Sign-in ID</th><th className="pb-2">Password</th></tr></thead>
+                        <thead><tr className="text-left text-xs uppercase tracking-wide text-[#5E5046]"><th className="pb-2 pr-3">Student</th><th className="pb-2 pr-3">Sign-in ID</th><th className="pb-2">Password</th></tr></thead>
                         <tbody className="divide-y divide-[#E6D5CC]">
                             {rows.map((r) => (
                                 <tr key={r.user_id}><td className="py-1.5 pr-3">{r.name}</td><td className="py-1.5 pr-3 font-mono">{r.login_id}</td><td className="py-1.5 font-mono">{r.password}</td></tr>
@@ -154,15 +154,15 @@ const AddStudents = ({ classes, domain, onCreated, disabled }) => {
     return (
         <div className={card}>
             <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-lg font-bold text-[#4A3B32] flex items-center gap-2"><UserPlus className="h-5 w-5 text-[#C8A288]" /> Create student sign-ins</h2>
+                <h2 className="text-lg font-bold text-[#163628] flex items-center gap-2"><UserPlus className="h-5 w-5 text-[#1E5C42]" /> Create student sign-ins</h2>
                 <div className="flex gap-1 rounded-2xl bg-[#FDF6F0] p-1">
                     {[['one', 'One student'], ['many', 'Many (CSV)']].map(([id, label]) => (
                         <button key={id} onClick={() => setMode(id)}
-                            className={`rounded-xl px-3 py-1 text-sm font-semibold ${mode === id ? 'bg-white shadow text-[#4A3B32]' : 'text-[#8a6a5c]'}`}>{label}</button>
+                            className={`rounded-xl px-3 py-1 text-sm font-semibold ${mode === id ? 'bg-white shadow text-[#163628]' : 'text-[#5E5046]'}`}>{label}</button>
                     ))}
                 </div>
             </div>
-            <p className="mt-1 text-sm text-[#8a6a5c]">
+            <p className="mt-1 text-sm text-[#5E5046]">
                 Each student gets an ID like <span className="font-mono">name-07@{domain}</span> (07 = last two digits of the register number). It's only for signing in; no email is sent.
             </p>
             {disabled && <p className="mt-2 text-sm text-amber-800">Available once your school is approved and paid up.</p>}
@@ -180,13 +180,13 @@ const AddStudents = ({ classes, domain, onCreated, disabled }) => {
                     <input value={one.login_id} onChange={set('login_id')} placeholder={preview ? `ID: ${preview}` : 'Custom ID (optional)'}
                         className={`${input} sm:col-span-2 font-mono text-sm`} aria-label="Custom sign-in ID" />
                     {error && <p className="text-sm text-rose-600 sm:col-span-2">{error}</p>}
-                    <button disabled={busy || disabled} className="sm:col-span-2 rounded-2xl bg-[#4A3B32] px-4 py-3 font-semibold text-white disabled:opacity-50">
+                    <button disabled={busy || disabled} className="sm:col-span-2 rounded-2xl bg-[#163628] px-4 py-3 font-semibold text-white disabled:opacity-50">
                         {busy ? <Loader2 className="mx-auto h-5 w-5 animate-spin" /> : 'Create sign-in'}
                     </button>
                 </form>
             ) : (
                 <div className="mt-4 space-y-3">
-                    <p className="text-xs text-[#8a6a5c]">Columns: <span className="font-mono">name, reg_no, password, class</span>. Password and class are optional; class must match a class name. Up to 500 at a time.</p>
+                    <p className="text-xs text-[#5E5046]">Columns: <span className="font-mono">name, reg_no, password, class</span>. Password and class are optional; class must match a class name. Up to 500 at a time.</p>
                     <textarea value={csv} onChange={(e) => setCsv(e.target.value)} rows={6} className={`${input} font-mono text-sm`}
                         placeholder={'name,reg_no,password,class\nArun Kumar,21CS107,,10 A\nPriya S,21CS112,Welcome123,10 A'} aria-label="Students CSV" />
                     <div className="flex flex-wrap items-center gap-3">
@@ -194,12 +194,12 @@ const AddStudents = ({ classes, domain, onCreated, disabled }) => {
                             <Upload className="h-4 w-4" /> Upload .csv
                             <input type="file" accept=".csv,.txt,text/csv" onChange={readFile} className="hidden" />
                         </label>
-                        <span className="text-sm text-[#8a6a5c]">{parsed.students.length} student{parsed.students.length === 1 ? '' : 's'} found</span>
+                        <span className="text-sm text-[#5E5046]">{parsed.students.length} student{parsed.students.length === 1 ? '' : 's'} found</span>
                     </div>
                     {parsed.problems.length > 0 && <ul className="text-sm text-amber-800">{parsed.problems.slice(0, 5).map((p) => <li key={p}>{p}</li>)}</ul>}
                     {error && <p className="text-sm text-rose-600">{error}</p>}
                     <button onClick={() => submit(parsed.students)} disabled={busy || disabled || !parsed.students.length || parsed.students.length > 500 || parsed.problems.length > 0}
-                        className="w-full rounded-2xl bg-[#4A3B32] px-4 py-3 font-semibold text-white disabled:opacity-50">
+                        className="w-full rounded-2xl bg-[#163628] px-4 py-3 font-semibold text-white disabled:opacity-50">
                         {busy ? <span className="inline-flex items-center gap-2"><Loader2 className="h-5 w-5 animate-spin" /> Creating…</span> : `Create ${parsed.students.length || ''} sign-ins`}
                     </button>
                 </div>
@@ -219,14 +219,14 @@ const StudentRow = ({ s, role, classes, onChanged, onReset }) => {
     return (
         <tr className="align-top">
             <td className="py-2 pr-3">
-                <div className={`font-semibold ${s.disabled ? 'text-[#8a6a5c] line-through' : 'text-[#4A3B32]'}`}>{s.display_name || '—'}</div>
-                <div className="text-xs text-[#8a6a5c]">{s.reg_no || ''}{s.classes?.length ? ` · ${s.classes.join(', ')}` : ''}</div>
+                <div className={`font-semibold ${s.disabled ? 'text-[#5E5046] line-through' : 'text-[#163628]'}`}>{s.display_name || '—'}</div>
+                <div className="text-xs text-[#5E5046]">{s.reg_no || ''}{s.classes?.length ? ` · ${s.classes.join(', ')}` : ''}</div>
                 {error && <div className="text-xs text-rose-600">{error}</div>}
             </td>
             <td className="py-2 pr-3 font-mono text-xs break-all">
                 {s.login_id || s.email}
                 {s.managed && s.must_change_password && !s.disabled && <div className="font-sans text-[11px] text-amber-700">Hasn't set own password yet</div>}
-                {!s.managed && <div className="font-sans text-[11px] text-[#8a6a5c]">Own account</div>}
+                {!s.managed && <div className="font-sans text-[11px] text-[#5E5046]">Own account</div>}
             </td>
             <td className="py-2">
                 <div className="flex flex-wrap items-center gap-1.5">
@@ -291,22 +291,22 @@ const StudentsPanel = ({ data, onChanged }) => {
                 <div className={`${card} border-emerald-300 flex flex-wrap items-center justify-between gap-3`}>
                     <div className="text-sm">
                         New password for <span className="font-mono">{reset.login_id}</span>: <span className="font-mono font-bold text-base">{reset.password}</span>
-                        <div className="text-xs text-[#8a6a5c]">They'll be asked to choose their own after signing in.</div>
+                        <div className="text-xs text-[#5E5046]">They'll be asked to choose their own after signing in.</div>
                     </div>
                     <div className="flex gap-2">
                         <button onClick={() => navigator.clipboard?.writeText(`${reset.login_id}\t${reset.password}`)} className="rounded-xl border border-[#E6D5CC] px-3 py-1.5 text-sm font-semibold"><Copy className="inline h-4 w-4" /> Copy</button>
-                        <button onClick={() => setReset(null)} className="rounded-xl px-3 py-1.5 text-sm font-semibold text-[#8a6a5c]">Done</button>
+                        <button onClick={() => setReset(null)} className="rounded-xl px-3 py-1.5 text-sm font-semibold text-[#5E5046]">Done</button>
                     </div>
                 </div>
             )}
             <AddStudents classes={classes} domain={data.login_domain || 'luminaiq.fun'} onCreated={created} disabled={!live} />
             <div className={card}>
                 <div className="flex flex-wrap items-center gap-3">
-                    <h2 className="text-lg font-bold text-[#4A3B32] mr-auto">Students {list ? <span className="text-sm font-normal text-[#8a6a5c]">({list.total})</span> : null}</h2>
+                    <h2 className="text-lg font-bold text-[#163628] mr-auto">Students {list ? <span className="text-sm font-normal text-[#5E5046]">({list.total})</span> : null}</h2>
                     <div className="relative">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a6a5c]" />
+                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#5E5046]" />
                         <input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Name, ID or reg. no"
-                            className="w-56 rounded-2xl border border-[#E6D5CC] bg-[#FDF6F0] py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-[#C8A288]" aria-label="Search students" />
+                            className="w-56 rounded-2xl border border-[#E6D5CC] bg-[#FDF6F0] py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-[#1E5C42]" aria-label="Search students" />
                     </div>
                     <select value={classId} onChange={(e) => { setClassId(e.target.value); setPage(1); }} aria-label="Filter by class"
                         className="rounded-2xl border border-[#E6D5CC] bg-[#FDF6F0] px-3 py-2 text-sm">
@@ -316,14 +316,14 @@ const StudentsPanel = ({ data, onChanged }) => {
                 </div>
                 {error && <p className="mt-3 text-sm text-rose-600">{error}</p>}
                 {!list ? (
-                    <div className="mt-4 flex items-center gap-2 text-[#8a6a5c]"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
+                    <div className="mt-4 flex items-center gap-2 text-[#5E5046]"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
                 ) : list.students.length === 0 ? (
-                    <p className="mt-4 text-sm text-[#8a6a5c]">{q || classId ? 'No students match.' : 'No students yet. Create sign-ins above or share a class code.'}</p>
+                    <p className="mt-4 text-sm text-[#5E5046]">{q || classId ? 'No students match.' : 'No students yet. Create sign-ins above or share a class code.'}</p>
                 ) : (
                     <div className="mt-3 overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead>
-                                <tr className="text-left text-xs uppercase tracking-wide text-[#8a6a5c]"><th className="pb-2 pr-3">Student</th><th className="pb-2 pr-3">Sign-in</th><th className="pb-2" /></tr>
+                                <tr className="text-left text-xs uppercase tracking-wide text-[#5E5046]"><th className="pb-2 pr-3">Student</th><th className="pb-2 pr-3">Sign-in</th><th className="pb-2" /></tr>
                             </thead>
                             <tbody className="divide-y divide-[#E6D5CC]">
                                 {list.students.map((s) => (

@@ -175,23 +175,23 @@ const VisualLabView = ({ projectId, availableTopics = [], selectedDocuments = []
             <div className="shrink-0 p-3 md:p-4 border-b border-[#E6D5CC]">
                 <form className="max-w-5xl mx-auto flex gap-2" onSubmit={(e) => { e.preventDefault(); build(query); }}>
                     <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8a6a5c]" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#5E5046]" />
                         <input value={query} onChange={(e) => setQuery(e.target.value)}
                             placeholder="Any topic: pendulum, Tyndall effect, the human heart…"
-                            className="w-full rounded-2xl border border-[#E6D5CC] bg-white pl-9 pr-3 py-2.5 text-[#4A3B32] placeholder-[#8a6a5c] outline-none focus:ring-2 focus:ring-[#C8A288]" />
+                            className="w-full rounded-2xl border border-[#E6D5CC] bg-white pl-9 pr-3 py-2.5 text-[#163628] placeholder-[#5E5046] outline-none focus:ring-2 focus:ring-[#1E5C42]" />
                     </div>
                     <button type="submit" disabled={busy || !query.trim()}
-                        className="inline-flex items-center gap-2 rounded-2xl bg-[#C8A288] px-4 py-2.5 font-semibold text-white hover:bg-[#B08B72] disabled:opacity-50">
+                        className="inline-flex items-center gap-2 rounded-2xl bg-[#1E5C42] px-4 py-2.5 font-semibold text-white hover:bg-[#163628] disabled:opacity-50">
                         <Wand2 className="h-4 w-4" /> <span className="hidden sm:inline">Visualize</span>
                     </button>
                     {html && (
                         <>
                             <button type="button" onClick={() => build(topic, { refresh: true })} disabled={busy} title="Build a fresh version"
-                                className="rounded-2xl border border-[#E6D5CC] bg-white px-3 text-[#4A3B32] hover:border-[#C8A288] disabled:opacity-50"><RefreshCw className="h-4 w-4" /></button>
+                                className="rounded-2xl border border-[#E6D5CC] bg-white px-3 text-[#163628] hover:border-[#1E5C42] disabled:opacity-50"><RefreshCw className="h-4 w-4" /></button>
                             <button type="button" onClick={download} title="Download as an HTML file"
-                                className="hidden sm:block rounded-2xl border border-[#E6D5CC] bg-white px-3 text-[#4A3B32] hover:border-[#C8A288]"><Download className="h-4 w-4" /></button>
+                                className="hidden sm:block rounded-2xl border border-[#E6D5CC] bg-white px-3 text-[#163628] hover:border-[#1E5C42]"><Download className="h-4 w-4" /></button>
                             <button type="button" onClick={() => setFull((f) => !f)} title={full ? 'Exit full screen' : 'Full screen'}
-                                className="rounded-2xl border border-[#E6D5CC] bg-white px-3 text-[#4A3B32] hover:border-[#C8A288]">{full ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</button>
+                                className="rounded-2xl border border-[#E6D5CC] bg-white px-3 text-[#163628] hover:border-[#1E5C42]">{full ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</button>
                         </>
                     )}
                 </form>
@@ -208,21 +208,21 @@ const VisualLabView = ({ projectId, availableTopics = [], selectedDocuments = []
                     <div className="absolute inset-0 flex items-center justify-center bg-[#FDF6F0]/90 p-6">
                         <div className="max-w-sm text-center">
                             <div className="relative mx-auto h-16 w-16">
-                                <FlaskConical className="h-16 w-16 text-[#C8A288]" />
-                                <Loader2 className="absolute -right-2 -bottom-2 h-6 w-6 animate-spin text-[#C8A288]" />
+                                <FlaskConical className="h-16 w-16 text-[#1E5C42]" />
+                                <Loader2 className="absolute -right-2 -bottom-2 h-6 w-6 animate-spin text-[#1E5C42]" />
                             </div>
-                            <h3 className="mt-3 text-lg font-bold text-[#4A3B32]">{repairing ? 'Fixing a glitch in the interactive…' : `${companion} is building “${topic}”`}</h3>
-                            <p className="mt-1 text-sm text-[#8a6a5c]">{BUILD_STEPS[stepIdx]}</p>
-                            <p className="mt-3 text-xs text-[#8a6a5c]">
+                            <h3 className="mt-3 text-lg font-bold text-[#163628]">{repairing ? 'Fixing a glitch in the interactive…' : `${companion} is building “${topic}”`}</h3>
+                            <p className="mt-1 text-sm text-[#5E5046]">{BUILD_STEPS[stepIdx]}</p>
+                            <p className="mt-3 text-xs text-[#5E5046]">
                                 {elapsed < 75 ? 'A first build takes up to a minute. Next time it opens instantly.' : 'Taking longer than usual. You can wait a bit more or try again.'}
                                 <span className="ml-1 tabular-nums">({elapsed}s)</span>
                             </p>
                             {loading && (
                                 <div className="mt-4 flex justify-center gap-2">
                                     {elapsed >= 75 && (
-                                        <button onClick={() => build(topic)} className="rounded-xl bg-[#C8A288] px-4 py-2 text-sm font-semibold text-white hover:bg-[#B08B72]">Try again</button>
+                                        <button onClick={() => build(topic)} className="rounded-xl bg-[#1E5C42] px-4 py-2 text-sm font-semibold text-white hover:bg-[#163628]">Try again</button>
                                     )}
-                                    <button onClick={cancel} className="rounded-xl border border-[#E6D5CC] bg-white px-4 py-2 text-sm font-semibold text-[#4A3B32] hover:border-[#C8A288]">Cancel</button>
+                                    <button onClick={cancel} className="rounded-xl border border-[#E6D5CC] bg-white px-4 py-2 text-sm font-semibold text-[#163628] hover:border-[#1E5C42]">Cancel</button>
                                 </div>
                             )}
                         </div>
@@ -257,13 +257,13 @@ const VisualLabView = ({ projectId, availableTopics = [], selectedDocuments = []
                             </motion.div>
                             {error && <p className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
                             <div className="mt-5 rounded-3xl border border-[#E6D5CC] bg-white p-5">
-                                <h3 className="font-bold text-[#4A3B32] flex items-center gap-2"><Sparkles className="h-4 w-4 text-[#C8A288]" /> {availableTopics.length ? 'From your book' : 'Try one'}</h3>
+                                <h3 className="font-bold text-[#163628] flex items-center gap-2"><Sparkles className="h-4 w-4 text-[#1E5C42]" /> {availableTopics.length ? 'From your book' : 'Try one'}</h3>
                                 <div className="mt-3 flex flex-wrap gap-2">
                                     {suggestions.map((t) => (
                                         <button key={t} onClick={() => build(t)}
-                                            className="rounded-full border border-[#E6D5CC] bg-white px-3 py-1.5 text-sm text-[#4A3B32] hover:border-[#C8A288] hover:bg-[#FDF6F0]">{t}</button>
+                                            className="rounded-full border border-[#E6D5CC] bg-white px-3 py-1.5 text-sm text-[#163628] hover:border-[#1E5C42] hover:bg-[#FDF6F0]">{t}</button>
                                     ))}
-                                    {!suggestions.length && <p className="text-sm text-[#8a6a5c]">No matching topic, so press Visualize to build “{query}” anyway.</p>}
+                                    {!suggestions.length && <p className="text-sm text-[#5E5046]">No matching topic, so press Visualize to build “{query}” anyway.</p>}
                                 </div>
                             </div>
                         </div>
