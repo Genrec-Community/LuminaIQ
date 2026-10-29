@@ -120,7 +120,8 @@
       requestAnimationFrame(tick);
     })();
   </script>
-  <div id="root"></div>
+  <!-- Read by crawlers and screen readers before the app loads; React replaces it on mount -->
+  <div id="root"><main><h1 style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Lumina IQ: your books, turned into a study plan</h1></main></div>
   <script type="module" src="/src/main.tsx"></script>
 </body>
 
