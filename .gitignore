@@ -375,3 +375,6 @@ logs_extracted*/
 play-store-keys/
 azure-deploy-secrets/
 .jury/
+
+# The marketing site keeps its helpers in src/lib (not a Python build dir)
+!frontend/website/src/lib/

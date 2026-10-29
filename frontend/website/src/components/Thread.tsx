@@ -69,7 +69,7 @@ export function Thread({ children }: { children: ReactNode }) {
   );
 }
 
-/** A review node on the thread. `day` is the SM-2 interval it stands for. */
+/** A review node on the thread. `day` is the review day it stands for. */
 export function Node({ day }: { day: number }) {
   return (
     <span className="node" data-node={day} aria-hidden="true">

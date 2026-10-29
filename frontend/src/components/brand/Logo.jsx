@@ -15,7 +15,7 @@ export default function Logo({ className = '', size = 'h-8 w-8', word = true }) 
     return (
         <span className={`lumina-logo ${className}`}>
             <Mark className={size} />
-            {word && <span className="lumina-logo__word">Lumina<span>IQ</span></span>}
+            {word && <span className="lumina-logo__word">Lumina <span>IQ</span></span>}
         </span>
     );
 }

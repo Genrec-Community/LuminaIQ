@@ -33,7 +33,7 @@ export function Footer() {
           <div className="finale__brand">
             <Mark className="finale__mark" />
             <p>
-              LuminaIQ turns your own study material into practice, and tells you when to come back to it.
+              Lumina IQ turns your own study material into practice, and tells you when to come back to it.
             </p>
           </div>
           <nav aria-label="Product">
@@ -63,8 +63,8 @@ export function Footer() {
         </div>
 
         <div className="finale__base">
-          <p>© {year} LuminaIQ. Built by {site.maker.name}.</p>
-          <p>Photography from Unsplash. Set in Newsreader and Atkinson Hyperlegible Next.</p>
+          <p>© {year} Lumina IQ. Built by {site.maker.name}.</p>
+          <p>Screens from the Lumina IQ app. Set in Newsreader and Atkinson Hyperlegible Next.</p>
         </div>
       </div>
     </footer>

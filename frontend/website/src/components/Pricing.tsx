@@ -1,10 +1,10 @@
 'use client';
 import { useState } from 'react';
-import { plans, site } from '@/data/site';
+import { examNightPass, plans } from '@/data/site';
 
-const money = (n: number) => (Number.isInteger(n) ? `$${n}` : `$${n.toFixed(2)}`);
+const money = (n: number) => `₹${n.toLocaleString('en-IN')}`;
 
-/** Plans with a monthly / annual switch. Annual prices are placeholders (see src/data/site.ts). */
+/** Plans with a monthly / yearly switch; the same plans the app sells at /plans. */
 export function Pricing({ headingLevel = 'h3' }: { headingLevel?: 'h2' | 'h3' }) {
   const [annual, setAnnual] = useState(false);
   const H = headingLevel;
@@ -15,7 +15,7 @@ export function Pricing({ headingLevel = 'h3' }: { headingLevel?: 'h2' | 'h3' })
           Monthly billing
         </button>
         <button type="button" className="billing__opt" aria-pressed={annual} onClick={() => setAnnual(true)}>
-          Annual billing <span className="billing__save">2 months free</span>
+          Yearly billing <span className="billing__save">save about 30%</span>
         </button>
       </div>
 
@@ -31,10 +31,10 @@ export function Pricing({ headingLevel = 'h3' }: { headingLevel?: 'h2' | 'h3' })
                 <p className="plan__price">
                   <span className="plan__amount" aria-live="polite">{money(price)}</span>
                   <span className="plan__per">
-                    {p.monthly === 0 ? 'forever' : annual ? 'per month, billed yearly' : 'per month'}
+                    {p.monthly === 0 ? 'forever' : annual ? `per month, ${money(p.yearly)} a year` : 'per month'}
                   </span>
                 </p>
-                <a href={site.appUrl} className={`btn ${p.popular ? 'btn--dark' : 'btn--soft'} btn--block`}>
+                <a href={annual && p.monthly ? `${p.href}&cycle=yearly` : p.href} className={`btn ${p.popular ? 'btn--dark' : 'btn--soft'} btn--block`}>
                   <span>{p.cta}</span>
                 </a>
               </div>
@@ -50,6 +50,9 @@ export function Pricing({ headingLevel = 'h3' }: { headingLevel?: 'h2' | 'h3' })
           );
         })}
       </ul>
+      <p className="pricing__pass">
+        Exam tomorrow? The <a className="link" href={examNightPass.href}>Exam Night Pass</a> gives you {examNightPass.hours} hours of Topper for ₹{examNightPass.price}. One payment, nothing renews.
+      </p>
     </div>
   );
 }

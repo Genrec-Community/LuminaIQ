@@ -1,5 +1,5 @@
 /* ==========================================================================
-   LuminaIQ. Tokens first (see DESIGN.md), then foundation, then sections.
+   Lumina IQ. Tokens first (see DESIGN.md), then foundation, then sections.
    ========================================================================== */
 
 :root {
@@ -400,6 +400,13 @@ html.motion .thread__svg path { stroke-dashoffset: 1; }
 .loop__grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--gutter); row-gap: 3rem; }
 .loop__intro { grid-column: 1 / -1; display: grid; gap: 1.5rem; justify-items: start; margin-bottom: 2rem; }
 .loop__intro > h2 { max-width: 15ch; }
+/* Wide screens: the headline on the left, its argument on the right, like the hero (no empty half) */
+@media (min-width: 1024px) {
+  .loop__intro { grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--gutter); align-items: end; }
+  .loop__intro > :not(h2):not(p) { grid-column: 1 / -1; }
+  .loop__intro > h2 { grid-column: 1 / 8; max-width: none; }
+  .loop__intro > .lede { grid-column: 8 / 13; padding-bottom: 0.6rem; }
+}
 .loop__stage { grid-column: 1 / 6; grid-row: 2; position: sticky; top: calc(var(--header-h) + 4vh); align-self: start; width: min(100%, 26rem); aspect-ratio: 1; }
 .dial { width: 100%; height: 100%; rotate: 0deg; }
 .dial__track { fill: none; stroke: var(--c-line); stroke-width: 1; }
@@ -416,7 +423,7 @@ html.motion .thread__svg path { stroke-dashoffset: 1; }
 .loop__stage[data-state='2'] [data-i='2'], .loop__stage[data-state='3'] [data-i='3'] { color: var(--c-fg); background: var(--c-accent); }
 .dial__center { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; font-family: var(--f-display); font-weight: 300; font-style: italic; font-size: clamp(2rem, 1.5rem + 2vw, 3.2rem); letter-spacing: -0.03em; line-height: 0.9; }
 .dial__center span { display: block; font-style: normal; font-family: var(--f-body); font-size: var(--t-xs); letter-spacing: 0; color: var(--c-muted); margin-bottom: 0.4rem; }
-.loop__chapters { grid-column: 7 / 13; grid-row: 2; list-style: none; padding: 0; display: grid; gap: clamp(4rem, 12vh, 9rem); padding-block: 4vh 18vh; }
+.loop__chapters { grid-column: 7 / 13; grid-row: 2; list-style: none; padding: 0; display: grid; gap: clamp(4rem, 12vh, 9rem); padding-block: 4vh 8vh; }
 .chapter { display: grid; gap: 1rem; opacity: 0.38; transition: opacity 0.5s var(--ease-soft); }
 .chapter.is-active { opacity: 1; }
 html:not(.motion) .chapter { opacity: 1; }
@@ -425,7 +432,9 @@ html:not(.motion) .chapter { opacity: 1; }
 .chapter__tools { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 @media (max-width: 1023px) {
   .loop__intro { grid-column: 1 / -1; }
-  .loop__stage { display: block; grid-column: 1 / -1; grid-row: 2; width: 100%; aspect-ratio: auto; top: calc(var(--header-h) + 0.5rem); z-index: 3; margin-bottom: -1rem; }
+  /* The phone tab bar sits on a paper band, so cards slide under it instead of colliding with it */
+  .loop__stage { display: block; grid-column: 1 / -1; grid-row: 2; width: 100%; aspect-ratio: auto; top: var(--header-h); z-index: 3; margin-bottom: -1rem; padding: 0.5rem 0 1.25rem; background: linear-gradient(var(--c-bg) 72%, rgb(253 246 240 / 0)); }
+  .loop__chapters > li { scroll-margin-top: calc(var(--header-h) + 5rem); }
   .loop__stage::before, .loop__stage .dial, .loop__stage .dial__center { display: none; }
   .loop__stage > .dial__labels { position: static; inset: auto; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.25rem; padding: 0.3rem; border-radius: 999px; background: var(--c-card); box-shadow: var(--shadow); font-size: var(--t-xs); }
   .loop__stage .dial__labels li { position: static; text-align: center; padding: 0.55rem 0.2rem; background: transparent; transition: background-color 0.4s var(--ease-out), color 0.3s; }
@@ -884,4 +893,15 @@ html.motion .step.is-lit { opacity: 1; }
   html.dock-on:not(.menu-open) .dock { translate: 0 0; visibility: visible; transition: translate 0.6s var(--ease-out), visibility 0s; }
   .dock .btn { min-height: 3rem; }
   html.dock-on .finale { padding-bottom: 6rem; }
+}
+
+/* Product shots: the real app, framed like a sheet of paper (no duotone) */
+.photo--product { background: var(--c-card); box-shadow: inset 0 0 0 1px var(--c-line); }
+.photo--product img { filter: none; mix-blend-mode: normal; object-fit: cover; object-position: top center; }
+.photo--product::after { display: none; }
+@media (min-width: 1024px) {
+  .tools__head { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--gutter); align-items: end; }
+  .tools__head > :not(h2):not(p) { grid-column: 1 / -1; }
+  .tools__head > h2 { grid-column: 1 / 8; }
+  .tools__head > .lede { grid-column: 8 / 13; padding-bottom: 0.6rem; }
 }

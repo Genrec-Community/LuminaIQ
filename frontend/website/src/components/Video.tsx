@@ -1,33 +1,17 @@
 'use client';
 /* eslint-disable @next/next/no-img-element -- YouTube thumbnail */
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 
 /**
- * The walkthrough plays by itself (muted, looping) as soon as it scrolls near the viewport, which is
- * the only kind of autoplay browsers allow. "Sound on" unmutes through the YouTube iframe API.
- * Under reduced motion it waits for a click instead.
+ * The walkthrough is a poster until it is clicked: no YouTube code loads before then (lighter page,
+ * no broken player where embeds are blocked), and the click lets it play with sound straight away.
  */
 export function Video({ id, title }: { id: string; title: string }) {
   const box = useRef<HTMLDivElement>(null);
   const frame = useRef<HTMLIFrameElement>(null);
   const [play, setPlay] = useState(false);
-  const [muted, setMuted] = useState(true);
+  const [muted, setMuted] = useState(false);
 
-  useEffect(() => {
-    const el = box.current;
-    if (!el || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
-          setPlay(true);
-          io.disconnect();
-        }
-      },
-      { rootMargin: '300px 0px' },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
 
   const command = (func: string) =>
     frame.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args: [] }), '*');
@@ -40,7 +24,7 @@ export function Video({ id, title }: { id: string; title: string }) {
     setMuted((m) => !m);
   };
 
-  const src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=1&loop=1&playlist=${id}&playsinline=1&rel=0&modestbranding=1&enablejsapi=1`;
+  const src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=0&loop=1&playlist=${id}&playsinline=1&rel=0&modestbranding=1&enablejsapi=1`;
 
   return (
     <div className="video" ref={box}>

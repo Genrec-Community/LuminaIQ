@@ -1,4 +1,4 @@
-// Global motion for the LuminaIQ site. Runs once on the client, before the first page initializes.
+// Global motion for the Lumina IQ site. Runs once on the client, before the first page initializes.
 // Motion verb: "mark and settle". Strokes draw like a highlighter; cards settle like paper.
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -74,11 +74,17 @@ function header() {
     const max = document.documentElement.scrollHeight - innerHeight;
     h.toggle('dock-on', y > innerHeight * 0.75 && y < max - innerHeight * 1.1);
     if (Math.abs(y - last) < 4) return;
-    h.toggle('frame-away', y > 240 && y > last && !h.contains('menu-open'));
+    // Over the closing band the header stays away, so it never covers that band's own Start free
+    const finale = document.querySelector('.finale');
+    const overFinale = !!finale && finale.getBoundingClientRect().top < innerHeight * 0.35;
+    h.toggle('frame-away', !h.contains('menu-open') && ((y > 240 && y > last) || overFinale));
     last = y;
   });
   onPage(() => {
     document.documentElement.classList.remove('frame-away', 'dock-on');
+    // A nav link keeps focus after Back; drop it so its band does not stick to the old page
+    const active = document.activeElement as HTMLElement | null;
+    if (active?.closest('.site-header')) active.blur();
   });
 }
 

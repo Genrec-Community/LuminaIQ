@@ -1,13 +1,13 @@
-// All visible content for the LuminaIQ site lives here.
+// All visible content for the Lumina IQ site lives here.
 //
 // Assumptions (mirrored in the hand-off; replace before launch):
 // - appUrl / loginUrl: taken from the app repo (Genrec-Community/LuminaIQ): its own landing
 //   page sends every CTA to /dashboard, which asks logged-out visitors to sign in.
-// - email: contact address was not provided.                                     placeholder
-// - Annual prices: not published; set to "two months free".                      placeholder
+// - email: the support address from the Play Store listing.
+// - Prices: the app's plans (backend/services/plans.py), yearly saves about 30%.
 // - Stats: the figures the current luminaiq.fun site reports, shown as reported.
-// - Photos: Unsplash (free license), hotlinked and duotoned. Illustrative only;
-//   replace with real product and student photography.                            placeholder
+// - Photos: real product screens from the app (public/shots), with sample study content;
+//   swap in student photography later if wanted.
 // - The YouTube video is presented as the product walkthrough.
 // - Example study content (photosynthesis) is invented to demonstrate the tools.
 
@@ -19,15 +19,15 @@ const siteUrl = (
 ).replace(/\/$/, '');
 
 export const site = {
-  name: 'LuminaIQ',
+  name: 'Lumina IQ',
   url: siteUrl,
   tagline: 'The AI study companion that remembers when you will forget',
   description:
-    'LuminaIQ turns your PDFs, textbooks and lecture notes into cited answers, quizzes, notes, flashcards and a spaced repetition schedule. Start free.',
+    'Lumina IQ turns your PDFs, textbooks and lecture notes into cited answers, quizzes, notes, flashcards and a spaced repetition schedule. Start free.',
   // Same-origin by default: the site is served in front of the app, so test stays on test
   appUrl: process.env.NEXT_PUBLIC_APP_URL || '/dashboard',
   loginUrl: process.env.NEXT_PUBLIC_LOGIN_URL || '/login',
-  email: 'hello@luminaiq.fun', // placeholder
+  email: 'support@luminaiq.fun',
   maker: { name: 'GenrecAI', url: 'https://www.genrecai.com' },
   youtubeId: 'uLXTLmunK0g',
   nav: [
@@ -45,19 +45,21 @@ export const stats = [
   { value: 30, prefix: '<', suffix: ' s', label: 'from upload to your first quiz' },
 ];
 
-/** SM-2 intervals with the default ease factor of 2.5: 1, 6, then the previous interval × 2.5. */
+/** Review days for a topic you keep remembering: each right answer makes the next gap longer. */
 export const reviewDays = [1, 6, 15, 38, 95];
 
-export type Photo = { id: string; alt: string; placeholder?: boolean };
-const u = (id: string) => id;
+// Real product screens (frontend/website/public/shots), captured from the app with sample
+// study material. `id` is kept for Unsplash photos; `src` marks a self-hosted product shot.
+export type Photo = { id: string; alt: string; src?: string; placeholder?: boolean };
+const shot = (file: string, alt: string): Photo => ({ id: file, src: `/shots/${file}`, alt });
 export const photos = {
-  hero: { id: u('photo-1513258496099-48168024aec0'), alt: 'A student studying at a desk with an open laptop and notes', placeholder: true },
-  college: { id: u('photo-1522202176988-66273c2fd55f'), alt: 'College students studying together around a laptop', placeholder: true },
-  medlaw: { id: u('photo-1481627834876-b7833e8f5570'), alt: 'Rows of books on library shelves', placeholder: true },
-  teachers: { id: u('photo-1524178232363-1fb2b075b655'), alt: 'A lecture hall with students listening to a teacher', placeholder: true },
-  self: { id: u('photo-1434030216411-0b793f4b4173'), alt: 'Someone writing study notes by hand next to a laptop', placeholder: true },
-  books: { id: u('photo-1497633762265-9d179a990aa6'), alt: 'A stack of textbooks on a table', placeholder: true },
-  group: { id: u('photo-1523240795612-9a054b0db644'), alt: 'A small study group working through material together', placeholder: true },
+  hero: shot('feed.webp', 'The Lumina IQ phone app: a quick question on where the light reactions happen, answered correctly'),
+  college: shot('dashboard.webp', 'The Lumina IQ dashboard: a greeting, today\'s numbers and quests, and the books on the shelf'),
+  medlaw: shot('phone-home.webp', 'The phone home screen: a getting-started checklist and today\'s review feed'),
+  teachers: shot('learning-path.webp', 'The learning path: the next topic to learn, why it comes next, and the memory curve'),
+  self: shot('exam-tonight.webp', 'Exam Tonight: pick how much time you have and get a plan that fits'),
+  books: shot('library.webp', 'The phone library: a shelf of books, one per subject'),
+  group: shot('memory-curve.webp', 'The memory curve on the dashboard: what you keep with reviews and what you lose without them'),
 } satisfies Record<string, Photo>;
 
 export type Stage = 'Understand' | 'Practise' | 'Measure' | 'Revise';
@@ -77,7 +79,7 @@ export const tools: Tool[] = [
     name: 'Chat with your documents',
     stage: 'Understand',
     line: 'Ask in your own words. The answer comes from your file, with the page it came from.',
-    body: 'Upload a chapter and ask it anything. LuminaIQ answers from your material, not from the open internet, and shows the passage it used so you can check it in seconds.',
+    body: 'Upload a chapter and ask it anything. Lumina IQ answers from your material, not from the open internet, and shows the passage it used so you can check it in seconds.',
     points: ['Answers grounded in your upload', 'Source citations on every answer', 'Follow-up questions keep context'],
   },
   {
@@ -117,23 +119,23 @@ export const tools: Tool[] = [
     name: 'Personalized learning paths',
     stage: 'Measure',
     line: 'Topics in prerequisite order, with your weak areas pulled to the front.',
-    body: 'LuminaIQ orders topics so each one builds on the last, then uses your quiz results to surface the parts you are weakest on. You always know what to study next.',
+    body: 'Lumina IQ orders topics so each one builds on the last, then uses your quiz results to surface the parts you are weakest on. You always know what to study next.',
     points: ['Prerequisite ordering', 'Weak areas surfaced', 'Progress analytics'],
   },
   {
     slug: 'spaced-repetition',
     name: 'Spaced repetition',
     stage: 'Revise',
-    line: 'SM-2 scheduling brings each card back just before you would forget it.',
-    body: 'Every review is graded, and the SM-2 algorithm uses that grade to set the next interval: one day, then six, then longer each time you remember. Cards you miss start again.',
-    points: ['SM-2 algorithm', 'Intervals that grow as you remember', 'Missed cards reset to day one'],
+    line: 'Each topic comes back just before you would forget it.',
+    body: 'Lumina IQ estimates how well you know each topic and how fast it is fading, and brings it back just before it slips: after a day, then about a week, then longer each time you remember. Topics you miss come back sooner.',
+    points: ['A memory model for every topic', 'Gaps that grow as you remember', 'Missed topics come back sooner'],
   },
   {
     slug: 'progress',
     name: 'Gamified progress',
     stage: 'Revise',
     line: 'XP, levels, badges and streaks. A reason to open it again tomorrow.',
-    body: 'Consistency beats cramming, so LuminaIQ rewards it. Earn XP for reviews and quizzes, level up, collect badges and keep a daily streak alive.',
+    body: 'Consistency beats cramming, so Lumina IQ rewards it. Earn XP for reviews and quizzes, level up, collect badges and keep a daily streak alive.',
     points: ['XP and levels', 'Badges', 'Daily streaks'],
   },
 ];
@@ -154,7 +156,7 @@ export const loop: { stage: Stage; title: string; text: string; tools: string[] 
   {
     stage: 'Measure',
     title: 'Measure it',
-    text: 'Every answer is data. LuminaIQ finds the topics you keep missing and moves them to the front of your path.',
+    text: 'Every answer is data. Lumina IQ finds the topics you keep missing and moves them to the front of your path.',
     tools: ['learning-paths'],
   },
   {
@@ -194,96 +196,108 @@ export const pipeline = [
 ];
 
 export type Plan = {
-  id: 'free' | 'pro' | 'team';
+  id: 'free' | 'scholar' | 'topper';
   name: string;
   monthly: number;
-  annualPerMonth: number; // placeholder for pro and team
+  annualPerMonth: number; // the yearly price divided by 12
+  yearly: number;
   who: string;
   includesLabel: string;
   features: string[];
   cta: string;
+  href: string;
   popular?: boolean;
 };
 
+// Mirrors the app's plans (backend/services/plans.py, frontend/src/utils/pricing.js).
 export const plans: Plan[] = [
   {
     id: 'free',
     name: 'Free',
     monthly: 0,
     annualPerMonth: 0,
-    who: 'For trying it on your next chapter',
+    yearly: 0,
+    who: 'Try the whole thing, no card needed',
     includesLabel: 'What you get',
-    features: ['Up to 3 documents', 'Unlimited chat and quizzes', 'Basic notes and flashcards', '7-day spaced repetition window'],
+    features: ['3 books', '20 chat answers a day', '60 quiz and Power Hour questions a day', '20 notes, flashcards and summaries a day', 'Exam Tonight plans and 30 cram cards a month', 'Learning path, reviews and your AI study buddy'],
     cta: 'Start free',
+    href: '/login?signup=1',
   },
   {
-    id: 'pro',
-    name: 'Pro',
-    monthly: 9,
-    annualPerMonth: 7.5, // placeholder
-    who: 'For students who study every week',
+    id: 'scholar',
+    name: 'Scholar',
+    monthly: 299,
+    annualPerMonth: 208,
+    yearly: 2499,
+    who: 'For steady, everyday study',
     includesLabel: 'Everything in Free, plus',
-    features: ['Unlimited documents', 'All four note types', 'Full learning path and analytics', 'Unlimited spaced repetition', 'Mind maps and knowledge graph', 'Priority AI processing'],
-    cta: 'Go Pro',
+    features: ['A smarter AI model', '15 books', '60 chat answers a day', '300 quiz and Power Hour questions a day', '60 notes, flashcards and summaries a day', 'Unlimited Exam Tonight plans, 300 cram cards a month', '15 Visual Lab simulations a month'],
+    cta: 'Get Scholar',
+    href: '/plans?plan=scholar',
     popular: true,
   },
   {
-    id: 'team',
-    name: 'Team',
-    monthly: 29,
-    annualPerMonth: 24, // placeholder
-    who: 'For study groups and classes',
-    includesLabel: 'Everything in Pro, plus',
-    features: ['Up to 10 members', 'Shared document library', 'Collaborative flashcards', 'Teacher dashboard'],
-    cta: 'Start a team',
+    id: 'topper',
+    name: 'Topper',
+    monthly: 999,
+    annualPerMonth: 708,
+    yearly: 8499,
+    who: 'For aiming at the top rank',
+    includesLabel: 'Everything in Scholar, plus',
+    features: ['Our best AI model for every answer', 'Unlimited books', 'Deep mode: 200 answers a month from our most capable model', '100 chat answers a day', '1,000 quiz and Power Hour questions a day', 'Cram cards written by the Deep model', '40 Visual Lab simulations a month'],
+    cta: 'Get Topper',
+    href: '/plans?plan=topper',
   },
 ];
 
-export const comparison: { row: string; free: string | boolean; pro: string | boolean; team: string | boolean }[] = [
-  { row: 'Documents', free: 'Up to 3', pro: 'Unlimited', team: 'Unlimited' },
-  { row: 'Chat with citations', free: 'Unlimited', pro: 'Unlimited', team: 'Unlimited' },
-  { row: 'Quizzes', free: 'Unlimited', pro: 'Unlimited', team: 'Unlimited' },
-  { row: 'Notes', free: 'Basic', pro: 'All four types', team: 'All four types' },
-  { row: 'Flashcards', free: 'Basic', pro: true, team: 'Collaborative' },
-  { row: 'Spaced repetition', free: '7-day window', pro: 'Unlimited', team: 'Unlimited' },
-  { row: 'Learning path and analytics', free: false, pro: true, team: true },
-  { row: 'Mind maps and knowledge graph', free: false, pro: true, team: true },
-  { row: 'Priority AI processing', free: false, pro: true, team: true },
-  { row: 'Members', free: '1', pro: '1', team: 'Up to 10' },
-  { row: 'Shared document library', free: false, pro: false, team: true },
-  { row: 'Teacher dashboard', free: false, pro: false, team: true },
+/** One night of Topper for the exam you did not see coming. */
+export const examNightPass = { price: 49, hours: 48, href: '/plans#pass' };
+/** Schools and coaching institutes: per seat, per month. */
+export const institution = { perSeat: 179, minSeats: 100, href: '/institution' };
+
+export const comparison: { row: string; free: string | boolean; scholar: string | boolean; topper: string | boolean }[] = [
+  { row: 'Books', free: '3', scholar: '15', topper: 'Unlimited' },
+  { row: 'Chat answers with citations', free: '20 a day', scholar: '60 a day', topper: '100 a day' },
+  { row: 'Quiz and Power Hour questions', free: '60 a day', scholar: '300 a day', topper: '1,000 a day' },
+  { row: 'Notes, flashcards and summaries', free: '20 a day', scholar: '60 a day', topper: '150 a day' },
+  { row: 'Exam Tonight cram cards', free: '30 a month', scholar: '300 a month', topper: '1,000 a month' },
+  { row: 'Visual Lab simulations', free: '3 a month', scholar: '15 a month', topper: '40 a month' },
+  { row: 'Learning path and reviews', free: true, scholar: true, topper: true },
+  { row: 'Mind maps and knowledge graph', free: true, scholar: true, topper: true },
+  { row: 'Smarter AI model', free: false, scholar: true, topper: 'Our best' },
+  { row: 'Deep mode answers', free: false, scholar: false, topper: '200 a month' },
 ];
 
 export const faqs = [
   {
     q: 'What can I upload?',
-    a: 'PDF, DOCX and TXT files. Scanned PDFs are run through OCR, so photographed handouts work too. On the Free plan each file can be up to 10 MB.',
+    a: 'PDF, Word and text files, or paste text straight in. Scanned PDFs are run through OCR, so photographed handouts work too. Each file can be up to 50 MB.',
   },
   {
-    q: 'Does LuminaIQ make things up?',
+    q: 'Does Lumina IQ make things up?',
     a: 'Answers are generated from the passages it retrieves from your own document, and each answer cites the passage it used. If something looks wrong, the citation takes you straight to the source to check.',
   },
   {
-    q: 'What is spaced repetition, exactly?',
-    a: 'A schedule for reviewing. LuminaIQ uses SM-2: after you grade a review, the next one comes after 1 day, then 6, then the previous gap multiplied by an ease factor that rises when you remember and falls when you do not. A missed card starts again at day one.',
+    q: 'How does Lumina IQ decide when I review?',
+    a: 'It keeps an estimate of how well you know each topic and how fast you are forgetting it. Each topic comes back just before you are likely to forget it, and every review you get right makes the memory last longer, so the gaps grow. Topics you miss come back sooner.',
   },
   {
     q: 'How is this different from a general chatbot?',
-    a: 'A chatbot answers from everything it was trained on. LuminaIQ answers from your material and then keeps going: it turns that material into practice, tracks what you miss, and schedules your reviews.',
+    a: 'A chatbot answers from everything it was trained on. Lumina IQ answers from your material and then keeps going: it turns that material into practice, tracks what you miss, and schedules your reviews.',
   },
   {
-    q: 'Can a teacher use it with a class?',
-    a: 'Yes. The Team plan covers up to 10 members with a shared document library, collaborative flashcards and a teacher dashboard.',
+    q: 'Can a school or teacher use it with a class?',
+    a: 'Yes. The Institution plan is ₹179 per student a month (from 100 seats). Every student gets Scholar-level access, teachers publish books to whole classes, and a class dashboard shows progress and weak topics.',
   },
   {
-    q: 'What happens on the Free plan after 7 days?',
-    a: 'The Free plan schedules reviews within a 7-day window. Pro removes the window, so cards keep coming back on day 15, day 38 and beyond.',
+    q: 'What is the Exam Night Pass?',
+    a: 'Exam tomorrow and on the Free plan? ₹49 gives you 48 hours of Topper: Deep answers, unlimited books and Deep cram cards for the night that counts. One payment, nothing renews.',
   },
 ];
 
 export const audiences = [
   { key: 'college', title: 'College students', text: 'Lecture PDFs, textbooks and slides become summaries, quizzes and revision cards the same evening.' },
-  { key: 'medlaw', title: 'Medical and law students', text: 'Dense reading, heavy terminology, a lot to recall. The glossary and spaced repetition were made for this.' },
-  { key: 'teachers', title: 'Teachers', text: 'Generate practice questions from your own handouts and follow a class through the Team dashboard.' },
+  { key: 'medlaw', title: 'Medical and law students', text: 'Dense reading, heavy terminology, a lot to recall. Notes, flashcards and well-timed reviews were made for this.' },
+  { key: 'teachers', title: 'Teachers', text: 'Publish your own handouts to a whole class and follow progress and weak topics on the class dashboard.' },
   { key: 'self', title: 'Self-learners', text: 'Technical manuals and online courses, turned into something you can question and practise.' },
 ] as const;

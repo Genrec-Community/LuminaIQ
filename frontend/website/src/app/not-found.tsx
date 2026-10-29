@@ -4,7 +4,7 @@ import { NotFoundCard } from '@/components/NotFoundCard';
 
 export const metadata: Metadata = {
   title: 'Page not found',
-  description: 'This page is not in your notes. Head back to the LuminaIQ home page or browse the study tools.',
+  description: 'This page is not in your notes. Head back to the Lumina IQ home page or browse the study tools.',
   robots: { index: false },
 };
 

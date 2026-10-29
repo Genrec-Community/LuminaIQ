@@ -8,7 +8,7 @@ import { site, tools } from '@/data/site';
 export const metadata: Metadata = pageMeta({
   title: 'Study tools: chat, quizzes, notes and flashcards',
   description:
-    'Eight study tools from one upload: chat with citations, a quiz generator, four kinds of notes, flashcards, mind maps, learning paths, SM-2 spaced repetition and streaks.',
+    'Eight study tools from one upload: chat with citations, a quiz generator, four kinds of notes, flashcards, mind maps, learning paths, well-timed reviews and streaks.',
   path: '/features/',
 });
 

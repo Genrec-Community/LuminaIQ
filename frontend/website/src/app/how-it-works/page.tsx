@@ -8,11 +8,11 @@ import { faqs, loop, pipeline, reviewDays, site } from '@/data/site';
 export const metadata: Metadata = pageMeta({
   title: 'How it works: from your PDF to cited answers',
   description:
-    'What happens after you upload: text extraction and OCR, chunking and embeddings, vector search, cited generation, then the SM-2 spaced repetition schedule.',
+    'What happens after you upload: text extraction and OCR, chunking and embeddings, vector search, cited generation, then a review schedule timed to your memory.',
   path: '/how-it-works/',
 });
 
-const howFaqs = faqs.filter((f) => ['What can I upload?', 'Does LuminaIQ make things up?', 'What is spaced repetition, exactly?'].includes(f.q));
+const howFaqs = faqs.filter((f) => ['What can I upload?', 'Does Lumina IQ make things up?', 'What is spaced repetition, exactly?'].includes(f.q));
 
 export default function HowItWorks() {
   return (
@@ -65,17 +65,17 @@ export default function HowItWorks() {
               Then the <em>schedule</em> takes over.
             </h2>
             <p data-reveal="up">
-              Every flashcard review is graded. LuminaIQ feeds that grade to SM-2, a spaced repetition algorithm used by
-              learners for decades. The first gap is one day, the second six, and each one after that is the previous
-              gap multiplied by an ease factor that rises when you remember and drops when you struggle.
+              Every answer you give is evidence. Lumina IQ keeps an estimate of how well you know each topic and how fast
+              you are forgetting it, and brings the topic back just before it slips. Every review you get right makes the
+              memory last longer, so the gaps grow.
             </p>
-            <p data-reveal="up">A card you miss goes back to day one. A card you know drifts out to months.</p>
+            <p data-reveal="up">A topic you miss comes back sooner. A topic you know drifts out to months.</p>
           </div>
           <div className="sched__days" data-reveal="up">
-            <p className="sched__label">A card you keep remembering, at the default ease of 2.5</p>
+            <p className="sched__label">A topic you keep remembering, bars drawn to scale</p>
             <ol>
               {reviewDays.map((d, i) => (
-                <li key={d} style={{ ['--w' as string]: `${Math.max(8, (Math.log(d + 1) / Math.log(96)) * 100)}%` }}>
+                <li key={d} style={{ ['--w' as string]: `${Math.max(3, (d / reviewDays[reviewDays.length - 1]) * 100)}%` }}>
                   <span className="sched__n">Review {i + 1}</span>
                   <span className="sched__bar" aria-hidden="true" />
                   <span className="sched__d">

@@ -1,6 +1,6 @@
 'use client';
 // The signature: an illustrative forgetting curve. A grey curve shows recall after reading once;
-// the lime curve resets at each SM-2 review (day 1, 6, 15, 38) and decays more slowly every time.
+// the lime curve resets at each review (day 1, 6, 15, 38) and decays more slowly every time.
 // Point at it, drag on it, or use the arrow keys to pick a day. At rest, the marker keeps walking.
 import { useMemo, useRef } from 'react';
 import { gsap } from 'gsap';

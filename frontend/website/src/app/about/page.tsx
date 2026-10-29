@@ -6,16 +6,16 @@ import { Photo } from '@/components/Photo';
 import { photos, site } from '@/data/site';
 
 export const metadata: Metadata = pageMeta({
-  title: 'About: why LuminaIQ exists',
+  title: 'About: why Lumina IQ exists',
   description:
-    'LuminaIQ is built by GenrecAI on one idea: students should spend their time practising and revising, not preparing notes and cards by hand.',
+    'Lumina IQ is built by GenrecAI on one idea: students should spend their time practising and revising, not preparing notes and cards by hand.',
   path: '/about/',
 });
 
 const principles = [
   {
     title: 'Your material, not the internet',
-    text: 'Exams test your course. LuminaIQ answers and writes questions from the documents you upload, not from whatever a model happens to know.',
+    text: 'Exams test your course. Lumina IQ answers and writes questions from the documents you upload, not from whatever a model happens to know.',
   },
   {
     title: 'Every answer shows its source',
@@ -27,7 +27,7 @@ const principles = [
   },
   {
     title: 'The right review on the right day',
-    text: 'Forgetting is predictable. SM-2 schedules each card just before it slips, so short sessions add up to long-term memory.',
+    text: 'Forgetting is predictable. Lumina IQ schedules each topic just before it slips, so short sessions add up to long-term memory.',
   },
 ];
 
@@ -42,7 +42,7 @@ export default function About() {
           <div className="page-hero__aside">
             <p className="lede rise" style={{ ['--d' as string]: '0.15s' }}>
               Highlighting, summarizing, copying definitions onto cards. Students spend hours getting ready to study.
-              LuminaIQ exists to hand those hours back.
+              Lumina IQ exists to hand those hours back.
             </p>
           </div>
         </div>
@@ -66,11 +66,11 @@ export default function About() {
               material often enough, at the right moments, to still know it on exam day.
             </p>
             <p data-reveal="up">
-              So LuminaIQ connects the steps: understand the chapter, practise it, measure what is not landing, and revise
+              So Lumina IQ connects the steps: understand the chapter, practise it, measure what is not landing, and revise
               on a schedule. Each step uses the same document, so nothing gets lost between tools.
             </p>
             <p data-reveal="up">
-              LuminaIQ is built by{' '}
+              Lumina IQ is built by{' '}
               <a className="link" href={site.maker.url} rel="noopener" target="_blank">
                 {site.maker.name}
               </a>
@@ -103,8 +103,8 @@ export default function About() {
               Teaching a class? Running a study group?
             </h2>
             <p data-reveal="up">
-              The Team plan gives up to 10 members a shared library, shared flashcards and a teacher dashboard. For anything
-              bigger, write to us.
+              The Institution plan gives every student Scholar-level access for ₹179 a month, lets teachers publish books to
+              whole classes, and shows a class dashboard of progress and weak topics.
             </p>
             <div className="actions" data-reveal="up">
               <a href={`mailto:${site.email}`} className="btn btn--dark">
@@ -112,7 +112,7 @@ export default function About() {
                 <Arrow />
               </a>
               <Link href="/pricing/" className="btn btn--light">
-                <span>See Team pricing</span>
+                <span>See plans</span>
               </Link>
             </div>
           </div>

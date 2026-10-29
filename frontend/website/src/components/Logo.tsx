@@ -21,7 +21,7 @@ export function Logo() {
     <span className="logo">
       <Mark className="logo__mark" />
       <span className="logo__word">
-        Lumina<span>IQ</span>
+        Lumina <span>IQ</span>
       </span>
     </span>
   );

@@ -5,9 +5,9 @@ import { Pricing } from '@/components/Pricing';
 import { comparison, faqs, plans } from '@/data/site';
 
 export const metadata: Metadata = pageMeta({
-  title: 'Pricing: Free, Pro $9 a month, Team $29 a month',
+  title: 'Pricing: Free, Scholar ₹299 and Topper ₹999 a month',
   description:
-    'Start free with 3 documents and unlimited chat and quizzes. Pro is $9 a month for unlimited documents and spaced repetition. Team is $29 a month for up to 10 members.',
+    'Start free with 3 books. Scholar is ₹299 a month for 15 books and a smarter AI model. Topper is ₹999 a month for unlimited books and Deep mode. Exam Night Pass: ₹49 for 48 hours.',
   path: '/pricing/',
 });
 
@@ -29,11 +29,11 @@ export default function PricingPage() {
       <section className="page-hero page-hero--center" aria-labelledby="pricing-title">
         <div className="wrap">
           <h1 id="pricing-title" className="display h-mega rise">
-            Free to start. <em>Nine dollars</em> to keep going.
+            Free to start. <em>₹299</em> to keep going.
           </h1>
           <p className="lede rise" style={{ ['--d' as string]: '0.15s' }}>
-            Every plan includes document chat with citations and unlimited quizzes. Upgrade for unlimited documents and a
-            review schedule with no end date.
+            Every plan includes chat with citations, quizzes, your learning path and reviews timed to your memory. Upgrade for
+            more books, more practice and a smarter AI model. Pay by UPI, card or netbanking.
           </p>
         </div>
       </section>
@@ -57,7 +57,7 @@ export default function PricingPage() {
                   {plans.map((p) => (
                     <th key={p.id} scope="col" className={p.popular ? 'is-popular' : undefined}>
                       {p.name}
-                      <span>{p.monthly === 0 ? '$0' : `$${p.monthly} / month`}</span>
+                      <span>{p.monthly === 0 ? '₹0' : `₹${p.monthly} / month`}</span>
                     </th>
                   ))}
                 </tr>
@@ -67,8 +67,8 @@ export default function PricingPage() {
                   <tr key={r.row}>
                     <th scope="row">{r.row}</th>
                     <td><Cell v={r.free} /></td>
-                    <td className="is-popular"><Cell v={r.pro} /></td>
-                    <td><Cell v={r.team} /></td>
+                    <td className="is-popular"><Cell v={r.scholar} /></td>
+                    <td><Cell v={r.topper} /></td>
                   </tr>
                 ))}
               </tbody>

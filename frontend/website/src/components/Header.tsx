@@ -56,7 +56,7 @@ export function Header() {
   return (
     <header className="site-header">
       <div className="wrap site-header__inner">
-        <Link href="/" className="site-header__home" aria-label="LuminaIQ home">
+        <Link href="/" className="site-header__home" aria-label="Lumina IQ home">
           <Logo />
         </Link>
         <nav className="site-nav" aria-label="Main">

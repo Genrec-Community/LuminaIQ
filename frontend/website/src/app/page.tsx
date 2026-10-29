@@ -11,9 +11,9 @@ import { Video } from '@/components/Video';
 import { audiences, loop, photos, site, stats, tools } from '@/data/site';
 
 export const metadata: Metadata = pageMeta({
-  title: 'LuminaIQ: AI study companion for quizzes, notes and flashcards',
+  title: 'Lumina IQ: AI study companion for quizzes, notes and flashcards',
   description:
-    'Upload a textbook or lecture PDF and get cited answers, quizzes, four kinds of notes, flashcards and SM-2 spaced repetition. LuminaIQ is free to start.',
+    'Upload a textbook or lecture PDF and get cited answers, quizzes, four kinds of notes, flashcards and reviews timed to your memory. Lumina IQ is free to start.',
   path: '/',
   absolute: true,
 });
@@ -50,7 +50,7 @@ export default function Home() {
             </h1>
             <div className="hero__aside">
               <p className="lede rise" style={{ ['--d' as string]: '0.3s' }}>
-                LuminaIQ turns your textbooks, lecture PDFs and notes into cited answers, quizzes and flashcards. Then it
+                Lumina IQ turns your textbooks, lecture PDFs and notes into cited answers, quizzes and flashcards. Then it
                 schedules the reviews that keep it all in your head.
               </p>
               <div className="actions rise" style={{ ['--d' as string]: '0.4s' }}>
@@ -110,7 +110,7 @@ export default function Home() {
 
       <Thread>
         {/* STATS: real numbers, small and exact */}
-        <section className="stats" aria-label="LuminaIQ in numbers">
+        <section className="stats" aria-label="Lumina IQ in numbers">
           <div className="wrap">
             <ul className="stats__list">
               {stats.map((s) => (
@@ -126,7 +126,7 @@ export default function Home() {
                 </li>
               ))}
             </ul>
-            <p className="stats__note">Figures reported by LuminaIQ.</p>
+            <p className="stats__note">Figures reported by Lumina IQ.</p>
           </div>
         </section>
 
@@ -140,7 +140,7 @@ export default function Home() {
               </h2>
               <p className="lede" data-reveal="up">
                 Most of an evening with a textbook goes on preparation: finding what matters, writing notes, making cards.
-                LuminaIQ does the preparation in seconds and spends your time on the four things that make it stick.
+                Lumina IQ does the preparation in seconds and spends your time on the four things that make it stick.
               </p>
             </div>
             <div className="loop__stage" data-loop-stage data-state="0" aria-hidden="true">
@@ -235,13 +235,13 @@ export default function Home() {
               <h2 id="watch-title" className="display h-xl" data-split="lines">
                 Watch it <em>work.</em>
               </h2>
-              <p>A guided tour of LuminaIQ, from your first upload to your first review.</p>
+              <p>A guided tour of Lumina IQ, from your first upload to your first review.</p>
               <a className="link link--on-dark" href={`https://www.youtube.com/watch?v=${site.youtubeId}`} rel="noopener" target="_blank">
                 Open on YouTube
               </a>
             </div>
             <div className="watch__frame" data-reveal="up">
-              <Video id={site.youtubeId} title="LuminaIQ walkthrough" />
+              <Video id={site.youtubeId} title="Lumina IQ walkthrough" />
             </div>
           </div>
         </section>
