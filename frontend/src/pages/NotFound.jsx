@@ -1,12 +1,17 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, RotateCcw } from 'lucide-react';
+import SiteHeader from '../components/site/SiteHeader';
+import { useAuth } from '../context/AuthContext';
 
 // The 404 is a flashcard: the question on the front, the way back on the back.
 const NotFound = () => {
+    const { user } = useAuth();
     const [flipped, setFlipped] = useState(false);
     return (
-        <main className="flex min-h-[100dvh] flex-col items-center justify-center gap-8 bg-[#FDF6F0] px-4 text-[#163628]">
+        <>
+        <SiteHeader />
+        <main id="main" className="flex min-h-[calc(100dvh-4.5rem)] flex-col items-center justify-center gap-8 bg-[#FDF6F0] px-4 text-[#163628]">
             <h1 className="sr-only">Page not found</h1>
             <button
                 type="button"
@@ -28,14 +33,20 @@ const NotFound = () => {
                 </span>
             </button>
             <div className="flex flex-wrap justify-center gap-3">
-                <Link to="/dashboard" className="inline-flex items-center gap-2 rounded-full bg-[#163628] px-5 py-3 font-semibold text-[#f4eee2]">
-                    Go to my books <ArrowRight className="h-4 w-4" />
-                </Link>
-                <Link to="/" className="lumina-secondary inline-flex items-center rounded-full border border-[#E6D5CC] bg-white px-5 py-3 font-semibold">
-                    Lumina IQ home
-                </Link>
+                {user ? (
+                    <>
+                        <Link to="/dashboard" className="btn btn--dark">Go to my books <ArrowRight className="arrow" /></Link>
+                        <a href="/" className="btn btn--light">Home</a>
+                    </>
+                ) : (
+                    <>
+                        <a href="/" className="btn btn--dark">Back to the home page <ArrowRight className="arrow" /></a>
+                        <Link to="/login" className="btn btn--light">Log in</Link>
+                    </>
+                )}
             </div>
         </main>
+        </>
     );
 };
 

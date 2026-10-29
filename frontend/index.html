@@ -96,7 +96,7 @@
     (function () {
       var root = document.getElementById('loader'); if (!root) return;
       var count = root.querySelector('.ld-count'), bar = root.querySelector('.ld-bar');
-      var MIN = 900, MAX = 6000, start = performance.now(), shown = 0, target = 8, appReady = false, done = false;
+      var MIN = 900, MAX = 3000, start = performance.now(), shown = 0, target = 8, appReady = false, done = false;
       var fonts = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
       fonts.then(function () { target = Math.max(target, 45); });
       window.addEventListener('lumina:ready', function () { appReady = true; });

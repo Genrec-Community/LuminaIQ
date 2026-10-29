@@ -433,7 +433,7 @@ const Dashboard = () => {
             <header className="app-header sticky top-0 z-30 border-b border-[#163628]/10 bg-[#FDF6F0]/90 backdrop-blur-md">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-[4.5rem] flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <a href="/" aria-label="Lumina IQ home" className="rounded-xl"><Logo /></a>
+                        <a href="/" title="Home" className="rounded-xl"><Logo /></a>
                         <h1 className="sr-only">Your books</h1>
                     </div>
 

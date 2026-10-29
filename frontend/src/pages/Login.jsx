@@ -233,7 +233,7 @@ const Login = () => {
                                     <button
                                         type="button"
                                         onClick={() => { setIsForgot(true); setMessage(null); }}
-                                        className="text-sm font-semibold text-[#1E5C42] hover:text-[#163628] hover:underline"
+                                        className="lumina-link inline-flex min-h-[32px] items-center text-sm font-semibold"
                                     >
                                         Forgot password?
                                     </button>
@@ -337,7 +337,7 @@ const Login = () => {
                                         setIsLogin(!isLogin);
                                         setMessage(null);
                                     }}
-                                    className="text-[#1E5C42] font-bold hover:text-[#163628] hover:underline transition-colors ml-1"
+                                    className="lumina-link ml-1 inline-flex min-h-[32px] items-center font-bold"
                                 >
                                     {isLogin ? 'Create an account' : 'Sign in'}
                                 </button>
@@ -351,7 +351,7 @@ const Login = () => {
                                 type="button"
                                 onClick={() => setShowSchoolHelp(!showSchoolHelp)}
                                 aria-expanded={showSchoolHelp}
-                                className="w-full flex items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-[#163628]"
+                                className="w-full flex items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-[#163628] rounded-[inherit] transition-colors hover:bg-[#D3EE6A]/45"
                             >
                                 <span className="flex items-center gap-2">
                                     <School className="h-4 w-4 text-[#5E5046]" />

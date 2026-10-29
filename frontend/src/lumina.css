@@ -293,10 +293,10 @@ html.lenis, html.lenis body { height: auto; }
 /* Logo: the curve mark + "Lumina" with an italic serif IQ */
 .lumina-logo { display: inline-flex; align-items: center; gap: 0.55rem; color: var(--lumina-ink); }
 html.dark .lumina-logo { color: var(--lumina-on-ink); }
-.lumina-mark { flex: none; transition: rotate 0.5s var(--lumina-ease); }
+.lumina-logomark { flex: none; transition: rotate 0.5s var(--lumina-ease); }
 .lumina-logo__word { font-weight: 600; font-size: 1.15rem; letter-spacing: -0.02em; white-space: nowrap; }
 .lumina-logo__word span { font-family: var(--font-display); font-style: italic; font-weight: 400; font-size: 1.15em; margin-left: 0.04em; }
-@media (hover: hover) { a:hover > .lumina-logo .lumina-mark, button:hover > .lumina-logo .lumina-mark, .lumina-logo:hover .lumina-mark { rotate: -8deg; } }
+@media (hover: hover) { a:hover > .lumina-logo .lumina-logomark, button:hover > .lumina-logo .lumina-logomark, .lumina-logo:hover .lumina-logomark { rotate: -8deg; } }
 
 /* Buttons: pills that fill with the lime highlighter from the left */
 .btn { position: relative; isolation: isolate; overflow: clip; display: inline-flex; align-items: center; justify-content: center; gap: 0.55em; min-height: 3rem; padding: 0 1.4rem; border-radius: 999px; font-size: 1rem; font-weight: 600; letter-spacing: -0.005em; white-space: nowrap; transition: color 0.35s cubic-bezier(0.215, 0.61, 0.355, 1), scale 0.2s; }
@@ -423,3 +423,8 @@ html.dark .mark-em em { background-image: linear-gradient(rgb(211 238 106 / 0.35
 html.dark .site-header { background: color-mix(in srgb, var(--dm-bg) 94%, transparent); color: var(--lumina-on-ink); }
 html.dark .menu { background: var(--dm-bg); }
 html.dark .menu-button { background: rgb(244 238 226 / 0.06); }
+
+/* Card titles in the workspace take the display face too */
+.lumina-workspace :is(h3):is(.text-xl, .text-2xl).font-bold { font-family: var(--font-display); font-weight: 400 !important; letter-spacing: -0.02em; }
+/* The hand-drawn circle needs a little air before the next word */
+.display .circled { margin-right: 0.12em; }

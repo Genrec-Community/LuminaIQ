@@ -1316,7 +1316,7 @@ const ProjectView = () => {
                     <div className={`flex-1 flex flex-col min-h-0 ${leftCollapsed ? 'p-3' : 'px-4 pt-5 pb-3'}`}>
                         <div className={`flex items-center ${leftCollapsed ? 'justify-center' : 'justify-between px-1.5'} mb-6`}>
                             {!leftCollapsed && (
-                                <Link to="/dashboard" aria-label="Back to your books" className="rounded-xl"><Logo /></Link>
+                                <Link to="/dashboard" title="Back to your books" className="rounded-xl"><Logo /></Link>
                             )}
                             <div className="flex items-center gap-1">
                                 {/* Desktop collapse toggle */}

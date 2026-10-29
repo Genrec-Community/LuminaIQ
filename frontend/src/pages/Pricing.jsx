@@ -125,7 +125,7 @@ const Pricing = () => {
             {user ? (
                 <header className="app-header sticky top-0 z-30 border-b border-[#163628]/10 bg-[#FDF6F0]/90 backdrop-blur-md">
                     <div className="site-wrap flex h-[4.5rem] items-center justify-between">
-                        <button onClick={() => navigate('/dashboard')} className="flex items-center gap-3 rounded-xl" aria-label="Back to your books">
+                        <button onClick={() => navigate('/dashboard')} className="flex items-center gap-3 rounded-xl" title="Back to your books">
                             <ArrowLeft className="h-4 w-4" /><Logo />
                         </button>
                         {myPlan && (

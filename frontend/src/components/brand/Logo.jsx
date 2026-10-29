@@ -2,7 +2,7 @@
 // gets lifted by a review, and sinks less each time.
 export function Mark({ className = 'h-8 w-8', ink = '#163628', lime = '#D3EE6A' }) {
     return (
-        <svg className={`lumina-mark ${className}`} viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+        <svg className={`lumina-logomark ${className}`} viewBox="0 0 32 32" aria-hidden="true" focusable="false">
             <rect width="32" height="32" rx="9" fill={ink} />
             <path d="M6 9c2.5 7 4 9 6.5 9.5V9c2.6 6 5 7.6 7.5 7.8V9c2 4.5 4 5.4 6 5.6"
                 fill="none" stroke={lime} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />

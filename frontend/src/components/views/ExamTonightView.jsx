@@ -487,7 +487,7 @@ const ExamTonightView = ({ projectId, selectedDocuments = [], onTopicMastered, o
                     </motion.div>
 
                     <div className="mt-5 rounded-3xl border border-[#E6D5CC] bg-white p-5 md:p-6">
-                        <h3 className="text-lg font-bold text-[#163628]">How much time do you have?</h3>
+                        <h3 className="font-display text-2xl text-[#163628]">How much <em>time</em> do you have?</h3>
                         <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
                             {BUDGETS.map((b) => (
                                 <button key={b.minutes} onClick={() => setMinutes(b.minutes)}

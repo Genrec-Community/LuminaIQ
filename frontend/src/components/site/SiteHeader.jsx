@@ -24,7 +24,7 @@ export default function SiteHeader({ cta = true }) {
     return (
         <header className="site-header">
             <div className="site-wrap site-header__inner">
-                <a href="/" className="site-header__home" aria-label="Lumina IQ home"><Logo /></a>
+                <a href="/" className="site-header__home" title="Home"><Logo /></a>
                 <nav className="site-nav" aria-label="Main">
                     <ul>{NAV.map((n) => <li key={n.href}><a href={n.href} className="mark">{n.label}</a></li>)}</ul>
                 </nav>
