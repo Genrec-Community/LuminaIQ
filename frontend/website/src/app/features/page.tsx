@@ -1,9 +1,8 @@
 import type { Metadata } from 'next';
 import { breadcrumbs, ld, pageMeta } from '@/lib/seo';
 import { FlashcardDemo, NotesDemo, QuizDemo } from '@/components/Demos';
-import { Arrow } from '@/components/Footer';
 import { Specimen } from '@/components/Specimen';
-import { site, tools } from '@/data/site';
+import { tools } from '@/data/site';
 
 export const metadata: Metadata = pageMeta({
   title: 'Study tools: chat, quizzes, notes and flashcards',
@@ -80,22 +79,6 @@ export default function Features() {
         ))}
       </div>
 
-      <section className="band" aria-labelledby="band-title">
-        <div className="wrap band__inner">
-          <h2 id="band-title" className="display h-xl" data-split="lines">
-            Your next chapter, <em>in thirty seconds.</em>
-          </h2>
-          <div className="actions">
-            <a href={site.appUrl} className="btn btn--dark">
-              <span>Start free</span>
-              <Arrow />
-            </a>
-            <a href="/how-it-works/" className="btn btn--light" data-title="How it works">
-              <span>See how it works</span>
-            </a>
-          </div>
-        </div>
-      </section>
       <script type="application/ld+json" dangerouslySetInnerHTML={ld(breadcrumbs('Features', '/features/'))} />
     </>
   );

@@ -293,7 +293,7 @@ html.motion .rise { animation: rise 1.1s var(--ease-out) both; animation-delay: 
 .hero__aside .lede { font-size: clamp(1.1rem, 1rem + 0.35vw, 1.3rem); }
 .hero__stage { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--gutter); margin-top: clamp(2.5rem, 1.5rem + 3vw, 4.5rem); align-items: start; }
 .hero__chart { grid-column: 1 / 9; grid-row: 1; align-self: end; position: relative; z-index: 2; margin-bottom: clamp(2rem, 4vw, 4rem); }
-.hero__media { grid-column: 8 / 13; grid-row: 1; position: relative; }
+.hero__media { grid-column: 9 / 13; grid-row: 1; position: relative; }
 .hero__media .photo { box-shadow: var(--shadow); }
 
 .floater { position: absolute; z-index: 3; }
@@ -348,7 +348,7 @@ html.motion .rise { animation: rise 1.1s var(--ease-out) both; animation-delay: 
 .curve__axis { list-style: none; padding: 0; position: absolute; left: 0; right: 0; bottom: 0; height: 2rem; font-size: var(--t-xs); color: var(--c-on-fg-muted); }
 .curve__axis li { position: absolute; bottom: 0; translate: -50% 0; white-space: nowrap; }
 .curve__axis li span { color: var(--c-on-fg); }
-.curve__axis li:first-child { translate: 0 0; }
+.curve__axis li:first-child { display: none; } /* day 1 sits too close to day 6 to label; its line stays */
 .curve__note { margin-top: 0.9rem; font-size: var(--t-xs); color: var(--c-on-fg-muted); max-width: 52ch; }
 
 @media (max-width: 1023px) {
@@ -558,6 +558,7 @@ html:not(.motion) .chapter { opacity: 1; }
 .wall__item--4 { grid-column: 7 / 12; margin-top: -10vh; }
 .wall__media { overflow: clip; border-radius: var(--radius); }
 .wall__media > div { scale: 1.06; }
+.wall__media:has(.photo--product) > div { scale: none; }
 html.motion .wall__media > div { scale: none; }
 .wall__title { font-family: var(--f-display); font-weight: 400; font-size: var(--t-m); letter-spacing: -0.02em; margin-top: 0.4rem; }
 .wall__text { color: var(--c-muted); font-size: var(--t-s); max-width: 40ch; }
@@ -565,7 +566,7 @@ html.motion .wall__media > div { scale: none; }
   .wall { display: flex; gap: 0.9rem; overflow-x: auto; scroll-snap-type: x mandatory; margin-inline: calc(var(--gutter) * -1); padding: 0 var(--gutter) 1rem; scroll-padding-inline: var(--gutter); scrollbar-width: none; overscroll-behavior-x: contain; }
   .wall::-webkit-scrollbar { display: none; }
   .wall__item--1, .wall__item--2, .wall__item--3, .wall__item--4 { flex: 0 0 80%; margin: 0; scroll-snap-align: start; }
-  .wall__item .photo { aspect-ratio: 4 / 5 !important; }
+  .wall__item .photo:not(.photo--product) { aspect-ratio: 4 / 5 !important; }
   .people__head::after { content: 'Swipe for more'; font-size: var(--t-xs); color: var(--c-muted); margin-top: 1rem; }
 }
 
@@ -590,7 +591,7 @@ html.motion .wall__media > div { scale: none; }
 .plan__name { font-size: 1.25rem; font-weight: 600; letter-spacing: -0.015em; }
 .plan__who { color: var(--c-muted); font-size: var(--t-s); }
 .plan__price { display: flex; align-items: baseline; gap: 0.6rem; margin: 1rem 0 1.25rem; }
-.plan__amount { font-size: clamp(2.8rem, 2.2rem + 1.6vw, 3.6rem); font-weight: 600; letter-spacing: -0.05em; line-height: 1; font-variant-numeric: tabular-nums; }
+.plan__amount { font-family: var(--f-display); font-size: clamp(3rem, 2.4rem + 1.8vw, 3.9rem); font-weight: 400; letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums; }
 .plan__per { color: var(--c-muted); font-size: var(--t-xs); }
 .plan__body { padding: clamp(1.4rem, 1rem + 1vw, 2rem); display: grid; gap: 1.1rem; align-content: start; }
 .plan__inc { font-size: var(--t-xs); font-weight: 600; }
@@ -761,6 +762,18 @@ html.motion .step.is-lit { opacity: 1; }
 .compare__table tbody th { font-weight: 500; }
 .compare__table tbody tr:last-child > * { border-bottom: 0; }
 .compare__table .is-popular { background: rgb(211 238 106 / 0.22); }
+/* Phones: each feature becomes a row of three labelled plan values, so nothing hides off-screen */
+@media (max-width: 767px) {
+  .compare__scroll { overflow: visible; }
+  .compare__table { min-width: 0; }
+  .compare__table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .compare__table tbody tr { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-bottom: 1px solid var(--c-line); }
+  .compare__table tbody tr:last-child { border-bottom: 0; }
+  .compare__table tbody th { grid-column: 1 / -1; padding: 1rem 1rem 0.35rem; border: 0; }
+  .compare__table tbody td { padding: 0.35rem 1rem 1rem; border: 0; font-size: 0.875rem; }
+  .compare__table tbody td::before { content: attr(data-plan); display: block; font-size: 0.6875rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--c-muted); margin-bottom: 0.2rem; }
+  .compare__table tbody td.is-popular { background: rgb(211 238 106 / 0.22); }
+}
 .yes, .no { display: inline-block; width: 1.3rem; height: 1.3rem; border-radius: 50%; overflow: hidden; text-indent: 200%; white-space: nowrap; vertical-align: middle; }
 .yes { background: var(--c-fg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5.5 10.5l3 3 6-7' fill='none' stroke='%23d3ee6a' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 100% no-repeat; }
 .no { background: linear-gradient(var(--c-muted), var(--c-muted)) center / 0.6rem 1.5px no-repeat; box-shadow: inset 0 0 0 1px var(--c-line); }

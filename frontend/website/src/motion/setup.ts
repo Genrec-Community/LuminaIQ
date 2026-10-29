@@ -70,10 +70,15 @@ function header() {
   onScroll(({ y }) => {
     const h = document.documentElement.classList;
     h.toggle('is-scrolled', y > 8);
-    // Phones: a Start free bar rises after the hero and steps aside for the footer's own CTA.
-    const max = document.documentElement.scrollHeight - innerHeight;
-    h.toggle('dock-on', y > innerHeight * 0.75 && y < max - innerHeight * 1.1);
     if (Math.abs(y - last) < 4) return;
+    // Phones: a Start free bar rises on the way back up after the hero, so it never sits over text
+    // being read, and steps aside while the page's own buttons or the footer's CTA are on screen.
+    const max = document.documentElement.scrollHeight - innerHeight;
+    const ownCta = [...document.querySelectorAll('main .btn')].some((el) => {
+      const r = el.getBoundingClientRect();
+      return r.height > 0 && r.bottom > 0 && r.top < innerHeight;
+    });
+    h.toggle('dock-on', y < last && y > innerHeight * 0.75 && y < max - innerHeight * 1.1 && !ownCta);
     // Over the closing band the header stays away, so it never covers that band's own Start free
     const finale = document.querySelector('.finale');
     const overFinale = !!finale && finale.getBoundingClientRect().top < innerHeight * 0.35;
@@ -283,15 +288,16 @@ function watchField() {
   });
 }
 
-/** Photos on the gallery wall pull focus: they ease from a close crop to the full frame as you pass. */
+/** Shots on the gallery wall pull focus: a slight close crop that settles on the whole screen
+ *  by the time it reaches the middle of the view, so no text is ever left cut off. */
 function wallFocus() {
   onPage(() => {
     if (prefersReducedMotion()) return;
     document.querySelectorAll<HTMLElement>('.wall__media > div').forEach((inner) =>
-      gsap.fromTo(inner, { scale: 1.25 }, {
-        scale: 1.04,
+      gsap.fromTo(inner, { scale: 1.08 }, {
+        scale: 1,
         ease: 'none',
-        scrollTrigger: { trigger: inner.parentElement, start: 'top bottom', end: 'bottom top', scrub: true },
+        scrollTrigger: { trigger: inner.parentElement, start: 'top bottom', end: 'center 60%', scrub: true },
       }),
     );
   });

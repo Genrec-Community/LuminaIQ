@@ -1,9 +1,7 @@
 import type { Metadata } from 'next';
 import { breadcrumbs, ld, pageMeta } from '@/lib/seo';
-import Link from 'next/link';
 import { Faq } from '@/components/Faq';
-import { Arrow } from '@/components/Footer';
-import { faqs, loop, pipeline, reviewDays, site } from '@/data/site';
+import { faqs, loop, pipeline, reviewDays } from '@/data/site';
 
 export const metadata: Metadata = pageMeta({
   title: 'How it works: from your PDF to cited answers',
@@ -115,22 +113,6 @@ export default function HowItWorks() {
         </div>
       </section>
 
-      <section className="band" aria-labelledby="band-title">
-        <div className="wrap band__inner">
-          <h2 id="band-title" className="display h-xl" data-split="lines">
-            Try it on tonight’s <em>reading.</em>
-          </h2>
-          <div className="actions">
-            <a href={site.appUrl} className="btn btn--dark">
-              <span>Start free</span>
-              <Arrow />
-            </a>
-            <Link href="/features/" className="btn btn--light">
-              <span>Browse the tools</span>
-            </Link>
-          </div>
-        </div>
-      </section>
       <script type="application/ld+json" dangerouslySetInnerHTML={ld(breadcrumbs('How it works', '/how-it-works/'))} />
     </>
   );

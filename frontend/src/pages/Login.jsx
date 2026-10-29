@@ -147,7 +147,7 @@ const Login = () => {
                     <Circled><em>Remember</em></Circled> it<br />
                     for the exam.
                 </p>
-                <div data-reveal="settle" data-delay="0.2" className="mt-10"><MemoryCurve height={210} compact /></div>
+                <div data-reveal="settle" data-delay="0.2" className="mt-10"><MemoryCurve height={210} compact titleAs="p" /></div>
             </section>
 
             <div data-reveal="settle" className="w-full lg:col-span-5 lg:col-start-8 bg-white rounded-[1.5rem] overflow-hidden border border-[#163628]/10 shadow-[0_24px_60px_-34px_rgba(22,54,40,0.45)]">
@@ -222,7 +222,7 @@ const Login = () => {
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
                                         className="w-full pl-12 pr-4 py-4 bg-[#FDF6F0] border border-[#163628]/15 rounded-full outline-none focus:border-[#163628] focus:bg-white focus:ring-4 focus:ring-[#D3EE6A]/70 transition-all text-[#163628] placeholder-[#5E5046]/60 font-medium"
-                                        placeholder="••••••••"
+                                        placeholder="Password"
                                         disabled={loading}
                                     />
                                 </div>

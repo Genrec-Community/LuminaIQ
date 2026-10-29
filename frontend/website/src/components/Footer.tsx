@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { site } from '@/data/site';
+import { FinaleLink } from './FinaleLink';
 import { Mark } from './Logo';
 
 export function Footer() {
@@ -8,9 +9,9 @@ export function Footer() {
     <footer className="finale">
       <div className="wrap">
         <div className="finale__head">
-          <p className="finale__title display" data-split="lines">
+          <h2 className="finale__title display" data-split="lines">
             Read it today. <em>Still know it</em> in June.
-          </p>
+          </h2>
           <svg className="finale__curve" viewBox="0 0 600 100" aria-hidden="true">
             <path
               data-draw-scrub
@@ -23,9 +24,7 @@ export function Footer() {
               <span>Start free</span>
               <Arrow />
             </a>
-            <Link href="/pricing/" className="btn btn--ghost">
-              <span>Compare plans</span>
-            </Link>
+            <FinaleLink />
           </div>
         </div>
 

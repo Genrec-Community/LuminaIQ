@@ -50,16 +50,17 @@ export const reviewDays = [1, 6, 15, 38, 95];
 
 // Real product screens (frontend/website/public/shots), captured from the app with sample
 // study material. `id` is kept for Unsplash photos; `src` marks a self-hosted product shot.
-export type Photo = { id: string; alt: string; src?: string; placeholder?: boolean };
-const shot = (file: string, alt: string): Photo => ({ id: file, src: `/shots/${file}`, alt });
+export type Photo = { id: string; alt: string; src?: string; w?: number; h?: number; placeholder?: boolean };
+// w × h is the capture's own size, so the frame never crops a product shot
+const shot = (file: string, w: number, h: number, alt: string): Photo => ({ id: file, src: `/shots/${file}`, w, h, alt });
 export const photos = {
-  hero: shot('feed.webp', 'The Lumina IQ phone app: a quick question on where the light reactions happen, answered correctly'),
-  college: shot('dashboard.webp', 'The Lumina IQ dashboard: a greeting, today\'s numbers and quests, and the books on the shelf'),
-  medlaw: shot('phone-home.webp', 'The phone home screen: a getting-started checklist and today\'s review feed'),
-  teachers: shot('learning-path.webp', 'The learning path: the next topic to learn, why it comes next, and the memory curve'),
-  self: shot('exam-tonight.webp', 'Exam Tonight: pick how much time you have and get a plan that fits'),
-  books: shot('library.webp', 'The phone library: a shelf of books, one per subject'),
-  group: shot('memory-curve.webp', 'The memory curve on the dashboard: what you keep with reviews and what you lose without them'),
+  hero: shot('feed.webp', 780, 974, 'The Lumina IQ phone app: a quick question on where the light reactions happen, answered correctly'),
+  college: shot('dashboard.webp', 740, 540, 'The Lumina IQ dashboard: a greeting, a nudge from Lumi and the chapter to continue'),
+  medlaw: shot('phone-home.webp', 780, 974, 'The phone home screen: a getting-started checklist and today\'s review feed'),
+  teachers: shot('memory-curve.webp', 878, 531, 'The memory curve: how much of the studied topics is still remembered, and when it fades'),
+  self: shot('exam-tonight.webp', 1080, 810, 'Exam Tonight: pick how much time you have and get a plan that fits'),
+  books: shot('library.webp', 780, 974, 'The phone library: a shelf of books, one per subject'),
+  group: shot('memory-curve.webp', 878, 531, 'The memory curve on the dashboard: what you keep with reviews and what you lose without them'),
 } satisfies Record<string, Photo>;
 
 export type Stage = 'Understand' | 'Practise' | 'Measure' | 'Revise';

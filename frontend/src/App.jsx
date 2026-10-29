@@ -106,6 +106,8 @@ function App() {
                             <Routes>
                                 <Route path="/" element={<SiteHome />} />
                                 <Route path="/login" element={<Login />} />
+                                <Route path="/signup" element={<Navigate to="/login?signup=1" replace />} />
+                                <Route path="/signin" element={<Navigate to="/login" replace />} />
                                 <Route path="/reset-password" element={<ResetPassword />} />
                                 <Route path="/plans" element={<Pricing />} />
                                 <Route path="/pricing" element={<Navigate to="/plans" replace />} />

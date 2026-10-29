@@ -78,7 +78,7 @@ function personal(profile) {
 
 const pct = (r) => `${Math.round(r * 100)}%`;
 
-export default function MemoryCurve({ profile, title, note, action, startDay, compact = false, height = 280 }) {
+export default function MemoryCurve({ profile, title, note, action, startDay, compact = false, height = 280, titleAs = 'h2' }) {
     const H = height;
     const model = useMemo(() => personal(profile) || illustrative(), [profile]);
     const { days } = model;
@@ -173,14 +173,16 @@ export default function MemoryCurve({ profile, title, note, action, startDay, co
     const rev = model.withReviews(day);
     const whole = Math.floor(day);
     const today = model.once(0);
+    // Beside a page's own form (Login) the chart is an aside, so its title need not be a heading
+    const Title = titleAs;
 
     return (
         <section ref={root} className={`lumina-curve ${compact ? 'lumina-curve--compact' : ''}`} aria-label="Memory curve">
             <div className="lumina-curve__head">
                 <div>
-                    <h2 className="lumina-curve__title">
+                    <Title className="lumina-curve__title">
                         {title || (model.personal ? <>What you'll still <em>remember</em></> : <>Why you <em>forget</em>, and the fix</>)}
-                    </h2>
+                    </Title>
                     {model.personal && (
                         <p className="lumina-curve__sub">Across the {model.count} topics you've studied here. You remember about <b>{pct(today)}</b> today.</p>
                     )}

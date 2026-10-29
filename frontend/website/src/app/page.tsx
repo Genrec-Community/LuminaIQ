@@ -260,7 +260,7 @@ export default function Home() {
                 <li key={a.key} className={`wall__item wall__item--${i + 1}`}>
                   <div data-reveal="clip">
                     <div className="wall__media">
-                      <div data-parallax="0.06">
+                      <div>
                         <Photo photo={photos[a.key]} ratio={i % 3 === 0 ? '4 / 3' : '4 / 5'} sizes="(min-width: 1024px) 45vw, 100vw" />
                       </div>
                     </div>

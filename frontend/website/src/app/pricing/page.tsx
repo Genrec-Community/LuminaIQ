@@ -47,7 +47,7 @@ export default function PricingPage() {
           <h2 id="compare-title" className="display h-l" data-split="lines">
             Every feature, plan by plan
           </h2>
-          <div className="compare__scroll" tabIndex={0} role="region" aria-labelledby="compare-title">
+          <div className="compare__scroll" tabIndex={0} role="region" aria-label="Plan comparison table, scrolls sideways">
             <table className="compare__table">
               <thead>
                 <tr>
@@ -66,9 +66,9 @@ export default function PricingPage() {
                 {comparison.map((r) => (
                   <tr key={r.row}>
                     <th scope="row">{r.row}</th>
-                    <td><Cell v={r.free} /></td>
-                    <td className="is-popular"><Cell v={r.scholar} /></td>
-                    <td><Cell v={r.topper} /></td>
+                    <td data-plan={plans[0].name}><Cell v={r.free} /></td>
+                    <td data-plan={plans[1].name} className="is-popular"><Cell v={r.scholar} /></td>
+                    <td data-plan={plans[2].name}><Cell v={r.topper} /></td>
                   </tr>
                 ))}
               </tbody>

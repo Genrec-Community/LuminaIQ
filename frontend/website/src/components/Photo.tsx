@@ -13,11 +13,11 @@ type Props = {
 
 /** A duotoned stock photo (forest on paper). If the image fails, the frame shows grid paper. */
 export function Photo({ photo, sizes, ratio = '4 / 5', eager, className }: Props) {
-  // A self-hosted product shot: shown as it is, no duotone, anchored to the top of the screen
+  // A self-hosted product shot: shown whole at its own aspect ratio, no duotone
   if (photo.src) {
     return (
-      <figure className={`photo photo--product ${className ?? ''}`} style={{ aspectRatio: ratio }}>
-        <img src={photo.src} alt={photo.alt} sizes={sizes} loading={eager ? 'eager' : 'lazy'}
+      <figure className={`photo photo--product ${className ?? ''}`} style={{ aspectRatio: photo.w && photo.h ? `${photo.w} / ${photo.h}` : ratio }}>
+        <img src={photo.src} alt={photo.alt} sizes={sizes} width={photo.w} height={photo.h} loading={eager ? 'eager' : 'lazy'}
           fetchPriority={eager ? 'high' : 'auto'} decoding="async" />
       </figure>
     );
