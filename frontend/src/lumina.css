@@ -254,3 +254,7 @@ html.dark .bg-\[\#E6D5CC\]\/60,
 html.dark .bg-\[\#E6D5CC\]\/50,
 html.dark .bg-\[\#E6D5CC\]\/40,
 html.dark .bg-\[\#E6D5CC\]\/30 { background-color: rgb(244 238 226 / 0.1) !important; }
+:root { --lumina-ring-text: #163628; }
+html.dark { --lumina-ring-text: #f4eee2; }
+/* The landing glows are heavy to repaint on phones: hold them still there */
+@media (max-width: 640px) { .aurora-blob { animation: none !important; } }

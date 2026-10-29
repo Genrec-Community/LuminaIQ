@@ -214,7 +214,8 @@ const ProjectView = () => {
         if (tool && tool !== 'general') return tool;
         const saved = sessionStorage.getItem(`lumina_tab_${projectId}`);
         // 'general' was a menu toggle, not a real view
-        return saved && saved !== 'general' ? saved : 'power';
+        // First visit opens on the Learning Path: one clear next step, plus the memory curve
+        return saved && saved !== 'general' ? saved : 'path';
     });
     const [labTopic, setLabTopic] = useState('');
     // Six-step lesson opened from the adaptive plan; planVersion refreshes the plan after it

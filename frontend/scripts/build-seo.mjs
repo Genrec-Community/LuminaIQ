@@ -171,6 +171,10 @@ footer.site{margin-top:72px;border-top:1px solid var(--line);padding:28px 0 40px
 footer.site .wrap{max-width:1040px;display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-between}
 footer.site a{color:var(--muted)}
 .btn:hover{background-size:100% 100%;color:#163628!important}
+.skip{position:fixed;left:12px;top:-60px;z-index:99;padding:10px 16px;border-radius:999px;background:var(--ink);color:var(--bg)!important;font-weight:700;text-decoration:none}.skip:focus{top:12px}
+footer.site a,.toc li a{display:inline-block;padding:4px 0}
+nav.top a:not(.btn){background:linear-gradient(#D3EE6A,#D3EE6A) no-repeat left calc(100% - 2px)/0% 3px;transition:background-size .4s cubic-bezier(.16,1,.3,1);padding:6px 0}nav.top a:not(.btn):hover{background-size:100% 3px}
+.logo{transition:transform .3s cubic-bezier(.16,1,.3,1)}.logo:hover{transform:translateY(-1px)}.logo:hover i{transform:rotate(-6deg)}.logo i{transition:transform .3s cubic-bezier(.16,1,.3,1)}
 @media (max-width:640px){nav.top .hide-sm{display:none}body{font-size:16px}h2{font-size:23px}}
 `;
 
@@ -209,8 +213,9 @@ ${published ? `<meta property="article:published_time" content="${published}">\n
 ${extraHead}
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 <header class="site"><div class="wrap">
-  <a class="logo" href="/" aria-label="${BRAND} home"><i><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/></svg></i><span>Lumina <b>IQ</b></span></a>
+  <a class="logo" href="/" aria-label="${BRAND} home"><i><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg></i><span>Lumina IQ</span></a>
   <nav class="top"><a href="/blog/">Blog</a><a class="hide-sm" href="/pricing">Pricing</a><a class="btn" href="/login">Start free</a></nav>
 </div></header>
 ${body}
@@ -271,7 +276,7 @@ for (const a of articles) {
             ],
         },
     ];
-    const body = `<main class="wrap">
+    const body = `<main id="main" class="wrap">
 <div class="crumbs"><a href="/">Home</a> / <a href="/blog/">Blog</a></div>
 <article>
 <h1>${esc(a.title)}</h1>
@@ -302,7 +307,7 @@ writeFileSync(join(OUT, 'blog', 'index.html'), shell({
     path: '/blog/',
     keywords: 'study tips, how to study for exams, learn fast, exam preparation, revision tips, study plan',
     extraHead: jsonLd(blogLd),
-    body: `<main class="wrap blog-wrap">
+    body: `<main id="main" class="wrap blog-wrap">
 <section class="blog-hero"><h1>Study smarter, not longer</h1>
 <p>Honest, practical guides for students who have exams coming and not enough time. How to study, how to learn fast, and how to actually remember it.</p></section>
 <h2>Latest guides</h2>

@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { isAppShell } from './utils/platform';
 import { AuthProvider } from './context/AuthContext';
@@ -53,7 +53,23 @@ const SkipLink = () => (
     }}>Skip to content</a>
 );
 
+// Warm the main page chunks once the browser is idle, so moving between pages
+// never flashes the loader
+const usePrefetchPages = () => {
+    useEffect(() => {
+        if (APP_SHELL) return undefined;
+        const warm = () => {
+            import('./pages/Landing'); import('./pages/Login'); import('./pages/Pricing');
+            import('./pages/Dashboard'); import('./pages/ProjectView'); import('./pages/NotFound');
+        };
+        const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1500));
+        const id = idle(warm, { timeout: 4000 });
+        return () => (window.cancelIdleCallback || clearTimeout)(id);
+    }, []);
+};
+
 function App() {
+    usePrefetchPages();
     return (
         <AuthProvider>
             <SettingsProvider>

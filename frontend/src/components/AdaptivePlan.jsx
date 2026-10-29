@@ -40,10 +40,10 @@ const Ring = ({ value, size = 56 }) => {
     const c = 2 * Math.PI * r;
     return (
         <svg width={size} height={size} className="shrink-0 -rotate-90">
-            <circle cx={size / 2} cy={size / 2} r={r} stroke="#F1E6DD" strokeWidth="6" fill="none" />
+            <circle cx={size / 2} cy={size / 2} r={r} stroke="currentColor" strokeOpacity="0.12" strokeWidth="6" fill="none" />
             <circle cx={size / 2} cy={size / 2} r={r} stroke="var(--lumina-accent)" strokeWidth="6" fill="none" strokeLinecap="round"
                 strokeDasharray={c} strokeDashoffset={c * (1 - (value || 0))} />
-            <text x="50%" y="50%" dominantBaseline="central" textAnchor="middle" className="rotate-90 fill-[#163628] text-[13px] font-bold"
+            <text x="50%" y="50%" dominantBaseline="central" textAnchor="middle" className="rotate-90 text-[13px] font-bold" fill="var(--lumina-ring-text, #163628)"
                 style={{ transformOrigin: 'center' }}>{pct(value)}</text>
         </svg>
     );

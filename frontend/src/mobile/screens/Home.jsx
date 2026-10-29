@@ -83,7 +83,7 @@ const Home = () => {
                         {settings.userAvatar || '🦊'}
                     </button>
                     <div className="min-w-0 flex-1">
-                        <p className="truncate text-[13px] font-medium" style={{ color: 'var(--m-muted)' }}>{timeGreeting()}</p>
+                        <p className="line-clamp-2 text-[13px] font-medium leading-snug" style={{ color: 'var(--m-muted)' }}>{timeGreeting()}</p>
                         <h1 className="truncate text-[22px] font-extrabold tracking-tight">{name} 👋</h1>
                     </div>
                     <div className="flex items-center gap-1 rounded-full px-3 py-1.5 text-[15px] font-extrabold" style={{ background: 'var(--m-soft)' }}>

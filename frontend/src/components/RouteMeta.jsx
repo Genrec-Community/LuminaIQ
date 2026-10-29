@@ -21,7 +21,11 @@ const PUBLIC = {
     },
     '/privacy': { title: 'Privacy Policy | Lumina IQ', description: 'How Lumina IQ collects, uses and protects your data.' },
     '/terms': { title: 'Terms of Service | Lumina IQ', description: 'The terms for using the Lumina IQ website and app.' },
+    '/delete-account': { title: 'Delete Your Account | Lumina IQ', description: 'How to delete your Lumina IQ account and everything stored with it.' },
 };
+
+// Signed-in and utility routes; anything else is the 404 page
+const APP_ROUTES = /^\/(dashboard|project|settings|bookstore|institution|platform|join|reset-password|app)(\/|$)/;
 
 function setMeta(selector, attr, key, value) {
     let el = document.head.querySelector(selector);
@@ -39,7 +43,7 @@ export default function RouteMeta() {
     useEffect(() => {
         const path = pathname.length > 1 ? pathname.replace(/\/+$/, '') : '/';
         const page = PUBLIC[path];
-        const title = page?.title || 'Lumina IQ';
+        const title = page?.title || (APP_ROUTES.test(path) ? 'Lumina IQ' : 'Page not found | Lumina IQ');
         const description = page?.description || DEFAULT_DESCRIPTION;
 
         document.title = title;

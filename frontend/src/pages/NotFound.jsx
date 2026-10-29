@@ -7,11 +7,12 @@ const NotFound = () => {
     const [flipped, setFlipped] = useState(false);
     return (
         <main className="flex min-h-[100dvh] flex-col items-center justify-center gap-8 bg-[#FDF6F0] px-4 text-[#163628]">
+            <h1 className="sr-only">Page not found</h1>
             <button
                 type="button"
                 onClick={() => setFlipped((f) => !f)}
-                aria-label={flipped ? 'Show the question again' : 'Flip the card to see the answer'}
-                className="group h-64 w-full max-w-md [perspective:1200px]"
+                aria-pressed={flipped}
+                className="group h-64 w-full max-w-md transition-transform duration-500 [perspective:1200px] hover:-translate-y-1 hover:rotate-[-1deg]"
             >
                 <span className="relative block h-full w-full transition-transform duration-700 [transform-style:preserve-3d] [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]"
                     style={{ transform: flipped ? 'rotateY(180deg)' : 'none' }}>

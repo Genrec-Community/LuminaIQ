@@ -117,10 +117,10 @@ const QuizCard = ({ card, onAnswer, active }) => {
                             onClick={() => choose(o.option)}
                             animate={isWrongPick ? { x: [0, -8, 8, -5, 5, 0] } : {}}
                             transition={{ duration: 0.4 }}
-                            className="m-pressable flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left text-[15px] font-semibold text-white"
+                            className={`m-pressable flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left text-[15px] font-semibold ${isRight ? 'text-[#0f271c]' : 'text-white'}`}
                             style={{
-                                background: isRight ? 'rgba(34,197,94,0.9)' : isWrongPick ? 'rgba(239,68,68,0.9)' : 'rgba(255,255,255,0.13)',
-                                border: `1px solid ${isRight ? '#4ade80' : isWrongPick ? '#f87171' : 'rgba(255,255,255,0.18)'}`,
+                                background: isRight ? '#D3EE6A' : isWrongPick ? 'rgba(239,68,68,0.9)' : 'rgba(255,255,255,0.13)',
+                                border: `1px solid ${isRight ? '#e0f590' : isWrongPick ? '#f87171' : 'rgba(255,255,255,0.18)'}`,
                                 opacity: picked && !isRight && !isWrongPick ? 0.55 : 1,
                                 backdropFilter: 'blur(6px)',
                             }}
@@ -191,7 +191,7 @@ const FlashCard = ({ card, onGrade }) => {
                         </button>
                         <button onClick={() => grade(true)} disabled={graded != null}
                             className="m-pressable h-14 rounded-2xl text-[15px] font-bold text-white disabled:opacity-60"
-                            style={{ background: graded === true ? '#22c55e' : 'rgba(34,197,94,0.28)', border: '1px solid rgba(74,222,128,0.6)' }}>
+                            style={{ background: graded === true ? '#D3EE6A' : 'rgba(211,238,106,0.22)', border: '1px solid rgba(211,238,106,0.6)', color: graded === true ? '#0f271c' : undefined }}>
                             Got it
                         </button>
                     </motion.div>
