@@ -11,7 +11,7 @@ const DEFAULT_DESCRIPTION = 'Lumina IQ turns your textbooks and notes into a stu
 
 const PUBLIC = {
     '/': { title: DEFAULT_TITLE, description: DEFAULT_DESCRIPTION },
-    '/pricing': {
+    '/plans': {
         title: 'Pricing: Free and Student Plans | Lumina IQ',
         description: 'Start studying free with Lumina IQ. Compare plans for students, exam night passes and school or institution seats.',
     },

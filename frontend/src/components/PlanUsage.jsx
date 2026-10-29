@@ -59,7 +59,7 @@ const PlanUsage = () => {
                     </p>
                 </div>
                 {plan.source !== 'institution' && !native && (
-                    <button onClick={() => navigate('/pricing')}
+                    <button onClick={() => navigate('/plans')}
                         className="rounded-xl bg-[#1E5C42] px-4 py-2 text-sm font-semibold text-white hover:bg-[#163628]">
                         {plan.plan === 'free' ? 'Upgrade' : renews ? 'Manage plan' : 'Add more time'}
                     </button>

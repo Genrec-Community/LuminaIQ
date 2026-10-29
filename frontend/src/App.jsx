@@ -1,5 +1,5 @@
-import { lazy, Suspense, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { lazy, Suspense, useEffect, useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { isAppShell } from './utils/platform';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
@@ -9,6 +9,8 @@ import PrivateRoute from './components/PrivateRoute';
 import XPToast from './components/XPToast';
 import LimitModal from './components/LimitModal';
 import RouteMeta from './components/RouteMeta';
+import Feel from './feel/Feel';
+import { Mark } from './components/brand/Logo';
 
 // Route-level code splitting: each page loads only when visited
 const Login = lazy(() => import('./pages/Login'));
@@ -32,15 +34,34 @@ const APP_SHELL = isAppShell();
 
 const PageLoader = () => (
     <div className="min-h-screen flex items-center justify-center bg-[#FDF6F0]">
-        <div className="h-12 w-12 rounded-2xl bg-[#1E5C42] animate-pulse shadow-lg shadow-[#1E5C42]/30" />
+        <Mark className="h-12 w-12 animate-pulse" />
     </div>
 );
 
-// Each page fades in (opacity only, so fixed layers keep working)
-const RouteFade = ({ children }) => {
-    const { pathname } = useLocation();
-    return <div key={pathname} className="lumina-route">{children}</div>;
+// Mounts only once the first page's code has loaded: lifts the first-load screen
+const Ready = () => {
+    useEffect(() => { window.dispatchEvent(new Event('lumina:ready')); }, []);
+    return null;
 };
+
+// The marketing site (frontend/website, a static Next.js export) owns "/" and its own
+// pages; the app is served for everything else. A client-side jump to "/" reloads so the
+// server hands over the site. Without the site (local dev) the old landing is the fallback.
+const SiteHome = () => {
+    const [fallback, setFallback] = useState(false);
+    useEffect(() => {
+        const key = 'lumina_site_reload';
+        const last = Number(sessionStorage.getItem(key) || 0);
+        if (Date.now() - last > 4000) {
+            sessionStorage.setItem(key, String(Date.now()));
+            window.location.replace('/');
+        } else {
+            setFallback(true);
+        }
+    }, []);
+    return fallback ? <Landing /> : <PageLoader />;
+};
+
 
 // First keyboard stop: jump past the header to the page's main content
 const SkipLink = () => (
@@ -59,7 +80,7 @@ const usePrefetchPages = () => {
     useEffect(() => {
         if (APP_SHELL) return undefined;
         const warm = () => {
-            import('./pages/Landing'); import('./pages/Login'); import('./pages/Pricing');
+            import('./pages/Login'); import('./pages/Pricing');
             import('./pages/Dashboard'); import('./pages/ProjectView'); import('./pages/NotFound');
         };
         const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1500));
@@ -78,14 +99,16 @@ function App() {
                         <Router>
                             {!APP_SHELL && <RouteMeta />}
                             {!APP_SHELL && <SkipLink />}
+                            {!APP_SHELL && <Feel />}
                             <Suspense fallback={<PageLoader />}>
+                            <Ready />
                             {APP_SHELL ? <MobileApp /> : (
-                            <RouteFade>
                             <Routes>
-                                <Route path="/" element={<Landing />} />
+                                <Route path="/" element={<SiteHome />} />
                                 <Route path="/login" element={<Login />} />
                                 <Route path="/reset-password" element={<ResetPassword />} />
-                                <Route path="/pricing" element={<Pricing />} />
+                                <Route path="/plans" element={<Pricing />} />
+                                <Route path="/pricing" element={<Navigate to="/plans" replace />} />
                                 <Route path="/privacy" element={<Privacy />} />
                                 <Route path="/terms" element={<Terms />} />
                                 <Route path="/delete-account" element={<DeleteAccount />} />
@@ -102,7 +125,6 @@ function App() {
                                 </Route>
                                 <Route path="*" element={<NotFound />} />
                             </Routes>
-                            </RouteFade>
                             )}
                             </Suspense>
                             <LimitModal />

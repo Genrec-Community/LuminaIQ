@@ -1,5 +1,5 @@
 {
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/((?!_next/|assets/|blog/)(?!.*\\.txt$).*)", "destination": "/app.html" }
   ]
 }

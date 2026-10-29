@@ -24,7 +24,11 @@ const OG_IMAGE = `${SITE}/og-image.png`;
 // Public SPA pages listed in the sitemap alongside the blog
 const STATIC_PAGES = [
     { path: '/', priority: '1.0', changefreq: 'weekly' },
-    { path: '/pricing', priority: '0.8', changefreq: 'monthly' },
+    // Marketing site pages (frontend/website, merged into dist after this script)
+    { path: '/features/', priority: '0.9', changefreq: 'monthly' },
+    { path: '/how-it-works/', priority: '0.8', changefreq: 'monthly' },
+    { path: '/pricing/', priority: '0.8', changefreq: 'monthly' },
+    { path: '/about/', priority: '0.6', changefreq: 'yearly' },
     { path: '/login', priority: '0.5', changefreq: 'yearly' },
     { path: '/privacy', priority: '0.3', changefreq: 'yearly' },
     { path: '/terms', priority: '0.3', changefreq: 'yearly' },

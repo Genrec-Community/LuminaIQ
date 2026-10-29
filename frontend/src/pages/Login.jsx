@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import SiteHeader from '../components/site/SiteHeader';
+import Circled from '../components/site/Circled';
+import MemoryCurve from '../components/MemoryCurve';
 import { AFTER_LOGIN_KEY } from '../utils/afterLogin';
-import { BookOpen, Loader2, ArrowRight, Mail, Lock, User, School, ChevronDown } from 'lucide-react';
+import { Loader2, ArrowRight, Mail, Lock, User, School, ChevronDown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { apiErrorText, SCHOOL_PAUSED_KEY } from '../api';
 
@@ -15,7 +18,7 @@ const Login = () => {
         if (next) sessionStorage.setItem(AFTER_LOGIN_KEY, next);
     }, [next]);
     const { login, signup, loginWithGoogle, requestOtp, verifyOtpCode, requestPasswordReset } = useAuth();
-    const [isLogin, setIsLogin] = useState(true);
+    const [isLogin, setIsLogin] = useState(() => searchParams.get('signup') !== '1');
     const [isOtpMode, setIsOtpMode] = useState(false);
     const [isForgot, setIsForgot] = useState(false); // "Forgot password?" form
     const [showSchoolHelp, setShowSchoolHelp] = useState(false);
@@ -134,24 +137,26 @@ const Login = () => {
     };
 
     return (
-        <main className="min-h-screen bg-[#FDF6F0] flex flex-col items-center justify-center p-4 font-sans text-[#163628]">
-            <nav aria-label="Site" className="mb-4 flex w-full max-w-md items-center justify-between text-sm">
-                <Link to="/" className="lumina-link inline-flex min-h-[40px] items-center gap-1.5 font-semibold">← Lumina IQ</Link>
-                <span className="flex gap-4">
-                    <Link to="/pricing" className="lumina-link inline-flex min-h-[40px] items-center">Pricing</Link>
-                    <a href="/blog/" className="lumina-link inline-flex min-h-[40px] items-center">Blog</a>
-                </span>
-            </nav>
-            <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl shadow-[#1E5C42]/10 overflow-hidden border border-[#E6D5CC]">
-                <div className="p-6 sm:p-12">
-                    <div className="text-center mb-10">
-                        <div className="h-16 w-16 bg-[#1E5C42] rounded-2xl flex items-center justify-center text-white mx-auto mb-6 shadow-lg shadow-[#1E5C42]/20 transform rotate-3 transition-transform hover:rotate-6">
-                            <BookOpen className="h-8 w-8" />
-                        </div>
-                        <h1 className="text-3xl font-bold mb-2 text-[#163628]">
-                            {isForgot ? 'Reset your password' : isOtpMode ? 'Passwordless Login' : isLogin ? 'Welcome Back' : 'Join Lumina IQ'}
+        <div className="min-h-screen bg-[#FDF6F0] font-sans text-[#163628]">
+        <SiteHeader cta={false} />
+        <main id="main" className="site-wrap grid gap-8 pb-16 pt-6 lg:grid-cols-12 lg:items-start lg:gap-10 lg:pt-12">
+            {/* The site's argument, on the left: you forget, reviews bring it back */}
+            <section className="hidden lg:col-span-6 lg:block lg:sticky lg:top-28" aria-label="Why Lumina IQ">
+                <p data-reveal="up" className="display h-xl">
+                    Read it once.<br />
+                    <Circled><em>Remember</em></Circled> it<br />
+                    for the exam.
+                </p>
+                <div data-reveal="settle" data-delay="0.2" className="mt-10"><MemoryCurve height={210} compact /></div>
+            </section>
+
+            <div data-reveal="settle" className="w-full lg:col-span-5 lg:col-start-8 bg-white rounded-[1.5rem] overflow-hidden border border-[#163628]/10 shadow-[0_24px_60px_-34px_rgba(22,54,40,0.45)]">
+                <div className="p-6 sm:p-10">
+                    <div className="mb-8">
+                        <h1 className="display h-l mb-3 mark-em">
+                            {isForgot ? <>Choose a new <em>password</em></> : isOtpMode ? <>Sign in with a <em>code</em></> : isLogin ? <>Welcome <em>back</em>.</> : <>Start <em>remembering</em>.</>}
                         </h1>
-                        <p className="text-[#5E5046] text-sm">
+                        <p className="text-[#5E5046]">
                             {isForgot ? "Enter your email and we'll send you a link to choose a new password" : isOtpMode ? 'We will send a one-time code to your email' : isLogin ? 'Pick up right where your learning path left off' : 'Turn any book into the shortest path to exam-ready'}
                         </p>
                     </div>
@@ -180,7 +185,7 @@ const Login = () => {
                                         required
                                         value={fullName}
                                         onChange={(e) => setFullName(e.target.value)}
-                                        className="w-full pl-12 pr-4 py-4 bg-white border-2 border-[#E6D5CC] rounded-xl outline-none focus:border-[#1E5C42] focus:ring-4 focus:ring-[#1E5C42]/10 transition-all text-[#163628] placeholder-[#d2bab0] font-medium"
+                                        className="w-full pl-12 pr-4 py-4 bg-[#FDF6F0] border border-[#163628]/15 rounded-full outline-none focus:border-[#163628] focus:bg-white focus:ring-4 focus:ring-[#D3EE6A]/70 transition-all text-[#163628] placeholder-[#5E5046]/60 font-medium"
                                         placeholder="Full Name"
                                         disabled={loading}
                                     />
@@ -199,7 +204,7 @@ const Login = () => {
                                     required
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full pl-12 pr-4 py-4 bg-white border-2 border-[#E6D5CC] rounded-xl outline-none focus:border-[#1E5C42] focus:ring-4 focus:ring-[#1E5C42]/10 transition-all text-[#163628] placeholder-[#d2bab0] font-medium"
+                                    className="w-full pl-12 pr-4 py-4 bg-[#FDF6F0] border border-[#163628]/15 rounded-full outline-none focus:border-[#163628] focus:bg-white focus:ring-4 focus:ring-[#D3EE6A]/70 transition-all text-[#163628] placeholder-[#5E5046]/60 font-medium"
                                     placeholder={isLogin && !isOtpMode && !isForgot ? 'Email' : 'name@example.com'}
                                     disabled={loading || (isOtpMode && otpSent)}
                                 />
@@ -216,7 +221,7 @@ const Login = () => {
                                         required
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
-                                        className="w-full pl-12 pr-4 py-4 bg-white border-2 border-[#E6D5CC] rounded-xl outline-none focus:border-[#1E5C42] focus:ring-4 focus:ring-[#1E5C42]/10 transition-all text-[#163628] placeholder-[#d2bab0] font-medium"
+                                        className="w-full pl-12 pr-4 py-4 bg-[#FDF6F0] border border-[#163628]/15 rounded-full outline-none focus:border-[#163628] focus:bg-white focus:ring-4 focus:ring-[#D3EE6A]/70 transition-all text-[#163628] placeholder-[#5E5046]/60 font-medium"
                                         placeholder="••••••••"
                                         disabled={loading}
                                     />
@@ -246,7 +251,7 @@ const Login = () => {
                                         required
                                         value={otpCode}
                                         onChange={(e) => setOtpCode(e.target.value)}
-                                        className="w-full pl-12 pr-4 py-4 bg-white border-2 border-[#E6D5CC] rounded-xl outline-none focus:border-[#1E5C42] focus:ring-4 focus:ring-[#1E5C42]/10 transition-all text-[#163628] placeholder-[#d2bab0] font-medium tracking-widest text-center"
+                                        className="w-full pl-12 pr-4 py-4 bg-[#FDF6F0] border border-[#163628]/15 rounded-full outline-none focus:border-[#163628] focus:bg-white focus:ring-4 focus:ring-[#D3EE6A]/70 transition-all text-[#163628] placeholder-[#5E5046]/60 font-medium tracking-widest text-center"
                                         placeholder="123456"
                                         maxLength={6}
                                         disabled={loading}
@@ -258,7 +263,7 @@ const Login = () => {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full py-4 bg-[#1E5C42] text-white rounded-xl font-bold text-lg hover:bg-[#163628] focus:ring-4 focus:ring-[#1E5C42]/30 transition-all disabled:opacity-70 flex items-center justify-center gap-2 shadow-xl shadow-[#1E5C42]/20 transform active:scale-[0.98]"
+                            className="btn btn--dark btn--block min-h-[3.4rem] text-lg"
                         >
                             {loading ? (
                                 <Loader2 className="h-6 w-6 animate-spin" />
@@ -303,7 +308,7 @@ const Login = () => {
                             }
                         }}
                         disabled={loading}
-                        className="w-full py-4 bg-white border-2 border-[#E6D5CC] text-[#163628] rounded-xl font-bold text-lg hover:bg-[#FDF6F0] focus:ring-4 focus:ring-[#1E5C42]/10 transition-all flex items-center justify-center gap-3 active:scale-[0.98]"
+                        className="btn btn--light btn--block min-h-[3.4rem] gap-3 text-lg"
                     >
                         <svg className="h-6 w-6" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C36.9 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
                         Google
@@ -317,7 +322,7 @@ const Login = () => {
                             setMessage(null);
                         }}
                         disabled={loading}
-                        className="w-full mt-4 py-4 bg-white border-2 border-[#E6D5CC] text-[#163628] rounded-xl font-bold text-lg hover:bg-[#FDF6F0] focus:ring-4 focus:ring-[#1E5C42]/10 transition-all flex items-center justify-center gap-3 active:scale-[0.98]"
+                        className="btn btn--soft btn--block mt-3 min-h-[3.4rem] gap-3 text-lg"
                     >
                         <Mail className="h-5 w-5 text-[#5E5046]" />
                         {isOtpMode ? 'Use Password Instead' : 'Login with Email Code'}
@@ -365,6 +370,7 @@ const Login = () => {
                 </div>
             </div>
         </main>
+        </div>
     );
 };
 

@@ -107,7 +107,7 @@ api.interceptors.response.use(
                 localStorage.removeItem('user');
                 delete api.defaults.headers.common['Authorization'];
                 // Redirect to login without a hard reload loop
-                const isAlreadyOnAuth = ['/login', '/signup', '/', '/pricing', '/institution'].includes(window.location.pathname);
+                const isAlreadyOnAuth = ['/login', '/signup', '/', '/pricing', '/plans', '/institution'].includes(window.location.pathname);
                 if (!isAlreadyOnAuth) {
                     window.location.href = '/login';
                 }

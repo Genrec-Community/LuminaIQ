@@ -68,7 +68,7 @@ const LimitModal = () => {
                         )}
                         <div className="mt-5 flex flex-col sm:flex-row gap-2">
                             {next && (
-                                <button onClick={() => { close(); navigate(`/pricing?plan=${next.key}`); }}
+                                <button onClick={() => { close(); navigate(`/plans?plan=${next.key}`); }}
                                     className="flex-1 rounded-2xl bg-[#1E5C42] px-4 py-3 font-semibold text-white hover:bg-[#163628]">
                                     See {next.name}
                                 </button>

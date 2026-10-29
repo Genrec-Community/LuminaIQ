@@ -62,17 +62,65 @@
 </head>
 
 <body>
-  <!-- Painted before the app loads (and read by crawlers); React replaces it on mount -->
-  <div id="root">
-    <main style="min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6rem;padding:24px;text-align:center;background:#FDF6F0;color:#163628;font-family:ui-sans-serif,system-ui,sans-serif">
-      <h1 style="margin:0;font:400 clamp(2rem,6vw,3rem)/1.05 Georgia,'Times New Roman',serif;letter-spacing:-.02em">Lumina IQ</h1>
-      <p style="margin:0;max-width:34ch;color:#5E5046">Learn the whole book, even tonight. Your textbooks and notes become a study plan, practice questions and flashcards.</p>
-      <noscript>
-        <p>Please turn on JavaScript to use the app.</p>
-        <p><a href="/blog/">Study blog</a> · <a href="/pricing">Pricing</a> · <a href="/login">Start free</a></p>
-      </noscript>
-    </main>
+  <!-- First-load screen, same family as the marketing site's curtain: a forest field,
+       the wordmark, a counter and a lime highlighter bar that follow real loading work.
+       It lifts off once the first page is ready (the app fires "lumina:ready"). -->
+  <div id="loader" aria-hidden="true">
+    <span class="ld-band"></span>
+    <div class="ld-inner">
+      <svg class="ld-mark" viewBox="0 0 32 32"><path d="M6 9c2.5 7 4 9 6.5 9.5V9c2.6 6 5 7.6 7.5 7.8V9c2 4.5 4 5.4 6 5.6" fill="none" stroke="#D3EE6A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" pathLength="1"/><circle cx="26" cy="22.5" r="2.4" fill="#D3EE6A"/></svg>
+      <p class="ld-word">Lumina<i>IQ</i></p>
+      <p class="ld-line">Read it once. Remember it for the exam.</p>
+    </div>
+    <div class="ld-foot"><span class="ld-count">000</span><span class="ld-track"><span class="ld-bar"></span></span></div>
   </div>
+  <style>
+    #loader{position:fixed;inset:0;z-index:10000;display:grid;grid-template-rows:1fr auto;padding:clamp(1rem,.6rem + 1.6vw,2.5rem);background:#163628;color:#f4eee2;transition:transform .9s cubic-bezier(.87,0,.13,1)}
+    #loader .ld-inner{align-self:center;justify-self:center;text-align:center}
+    #loader .ld-mark{width:3.25rem;height:3.25rem;margin:0 auto 1.1rem;overflow:visible}
+    #loader .ld-mark path{stroke-dasharray:1;stroke-dashoffset:1;animation:ld-draw 1.1s cubic-bezier(.65,0,.35,1) .1s forwards}
+    #loader .ld-mark circle{opacity:0;animation:ld-pop .4s ease-out 1s forwards}
+    #loader .ld-word{margin:0;font:600 clamp(2.4rem,1.6rem + 4vw,4.6rem)/1 "Atkinson Hyperlegible Next Variable","Atkinson Hyperlegible Next",system-ui,sans-serif;letter-spacing:-.03em}
+    #loader .ld-word i{font-family:"Newsreader Variable",Newsreader,Georgia,serif;font-weight:400;margin-left:.04em}
+    #loader .ld-line{margin:.9rem 0 0;font:italic 300 clamp(1rem,.9rem + .5vw,1.35rem) "Newsreader Variable",Newsreader,Georgia,serif;color:rgb(244 238 226/.7)}
+    #loader .ld-foot{display:flex;align-items:center;gap:1rem;font:500 .8125rem system-ui,sans-serif;font-variant-numeric:tabular-nums;color:rgb(244 238 226/.7)}
+    #loader .ld-track{flex:1;height:3px;background:rgb(244 238 226/.14);border-radius:3px;overflow:hidden}
+    #loader .ld-bar{display:block;height:100%;background:#D3EE6A;transform:scaleX(0);transform-origin:left}
+    #loader .ld-band{position:absolute;left:0;right:0;bottom:0;height:2.6rem;background:#D3EE6A;translate:0 100%}
+    #loader.is-out{transform:translateY(-100%)}
+    @keyframes ld-draw{to{stroke-dashoffset:0}}
+    @keyframes ld-pop{to{opacity:1}}
+    @media (prefers-reduced-motion:reduce){#loader{transition:opacity .3s}#loader.is-out{transform:none;opacity:0}#loader .ld-mark path{animation:none;stroke-dashoffset:0}#loader .ld-mark circle{opacity:1;animation:none}}
+  </style>
+  <script>
+    (function () {
+      var root = document.getElementById('loader'); if (!root) return;
+      var count = root.querySelector('.ld-count'), bar = root.querySelector('.ld-bar');
+      var MIN = 900, MAX = 6000, start = performance.now(), shown = 0, target = 8, appReady = false, done = false;
+      var fonts = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
+      fonts.then(function () { target = Math.max(target, 45); });
+      window.addEventListener('lumina:ready', function () { appReady = true; });
+      function tick(now) {
+        var t = now - start;
+        if (appReady) target = 100; else target = Math.min(90, Math.max(target, 8 + t / 40));
+        var goal = Math.min(target, (t / MIN) * 100);
+        if (t > MAX) goal = 100;
+        shown += (goal - shown) * 0.14;
+        if (goal === 100 && shown > 99.5) shown = 100;
+        count.textContent = String(Math.round(shown)).padStart(3, '0');
+        bar.style.transform = 'scaleX(' + shown / 100 + ')';
+        if (shown === 100 && !done) {
+          done = true;
+          root.classList.add('is-out');
+          setTimeout(function () { root.remove(); document.documentElement.classList.add('is-loaded'); }, 950);
+          return;
+        }
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    })();
+  </script>
+  <div id="root"></div>
   <script type="module" src="/src/main.tsx"></script>
 </body>
 

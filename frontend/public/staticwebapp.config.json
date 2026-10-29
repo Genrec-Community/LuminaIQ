@@ -1,14 +1,42 @@
 {
   "navigationFallback": {
-    "rewrite": "/index.html",
-    "exclude": ["/assets/*", "/*.{png,jpg,jpeg,svg,ico,webmanifest,json,txt,js,css,woff,woff2}"]
+    "rewrite": "/app.html",
+    "exclude": [
+      "/assets/*",
+      "/_next/*",
+      "/_vercel/*",
+      "/blog/*",
+      "/*.{png,jpg,jpeg,svg,ico,webmanifest,json,txt,js,css,woff,woff2,xml,html}"
+    ]
   },
   "globalHeaders": {
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "strict-origin-when-cross-origin"
   },
   "routes": [
-    { "route": "/assets/*", "headers": { "Cache-Control": "public, max-age=31536000, immutable" } },
-    { "route": "/index.html", "headers": { "Cache-Control": "no-cache" } }
+    {
+      "route": "/assets/*",
+      "headers": {
+        "Cache-Control": "public, max-age=31536000, immutable"
+      }
+    },
+    {
+      "route": "/index.html",
+      "headers": {
+        "Cache-Control": "no-cache"
+      }
+    },
+    {
+      "route": "/_next/static/*",
+      "headers": {
+        "Cache-Control": "public, max-age=31536000, immutable"
+      }
+    },
+    {
+      "route": "/app.html",
+      "headers": {
+        "Cache-Control": "no-cache"
+      }
+    }
   ]
 }

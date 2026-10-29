@@ -151,6 +151,7 @@ const MobileApp = () => {
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/dashboard" element={<Navigate to="/app/home" replace />} />
                 <Route path="/pricing" element={<Navigate to="/app/me" replace />} />
+                <Route path="/plans" element={<Navigate to="/app/me" replace />} />
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/terms" element={<Terms />} />
 

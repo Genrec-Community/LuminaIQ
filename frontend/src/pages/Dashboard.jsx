@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { createProject, uploadDocument, getProjects, deleteProject, getPublicBooks, importBook, getLearningPlan } from '../api';
 import MemoryCurve from '../components/MemoryCurve';
+import Logo from '../components/brand/Logo';
 
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -429,19 +430,17 @@ const Dashboard = () => {
                 options={TOUR_OPTIONS}
             />
             {/* Header */}
-            <header className="bg-white border-b border-[#E6D5CC] sticky top-0 z-10">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+            <header className="app-header sticky top-0 z-30 border-b border-[#163628]/10 bg-[#FDF6F0]/90 backdrop-blur-md">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-[4.5rem] flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 bg-[#1E5C42] rounded-xl flex items-center justify-center text-white shadow-md shadow-[#1E5C42]/20">
-                            <BookOpen className="h-6 w-6" />
-                        </div>
-                        <h1 className="text-2xl font-bold text-[#163628]">Lumina IQ</h1>
+                        <a href="/" aria-label="Lumina IQ home" className="rounded-xl"><Logo /></a>
+                        <h1 className="sr-only">Your books</h1>
                     </div>
 
                     <div className="flex items-center gap-2 sm:gap-4">
                         {myPlan && !(isNativeApp() && myPlan.plan === 'free') && (
                             <button
-                                onClick={() => navigate(myPlan.plan === 'free' ? '/pricing' : '/settings?section=plan')}
+                                onClick={() => navigate(myPlan.plan === 'free' ? '/plans' : '/settings?section=plan')}
                                 className={`rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${myPlan.plan === 'free'
                                     ? 'bg-[#1E5C42] text-white hover:bg-[#163628]'
                                     : 'border border-[#E6D5CC] bg-[#FDF6F0] text-[#163628] hover:border-[#1E5C42]'}`}
@@ -498,8 +497,8 @@ const Dashboard = () => {
 
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
                     <div>
-                        <h2 className="text-2xl md:text-3xl font-bold mb-1">Your Study Spaces</h2>
-                        <p className="text-[#5E5046]">One space per subject — drop in textbooks, notes or slides</p>
+                        <h2 data-split className="font-display text-4xl md:text-5xl font-normal tracking-tight mb-2">Your <em>books</em></h2>
+                        <p className="text-[#5E5046]">One book per subject. Drop in textbooks, notes or slides.</p>
                     </div>
 
                     <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
@@ -507,23 +506,23 @@ const Dashboard = () => {
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-[#5E5046]" />
                             <input
                                 type="text"
-                                placeholder="Search projects..."
+                                placeholder="Search your books"
                                 value={projectSearch}
                                 onChange={e => setProjectSearch(e.target.value)}
-                                className="pl-12 pr-4 py-3 bg-white border border-[#E6D5CC] rounded-xl focus:ring-2 focus:ring-[#1E5C42] outline-none w-full md:w-64"
+                                className="h-12 pl-12 pr-4 bg-white border border-[#163628]/10 rounded-full focus:ring-2 focus:ring-[#D3EE6A] focus:border-[#163628] outline-none w-full md:w-64"
                             />
                         </div>
                         <button
                             id="tour-bookstore"
                             onClick={() => navigate('/bookstore')}
-                            className="px-6 py-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl font-medium hover:bg-emerald-100 transition-colors flex items-center justify-center gap-2 w-full md:w-auto"
+                            className="btn btn--soft w-full md:w-auto"
                         >
                             <Globe className="h-5 w-5" />
                             <span>Book Store</span>
                         </button>
                         <button
                             onClick={() => navigate('/institution')}
-                            className="px-5 py-3 bg-white border border-[#E6D5CC] text-[#163628] rounded-xl font-medium hover:border-[#1E5C42] transition-colors flex items-center justify-center gap-2 w-full md:w-auto"
+                            className="btn btn--light w-full md:w-auto"
                             title="Join a class with a code, or manage your institution"
                         >
                             <GraduationCap className="h-5 w-5 text-[#1E5C42]" />
@@ -532,20 +531,25 @@ const Dashboard = () => {
                         <button
                             id="tour-new-project"
                             onClick={openNewProjectModal}
-                            className="px-6 py-3 bg-[#1E5C42] text-white rounded-xl font-medium hover:bg-[#163628] transition-colors flex items-center justify-center gap-2 shadow-lg shadow-[#1E5C42]/20 w-full md:w-auto"
+                            data-magnetic="0.25"
+                            className="btn btn--dark w-full md:w-auto"
                         >
                             <Plus className="h-5 w-5" />
-                            <span>New Project</span>
+                            <span>New book</span>
                         </button>
                     </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredProjects.map((project) => (
+                    {filteredProjects.map((project, i) => (
                         <div
                             key={project.id}
                             onClick={() => navigate(`/project/${project.id}`)}
-                            className="group bg-white p-6 rounded-2xl border border-[#E6D5CC] hover:border-[#1E5C42] hover:shadow-lg hover:shadow-[#1E5C42]/10 transition-all cursor-pointer relative overflow-hidden"
+                            data-reveal="settle"
+                            data-delay={Math.min(i, 8) * 0.06}
+                            data-tilt={i % 2 ? '-1.6' : '1.6'}
+                            data-cursor="Open"
+                            className="lumina-book group relative cursor-pointer overflow-hidden rounded-[1.25rem] border border-[#163628]/10 bg-white p-6"
                         >
                             <div className="absolute top-0 right-0 p-6 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <ArrowRight className="h-5 w-5 text-[#1E5C42]" />
@@ -559,11 +563,11 @@ const Dashboard = () => {
                                 <Trash2 className="h-5 w-5" />
                             </button>
 
-                            <div className="h-12 w-12 bg-[#FDF6F0] rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-                                <BookOpen className="h-6 w-6 text-[#1E5C42]" />
+                            <div className="mb-8 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#F2E6DB] transition-transform duration-500 group-hover:-rotate-6">
+                                <BookOpen className="h-6 w-6 text-[#163628]" />
                             </div>
 
-                            <h3 className="text-xl font-bold mb-2 group-hover:text-[#1E5C42] transition-colors">{project.name}</h3>
+                            <h3 className="font-display text-2xl leading-tight tracking-tight"><span className="lumina-book__title">{project.name}</span></h3>
 
                             <div className="flex items-center gap-4 text-sm text-[#5E5046] mt-4 pt-4 border-t border-[#FDF6F0]">
                                 <div className="flex items-center gap-1.5">
@@ -572,7 +576,7 @@ const Dashboard = () => {
                                 </div>
                                 <div className="flex items-center gap-1.5">
                                     <BookOpen className="h-4 w-4" />
-                                    <span>{project.docs || 0} Docs</span>
+                                    <span>{project.docs || 0} {project.docs === 1 ? 'file' : 'files'}</span>
                                 </div>
                             </div>
                         </div>
@@ -582,12 +586,14 @@ const Dashboard = () => {
                     <button
                         id="tour-new-project-card"
                         onClick={openNewProjectModal}
-                        className="flex flex-col items-center justify-center p-6 rounded-2xl border-2 border-dashed border-[#E6D5CC] hover:border-[#1E5C42] hover:bg-[#FDF6F0]/50 transition-all group h-full min-h-[200px]"
+                        data-reveal="settle"
+                        data-cursor="New"
+                        className="group flex h-full min-h-[200px] flex-col items-center justify-center rounded-[1.25rem] border-2 border-dashed border-[#163628]/15 p-6 transition-all hover:border-[#163628] hover:bg-white"
                     >
                         <div className="h-12 w-12 bg-[#FDF6F0] rounded-full flex items-center justify-center mb-4 group-hover:bg-[#1E5C42] transition-colors">
                             <Plus className="h-6 w-6 text-[#1E5C42] group-hover:text-white transition-colors" />
                         </div>
-                        <span className="font-medium text-[#5E5046] group-hover:text-[#1E5C42]">Create New Project</span>
+                        <span className="font-medium text-[#5E5046] group-hover:text-[#163628]">Add a book</span>
                     </button>
                 </div>
             </main>

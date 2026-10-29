@@ -510,7 +510,7 @@ const ExamTonightView = ({ projectId, selectedDocuments = [], onTopicMastered, o
                             {loadingPlan ? <><Loader2 className="h-5 w-5 animate-spin" /> Weighing every topic in your book…</> : <>Build my plan <ArrowRight className="h-5 w-5" /></>}
                         </button>
                         {offerPass && (
-                            <Link to="/pricing#pass" className="mt-3 flex items-center justify-center gap-2 rounded-2xl border border-dashed border-[#1E5C42] px-4 py-2.5 text-sm text-[#163628] hover:bg-[#FDF6F0]">
+                            <Link to="/plans#pass" className="mt-3 flex items-center justify-center gap-2 rounded-2xl border border-dashed border-[#1E5C42] px-4 py-2.5 text-sm text-[#163628] hover:bg-[#FDF6F0]">
                                 <Moon className="h-4 w-4 text-[#1E5C42]" /> Big night? Get Deep cram cards and Topper limits for 48 hours: <b>Exam Night Pass ₹49</b>
                             </Link>
                         )}
