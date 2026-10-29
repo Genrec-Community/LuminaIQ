@@ -24,13 +24,13 @@ const MindmapNode = ({ node, depth = 0, colorIndex = 0, isLast = false }) => {
         // Root node
         return (
             <div className="flex flex-col items-center">
-                <div className="px-6 py-3 bg-gradient-to-br from-[#C8A288] to-[#A08072] text-white rounded-2xl shadow-lg font-bold text-lg text-center max-w-xs border-2 border-white/20">
+                <div className="px-6 py-3 bg-gradient-to-br from-[#1E5C42] to-[#163628] text-white rounded-2xl shadow-lg font-bold text-lg text-center max-w-xs border-2 border-white/20">
                     {node.label}
                 </div>
                 {hasChildren && (
                     <div className="mt-4 flex flex-col items-center w-full">
                         {/* Vertical connector from root */}
-                        <div className="w-0.5 h-6 bg-[#C8A288]" />
+                        <div className="w-0.5 h-6 bg-[#1E5C42]" />
                         {/* Horizontal branch bar */}
                         <div className="relative w-full flex justify-center">
                             {node.children.length > 1 && (
@@ -149,7 +149,7 @@ const TopicMindmap = ({ projectId, topic, selectedDocuments = [], onClose }) => 
                 <div className="flex items-center gap-3 min-w-0">
                     <button
                         onClick={onClose}
-                        className="p-2 hover:bg-[#FDF6F0] rounded-lg transition-colors text-[#8a6a5c] flex-shrink-0"
+                        className="p-2 hover:bg-[#FDF6F0] rounded-lg transition-colors text-[#5E5046] flex-shrink-0"
                         title="Back to Learning Path"
                     >
                         <ArrowLeft className="h-5 w-5" />
@@ -158,25 +158,25 @@ const TopicMindmap = ({ projectId, topic, selectedDocuments = [], onClose }) => 
                         <GitBranch className="h-5 w-5" />
                     </div>
                     <div className="min-w-0">
-                        <h3 className="font-bold text-[#4A3B32] text-lg truncate">Mindmap</h3>
-                        <p className="text-xs text-[#8a6a5c] truncate">{topic}</p>
+                        <h3 className="font-bold text-[#163628] text-lg truncate">Mindmap</h3>
+                        <p className="text-xs text-[#5E5046] truncate">{topic}</p>
                     </div>
                 </div>
 
                 <div className="flex items-center gap-1 flex-shrink-0">
                     <button
                         onClick={handleZoomOut}
-                        className="p-2 hover:bg-[#FDF6F0] rounded-lg transition-colors text-[#8a6a5c]"
+                        className="p-2 hover:bg-[#FDF6F0] rounded-lg transition-colors text-[#5E5046]"
                         title="Zoom out"
                     >
                         <ZoomOut className="h-4 w-4" />
                     </button>
-                    <span className="text-xs font-medium text-[#8a6a5c] w-10 text-center">
+                    <span className="text-xs font-medium text-[#5E5046] w-10 text-center">
                         {Math.round(scale * 100)}%
                     </span>
                     <button
                         onClick={handleZoomIn}
-                        className="p-2 hover:bg-[#FDF6F0] rounded-lg transition-colors text-[#8a6a5c]"
+                        className="p-2 hover:bg-[#FDF6F0] rounded-lg transition-colors text-[#5E5046]"
                         title="Zoom in"
                     >
                         <ZoomIn className="h-4 w-4" />
@@ -185,7 +185,7 @@ const TopicMindmap = ({ projectId, topic, selectedDocuments = [], onClose }) => 
                     <button
                         onClick={loadMindmap}
                         disabled={loading}
-                        className="p-2 hover:bg-[#FDF6F0] rounded-lg transition-colors text-[#8a6a5c] disabled:opacity-50"
+                        className="p-2 hover:bg-[#FDF6F0] rounded-lg transition-colors text-[#5E5046] disabled:opacity-50"
                         title="Regenerate"
                     >
                         <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
@@ -206,8 +206,8 @@ const TopicMindmap = ({ projectId, topic, selectedDocuments = [], onClose }) => 
                             <GitBranch className="absolute inset-0 m-auto h-6 w-6 text-indigo-500" />
                         </div>
                         <div className="text-center">
-                            <p className="text-[#4A3B32] font-bold">Generating Mindmap</p>
-                            <p className="text-xs text-[#8a6a5c] mt-1">Analyzing "{topic}" from your documents...</p>
+                            <p className="text-[#163628] font-bold">Generating Mindmap</p>
+                            <p className="text-xs text-[#5E5046] mt-1">Analyzing "{topic}" from your documents...</p>
                         </div>
                     </div>
                 ) : error ? (
@@ -215,11 +215,11 @@ const TopicMindmap = ({ projectId, topic, selectedDocuments = [], onClose }) => 
                         <div className="h-16 w-16 bg-red-100 rounded-full flex items-center justify-center">
                             <X className="h-8 w-8 text-red-500" />
                         </div>
-                        <p className="text-[#4A3B32] font-bold">Generation Failed</p>
-                        <p className="text-sm text-[#8a6a5c] text-center max-w-md">{error}</p>
+                        <p className="text-[#163628] font-bold">Generation Failed</p>
+                        <p className="text-sm text-[#5E5046] text-center max-w-md">{error}</p>
                         <button
                             onClick={loadMindmap}
-                            className="px-4 py-2 bg-[#C8A288] text-white rounded-lg font-medium hover:bg-[#B08B72] transition-colors flex items-center gap-2"
+                            className="px-4 py-2 bg-[#1E5C42] text-white rounded-lg font-medium hover:bg-[#163628] transition-colors flex items-center gap-2"
                         >
                             <RefreshCw className="h-4 w-4" />
                             Try Again

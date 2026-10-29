@@ -591,7 +591,7 @@ const QuizView = ({
         return (
             <button
                 onClick={onReturnToPath}
-                className="flex items-center gap-2 px-4 py-2 text-[#C8A288] hover:bg-[#FDF6F0] rounded-lg font-medium transition-colors"
+                className="flex items-center gap-2 px-4 py-2 text-[#1E5C42] hover:bg-[#FDF6F0] rounded-lg font-medium transition-colors"
             >
                 <ArrowLeft className="h-4 w-4" />
                 Back to Learning Path
@@ -623,35 +623,24 @@ const QuizView = ({
 
     return (
         <div className="h-full flex flex-col relative w-full">
-            {/* Back Button - shown when no quiz is active and not loading */}
-            {onBack && !mcqLoading && !evalLoading && !mcqTest && !evalTest && !cameFromPath && (
-                <div className="px-4 pt-4 md:px-8 md:pt-6">
-                    <button
-                        onClick={onBack}
-                        className="flex items-center gap-2 px-4 py-2 text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30 rounded-lg font-medium transition-colors"
-                    >
-                        <ArrowLeft className="h-4 w-4" />
-                        Back to Chat
-                    </button>
-                </div>
-            )}
+            {/* No 'Back to Chat' link: the sidebar is always one tap away */}
 
             {/* Full-screen Loading State for MCQ */}
             {mcqLoading && (
                 <div className="h-full flex flex-col items-center justify-center animate-in fade-in duration-300">
                     <div className="relative mb-6">
                         <div className="h-20 w-20 border-4 border-[#E6D5CC] rounded-full"></div>
-                        <div className="absolute inset-0 h-20 w-20 border-4 border-[#C8A288] rounded-full border-t-transparent animate-spin"></div>
-                        <CheckSquare className="absolute inset-0 m-auto h-8 w-8 text-[#C8A288]" />
+                        <div className="absolute inset-0 h-20 w-20 border-4 border-[#1E5C42] rounded-full border-t-transparent animate-spin"></div>
+                        <CheckSquare className="absolute inset-0 m-auto h-8 w-8 text-[#1E5C42]" />
                     </div>
-                    <h3 className="text-xl font-bold text-[#4A3B32] mb-2">Generating Quiz</h3>
-                    <p className="text-[#8a6a5c] text-center max-w-xs">
+                    <h3 className="text-xl font-bold text-[#163628] mb-2">Generating Quiz</h3>
+                    <p className="text-[#5E5046] text-center max-w-xs">
                         Creating questions about <span className="font-semibold">{mcqTopic || 'your documents'}</span>...
                     </p>
                     <div className="flex gap-1.5 mt-6">
-                        <div className="h-2 w-2 bg-[#C8A288] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                        <div className="h-2 w-2 bg-[#C8A288] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                        <div className="h-2 w-2 bg-[#C8A288] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                        <div className="h-2 w-2 bg-[#1E5C42] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                        <div className="h-2 w-2 bg-[#1E5C42] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                        <div className="h-2 w-2 bg-[#1E5C42] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                     </div>
                 </div>
             )}
@@ -661,16 +650,16 @@ const QuizView = ({
                 <div className="h-full flex flex-col items-center justify-center animate-in fade-in duration-300">
                     <div className="relative mb-6">
                         <div className="h-20 w-20 border-4 border-[#E6D5CC] rounded-full"></div>
-                        <div className="absolute inset-0 h-20 w-20 border-4 border-[#C8A288] rounded-full border-t-transparent animate-spin"></div>
-                        <FileText className="absolute inset-0 m-auto h-8 w-8 text-[#C8A288]" />
+                        <div className="absolute inset-0 h-20 w-20 border-4 border-[#1E5C42] rounded-full border-t-transparent animate-spin"></div>
+                        <FileText className="absolute inset-0 m-auto h-8 w-8 text-[#1E5C42]" />
                     </div>
-                    <h3 className="text-xl font-bold text-[#4A3B32] mb-2">
+                    <h3 className="text-xl font-bold text-[#163628] mb-2">
                         {bothModePhase === 'subjective' ? 'Loading Subjective Questions' : evalResult ? 'Evaluating Answers' : 'Generating Questions'}
                     </h3>
                     <div className="flex gap-1.5 mt-6">
-                        <div className="h-2 w-2 bg-[#C8A288] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                        <div className="h-2 w-2 bg-[#C8A288] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                        <div className="h-2 w-2 bg-[#C8A288] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                        <div className="h-2 w-2 bg-[#1E5C42] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                        <div className="h-2 w-2 bg-[#1E5C42] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                        <div className="h-2 w-2 bg-[#1E5C42] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                     </div>
                 </div>
             )}
@@ -691,32 +680,34 @@ const QuizView = ({
                     <div className="animate-in fade-in slide-in-from-bottom-4">
                         <div className="flex items-center justify-between mb-8">
                             <div>
-                                <h2 className="text-2xl font-bold text-[#4A3B32]">Quizzes</h2>
-                                <p className="text-[#8a6a5c]">Test your knowledge with AI-generated quizzes</p>
+                                <h2 className="text-2xl font-bold text-[#163628]">Quizzes</h2>
+                                <p className="text-[#5E5046]">Test your knowledge with AI-generated quizzes</p>
                             </div>
-                            <button
-                                onClick={() => setShowSavedList(false)}
-                                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#C8A288] to-[#A08072] text-white rounded-lg hover:opacity-90 transition-opacity shadow-sm"
-                            >
-                                <Plus className="h-4 w-4" />
-                                New Quiz
-                            </button>
+                            {savedQuizzes.length > 0 && (
+                                <button
+                                    onClick={() => setShowSavedList(false)}
+                                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#1E5C42] to-[#163628] text-white rounded-lg hover:opacity-90 transition-opacity shadow-sm"
+                                >
+                                    <Plus className="h-4 w-4" />
+                                    New Quiz
+                                </button>
+                            )}
                         </div>
 
                         {savedLoading ? (
                             <div className="flex items-center justify-center py-16">
-                                <Loader2 className="h-8 w-8 text-[#C8A288] animate-spin" />
+                                <Loader2 className="h-8 w-8 text-[#1E5C42] animate-spin" />
                             </div>
                         ) : savedQuizzes.length === 0 ? (
                             <div className="text-center py-16">
                                 <div className="h-20 w-20 bg-[#FDF6F0] rounded-full flex items-center justify-center mx-auto mb-6">
-                                    <CheckSquare className="h-10 w-10 text-[#C8A288]" />
+                                    <CheckSquare className="h-10 w-10 text-[#1E5C42]" />
                                 </div>
-                                <h3 className="text-xl font-bold text-[#4A3B32] mb-2">No Quizzes Yet</h3>
-                                <p className="text-[#8a6a5c] mb-6">Generate your first quiz to test your knowledge</p>
+                                <h3 className="text-xl font-bold text-[#163628] mb-2">Your first quiz takes 30 seconds</h3>
+                                <p className="text-[#5E5046] mb-6">Five questions from your own pages. Getting some wrong is how they stick.</p>
                                 <button
                                     onClick={() => setShowSavedList(false)}
-                                    className="px-6 py-3 bg-gradient-to-r from-[#C8A288] to-[#A08072] text-white rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2 mx-auto"
+                                    className="px-6 py-3 bg-gradient-to-r from-[#1E5C42] to-[#163628] text-white rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2 mx-auto"
                                 >
                                     <CheckSquare className="h-5 w-5" />
                                     Create Quiz
@@ -739,8 +730,8 @@ const QuizView = ({
                                         >
                                             <div className="flex items-start justify-between mb-3">
                                                 <div className="flex-1 min-w-0">
-                                                    <h3 className="font-bold text-[#4A3B32] mb-1 truncate">{quiz.chapter_name || 'General Quiz'}</h3>
-                                                    <div className="flex items-center gap-1.5 text-xs text-[#8a6a5c]">
+                                                    <h3 className="font-bold text-[#163628] mb-1 truncate">{quiz.chapter_name || 'General Quiz'}</h3>
+                                                    <div className="flex items-center gap-1.5 text-xs text-[#5E5046]">
                                                         <Clock className="h-3 w-3" />
                                                         {formatDate(quiz.created_at)}
                                                     </div>
@@ -753,11 +744,11 @@ const QuizView = ({
                                                 </button>
                                             </div>
                                             {questionCount && (
-                                                <p className="text-xs text-[#8a6a5c] mb-3">{questionCount} questions</p>
+                                                <p className="text-xs text-[#5E5046] mb-3">{questionCount} questions</p>
                                             )}
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); handleViewSavedQuiz(quiz.id); }}
-                                                className="w-full py-2 bg-[#C8A288] text-white rounded-lg hover:bg-[#B08B72] transition-colors text-sm font-medium flex items-center justify-center gap-1.5"
+                                                className="w-full py-2 bg-[#1E5C42] text-white rounded-lg hover:bg-[#163628] transition-colors text-sm font-medium flex items-center justify-center gap-1.5"
                                             >
                                                 <Eye className="h-3.5 w-3.5" />
                                                 Take Quiz
@@ -779,25 +770,25 @@ const QuizView = ({
                                 {!cameFromPath && (
                                     <button
                                         onClick={() => setShowSavedList(true)}
-                                        className="flex items-center gap-2 px-4 py-2 mb-4 text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30 rounded-lg font-medium transition-colors"
+                                        className="flex items-center gap-2 px-4 py-2 mb-4 text-[#5E5046] hover:text-[#163628] hover:bg-[#E6D5CC]/30 rounded-lg font-medium transition-colors"
                                     >
                                         <ArrowLeft className="h-4 w-4" />
                                         Back to Saved
                                     </button>
                                 )}
                                 <div className="inline-flex items-center justify-center p-4 bg-white rounded-2xl shadow-sm border border-[#E6D5CC] mb-6">
-                                    <Brain className="h-8 w-8 text-[#C8A288]" />
+                                    <Brain className="h-8 w-8 text-[#1E5C42]" />
                                 </div>
-                                <h3 className="text-2xl font-bold mb-2 text-[#4A3B32]">Complete Quiz</h3>
-                                <p className="text-[#8a6a5c] mb-8">5 MCQ + 2 Subjective Questions</p>
+                                <h3 className="text-2xl font-bold mb-2 text-[#163628]">Complete Quiz</h3>
+                                <p className="text-[#5E5046] mb-8">5 MCQ + 2 Subjective Questions</p>
                                 
                                 {renderPreSelectedBanner()}
 
                                 <div className="max-w-md mx-auto space-y-5 bg-white p-6 md:p-8 rounded-3xl border border-[#E6D5CC] shadow-sm text-left">
                                     <div>
-                                        <label className="block text-sm font-bold mb-2 text-[#4A3B32] uppercase tracking-wide opacity-80">Topic</label>
+                                        <label className="block text-sm font-bold mb-2 text-[#163628] uppercase tracking-wide opacity-80">Topic</label>
                                         {cameFromPath ? (
-                                            <div className="px-5 py-3.5 bg-[#FDF6F0] rounded-xl text-[#4A3B32] font-medium">
+                                            <div className="px-5 py-3.5 bg-[#FDF6F0] rounded-xl text-[#163628] font-medium">
                                                 {mcqTopic}
                                             </div>
                                         ) : availableTopics.length > 0 ? (
@@ -816,7 +807,7 @@ const QuizView = ({
                                                             setEvalTopic('');
                                                         }
                                                     }}
-                                                    className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#C8A288] text-[#4A3B32] font-medium appearance-none"
+                                                    className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#1E5C42] text-[#163628] font-medium appearance-none"
                                                 >
                                                     <option value="">Select a topic...</option>
                                                     {availableTopics.map((topic, idx) => (
@@ -824,7 +815,7 @@ const QuizView = ({
                                                     ))}
                                                     <option value="__custom__">Custom Topic...</option>
                                                 </select>
-                                                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8a6a5c] pointer-events-none" />
+                                                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#5E5046] pointer-events-none" />
                                             </div>
                                         ) : (
                                             <input
@@ -835,13 +826,13 @@ const QuizView = ({
                                                     setEvalTopic(e.target.value);
                                                 }}
                                                 placeholder="e.g., Thermodynamics"
-                                                className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#C8A288]"
+                                                className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#1E5C42]"
                                             />
                                         )}
                                     </div>
                                     
                                     <div>
-                                        <label className="block text-sm font-bold mb-2 text-[#4A3B32] uppercase tracking-wide opacity-80">Difficulty</label>
+                                        <label className="block text-sm font-bold mb-2 text-[#163628] uppercase tracking-wide opacity-80">Difficulty</label>
                                         
                                         {/* Adaptive Mode Banner */}
                                         {isAdaptiveMode && adaptiveComputed && (
@@ -879,7 +870,7 @@ const QuizView = ({
                                                     className={`flex-1 py-3 px-4 rounded-xl border-2 font-bold text-sm transition-all flex items-center justify-center gap-2 ${
                                                         mcqDifficulty === value 
                                                             ? `${color} border-current` 
-                                                            : 'bg-[#FDF6F0] border-transparent text-[#8a6a5c] hover:bg-white'
+                                                            : 'bg-[#FDF6F0] border-transparent text-[#5E5046] hover:bg-white'
                                                     }`}
                                                 >
                                                     <Icon className="h-4 w-4" />
@@ -892,7 +883,7 @@ const QuizView = ({
                                     <button
                                         onClick={handleGenerateMCQ}
                                         disabled={mcqLoading || !mcqTopic}
-                                        className="w-full py-4 bg-[#C8A288] text-white rounded-xl hover:bg-[#B08B72] font-bold shadow-lg shadow-[#C8A288]/20 disabled:opacity-50 transition-all active:scale-[0.98] mt-2 flex items-center justify-center gap-2"
+                                        className="w-full py-4 bg-[#1E5C42] text-white rounded-xl hover:bg-[#163628] font-bold shadow-lg shadow-[#1E5C42]/20 disabled:opacity-50 transition-all active:scale-[0.98] mt-2 flex items-center justify-center gap-2"
                                     >
                                         <Brain className="h-5 w-5" />
                                         Start Complete Quiz
@@ -906,26 +897,26 @@ const QuizView = ({
                             <div className="pb-20 h-full flex flex-col">
                                 <div className="flex justify-between items-center mb-6 px-2">
                                     <div>
-                                        <h3 className="text-xl font-bold text-[#4A3B32]">{mcqTest.topic || 'Complete'} Quiz</h3>
-                                        <p className="text-xs text-[#8a6a5c] font-bold uppercase tracking-wider mt-1">
+                                        <h3 className="text-xl font-bold text-[#163628]">{mcqTest.topic || 'Complete'} Quiz</h3>
+                                        <p className="text-xs text-[#5E5046] font-bold uppercase tracking-wider mt-1">
                                             Part 1: MCQ • Question {currentQuestionIndex + 1} of {mcqTest.questions.length}
                                         </p>
                                     </div>
-                                    <button onClick={handleClearMCQ} className="p-2 hover:bg-[#E6D5CC]/30 rounded-lg text-[#8a6a5c]">
+                                    <button onClick={handleClearMCQ} className="p-2 hover:bg-[#E6D5CC]/30 rounded-lg text-[#5E5046]">
                                         <X className="h-5 w-5" />
                                     </button>
                                 </div>
 
                                 <div className="h-2 w-full bg-[#E6D5CC]/30 rounded-full mb-8 overflow-hidden mx-2">
                                     <div
-                                        className="h-full bg-[#C8A288] transition-all duration-500 ease-out rounded-full"
+                                        className="h-full bg-[#1E5C42] transition-all duration-500 ease-out rounded-full"
                                         style={{ width: `${((currentQuestionIndex + 1) / mcqTest.questions.length) * 50}%` }}
                                     />
                                 </div>
 
                                 <div className="flex-1 flex flex-col animate-in fade-in slide-in-from-right-4 duration-300 px-2" key={currentQuestionIndex}>
                                     <div className="bg-white p-6 md:p-8 rounded-3xl border border-[#E6D5CC] shadow-sm mb-6">
-                                        <div className="prose prose-lg max-w-none text-[#4A3B32] font-medium mb-6 overflow-x-auto">
+                                        <div className="prose prose-lg max-w-none text-[#163628] font-medium mb-6 overflow-x-auto">
                                             <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                                 {mcqTest.questions[currentQuestionIndex].question}
                                             </ReactMarkdown>
@@ -939,17 +930,17 @@ const QuizView = ({
                                                         key={idx}
                                                         onClick={() => handleOptionSelect(currentQuestionIndex, opt.option)}
                                                         className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-200 flex items-center gap-4 group ${isSelected
-                                                            ? 'bg-[#FDF6F0] border-[#C8A288] shadow-sm'
+                                                            ? 'bg-[#FDF6F0] border-[#1E5C42] shadow-sm'
                                                             : 'bg-white border-transparent hover:bg-gray-50 hover:border-gray-200'
                                                         }`}
                                                     >
                                                         <div className={`h-8 w-8 rounded-full border-2 flex items-center justify-center font-bold text-sm transition-colors ${isSelected
-                                                            ? 'bg-[#C8A288] border-[#C8A288] text-white'
-                                                            : 'bg-white border-[#E6D5CC] text-[#8a6a5c] group-hover:border-[#C8A288]'
+                                                            ? 'bg-[#1E5C42] border-[#1E5C42] text-white'
+                                                            : 'bg-white border-[#E6D5CC] text-[#5E5046] group-hover:border-[#1E5C42]'
                                                         }`}>
                                                             {opt.option}
                                                         </div>
-                                                        <span className={`text-[#4A3B32] font-medium ${isSelected ? 'opacity-100' : 'opacity-80'}`}>
+                                                        <span className={`text-[#163628] font-medium ${isSelected ? 'opacity-100' : 'opacity-80'}`}>
                                                             {opt.text}
                                                         </span>
                                                     </button>
@@ -962,7 +953,7 @@ const QuizView = ({
                                         <button
                                             onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))}
                                             disabled={currentQuestionIndex === 0}
-                                            className="px-6 py-3 rounded-xl font-bold text-[#8a6a5c] disabled:opacity-30 hover:bg-[#FDF6F0] transition-colors"
+                                            className="px-6 py-3 rounded-xl font-bold text-[#5E5046] disabled:opacity-30 hover:bg-[#FDF6F0] transition-colors"
                                         >
                                             Previous
                                         </button>
@@ -971,14 +962,14 @@ const QuizView = ({
                                             <button
                                                 onClick={handleSubmitMCQ}
                                                 disabled={Object.keys(mcqUserAnswers).length !== mcqTest.questions.length}
-                                                className="px-8 py-3 bg-[#C8A288] text-white rounded-xl font-bold shadow-lg shadow-[#C8A288]/20 hover:bg-[#B08B72] transition-colors disabled:opacity-50"
+                                                className="px-8 py-3 bg-[#1E5C42] text-white rounded-xl font-bold shadow-lg shadow-[#1E5C42]/20 hover:bg-[#163628] transition-colors disabled:opacity-50"
                                             >
                                                 Continue to Subjective
                                             </button>
                                         ) : (
                                             <button
                                                 onClick={() => setCurrentQuestionIndex(prev => Math.min(mcqTest.questions.length - 1, prev + 1))}
-                                                className="px-8 py-3 bg-[#4A3B32] text-white rounded-xl font-bold hover:bg-[#2e2520] transition-colors flex items-center gap-2"
+                                                className="px-8 py-3 bg-[#163628] text-white rounded-xl font-bold hover:bg-[#20382B] transition-colors flex items-center gap-2"
                                             >
                                                 Next <ChevronDown className="h-4 w-4 -rotate-90" />
                                             </button>
@@ -993,15 +984,15 @@ const QuizView = ({
                             <div className="space-y-8 pb-20 px-2">
                                 <div className="flex justify-between items-center">
                                     <div>
-                                        <h3 className="text-xl font-bold text-[#4A3B32]">{evalTest.topic || 'Complete'} Quiz</h3>
-                                        <p className="text-xs text-[#8a6a5c] font-bold uppercase tracking-wider mt-1">
+                                        <h3 className="text-xl font-bold text-[#163628]">{evalTest.topic || 'Complete'} Quiz</h3>
+                                        <p className="text-xs text-[#5E5046] font-bold uppercase tracking-wider mt-1">
                                             Part 2: Subjective • {evalTest.questions.length} Questions
                                         </p>
                                     </div>
                                 </div>
                                 
                                 <div className="h-2 w-full bg-[#E6D5CC]/30 rounded-full overflow-hidden">
-                                    <div className="h-full bg-[#C8A288] rounded-full" style={{ width: '75%' }} />
+                                    <div className="h-full bg-[#1E5C42] rounded-full" style={{ width: '75%' }} />
                                 </div>
                                 
                                 <div className="bg-green-50 border border-green-200 rounded-xl p-4">
@@ -1024,7 +1015,7 @@ const QuizView = ({
                                             value={evalUserAnswers[q.id] || ''}
                                             onChange={(e) => handleSubjectiveAnswerChange(q.id, e.target.value)}
                                             rows={4}
-                                            className="w-full px-4 py-3 bg-white border border-[#E6D5CC] rounded-xl focus:ring-2 focus:ring-[#C8A288] outline-none resize-none"
+                                            className="w-full px-4 py-3 bg-white border border-[#E6D5CC] rounded-xl focus:ring-2 focus:ring-[#1E5C42] outline-none resize-none"
                                             placeholder="Type your answer here..."
                                         />
                                     </div>
@@ -1034,7 +1025,7 @@ const QuizView = ({
                                     <button
                                         onClick={handleSubmitSubjectiveTest}
                                         disabled={evalLoading || Object.keys(evalUserAnswers).length !== evalTest.questions.length}
-                                        className="w-full py-4 bg-[#C8A288] text-white rounded-xl hover:bg-[#B08B72] font-bold text-lg shadow-sm disabled:opacity-50 transition-all"
+                                        className="w-full py-4 bg-[#1E5C42] text-white rounded-xl hover:bg-[#163628] font-bold text-lg shadow-sm disabled:opacity-50 transition-all"
                                     >
                                         Submit Complete Quiz
                                     </button>
@@ -1076,7 +1067,7 @@ const QuizView = ({
                                     {cameFromPath && onReturnToPath && (
                                         <button
                                             onClick={onReturnToPath}
-                                            className="px-8 py-3 bg-[#C8A288] text-white rounded-xl hover:bg-[#B08B72] font-bold transition-colors flex items-center justify-center gap-2"
+                                            className="px-8 py-3 bg-[#1E5C42] text-white rounded-xl hover:bg-[#163628] font-bold transition-colors flex items-center justify-center gap-2"
                                         >
                                             <ArrowLeft className="h-5 w-5" />
                                             Back to Learning Path
@@ -1084,7 +1075,7 @@ const QuizView = ({
                                     )}
                                     <button
                                         onClick={handleResetAll}
-                                        className="px-8 py-3 bg-[#FDF6F0] text-[#4A3B32] rounded-xl hover:bg-[#E6D5CC] font-bold transition-colors border border-[#E6D5CC]"
+                                        className="px-8 py-3 bg-[#FDF6F0] text-[#163628] rounded-xl hover:bg-[#E6D5CC] font-bold transition-colors border border-[#E6D5CC]"
                                     >
                                         New Quiz
                                     </button>
@@ -1102,17 +1093,17 @@ const QuizView = ({
                                 {!cameFromPath && (
                                     <button
                                         onClick={() => setShowSavedList(true)}
-                                        className="flex items-center gap-2 px-4 py-2 mb-4 text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30 rounded-lg font-medium transition-colors"
+                                        className="flex items-center gap-2 px-4 py-2 mb-4 text-[#5E5046] hover:text-[#163628] hover:bg-[#E6D5CC]/30 rounded-lg font-medium transition-colors"
                                     >
                                         <ArrowLeft className="h-4 w-4" />
                                         Back to Saved
                                     </button>
                                 )}
                                 <div className="inline-flex items-center justify-center p-4 bg-white rounded-2xl shadow-sm border border-[#E6D5CC] mb-6">
-                                    <HelpCircle className="h-8 w-8 text-[#C8A288]" />
+                                    <HelpCircle className="h-8 w-8 text-[#1E5C42]" />
                                 </div>
-                                <h3 className="text-2xl font-bold mb-2 text-[#4A3B32]">Generate Quiz</h3>
-                                <p className="text-[#8a6a5c] mb-8">Create a personalized multiple-choice quiz from your documents.</p>
+                                <h3 className="text-2xl font-bold mb-2 text-[#163628]">Generate Quiz</h3>
+                                <p className="text-[#5E5046] mb-8">Create a personalized multiple-choice quiz from your documents.</p>
 
                                 {renderPreSelectedBanner()}
 
@@ -1140,9 +1131,9 @@ const QuizView = ({
                                     )}
                                     
                                     <div>
-                                        <label className="block text-sm font-bold mb-2 text-[#4A3B32] uppercase tracking-wide opacity-80">Topic</label>
+                                        <label className="block text-sm font-bold mb-2 text-[#163628] uppercase tracking-wide opacity-80">Topic</label>
                                         {cameFromPath ? (
-                                            <div className="px-5 py-3.5 bg-[#FDF6F0] rounded-xl text-[#4A3B32] font-medium">
+                                            <div className="px-5 py-3.5 bg-[#FDF6F0] rounded-xl text-[#163628] font-medium">
                                                 {mcqTopic}
                                             </div>
                                         ) : availableTopics.length > 0 ? (
@@ -1155,7 +1146,7 @@ const QuizView = ({
                                                         if (val !== '__custom__') setMcqTopic(val);
                                                         else setMcqTopic('');
                                                     }}
-                                                    className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#C8A288] text-[#4A3B32] font-medium appearance-none"
+                                                    className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#1E5C42] text-[#163628] font-medium appearance-none"
                                                 >
                                                     <option value="">Select a topic...</option>
                                                     {availableTopics.map((topic, idx) => (
@@ -1163,14 +1154,14 @@ const QuizView = ({
                                                     ))}
                                                     <option value="__custom__">Custom Topic...</option>
                                                 </select>
-                                                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8a6a5c] pointer-events-none" />
+                                                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#5E5046] pointer-events-none" />
                                                 {mcqTopicSelection === '__custom__' && (
                                                     <input
                                                         type="text"
                                                         value={mcqTopic}
                                                         onChange={(e) => setMcqTopic(e.target.value)}
                                                         placeholder="Enter custom topic..."
-                                                        className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#C8A288] mt-3 animate-in fade-in"
+                                                        className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#1E5C42] mt-3 animate-in fade-in"
                                                         autoFocus
                                                     />
                                                 )}
@@ -1181,29 +1172,29 @@ const QuizView = ({
                                                 value={mcqTopic}
                                                 onChange={(e) => setMcqTopic(e.target.value)}
                                                 placeholder="e.g., Thermodynamics"
-                                                className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#C8A288]"
+                                                className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#1E5C42]"
                                             />
                                         )}
                                     </div>
 
                                     <div>
-                                        <label className="block text-sm font-bold mb-2 text-[#4A3B32] uppercase tracking-wide opacity-80">Questions</label>
+                                        <label className="block text-sm font-bold mb-2 text-[#163628] uppercase tracking-wide opacity-80">Questions</label>
                                         <div className="relative">
                                             <select
                                                 value={mcqNumQuestions}
                                                 onChange={(e) => setMcqNumQuestions(e.target.value)}
-                                                className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#C8A288] text-[#4A3B32] font-medium appearance-none"
+                                                className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#1E5C42] text-[#163628] font-medium appearance-none"
                                             >
                                                 {[3, 5, 10, 15, 20].map(num => (
                                                     <option key={num} value={num}>{num} Questions</option>
                                                 ))}
                                             </select>
-                                            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8a6a5c] pointer-events-none" />
+                                            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#5E5046] pointer-events-none" />
                                         </div>
                                     </div>
                                     
                                     <div>
-                                        <label className="block text-sm font-bold mb-2 text-[#4A3B32] uppercase tracking-wide opacity-80">Difficulty</label>
+                                        <label className="block text-sm font-bold mb-2 text-[#163628] uppercase tracking-wide opacity-80">Difficulty</label>
                                         
                                         {/* Adaptive Mode Banner */}
                                         {isAdaptiveMode && adaptiveComputed && (
@@ -1241,7 +1232,7 @@ const QuizView = ({
                                                     className={`flex-1 py-3 px-4 rounded-xl border-2 font-bold text-sm transition-all flex items-center justify-center gap-2 ${
                                                         mcqDifficulty === value 
                                                             ? `${color} border-current` 
-                                                            : 'bg-[#FDF6F0] border-transparent text-[#8a6a5c] hover:bg-white'
+                                                            : 'bg-[#FDF6F0] border-transparent text-[#5E5046] hover:bg-white'
                                                     }`}
                                                 >
                                                     <Icon className="h-4 w-4" />
@@ -1254,7 +1245,7 @@ const QuizView = ({
                                     <button
                                         onClick={handleGenerateMCQ}
                                         disabled={mcqLoading}
-                                        className="w-full py-4 bg-[#C8A288] text-white rounded-xl hover:bg-[#B08B72] font-bold shadow-lg shadow-[#C8A288]/20 disabled:opacity-50 transition-all active:scale-[0.98] mt-2 flex items-center justify-center gap-2"
+                                        className="w-full py-4 bg-[#1E5C42] text-white rounded-xl hover:bg-[#163628] font-bold shadow-lg shadow-[#1E5C42]/20 disabled:opacity-50 transition-all active:scale-[0.98] mt-2 flex items-center justify-center gap-2"
                                     >
                                         {mcqLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <CheckSquare className="h-5 w-5" />}
                                         {mcqLoading ? 'Generating...' : 'Start Quiz'}
@@ -1266,14 +1257,14 @@ const QuizView = ({
                                 {/* Quiz Header */}
                                 <div className="flex justify-between items-center mb-6 px-2">
                                     <div>
-                                        <h3 className="text-xl font-bold text-[#4A3B32]">{mcqTest.topic || 'General'} Quiz</h3>
-                                        <p className="text-xs text-[#8a6a5c] font-bold uppercase tracking-wider mt-1">
+                                        <h3 className="text-xl font-bold text-[#163628]">{mcqTest.topic || 'General'} Quiz</h3>
+                                        <p className="text-xs text-[#5E5046] font-bold uppercase tracking-wider mt-1">
                                             Question {currentQuestionIndex + 1} of {mcqTest.questions.length}
                                         </p>
                                     </div>
                                     <button
                                         onClick={handleClearMCQ}
-                                        className="p-2 hover:bg-[#E6D5CC]/30 rounded-lg text-[#8a6a5c] transition-colors"
+                                        className="p-2 hover:bg-[#E6D5CC]/30 rounded-lg text-[#5E5046] transition-colors"
                                         title="Exit Quiz"
                                     >
                                         <X className="h-5 w-5" />
@@ -1283,7 +1274,7 @@ const QuizView = ({
                                 {/* Progress Bar */}
                                 <div className="h-2 w-full bg-[#E6D5CC]/30 rounded-full mb-8 overflow-hidden mx-2">
                                     <div
-                                        className="h-full bg-[#C8A288] transition-all duration-500 ease-out rounded-full"
+                                        className="h-full bg-[#1E5C42] transition-all duration-500 ease-out rounded-full"
                                         style={{ width: `${((currentQuestionIndex + 1) / mcqTest.questions.length) * 100}%` }}
                                     />
                                 </div>
@@ -1292,18 +1283,18 @@ const QuizView = ({
                                     /* Result View */
                                     <div className="animate-in fade-in zoom-in-95 duration-300 px-2">
                                         <div className="bg-white p-8 rounded-3xl border border-[#E6D5CC] shadow-lg text-center mb-8 relative overflow-hidden">
-                                            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-[#C8A288] to-[#FDF6F0]" />
-                                            <h4 className="text-2xl font-bold text-[#4A3B32] mb-2">Quiz Complete!</h4>
+                                            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-[#1E5C42] to-[#FDF6F0]" />
+                                            <h4 className="text-2xl font-bold text-[#163628] mb-2">Quiz Complete!</h4>
                                             <div className="relative inline-block my-6">
                                                 <div className={`h-32 w-32 rounded-full border-8 flex items-center justify-center ${
                                                     mcqScore.percentage >= 80 ? 'border-green-200' : 'border-[#FDF6F0]'
                                                 }`}>
                                                     <span className={`text-4xl font-black ${
-                                                        mcqScore.percentage >= 80 ? 'text-green-600' : 'text-[#C8A288]'
+                                                        mcqScore.percentage >= 80 ? 'text-green-600' : 'text-[#1E5C42]'
                                                     }`}>{Math.round(mcqScore.percentage)}%</span>
                                                 </div>
                                             </div>
-                                            <p className="text-[#8a6a5c] mb-4 font-medium">You got {mcqScore.score} out of {mcqScore.total} questions correct.</p>
+                                            <p className="text-[#5E5046] mb-4 font-medium">You got {mcqScore.score} out of {mcqScore.total} questions correct.</p>
                                             
                                             {cameFromPath && (
                                                 <p className={`text-sm font-bold mb-4 ${mcqScore.percentage >= 80 ? 'text-green-600' : 'text-orange-600'}`}>
@@ -1313,7 +1304,7 @@ const QuizView = ({
                                             
                                             {/* Performance Saved Indicator */}
                                             {savingPerformance ? (
-                                                <p className="text-xs text-[#8a6a5c] flex items-center justify-center gap-1 mb-4">
+                                                <p className="text-xs text-[#5E5046] flex items-center justify-center gap-1 mb-4">
                                                     <Loader2 className="h-3 w-3 animate-spin" /> Saving progress...
                                                 </p>
                                             ) : performanceSaved ? (
@@ -1326,7 +1317,7 @@ const QuizView = ({
                                                 {cameFromPath && onReturnToPath && (
                                                     <button
                                                         onClick={onReturnToPath}
-                                                        className="px-8 py-3 bg-[#C8A288] text-white rounded-xl hover:bg-[#B08B72] font-bold transition-colors flex items-center justify-center gap-2"
+                                                        className="px-8 py-3 bg-[#1E5C42] text-white rounded-xl hover:bg-[#163628] font-bold transition-colors flex items-center justify-center gap-2"
                                                     >
                                                         <ArrowLeft className="h-5 w-5" />
                                                         Back to Learning Path
@@ -1334,13 +1325,13 @@ const QuizView = ({
                                                 )}
                                                 <button
                                                     onClick={handleRetest}
-                                                    className="px-8 py-3 bg-[#FDF6F0] text-[#4A3B32] rounded-xl hover:bg-[#E6D5CC] font-bold transition-colors border border-transparent hover:border-[#C8A288]"
+                                                    className="px-8 py-3 bg-[#FDF6F0] text-[#163628] rounded-xl hover:bg-[#E6D5CC] font-bold transition-colors border border-transparent hover:border-[#1E5C42]"
                                                 >
                                                     Retest
                                                 </button>
                                                 <button
                                                     onClick={handleClearMCQ}
-                                                    className="px-8 py-3 bg-[#4A3B32] text-white rounded-xl hover:bg-[#2e2520] font-bold transition-colors"
+                                                    className="px-8 py-3 bg-[#163628] text-white rounded-xl hover:bg-[#20382B] font-bold transition-colors"
                                                 >
                                                     New Quiz
                                                 </button>
@@ -1379,7 +1370,7 @@ const QuizView = ({
 
                                         {/* Review Answers */}
                                         <div className="space-y-4">
-                                            <h4 className="font-bold text-[#4A3B32] px-2 mb-2">Review Answers</h4>
+                                            <h4 className="font-bold text-[#163628] px-2 mb-2">Review Answers</h4>
                                             {mcqTest.questions.map((q, i) => {
                                                 const isCorrect = mcqUserAnswers[i] === q.correct_answer;
                                                 const userAnswerOption = q.options.find(opt => opt.option === mcqUserAnswers[i]);
@@ -1422,8 +1413,8 @@ const QuizView = ({
 
                                                             {q.explanation && (
                                                                 <div className="mt-3 p-3 bg-white/60 rounded-lg border border-[#E6D5CC]/50">
-                                                                    <span className="font-semibold text-[#4A3B32] block mb-1">Explanation:</span>
-                                                                    <div className="text-[#5a4a42] prose prose-sm max-w-none overflow-x-auto">
+                                                                    <span className="font-semibold text-[#163628] block mb-1">Explanation:</span>
+                                                                    <div className="text-[#2B3F35] prose prose-sm max-w-none overflow-x-auto">
                                                                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{q.explanation}</ReactMarkdown>
                                                                     </div>
                                                                 </div>
@@ -1438,7 +1429,7 @@ const QuizView = ({
                                     /* Active Question View */
                                     <div className="flex-1 flex flex-col animate-in fade-in slide-in-from-right-4 duration-300 px-2" key={currentQuestionIndex}>
                                         <div className="bg-white p-6 md:p-8 rounded-3xl border border-[#E6D5CC] shadow-sm mb-6 flex-1 md:flex-none">
-                                            <div className="prose prose-lg max-w-none text-[#4A3B32] font-medium mb-6">
+                                            <div className="prose prose-lg max-w-none text-[#163628] font-medium mb-6">
                                                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                                     {mcqTest.questions[currentQuestionIndex].question}
                                                 </ReactMarkdown>
@@ -1452,17 +1443,17 @@ const QuizView = ({
                                                             key={idx}
                                                             onClick={() => handleOptionSelect(currentQuestionIndex, opt.option)}
                                                             className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-200 flex items-center gap-4 group ${isSelected
-                                                                ? 'bg-[#FDF6F0] border-[#C8A288] shadow-sm'
+                                                                ? 'bg-[#FDF6F0] border-[#1E5C42] shadow-sm'
                                                                 : 'bg-white border-transparent hover:bg-gray-50 hover:border-gray-200'
                                                             }`}
                                                         >
                                                             <div className={`h-8 w-8 rounded-full border-2 flex items-center justify-center font-bold text-sm transition-colors ${isSelected
-                                                                ? 'bg-[#C8A288] border-[#C8A288] text-white'
-                                                                : 'bg-white border-[#E6D5CC] text-[#8a6a5c] group-hover:border-[#C8A288]'
+                                                                ? 'bg-[#1E5C42] border-[#1E5C42] text-white'
+                                                                : 'bg-white border-[#E6D5CC] text-[#5E5046] group-hover:border-[#1E5C42]'
                                                             }`}>
                                                                 {opt.option}
                                                             </div>
-                                                            <span className={`text-[#4A3B32] font-medium ${isSelected ? 'opacity-100' : 'opacity-80'}`}>
+                                                            <span className={`text-[#163628] font-medium ${isSelected ? 'opacity-100' : 'opacity-80'}`}>
                                                                 {opt.text}
                                                             </span>
                                                         </button>
@@ -1475,7 +1466,7 @@ const QuizView = ({
                                             <button
                                                 onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))}
                                                 disabled={currentQuestionIndex === 0}
-                                                className="px-6 py-3 rounded-xl font-bold text-[#8a6a5c] disabled:opacity-30 hover:bg-[#FDF6F0] transition-colors"
+                                                className="px-6 py-3 rounded-xl font-bold text-[#5E5046] disabled:opacity-30 hover:bg-[#FDF6F0] transition-colors"
                                             >
                                                 Previous
                                             </button>
@@ -1484,14 +1475,14 @@ const QuizView = ({
                                                 <button
                                                     onClick={handleSubmitMCQ}
                                                     disabled={Object.keys(mcqUserAnswers).length !== mcqTest.questions.length}
-                                                    className="px-8 py-3 bg-[#C8A288] text-white rounded-xl font-bold shadow-lg shadow-[#C8A288]/20 hover:bg-[#B08B72] transition-colors disabled:opacity-50 disabled:shadow-none"
+                                                    className="px-8 py-3 bg-[#1E5C42] text-white rounded-xl font-bold shadow-lg shadow-[#1E5C42]/20 hover:bg-[#163628] transition-colors disabled:opacity-50 disabled:shadow-none"
                                                 >
                                                     Submit Quiz
                                                 </button>
                                             ) : (
                                                 <button
                                                     onClick={() => setCurrentQuestionIndex(prev => Math.min(mcqTest.questions.length - 1, prev + 1))}
-                                                    className="px-8 py-3 bg-[#4A3B32] text-white rounded-xl font-bold hover:bg-[#2e2520] transition-colors flex items-center gap-2"
+                                                    className="px-8 py-3 bg-[#163628] text-white rounded-xl font-bold hover:bg-[#20382B] transition-colors flex items-center gap-2"
                                                 >
                                                     Next <ChevronDown className="h-4 w-4 -rotate-90" />
                                                 </button>
@@ -1512,26 +1503,26 @@ const QuizView = ({
                                 {!cameFromPath && (
                                     <button
                                         onClick={() => setShowSavedList(true)}
-                                        className="flex items-center gap-2 px-4 py-2 mb-4 text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30 rounded-lg font-medium transition-colors"
+                                        className="flex items-center gap-2 px-4 py-2 mb-4 text-[#5E5046] hover:text-[#163628] hover:bg-[#E6D5CC]/30 rounded-lg font-medium transition-colors"
                                     >
                                         <ArrowLeft className="h-4 w-4" />
                                         Back to Saved
                                     </button>
                                 )}
                                 <div className="inline-flex items-center justify-center p-4 bg-white rounded-2xl shadow-sm border border-[#E6D5CC] mb-6">
-                                    <FileText className="h-8 w-8 text-[#C8A288]" />
+                                    <FileText className="h-8 w-8 text-[#1E5C42]" />
                                 </div>
-                                <h3 className="text-2xl font-bold mb-2 text-[#4A3B32]">Subjective Evaluation</h3>
-                                <p className="text-[#8a6a5c] mb-8">Write answers and get AI feedback.</p>
+                                <h3 className="text-2xl font-bold mb-2 text-[#163628]">Subjective Evaluation</h3>
+                                <p className="text-[#5E5046] mb-8">Write answers and get AI feedback.</p>
 
                                 {renderPreSelectedBanner()}
 
                                 <div className="max-w-md mx-auto space-y-4 bg-white p-6 md:p-8 rounded-3xl border border-[#E6D5CC] shadow-sm text-left">
                                     <div>
-                                        <label className="block text-sm font-bold mb-2 text-[#4A3B32] uppercase tracking-wide opacity-80">Topic</label>
+                                        <label className="block text-sm font-bold mb-2 text-[#163628] uppercase tracking-wide opacity-80">Topic</label>
 
                                         {cameFromPath ? (
-                                            <div className="px-5 py-3.5 bg-[#FDF6F0] rounded-xl text-[#4A3B32] font-medium">
+                                            <div className="px-5 py-3.5 bg-[#FDF6F0] rounded-xl text-[#163628] font-medium">
                                                 {evalTopic}
                                             </div>
                                         ) : availableTopics.length > 0 ? (
@@ -1544,7 +1535,7 @@ const QuizView = ({
                                                         if (val !== '__custom__') setEvalTopic(val);
                                                         else setEvalTopic('');
                                                     }}
-                                                    className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#C8A288] text-[#4A3B32] font-medium appearance-none"
+                                                    className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#1E5C42] text-[#163628] font-medium appearance-none"
                                                 >
                                                     <option value="">Select a topic...</option>
                                                     {availableTopics.map((topic, idx) => (
@@ -1552,14 +1543,14 @@ const QuizView = ({
                                                     ))}
                                                     <option value="__custom__">Custom Topic...</option>
                                                 </select>
-                                                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8a6a5c] pointer-events-none" />
+                                                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#5E5046] pointer-events-none" />
                                                 {evalTopicSelection === '__custom__' && (
                                                     <input
                                                         type="text"
                                                         value={evalTopic}
                                                         onChange={(e) => setEvalTopic(e.target.value)}
                                                         placeholder="Enter custom topic..."
-                                                        className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#C8A288] mt-3"
+                                                        className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#1E5C42] mt-3"
                                                         autoFocus
                                                     />
                                                 )}
@@ -1570,31 +1561,31 @@ const QuizView = ({
                                                 value={evalTopic}
                                                 onChange={(e) => setEvalTopic(e.target.value)}
                                                 placeholder="e.g., Photosynthesis"
-                                                className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#C8A288]"
+                                                className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#1E5C42]"
                                             />
                                         )}
                                     </div>
 
                                     <div>
-                                        <label className="block text-sm font-bold mb-2 text-[#4A3B32] uppercase tracking-wide opacity-80">Questions</label>
+                                        <label className="block text-sm font-bold mb-2 text-[#163628] uppercase tracking-wide opacity-80">Questions</label>
                                         <div className="relative">
                                             <select
                                                 value={evalNumQuestions}
                                                 onChange={(e) => setEvalNumQuestions(e.target.value)}
-                                                className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#C8A288] text-[#4A3B32] font-medium appearance-none"
+                                                className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#1E5C42] text-[#163628] font-medium appearance-none"
                                             >
                                                 {[1, 2, 3, 5].map(num => (
                                                     <option key={num} value={num}>{num} Questions</option>
                                                 ))}
                                             </select>
-                                            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8a6a5c] pointer-events-none" />
+                                            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#5E5046] pointer-events-none" />
                                         </div>
                                     </div>
 
                                     <button
                                         onClick={handleGenerateSubjectiveTest}
                                         disabled={evalLoading}
-                                        className="w-full py-4 bg-[#C8A288] text-white rounded-xl hover:bg-[#B08B72] font-bold disabled:opacity-50 transition-colors mt-4 flex items-center justify-center gap-2"
+                                        className="w-full py-4 bg-[#1E5C42] text-white rounded-xl hover:bg-[#163628] font-bold disabled:opacity-50 transition-colors mt-4 flex items-center justify-center gap-2"
                                     >
                                         {evalLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <FileText className="h-5 w-5" />}
                                         {evalLoading ? 'Generating...' : 'Start Evaluation'}
@@ -1606,11 +1597,11 @@ const QuizView = ({
                                 <div className="flex justify-between items-center">
                                     <div>
                                         <h3 className="text-2xl font-bold">{evalTest.topic || 'Subjective'} Evaluation</h3>
-                                        <p className="text-sm text-[#8a6a5c]">{evalTest.questions.length} Questions</p>
+                                        <p className="text-sm text-[#5E5046]">{evalTest.questions.length} Questions</p>
                                     </div>
                                     <button
                                         onClick={handleResetSubjectiveTest}
-                                        className="text-[#C8A288] hover:text-[#B08B72] font-medium flex items-center gap-1"
+                                        className="text-[#1E5C42] hover:text-[#163628] font-medium flex items-center gap-1"
                                     >
                                         <LogOut className="h-4 w-4 rotate-180" /> Back
                                     </button>
@@ -1618,11 +1609,11 @@ const QuizView = ({
 
                                 {evalResult && (
                                     <div className="bg-white p-6 rounded-2xl border border-[#E6D5CC] shadow-sm text-center">
-                                        <h4 className="text-lg font-bold text-[#4A3B32] mb-2">Evaluation Report</h4>
+                                        <h4 className="text-lg font-bold text-[#163628] mb-2">Evaluation Report</h4>
                                         <div className={`text-3xl font-bold mb-1 ${
-                                            evalResult.percentage >= 80 ? 'text-green-600' : 'text-[#C8A288]'
+                                            evalResult.percentage >= 80 ? 'text-green-600' : 'text-[#1E5C42]'
                                         }`}>{evalResult.total_score} / {evalResult.max_score}</div>
-                                        <p className="text-[#8a6a5c] mb-4">{evalResult.percentage.toFixed(0)}% Score</p>
+                                        <p className="text-[#5E5046] mb-4">{evalResult.percentage.toFixed(0)}% Score</p>
                                         
                                         {cameFromPath && (
                                             <p className={`text-sm font-bold mb-4 ${evalResult.percentage >= 80 ? 'text-green-600' : 'text-orange-600'}`}>
@@ -1634,7 +1625,7 @@ const QuizView = ({
                                             {cameFromPath && onReturnToPath && (
                                                 <button
                                                     onClick={onReturnToPath}
-                                                    className="px-6 py-2 bg-[#C8A288] text-white rounded-lg hover:bg-[#B08B72] font-medium transition-colors flex items-center gap-2"
+                                                    className="px-6 py-2 bg-[#1E5C42] text-white rounded-lg hover:bg-[#163628] font-medium transition-colors flex items-center gap-2"
                                                 >
                                                     <ArrowLeft className="h-4 w-4" />
                                                     Back to Path
@@ -1642,7 +1633,7 @@ const QuizView = ({
                                             )}
                                             <button
                                                 onClick={handleResetSubjectiveTest}
-                                                className="px-6 py-2 bg-[#FDF6F0] text-[#4A3B32] rounded-lg hover:bg-[#E6D5CC] font-medium transition-colors"
+                                                className="px-6 py-2 bg-[#FDF6F0] text-[#163628] rounded-lg hover:bg-[#E6D5CC] font-medium transition-colors"
                                             >
                                                 New Evaluation
                                             </button>
@@ -1666,14 +1657,14 @@ const QuizView = ({
                                                     value={evalUserAnswers[q.id] || ''}
                                                     onChange={(e) => handleSubjectiveAnswerChange(q.id, e.target.value)}
                                                     rows={4}
-                                                    className="w-full px-4 py-3 bg-white border border-[#E6D5CC] rounded-xl focus:ring-2 focus:ring-[#C8A288] outline-none resize-none"
+                                                    className="w-full px-4 py-3 bg-white border border-[#E6D5CC] rounded-xl focus:ring-2 focus:ring-[#1E5C42] outline-none resize-none"
                                                     placeholder="Type your answer here..."
                                                 />
                                             ) : (
                                                 <div className="space-y-4">
                                                     <div className="bg-white p-4 rounded-xl border border-[#E6D5CC]">
-                                                        <p className="text-xs text-[#8a6a5c] uppercase font-bold mb-1">Your Answer</p>
-                                                        <p className="text-[#4A3B32]">{result?.user_answer}</p>
+                                                        <p className="text-xs text-[#5E5046] uppercase font-bold mb-1">Your Answer</p>
+                                                        <p className="text-[#163628]">{result?.user_answer}</p>
                                                     </div>
 
                                                     <div className={`p-4 rounded-xl border ${result?.score >= 7 ? 'bg-green-50 border-green-200' :
@@ -1699,7 +1690,7 @@ const QuizView = ({
                                         <button
                                             onClick={handleSubmitSubjectiveTest}
                                             disabled={evalLoading || Object.keys(evalUserAnswers).length === 0}
-                                            className="w-full py-4 bg-[#C8A288] text-white rounded-xl hover:bg-[#B08B72] font-bold text-lg shadow-sm disabled:opacity-50 transition-all transform active:scale-[0.99]"
+                                            className="w-full py-4 bg-[#1E5C42] text-white rounded-xl hover:bg-[#163628] font-bold text-lg shadow-sm disabled:opacity-50 transition-all transform active:scale-[0.99]"
                                         >
                                             {evalLoading ? 'Evaluating Answers...' : 'Submit All Answers'}
                                         </button>
@@ -1719,19 +1710,19 @@ const QuizView = ({
                         <div className="bg-[#E6D5CC]/40 p-1.5 rounded-xl flex gap-1 shadow-inner">
                             <button
                                 onClick={() => setQuizMode('mcq')}
-                                className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${quizMode === 'mcq' ? 'bg-[#C8A288] text-white shadow-md transform scale-105' : 'text-[#8a6a5c] hover:bg-white/50'}`}
+                                className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${quizMode === 'mcq' ? 'bg-[#1E5C42] text-white shadow-md transform scale-105' : 'text-[#5E5046] hover:bg-white/50'}`}
                             >
                                 MCQ
                             </button>
                             <button
                                 onClick={() => setQuizMode('subjective')}
-                                className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${quizMode === 'subjective' ? 'bg-[#C8A288] text-white shadow-md transform scale-105' : 'text-[#8a6a5c] hover:bg-white/50'}`}
+                                className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${quizMode === 'subjective' ? 'bg-[#1E5C42] text-white shadow-md transform scale-105' : 'text-[#5E5046] hover:bg-white/50'}`}
                             >
                                 Subjective
                             </button>
                             <button
                                 onClick={() => setQuizMode('both')}
-                                className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${quizMode === 'both' ? 'bg-[#C8A288] text-white shadow-md transform scale-105' : 'text-[#8a6a5c] hover:bg-white/50'}`}
+                                className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${quizMode === 'both' ? 'bg-[#1E5C42] text-white shadow-md transform scale-105' : 'text-[#5E5046] hover:bg-white/50'}`}
                             >
                                 Complete
                             </button>

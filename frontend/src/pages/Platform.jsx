@@ -45,18 +45,18 @@ const School = ({ s, onChanged }) => {
             <div className="flex flex-wrap items-start gap-3">
                 <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="font-bold text-[#4A3B32]">{s.name}</h3>
+                        <h3 className="font-bold text-[#163628]">{s.name}</h3>
                         <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${cls}`}>{label}</span>
                     </div>
-                    <div className="mt-0.5 text-sm text-[#8a6a5c]">
+                    <div className="mt-0.5 text-sm text-[#5E5046]">
                         {s.contact_email || 'no email'} · {s.students} / {s.seats} students · created {fmtDate(s.created_at)}
                     </div>
-                    <div className="text-sm text-[#8a6a5c]">
+                    <div className="text-sm text-[#5E5046]">
                         Paid until {fmtDate(s.paid_until)}{s.timer?.days_left != null && s.timer.seconds_left > 0 ? ` (${s.timer.days_left} days left)` : ''}
                         {s.last_payment_at ? ` · last payment ${fmtDate(s.last_payment_at)}` : ''}
                         {s.gstin ? ` · GSTIN ${s.gstin}` : ''}
                     </div>
-                    {s.approval_note && <div className="text-sm text-[#8a6a5c]">Note: {s.approval_note}</div>}
+                    {s.approval_note && <div className="text-sm text-[#5E5046]">Note: {s.approval_note}</div>}
                 </div>
                 <div className="flex flex-wrap gap-2">
                     {s.approval_status !== 'approved' && (
@@ -80,18 +80,18 @@ const School = ({ s, onChanged }) => {
             {extend && (
                 <form onSubmit={(e) => { e.preventDefault(); act('extend', () => extendSchool(s.id, { days: Number(form.days) || null, seats: Number(form.seats) || null, note: form.note })).then(() => setExtend(false)); }}
                     className="mt-3 flex flex-wrap items-end gap-3 rounded-2xl bg-[#FDF6F0] p-3">
-                    <label className="text-xs text-[#8a6a5c]">Add days<input type="number" min={1} value={form.days} onChange={(e) => setForm({ ...form, days: e.target.value })} className="mt-1 block w-24 rounded-xl border border-[#E6D5CC] px-2 py-1.5 text-sm" /></label>
-                    <label className="text-xs text-[#8a6a5c]">Seats<input type="number" min={1} value={form.seats} onChange={(e) => setForm({ ...form, seats: e.target.value })} className="mt-1 block w-24 rounded-xl border border-[#E6D5CC] px-2 py-1.5 text-sm" /></label>
-                    <label className="text-xs text-[#8a6a5c] flex-1 min-w-[10rem]">Note (e.g. bank transfer ref.)<input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} className="mt-1 block w-full rounded-xl border border-[#E6D5CC] px-2 py-1.5 text-sm" /></label>
-                    <button disabled={!!busy} className="rounded-xl bg-[#4A3B32] px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy === 'extend' ? 'Saving…' : 'Save'}</button>
+                    <label className="text-xs text-[#5E5046]">Add days<input type="number" min={1} value={form.days} onChange={(e) => setForm({ ...form, days: e.target.value })} className="mt-1 block w-24 rounded-xl border border-[#E6D5CC] px-2 py-1.5 text-sm" /></label>
+                    <label className="text-xs text-[#5E5046]">Seats<input type="number" min={1} value={form.seats} onChange={(e) => setForm({ ...form, seats: e.target.value })} className="mt-1 block w-24 rounded-xl border border-[#E6D5CC] px-2 py-1.5 text-sm" /></label>
+                    <label className="text-xs text-[#5E5046] flex-1 min-w-[10rem]">Note (e.g. bank transfer ref.)<input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} className="mt-1 block w-full rounded-xl border border-[#E6D5CC] px-2 py-1.5 text-sm" /></label>
+                    <button disabled={!!busy} className="rounded-xl bg-[#163628] px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy === 'extend' ? 'Saving…' : 'Save'}</button>
                 </form>
             )}
             {error && <p className="mt-2 text-sm text-rose-600">{error}</p>}
             {audit && (
-                <ul className="mt-3 max-h-56 space-y-1 overflow-auto rounded-2xl bg-[#FDF6F0] p-3 text-xs text-[#4A3B32]">
+                <ul className="mt-3 max-h-56 space-y-1 overflow-auto rounded-2xl bg-[#FDF6F0] p-3 text-xs text-[#163628]">
                     {audit.length === 0 && <li>Nothing yet.</li>}
                     {audit.map((a) => (
-                        <li key={a.id}><span className="text-[#8a6a5c]">{new Date(a.created_at).toLocaleString()}</span> · <span className="font-semibold">{a.action}</span>{a.detail && Object.keys(a.detail).length ? ` · ${JSON.stringify(a.detail)}` : ''}</li>
+                        <li key={a.id}><span className="text-[#5E5046]">{new Date(a.created_at).toLocaleString()}</span> · <span className="font-semibold">{a.action}</span>{a.detail && Object.keys(a.detail).length ? ` · ${JSON.stringify(a.detail)}` : ''}</li>
                     ))}
                 </ul>
             )}
@@ -121,7 +121,7 @@ const Platform = () => {
 
     const pages = data ? Math.max(1, Math.ceil(data.total / data.page_size)) : 1;
     return (
-        <div className="min-h-[100dvh] bg-[#FDF6F0] text-[#4A3B32]">
+        <div className="min-h-[100dvh] bg-[#FDF6F0] text-[#163628]">
             <header className="mx-auto max-w-5xl px-4 py-5 flex items-center justify-between">
                 <button onClick={() => navigate('/dashboard')} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold hover:bg-white">
                     <ArrowLeft className="h-4 w-4" /> Dashboard
@@ -129,25 +129,25 @@ const Platform = () => {
                 <span className="font-bold">Schools console</span>
             </header>
             <main className="mx-auto max-w-5xl px-4 pb-16">
-                {allowed === null && <div className="flex items-center gap-2 text-[#8a6a5c]"><Loader2 className="h-4 w-4 animate-spin" /> Checking access…</div>}
+                {allowed === null && <div className="flex items-center gap-2 text-[#5E5046]"><Loader2 className="h-4 w-4 animate-spin" /> Checking access…</div>}
                 {allowed === false && <p className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-800">This page is for Lumina IQ staff.</p>}
                 {allowed && (
                     <>
                         <div className="mb-4 flex flex-wrap items-center gap-2">
                             {FILTERS.map(([id, label]) => (
                                 <button key={id} onClick={() => { setStatus(id); setPage(1); }}
-                                    className={`rounded-2xl px-3 py-1.5 text-sm font-semibold ${status === id ? 'bg-[#4A3B32] text-white' : 'border border-[#E6D5CC] bg-white'}`}>{label}</button>
+                                    className={`rounded-2xl px-3 py-1.5 text-sm font-semibold ${status === id ? 'bg-[#163628] text-white' : 'border border-[#E6D5CC] bg-white'}`}>{label}</button>
                             ))}
                             <div className="relative ml-auto">
-                                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a6a5c]" />
+                                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#5E5046]" />
                                 <input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="School or email" aria-label="Search schools"
-                                    className="w-56 rounded-2xl border border-[#E6D5CC] bg-white py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-[#C8A288]" />
+                                    className="w-56 rounded-2xl border border-[#E6D5CC] bg-white py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-[#1E5C42]" />
                             </div>
                         </div>
                         {error && <p className="mb-3 text-sm text-rose-600">{error}</p>}
-                        {!data ? <div className="flex items-center gap-2 text-[#8a6a5c]"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div> : (
+                        {!data ? <div className="flex items-center gap-2 text-[#5E5046]"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div> : (
                             <>
-                                <p className="mb-2 text-sm text-[#8a6a5c]">{data.total} school{data.total === 1 ? '' : 's'}</p>
+                                <p className="mb-2 text-sm text-[#5E5046]">{data.total} school{data.total === 1 ? '' : 's'}</p>
                                 <ul className="space-y-3">{data.institutions.map((s) => <School key={s.id} s={s} onChanged={load} />)}</ul>
                                 {pages > 1 && (
                                     <div className="mt-4 flex items-center justify-end gap-2 text-sm">

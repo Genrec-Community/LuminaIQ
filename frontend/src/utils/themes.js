@@ -9,13 +9,13 @@
 
 export const THEMES = {
     latte: {
-        name: 'Café Latte', mode: 'light', blurb: 'Warm cream & caramel — the original',
-        swatch: ['#FDF6F0', '#E6D5CC', '#C8A288', '#4A3B32'],
+        name: 'Lumina Paper', mode: 'light', blurb: 'Warm paper, forest ink, a lime highlighter',
+        swatch: ['#FDF6F0', '#E6D5CC', '#1E5C42', '#163628'],
         // built-in: no overrides
     },
     espresso: {
-        name: 'Espresso Night', mode: 'dark', blurb: 'Deep roast, soft gold glow',
-        swatch: ['#1c1814', '#2b2620', '#d4aa82', '#f0ece6'],
+        name: 'Forest Night', mode: 'dark', blurb: 'Deep forest with a lime glow',
+        swatch: ['#0f1d16', '#182c21', '#D3EE6A', '#f4eee2'],
     },
     orchid: {
         name: 'Midnight Orchid', mode: 'dark', blurb: 'Velvet violet for late-night focus',
@@ -56,13 +56,14 @@ export const THEMES = {
 };
 
 export const FONT_STYLES = {
-    default: { name: 'Rounded', sample: 'Aa', stack: '"Outfit", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif' },
-    clean: { name: 'Clean', sample: 'Aa', stack: '"Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif' },
+    default: { name: 'Lumina', sample: 'Aa', stack: '"Atkinson Hyperlegible Next Variable", "Atkinson Hyperlegible Next", "Plus Jakarta Sans Variable", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif' },
+    rounded: { name: 'Rounded', sample: 'Aa', stack: '"Outfit Variable", "Outfit", "Plus Jakarta Sans Variable", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif' },
+    clean: { name: 'Clean', sample: 'Aa', stack: '"Plus Jakarta Sans Variable", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif' },
     serif: { name: 'Bookish', sample: 'Aa', stack: 'Georgia, "Iowan Old Style", "Times New Roman", serif' },
     mono: { name: 'Coder', sample: 'Aa', stack: 'ui-monospace, "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace' },
 };
 
-export const ACCENT_PRESETS = ['#C8A288', '#e46a91', '#b48cff', '#3b8fd6', '#2dd4bf', '#2f9e5b', '#39ff88', '#ff7a45', '#f5b301'];
+export const ACCENT_PRESETS = ['#1E5C42', '#e46a91', '#b48cff', '#3b8fd6', '#2dd4bf', '#2f9e5b', '#39ff88', '#ff7a45', '#f5b301'];
 
 export const THEME_CACHE_KEY = 'lumina_theme_vars';
 
@@ -116,6 +117,7 @@ export const buildThemeState = (settings) => {
             'data-theme': p ? id : null,           // palette rules only for non-classic themes
             'data-theme-mode': theme.mode,
             'data-accent': accent || (p ? 'theme' : null), // accent rules when an accent is themed/custom
+            'data-font': fontKey !== 'default' ? fontKey : null, // a picked font also replaces the display face
         },
         vars,
     };

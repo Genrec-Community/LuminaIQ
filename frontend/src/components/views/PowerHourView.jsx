@@ -32,7 +32,7 @@ const Confetti = () => {
         x: (Math.random() - 0.5) * 600,
         y: -(200 + Math.random() * 300),
         r: Math.random() * 720,
-        c: ['#C8A288', '#f59e0b', '#10b981', '#e0b48a', '#f472b6', '#60a5fa'][i % 6],
+        c: ['#1E5C42', '#f59e0b', '#10b981', '#C5E35A', '#f472b6', '#60a5fa'][i % 6],
         d: 0.8 + Math.random() * 0.8,
     })), []);
     return (
@@ -277,8 +277,8 @@ const PowerHourView = ({ projectId, availableTopics = [], selectedDocuments = []
             <div className="h-full flex items-center justify-center p-6">
                 <div className="max-w-md text-center">
                     <div className="text-5xl mb-4">📚</div>
-                    <h2 className="text-2xl font-bold text-[#4A3B32] mb-2">No topics yet</h2>
-                    <p className="text-[#8a6a5c]">Select a ready document in the sidebar (or wait for processing to finish). {companion} will break it into bite-sized topics for you.</p>
+                    <h2 className="text-2xl font-bold text-[#163628] mb-2">No topics yet</h2>
+                    <p className="text-[#5E5046]">Select a ready document in the sidebar (or wait for processing to finish). {companion} will break it into bite-sized topics for you.</p>
                 </div>
             </div>
         );
@@ -291,13 +291,13 @@ const PowerHourView = ({ projectId, availableTopics = [], selectedDocuments = []
                 <div className="max-w-3xl mx-auto">
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                         className="relative overflow-hidden rounded-3xl border border-[#E6D5CC] bg-white p-6 md:p-10 text-center">
-                        <div className="pointer-events-none absolute -top-20 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-[#C8A288]/20 blur-3xl" />
+                        <div className="pointer-events-none absolute -top-20 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-[#1E5C42]/20 blur-3xl" />
                         <motion.div animate={{ rotate: [0, -8, 8, 0] }} transition={{ repeat: Infinity, duration: 3 }}
-                            className="relative mx-auto mb-4 h-20 w-20 rounded-3xl bg-gradient-to-br from-[#C8A288] to-[#e8c9a8] flex items-center justify-center shadow-xl shadow-[#C8A288]/30">
+                            className="relative mx-auto mb-4 h-20 w-20 rounded-3xl bg-gradient-to-br from-[#1E5C42] to-[#D3EE6A] flex items-center justify-center shadow-xl shadow-[#1E5C42]/30">
                             <Zap className="h-10 w-10 text-white fill-white" />
                         </motion.div>
-                        <h1 className="relative text-3xl md:text-4xl font-bold text-[#4A3B32]">Power Hour</h1>
-                        <p className="relative mt-2 text-[#8a6a5c] text-lg">Bite-sized lessons + instant quizzes. Swipe through your whole book.</p>
+                        <h1 className="relative text-3xl md:text-4xl font-bold text-[#163628]">Power Hour</h1>
+                        <p className="relative mt-2 text-[#5E5046] text-lg">Bite-sized lessons + instant quizzes. Swipe through your whole book.</p>
 
                         <div className="relative mt-6 grid grid-cols-3 gap-3 text-left">
                             {[
@@ -306,37 +306,37 @@ const PowerHourView = ({ projectId, availableTopics = [], selectedDocuments = []
                                 [Timer, `~${est || 4} min`, 'to finish'],
                             ].map(([Icon, v, l]) => (
                                 <div key={l} className="rounded-2xl border border-[#E6D5CC] bg-[#FDF6F0] p-3">
-                                    <Icon className="h-4 w-4 text-[#C8A288]" />
-                                    <div className="mt-1 text-xl font-bold text-[#4A3B32]">{v}</div>
-                                    <div className="text-xs text-[#8a6a5c]">{l}</div>
+                                    <Icon className="h-4 w-4 text-[#1E5C42]" />
+                                    <div className="mt-1 text-xl font-bold text-[#163628]">{v}</div>
+                                    <div className="text-xs text-[#5E5046]">{l}</div>
                                 </div>
                             ))}
                         </div>
                         <div className="relative mt-3 h-2 overflow-hidden rounded-full bg-[#E6D5CC]/60">
-                            <div className="h-full rounded-full bg-gradient-to-r from-[#C8A288] to-emerald-400" style={{ width: `${(mastered.size / availableTopics.length) * 100}%` }} />
+                            <div className="h-full rounded-full bg-gradient-to-r from-[#1E5C42] to-emerald-400" style={{ width: `${(mastered.size / availableTopics.length) * 100}%` }} />
                         </div>
 
                         <div className="relative mt-8 grid gap-3 sm:grid-cols-3">
                             <button onClick={() => start('sprint')}
-                                className="sm:col-span-3 flex items-center justify-center gap-2 rounded-2xl bg-[#C8A288] px-6 py-4 text-lg font-bold text-white shadow-lg shadow-[#C8A288]/30 transition-all hover:bg-[#B08B72] active:scale-95">
+                                className="sm:col-span-3 flex items-center justify-center gap-2 rounded-2xl bg-[#1E5C42] px-6 py-4 text-lg font-bold text-white shadow-lg shadow-[#1E5C42]/30 transition-all hover:bg-[#163628] active:scale-95">
                                 <Timer className="h-5 w-5" /> Start 60-minute sprint
                             </button>
                             <button onClick={() => start('quick')}
-                                className="sm:col-span-2 flex items-center justify-center gap-2 rounded-2xl border-2 border-[#E6D5CC] bg-white px-4 py-3 font-semibold text-[#4A3B32] hover:border-[#C8A288] active:scale-95">
-                                <Zap className="h-4 w-4 text-[#C8A288]" /> Quick 5 (≈15 min)
+                                className="sm:col-span-2 flex items-center justify-center gap-2 rounded-2xl border-2 border-[#E6D5CC] bg-white px-4 py-3 font-semibold text-[#163628] hover:border-[#1E5C42] active:scale-95">
+                                <Zap className="h-4 w-4 text-[#1E5C42]" /> Quick 5 (≈15 min)
                             </button>
                             <button onClick={() => start('review')} disabled={!weak.some((t) => availableTopics.includes(t))}
-                                className="flex items-center justify-center gap-2 rounded-2xl border-2 border-[#E6D5CC] bg-white px-4 py-3 font-semibold text-[#4A3B32] hover:border-[#C8A288] disabled:opacity-40 active:scale-95">
-                                <RotateCcw className="h-4 w-4 text-[#C8A288]" /> Fix weak spots ({weak.filter((t) => availableTopics.includes(t)).length})
+                                className="flex items-center justify-center gap-2 rounded-2xl border-2 border-[#E6D5CC] bg-white px-4 py-3 font-semibold text-[#163628] hover:border-[#1E5C42] disabled:opacity-40 active:scale-95">
+                                <RotateCcw className="h-4 w-4 text-[#1E5C42]" /> Fix weak spots ({weak.filter((t) => availableTopics.includes(t)).length})
                             </button>
                         </div>
-                        <p className="relative mt-4 hidden md:block text-xs text-[#8a6a5c]">Tip: use keys <b>1–4</b> to answer and <b>Enter</b> to continue.</p>
+                        <p className="relative mt-4 hidden md:block text-xs text-[#5E5046]">Tip: use keys <b>1–4</b> to answer and <b>Enter</b> to continue.</p>
                     </motion.div>
 
                     <div className="mt-4 flex items-start gap-3 rounded-2xl border border-[#E6D5CC] bg-white p-4">
                         <span className="text-2xl">{settings.aiAvatar || '✨'}</span>
-                        <div className="text-[#4A3B32]">
-                            <span className="text-xs font-semibold text-[#C8A288] block">{companion}</span>
+                        <div className="text-[#163628]">
+                            <span className="text-xs font-semibold text-[#1E5C42] block">{companion}</span>
                             {character.greet(name)} Each card takes about 3 minutes — {remainingTopics.length ? `${remainingTopics.length} topics left to master.` : 'you have mastered everything — time for a review lap!'}
                             {nextUp && <span className="block mt-1 text-sm">Next up: <b>{nextUp}</b>{topicMeta[nextUp]?.prerequisites?.length ? ` (builds on ${topicMeta[nextUp].prerequisites.slice(0, 2).join(', ')})` : ' — a great starting point'}.</span>}
                         </div>
@@ -345,8 +345,8 @@ const PowerHourView = ({ projectId, availableTopics = [], selectedDocuments = []
                     {/* Chapter path */}
                     <div className="mt-4 rounded-3xl border border-[#E6D5CC] bg-white p-4 md:p-6">
                         <div className="flex items-center justify-between mb-1">
-                            <h3 className="text-lg font-bold text-[#4A3B32]">Your path</h3>
-                            <span className="text-xs text-[#8a6a5c]">Basics first, then what builds on them</span>
+                            <h3 className="text-lg font-bold text-[#163628]">Your path</h3>
+                            <span className="text-xs text-[#5E5046]">Basics first, then what builds on them</span>
                         </div>
                         <div className="divide-y divide-[#E6D5CC]">
                             {chapters.map((ch, ci) => {
@@ -355,18 +355,18 @@ const PowerHourView = ({ projectId, availableTopics = [], selectedDocuments = []
                                 return (
                                     <div key={ch.title} className="py-3">
                                         <div className="flex items-center gap-3">
-                                            <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${complete ? 'bg-emerald-500 text-white' : 'bg-[#FDF6F0] text-[#C8A288]'}`}>
+                                            <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${complete ? 'bg-emerald-500 text-white' : 'bg-[#FDF6F0] text-[#1E5C42]'}`}>
                                                 {complete ? <CheckCircle2 className="h-4 w-4" /> : ci + 1}
                                             </span>
                                             <div className="flex-1 min-w-0">
-                                                <div className="font-semibold text-[#4A3B32] truncate">{ch.title}</div>
+                                                <div className="font-semibold text-[#163628] truncate">{ch.title}</div>
                                                 <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[#E6D5CC]/60">
-                                                    <div className="h-full rounded-full bg-[#C8A288]" style={{ width: `${(done / ch.topics.length) * 100}%` }} />
+                                                    <div className="h-full rounded-full bg-[#1E5C42]" style={{ width: `${(done / ch.topics.length) * 100}%` }} />
                                                 </div>
                                             </div>
-                                            <span className="text-xs tabular-nums text-[#8a6a5c]">{done}/{ch.topics.length}</span>
+                                            <span className="text-xs tabular-nums text-[#5E5046]">{done}/{ch.topics.length}</span>
                                             <button onClick={() => start('sprint', ch.topics)}
-                                                className="rounded-xl border border-[#E6D5CC] px-3 py-1.5 text-xs font-semibold text-[#4A3B32] hover:border-[#C8A288] hover:bg-[#FDF6F0]">
+                                                className="rounded-xl border border-[#E6D5CC] px-3 py-1.5 text-xs font-semibold text-[#163628] hover:border-[#1E5C42] hover:bg-[#FDF6F0]">
                                                 {complete ? 'Review' : done ? 'Continue' : 'Start'}
                                             </button>
                                         </div>
@@ -379,9 +379,9 @@ const PowerHourView = ({ projectId, availableTopics = [], selectedDocuments = []
                                                     <button key={t} onClick={() => start('sprint', [t])}
                                                         title={topicMeta[t]?.prerequisites?.length ? `Builds on: ${topicMeta[t].prerequisites.join(', ')}` : 'No prerequisites'}
                                                         className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${m ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-                                                            : next ? 'border-[#C8A288] bg-[#C8A288] text-white'
-                                                                : ready ? 'border-[#E6D5CC] bg-white text-[#4A3B32] hover:border-[#C8A288]'
-                                                                    : 'border-dashed border-[#E6D5CC] bg-white text-[#8a6a5c] hover:border-[#C8A288]'}`}>
+                                                            : next ? 'border-[#1E5C42] bg-[#1E5C42] text-white'
+                                                                : ready ? 'border-[#E6D5CC] bg-white text-[#163628] hover:border-[#1E5C42]'
+                                                                    : 'border-dashed border-[#E6D5CC] bg-white text-[#5E5046] hover:border-[#1E5C42]'}`}>
                                                         {m ? '✓ ' : next ? '▶ ' : ''}{t}
                                                     </button>
                                                 );
@@ -391,7 +391,7 @@ const PowerHourView = ({ projectId, availableTopics = [], selectedDocuments = []
                                 );
                             })}
                         </div>
-                        <p className="mt-2 text-xs text-[#8a6a5c]">Solid chips are ready to learn; dashed ones build on topics you haven&apos;t mastered yet.</p>
+                        <p className="mt-2 text-xs text-[#5E5046]">Solid chips are ready to learn; dashed ones build on topics you haven&apos;t mastered yet.</p>
                     </div>
                 </div>
             </div>
@@ -404,23 +404,23 @@ const PowerHourView = ({ projectId, availableTopics = [], selectedDocuments = []
             <div className="h-full overflow-y-auto p-4 md:p-8">
                 <Confetti />
                 <div className="max-w-xl mx-auto text-center rounded-3xl border border-[#E6D5CC] bg-white p-8">
-                    <Trophy className="mx-auto h-14 w-14 text-[#C8A288]" />
-                    <h2 className="mt-3 text-3xl font-bold text-[#4A3B32]">Session complete!</h2>
-                    <p className="mt-1 text-[#8a6a5c]">{acc >= 80 ? pick(character.cheers) : acc >= 50 ? 'Solid work — your weak spots are saved for a quick fix.' : pick(character.consoles)}</p>
+                    <Trophy className="mx-auto h-14 w-14 text-[#1E5C42]" />
+                    <h2 className="mt-3 text-3xl font-bold text-[#163628]">Session complete!</h2>
+                    <p className="mt-1 text-[#5E5046]">{acc >= 80 ? pick(character.cheers) : acc >= 50 ? 'Solid work — your weak spots are saved for a quick fix.' : pick(character.consoles)}</p>
                     <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
                         {[['Cards', stats.cards], ['Accuracy', `${acc}%`], ['Best combo', `${stats.bestCombo}×`], ['XP', `+${stats.xp}`]].map(([l, v]) => (
                             <div key={l} className="rounded-2xl border border-[#E6D5CC] bg-[#FDF6F0] p-3">
-                                <div className="text-2xl font-bold text-[#4A3B32]">{v}</div>
-                                <div className="text-xs text-[#8a6a5c]">{l}</div>
+                                <div className="text-2xl font-bold text-[#163628]">{v}</div>
+                                <div className="text-xs text-[#5E5046]">{l}</div>
                             </div>
                         ))}
                     </div>
                     <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
-                        <button onClick={() => setPhase('start')} className="flex items-center justify-center gap-2 rounded-2xl bg-[#C8A288] px-6 py-3 font-semibold text-white hover:bg-[#B08B72]">
+                        <button onClick={() => setPhase('start')} className="flex items-center justify-center gap-2 rounded-2xl bg-[#1E5C42] px-6 py-3 font-semibold text-white hover:bg-[#163628]">
                             <Zap className="h-4 w-4" /> Another round
                         </button>
                         {weak.some((t) => availableTopics.includes(t)) && (
-                            <button onClick={() => start('review')} className="flex items-center justify-center gap-2 rounded-2xl border-2 border-[#E6D5CC] px-6 py-3 font-semibold text-[#4A3B32] hover:border-[#C8A288]">
+                            <button onClick={() => start('review')} className="flex items-center justify-center gap-2 rounded-2xl border-2 border-[#E6D5CC] px-6 py-3 font-semibold text-[#163628] hover:border-[#1E5C42]">
                                 <RotateCcw className="h-4 w-4" /> Fix weak spots
                             </button>
                         )}
@@ -440,13 +440,13 @@ const PowerHourView = ({ projectId, availableTopics = [], selectedDocuments = []
             {/* HUD */}
             <div className="shrink-0 px-4 md:px-8 pt-4">
                 <div className="max-w-3xl mx-auto flex items-center gap-3">
-                    <button onClick={() => setPhase('done')} className="text-xs text-[#8a6a5c] hover:text-[#4A3B32]">End</button>
+                    <button onClick={() => setPhase('done')} className="text-xs text-[#5E5046] hover:text-[#163628]">End</button>
                     <div className="flex-1 h-2.5 overflow-hidden rounded-full bg-[#E6D5CC]/60">
-                        <motion.div className="h-full rounded-full bg-gradient-to-r from-[#C8A288] to-[#e0b48a]" animate={{ width: `${progressPct}%` }} />
+                        <motion.div className="h-full rounded-full bg-gradient-to-r from-[#1E5C42] to-[#C5E35A]" animate={{ width: `${progressPct}%` }} />
                     </div>
-                    <span className="text-xs tabular-nums text-[#8a6a5c]">{index + 1}/{queue.length}</span>
+                    <span className="text-xs tabular-nums text-[#5E5046]">{index + 1}/{queue.length}</span>
                     {mode === 'sprint' && (
-                        <span className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums ${secondsLeft < 300 ? 'bg-red-50 text-red-600' : 'bg-[#FDF6F0] text-[#4A3B32]'}`}>
+                        <span className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums ${secondsLeft < 300 ? 'bg-red-50 text-red-600' : 'bg-[#FDF6F0] text-[#163628]'}`}>
                             <Timer className="h-3.5 w-3.5" />{fmt(secondsLeft)}
                         </span>
                     )}
@@ -472,17 +472,17 @@ const PowerHourView = ({ projectId, availableTopics = [], selectedDocuments = []
                         className="max-w-3xl mx-auto"
                     >
                         <div className="rounded-3xl border border-[#E6D5CC] bg-white p-5 md:p-8 shadow-sm">
-                            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[#C8A288]">
+                            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[#1E5C42]">
                                 {phase === 'learn' ? <><BookOpen className="h-4 w-4" /> Learn</> : <><Target className="h-4 w-4" /> Quick check {qIndex + 1}/{card.questions?.length || QUESTIONS_PER_TOPIC}</>}
                             </div>
-                            <h2 className="mt-2 text-2xl md:text-3xl font-bold text-[#4A3B32]">{topic}</h2>
+                            <h2 className="mt-2 text-2xl md:text-3xl font-bold text-[#163628]">{topic}</h2>
                             {(topicMeta[topic]?.chapter || topicMeta[topic]?.prerequisites?.length > 0) && (
                                 <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
                                     {topicMeta[topic]?.chapter && (
-                                        <span className="rounded-full bg-[#FDF6F0] border border-[#E6D5CC] px-2.5 py-1 text-[#8a6a5c]">📖 {topicMeta[topic].chapter}</span>
+                                        <span className="rounded-full bg-[#FDF6F0] border border-[#E6D5CC] px-2.5 py-1 text-[#5E5046]">📖 {topicMeta[topic].chapter}</span>
                                     )}
                                     {topicMeta[topic]?.prerequisites?.length > 0 && (
-                                        <span className="rounded-full bg-[#FDF6F0] border border-[#E6D5CC] px-2.5 py-1 text-[#8a6a5c]">
+                                        <span className="rounded-full bg-[#FDF6F0] border border-[#E6D5CC] px-2.5 py-1 text-[#5E5046]">
                                             🧩 Builds on: {topicMeta[topic].prerequisites.join(', ')}
                                         </span>
                                     )}
@@ -493,10 +493,10 @@ const PowerHourView = ({ projectId, availableTopics = [], selectedDocuments = []
                                 card.summary === undefined && !card.error ? (
                                     <div className="mt-6 space-y-3">
                                         {[90, 75, 85, 60].map((w, i) => <div key={i} className="h-4 rounded-full bg-[#E6D5CC]/50 animate-pulse" style={{ width: `${w}%` }} />)}
-                                        <p className="flex items-center gap-2 pt-2 text-sm text-[#8a6a5c]"><Loader2 className="h-4 w-4 animate-spin" /> {companion} is reading your book…</p>
+                                        <p className="flex items-center gap-2 pt-2 text-sm text-[#5E5046]"><Loader2 className="h-4 w-4 animate-spin" /> {companion} is reading your book…</p>
                                     </div>
                                 ) : (
-                                    <div className="prose prose-lg max-w-none mt-4 text-[#4A3B32] prose-strong:text-[#4A3B32] prose-headings:text-[#4A3B32]">
+                                    <div className="prose prose-lg max-w-none mt-4 text-[#163628] prose-strong:text-[#163628] prose-headings:text-[#163628]">
                                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{card.summary || "Couldn't load this lesson right now. You can still test yourself or skip."}</ReactMarkdown>
                                     </div>
                                 )
@@ -504,12 +504,12 @@ const PowerHourView = ({ projectId, availableTopics = [], selectedDocuments = []
 
                             {phase === 'check' && (
                                 !card.questions ? (
-                                    <p className="mt-6 flex items-center gap-2 text-[#8a6a5c]"><Loader2 className="h-4 w-4 animate-spin" /> Cooking up questions…</p>
+                                    <p className="mt-6 flex items-center gap-2 text-[#5E5046]"><Loader2 className="h-4 w-4 animate-spin" /> Cooking up questions…</p>
                                 ) : !q ? (
-                                    <p className="mt-6 text-[#8a6a5c]">No questions for this one — moving on counts as reviewed.</p>
+                                    <p className="mt-6 text-[#5E5046]">No questions for this one — moving on counts as reviewed.</p>
                                 ) : (
                                     <div className="mt-5">
-                                        <p className="text-lg font-medium text-[#4A3B32]">{q.question}</p>
+                                        <p className="text-lg font-medium text-[#163628]">{q.question}</p>
                                         <div className="mt-4 grid gap-2.5">
                                             {q.options.map((o, i) => {
                                                 const isCorrect = o.option === q.correct_answer;
@@ -521,21 +521,21 @@ const PowerHourView = ({ projectId, availableTopics = [], selectedDocuments = []
                                                         whileTap={!picked ? { scale: 0.98 } : {}}
                                                         animate={state === 'wrong' ? { x: [0, -8, 8, -4, 0] } : state === 'correct' && isPicked ? { scale: [1, 1.03, 1] } : {}}
                                                         onClick={() => answer(o.option)}
-                                                        className={`flex items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left transition-colors ${state === 'idle' ? 'border-[#E6D5CC] bg-white hover:border-[#C8A288] hover:bg-[#FDF6F0]'
+                                                        className={`flex items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left transition-colors ${state === 'idle' ? 'border-[#E6D5CC] bg-white hover:border-[#1E5C42] hover:bg-[#FDF6F0]'
                                                             : state === 'correct' ? 'border-emerald-400 bg-emerald-50'
                                                                 : state === 'wrong' ? 'border-red-300 bg-red-50' : 'border-[#E6D5CC] bg-white opacity-50'}`}
                                                     >
-                                                        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${state === 'correct' ? 'bg-emerald-500 text-white' : state === 'wrong' ? 'bg-red-400 text-white' : 'bg-[#FDF6F0] text-[#8a6a5c]'}`}>
+                                                        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${state === 'correct' ? 'bg-emerald-500 text-white' : state === 'wrong' ? 'bg-red-400 text-white' : 'bg-[#FDF6F0] text-[#5E5046]'}`}>
                                                             {state === 'correct' ? <CheckCircle2 className="h-4 w-4" /> : state === 'wrong' ? <XCircle className="h-4 w-4" /> : i + 1}
                                                         </span>
-                                                        <span className={state === 'correct' ? 'text-emerald-800' : state === 'wrong' ? 'text-red-700' : 'text-[#4A3B32]'}>{o.text}</span>
+                                                        <span className={state === 'correct' ? 'text-emerald-800' : state === 'wrong' ? 'text-red-700' : 'text-[#163628]'}>{o.text}</span>
                                                     </motion.button>
                                                 );
                                             })}
                                         </div>
                                         {picked && q.explanation && (
                                             <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-                                                className="mt-4 rounded-2xl border border-[#E6D5CC] bg-[#FDF6F0] p-4 text-sm text-[#4A3B32]">
+                                                className="mt-4 rounded-2xl border border-[#E6D5CC] bg-[#FDF6F0] p-4 text-sm text-[#163628]">
                                                 <span className="font-semibold">Why: </span>{q.explanation}
                                             </motion.div>
                                         )}
@@ -555,35 +555,35 @@ const PowerHourView = ({ projectId, availableTopics = [], selectedDocuments = []
                         <AnimatePresence mode="wait">
                             {reaction && (
                                 <motion.span key={reaction} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                                    className="text-sm font-medium text-[#4A3B32]">{reaction}</motion.span>
+                                    className="text-sm font-medium text-[#163628]">{reaction}</motion.span>
                             )}
                         </AnimatePresence>
                     </div>
                     <div className="flex items-center gap-2">
                         {phase === 'learn' && (
                             <>
-                                <button onClick={nextTopic} className="flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-sm text-[#8a6a5c] hover:bg-[#FDF6F0]" title="Skip topic">
+                                <button onClick={nextTopic} className="flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-sm text-[#5E5046] hover:bg-[#FDF6F0]" title="Skip topic">
                                     <SkipForward className="h-4 w-4" /> Skip
                                 </button>
                                 {onOpenChat && (
                                     <button onClick={() => onOpenChat(`Explain "${topic}" to me simply, with an example and a memory trick.`)}
-                                        className="flex items-center gap-1.5 rounded-xl border border-[#E6D5CC] px-3 py-2.5 text-sm text-[#4A3B32] hover:border-[#C8A288]">
-                                        <Brain className="h-4 w-4 text-[#C8A288]" /> <span className="hidden sm:inline">Ask {companion}</span>
+                                        className="flex items-center gap-1.5 rounded-xl border border-[#E6D5CC] px-3 py-2.5 text-sm text-[#163628] hover:border-[#1E5C42]">
+                                        <Brain className="h-4 w-4 text-[#1E5C42]" /> <span className="hidden sm:inline">Ask {companion}</span>
                                     </button>
                                 )}
                                 {onVisualize && (
                                     <button onClick={() => onVisualize(topic)} title="Open an interactive simulation of this topic"
-                                        className="flex items-center gap-1.5 rounded-xl border border-[#E6D5CC] px-3 py-2.5 text-sm text-[#4A3B32] hover:border-[#C8A288]">
-                                        <FlaskConical className="h-4 w-4 text-[#C8A288]" /> <span className="hidden sm:inline">Visualize</span>
+                                        className="flex items-center gap-1.5 rounded-xl border border-[#E6D5CC] px-3 py-2.5 text-sm text-[#163628] hover:border-[#1E5C42]">
+                                        <FlaskConical className="h-4 w-4 text-[#1E5C42]" /> <span className="hidden sm:inline">Visualize</span>
                                     </button>
                                 )}
-                                <button onClick={goCheck} className="flex items-center gap-2 rounded-xl bg-[#C8A288] px-5 py-2.5 font-semibold text-white shadow-md shadow-[#C8A288]/30 hover:bg-[#B08B72] active:scale-95">
+                                <button onClick={goCheck} className="flex items-center gap-2 rounded-xl bg-[#1E5C42] px-5 py-2.5 font-semibold text-white shadow-md shadow-[#1E5C42]/30 hover:bg-[#163628] active:scale-95">
                                     Got it — quiz me <ArrowRight className="h-4 w-4" />
                                 </button>
                             </>
                         )}
                         {phase === 'check' && (picked || (card.questions && !q)) && (
-                            <button onClick={continueCheck} className="flex items-center gap-2 rounded-xl bg-[#C8A288] px-5 py-2.5 font-semibold text-white shadow-md shadow-[#C8A288]/30 hover:bg-[#B08B72] active:scale-95">
+                            <button onClick={continueCheck} className="flex items-center gap-2 rounded-xl bg-[#1E5C42] px-5 py-2.5 font-semibold text-white shadow-md shadow-[#1E5C42]/30 hover:bg-[#163628] active:scale-95">
                                 {qIndex + 1 < (card.questions?.length || 0) ? 'Next question' : <>Next topic <Sparkles className="h-4 w-4" /></>} <ArrowRight className="h-4 w-4" />
                             </button>
                         )}

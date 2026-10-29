@@ -64,15 +64,15 @@ const SidebarNav = ({ activeTab, onSelect, collapsed, isDark, aiLabel }) => {
 
     // Theme tokens
     const c = isDark ? {
-        label: 'text-[#8a6a4c]', text: 'text-[#c4a882]', hover: 'hover:bg-[#2e2318]/80 hover:text-[#e8c898]',
-        active: 'bg-gradient-to-r from-[#C8A288] to-[#a8824a] text-white shadow-md shadow-[#C8A288]/25',
-        rule: 'border-[#3a2a18]', chip: 'bg-[#2e2318] text-[#c4a882]', chipOn: 'bg-[#C8A288] text-white',
-        icon: 'text-[#8a6a4c] hover:text-[#e8c898] hover:bg-[#2e2318]',
+        label: 'text-[#8FA093]', text: 'text-[#B7C2B4]', hover: 'hover:bg-[#20382B]/80 hover:text-[#E0F590]',
+        active: 'lumina-nav-active bg-[#D3EE6A] text-[#0f271c] shadow-md shadow-black/20',
+        rule: 'border-[#24402F]', chip: 'bg-[#20382B] text-[#B7C2B4]', chipOn: 'bg-[#1E5C42] text-white',
+        icon: 'text-[#8FA093] hover:text-[#E0F590] hover:bg-[#20382B]',
     } : {
-        label: 'text-[#a99080]', text: 'text-[#5a4a42]', hover: 'hover:bg-[#E6D5CC]/60 hover:text-[#4A3B32]',
-        active: 'bg-[#C8A288] text-white shadow-md shadow-[#C8A288]/20',
-        rule: 'border-[#E6D5CC]/70', chip: 'bg-white/70 text-[#8a6a5c]', chipOn: 'bg-[#C8A288] text-white',
-        icon: 'text-[#b8a094] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/60',
+        label: 'text-[#a99080]', text: 'text-[#2B3F35]', hover: 'hover:bg-[#E6D5CC]/60 hover:text-[#163628]',
+        active: 'lumina-nav-active bg-[#163628] text-[#f4eee2] shadow-md shadow-[#163628]/20',
+        rule: 'border-[#E6D5CC]/70', chip: 'bg-white/70 text-[#5E5046]', chipOn: 'bg-[#1E5C42] text-white',
+        icon: 'text-[#b8a094] hover:text-[#163628] hover:bg-[#E6D5CC]/60',
     };
 
     const Row = ({ item }) => {
@@ -99,7 +99,7 @@ const SidebarNav = ({ activeTab, onSelect, collapsed, isDark, aiLabel }) => {
                     <div className="ml-1 flex shrink-0 items-center">
                         <button
                             onClick={() => toggleIn('pinned', item.id)}
-                            className={`rounded-lg p-1.5 transition-colors ${isPinned ? 'text-[#C8A288]' : c.icon}`}
+                            className={`rounded-lg p-1.5 transition-colors ${isPinned ? 'text-[#1E5C42]' : c.icon}`}
                             title={isPinned ? 'Unpin' : 'Pin to top'}
                             aria-label={isPinned ? `Unpin ${item.label}` : `Pin ${item.label}`}
                         >
@@ -178,7 +178,7 @@ const SidebarNav = ({ activeTab, onSelect, collapsed, isDark, aiLabel }) => {
                                     <RotateCcw className="h-3.5 w-3.5" /> Reset
                                 </button>
                                 <button onClick={() => setEditing(false)}
-                                    className="ml-auto flex items-center gap-1.5 rounded-lg bg-[#C8A288] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#B08B72]">
+                                    className="ml-auto flex items-center gap-1.5 rounded-lg bg-[#1E5C42] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#163628]">
                                     <Check className="h-3.5 w-3.5" /> Done
                                 </button>
                             </div>

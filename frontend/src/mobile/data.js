@@ -27,7 +27,7 @@ export const useBooks = () => {
 
 // A warm, stable colour per book so covers are recognisable at a glance
 const COVERS = [
-    ['#C8A288', '#8f6a52'], ['#e07a5f', '#a3452f'], ['#7c6fd6', '#4b3fa3'], ['#2f9e7a', '#1c6b52'],
+    ['#1E5C42', '#8f6a52'], ['#e07a5f', '#a3452f'], ['#7c6fd6', '#4b3fa3'], ['#2f9e7a', '#1c6b52'],
     ['#3b8fd6', '#245f96'], ['#e46a91', '#a83a60'], ['#d9a441', '#9c7117'], ['#5c7c8a', '#36505c'],
 ];
 export const coverFor = (id = '') => {

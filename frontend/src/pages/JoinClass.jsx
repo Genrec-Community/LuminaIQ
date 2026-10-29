@@ -28,22 +28,22 @@ const JoinClass = () => {
     return (
         <div className="min-h-[100dvh] bg-[#FDF6F0] flex items-center justify-center p-6">
             <div className="max-w-md w-full rounded-3xl border border-[#E6D5CC] bg-white p-8 text-center">
-                {state.status === 'joining' && <><Loader2 className="mx-auto h-10 w-10 animate-spin text-[#C8A288]" /><p className="mt-3 text-[#8a6a5c]">Joining your class…</p></>}
+                {state.status === 'joining' && <><Loader2 className="mx-auto h-10 w-10 animate-spin text-[#1E5C42]" /><p className="mt-3 text-[#5E5046]">Joining your class…</p></>}
                 {state.status === 'joined' && (
                     <>
-                        <GraduationCap className="mx-auto h-12 w-12 text-[#C8A288]" />
-                        <h1 className="mt-3 text-2xl font-bold text-[#4A3B32]">You're in!</h1>
-                        <p className="mt-1 text-[#8a6a5c]">{state.class ? `${state.class} · ${state.institution}` : `Teacher at ${state.institution}`}</p>
+                        <GraduationCap className="mx-auto h-12 w-12 text-[#1E5C42]" />
+                        <h1 className="mt-3 text-2xl font-bold text-[#163628]">You're in!</h1>
+                        <p className="mt-1 text-[#5E5046]">{state.class ? `${state.class} · ${state.institution}` : `Teacher at ${state.institution}`}</p>
                         {!state.project_id && (
-                            <button onClick={() => navigate('/institution')} className="mt-6 w-full rounded-2xl bg-[#C8A288] px-4 py-3 font-semibold text-white">Open institution</button>
+                            <button onClick={() => navigate('/institution')} className="mt-6 w-full rounded-2xl bg-[#1E5C42] px-4 py-3 font-semibold text-white">Open institution</button>
                         )}
                     </>
                 )}
                 {state.status === 'error' && (
                     <>
                         <AlertTriangle className="mx-auto h-10 w-10 text-amber-500" />
-                        <p className="mt-3 text-[#4A3B32]">{state.message}</p>
-                        <button onClick={() => navigate('/dashboard')} className="mt-6 w-full rounded-2xl border-2 border-[#E6D5CC] px-4 py-3 font-semibold text-[#4A3B32]">Go to dashboard</button>
+                        <p className="mt-3 text-[#163628]">{state.message}</p>
+                        <button onClick={() => navigate('/dashboard')} className="mt-6 w-full rounded-2xl border-2 border-[#E6D5CC] px-4 py-3 font-semibold text-[#163628]">Go to dashboard</button>
                     </>
                 )}
             </div>

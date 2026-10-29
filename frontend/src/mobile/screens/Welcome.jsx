@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Check, X, FileUp, Sparkles, Flame } from 'lucide-react';
 import { tap, notify } from '../device';
-import logo from '../logo.png';
+import { Mark } from '../../components/brand/Logo';
+import Circled from '../../components/site/Circled';
 
 export const WELCOMED_KEY = 'lumina_app_welcomed';
 
@@ -26,17 +27,16 @@ const DEMO = {
 
 const Brand = () => (
     <div className="flex flex-1 flex-col items-center justify-center text-center">
-        <motion.img
-            src={logo}
-            alt=""
-            className="h-28 w-28"
-            initial={{ scale: 0.85, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
+        <motion.div
+            initial={{ scale: 0.85, opacity: 0, rotate: -8 }}
+            animate={{ scale: 1, opacity: 1, rotate: 0 }}
             transition={{ type: 'spring', damping: 14, stiffness: 140 }}
-        />
-        <motion.h1 className="mt-8 text-[34px] font-extrabold leading-[1.08] tracking-tight"
+        >
+            <Mark className="h-20 w-20" />
+        </motion.div>
+        <motion.h1 className="display mt-8 text-[44px]"
             initial={{ y: 14, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.15 }}>
-            Your books,<br />turned into a<br /><span style={{ color: 'var(--m-accent-text)' }}>daily habit.</span>
+            Your books,<br />turned into a<br />daily <Circled delay={0.6}><em>habit</em></Circled>.
         </motion.h1>
         <motion.p className="mt-4 max-w-xs text-[16px] leading-relaxed" style={{ color: 'var(--m-muted)' }}
             initial={{ y: 14, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.25 }}>
@@ -51,7 +51,7 @@ const Demo = ({ picked, onPick }) => {
         <div className="flex flex-1 flex-col justify-center">
             <p className="text-[13px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--m-accent-text)' }}>Try one</p>
             <div className="mt-3 overflow-hidden rounded-[26px] p-5 text-white shadow-xl"
-                style={{ background: 'radial-gradient(120% 80% at 90% 0%, #8f6a52cc 0%, transparent 60%), #1d140e' }}>
+                style={{ background: 'radial-gradient(120% 80% at 90% 0%, rgb(211 238 106 / 0.18) 0%, transparent 60%), #163628' }}>
                 <p className="text-[18px] font-bold leading-snug">{DEMO.q}</p>
                 <div className="mt-4 space-y-2.5">
                     {DEMO.options.map((o) => {
@@ -66,8 +66,9 @@ const Demo = ({ picked, onPick }) => {
                                 animate={showWrong ? { x: [0, -7, 7, -4, 4, 0] } : {}}
                                 className="m-pressable flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left text-[15px] font-semibold"
                                 style={{
-                                    background: showRight ? 'rgba(34,197,94,0.9)' : showWrong ? 'rgba(239,68,68,0.85)' : 'rgba(255,255,255,0.12)',
-                                    border: `1px solid ${showRight ? '#4ade80' : showWrong ? '#f87171' : 'rgba(255,255,255,0.16)'}`,
+                                    background: showRight ? '#D3EE6A' : showWrong ? 'rgba(239,68,68,0.85)' : 'rgba(255,255,255,0.12)',
+                                    color: showRight ? '#0f271c' : undefined,
+                                    border: `1px solid ${showRight ? '#e0f590' : showWrong ? '#f87171' : 'rgba(255,255,255,0.16)'}`,
                                     opacity: done && !showRight && !isPicked ? 0.5 : 1,
                                 }}
                             >

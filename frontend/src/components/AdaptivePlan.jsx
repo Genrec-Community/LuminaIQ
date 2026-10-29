@@ -4,6 +4,7 @@ import {
     Sparkles, Clock, ArrowRight, Brain, RotateCcw, Lock, Layers, ChevronDown, Info, Loader2, GitBranch, Scale, Activity,
 } from 'lucide-react';
 import { getLearningPlan, getLearningMetrics } from '../api';
+import MemoryCurve from './MemoryCurve';
 
 /*
  * The learning engine's plan: what to learn next and why, what follows, the
@@ -14,14 +15,14 @@ import { getLearningPlan, getLearningMetrics } from '../api';
 
 const LAYERS = {
     foundation: { label: 'Foundation', hint: 'Ideas that unlock other ideas', color: '#B07A52' },
-    expansion: { label: 'Expansion', hint: 'Breadth and connections', color: '#C8A288' },
+    expansion: { label: 'Expansion', hint: 'Breadth and connections', color: 'var(--lumina-accent)' },
     completeness: { label: 'Completeness', hint: 'Details and edge cases', color: '#A99383' },
     retention: { label: 'Retention', hint: 'Keep it from fading', color: '#5E8C6A' },
 };
 
 const STATUS = {
     strong: { label: 'Strong', color: '#4f8a5b' },
-    developing: { label: 'Developing', color: '#C8A288' },
+    developing: { label: 'Developing', color: 'var(--lumina-accent)' },
     weak: { label: 'Weak', color: '#c2674b' },
     untested: { label: 'Untested', color: '#b9aca2' },
 };
@@ -30,7 +31,7 @@ const pct = (x) => `${Math.round((x || 0) * 100)}%`;
 
 const MasteryBar = ({ value, status }) => (
     <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#F1E6DD]">
-        <div className="h-full rounded-full transition-all" style={{ width: `${Math.max(3, Math.round((value || 0) * 100))}%`, background: STATUS[status]?.color || '#C8A288' }} />
+        <div className="h-full rounded-full transition-all" style={{ width: `${Math.max(3, Math.round((value || 0) * 100))}%`, background: STATUS[status]?.color || '#1E5C42' }} />
     </div>
 );
 
@@ -39,17 +40,17 @@ const Ring = ({ value, size = 56 }) => {
     const c = 2 * Math.PI * r;
     return (
         <svg width={size} height={size} className="shrink-0 -rotate-90">
-            <circle cx={size / 2} cy={size / 2} r={r} stroke="#F1E6DD" strokeWidth="6" fill="none" />
-            <circle cx={size / 2} cy={size / 2} r={r} stroke="#C8A288" strokeWidth="6" fill="none" strokeLinecap="round"
+            <circle cx={size / 2} cy={size / 2} r={r} stroke="currentColor" strokeOpacity="0.12" strokeWidth="6" fill="none" />
+            <circle cx={size / 2} cy={size / 2} r={r} stroke="var(--lumina-accent)" strokeWidth="6" fill="none" strokeLinecap="round"
                 strokeDasharray={c} strokeDashoffset={c * (1 - (value || 0))} />
-            <text x="50%" y="50%" dominantBaseline="central" textAnchor="middle" className="rotate-90 fill-[#4A3B32] text-[13px] font-bold"
+            <text x="50%" y="50%" dominantBaseline="central" textAnchor="middle" className="rotate-90 text-[13px] font-bold" fill="var(--lumina-ring-text, #163628)"
                 style={{ transformOrigin: 'center' }}>{pct(value)}</text>
         </svg>
     );
 };
 
 const AdaptivePlan = ({ projectId, selectedDocuments, onLearn, onPractise, colors = {} }) => {
-    const { card = '#ffffff', cardBorder = '#E6D5CC', bodyText = '#4A3B32', mutedText = '#8a6a5c' } = colors;
+    const { card = '#ffffff', cardBorder = '#E6D5CC', bodyText = '#163628', mutedText = '#5E5046' } = colors;
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -96,7 +97,7 @@ const AdaptivePlan = ({ projectId, selectedDocuments, onLearn, onPractise, color
     if (loading) {
         return (
             <div className="mb-6 flex items-center gap-3 rounded-2xl border p-5" style={{ background: card, borderColor: cardBorder, color: mutedText }}>
-                <Loader2 className="h-5 w-5 animate-spin text-[#C8A288]" /> Working out the best next step for you…
+                <Loader2 className="h-5 w-5 animate-spin text-[#1E5C42]" /> Working out the best next step for you…
             </div>
         );
     }
@@ -118,7 +119,7 @@ const AdaptivePlan = ({ projectId, selectedDocuments, onLearn, onPractise, color
             {/* Up next */}
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                 className="rounded-3xl border p-5 md:p-6 shadow-sm" style={{ background: card, borderColor: cardBorder }}>
-                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[#C8A288]">
+                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[#1E5C42]">
                     <Sparkles className="h-4 w-4" /> {next.kind === 'review' ? 'Review next' : 'Learn next'}
                 </div>
                 <div className="mt-3 flex items-start gap-4">
@@ -135,30 +136,44 @@ const AdaptivePlan = ({ projectId, selectedDocuments, onLearn, onPractise, color
                 <ul className="mt-4 space-y-1.5">
                     {next.why.map((w) => (
                         <li key={w} className="flex gap-2 text-sm leading-relaxed" style={{ color: bodyText }}>
-                            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#C8A288]" />{w}
+                            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#1E5C42]" />{w}
                         </li>
                     ))}
                 </ul>
                 <div className="mt-5 flex flex-col gap-2 sm:flex-row">
                     {next.kind === 'review' ? (
                         <button onClick={() => onPractise?.(next.topic)}
-                            className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[#C8A288] px-4 py-3 font-semibold text-white hover:bg-[#B08B72]">
+                            className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[#1E5C42] px-4 py-3 font-semibold text-white hover:bg-[#163628]">
                             <RotateCcw className="h-4 w-4" /> Review it now
                         </button>
                     ) : (
                         <>
                             <button onClick={() => onLearn?.(next.topic)}
-                                className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[#C8A288] px-4 py-3 font-semibold text-white hover:bg-[#B08B72]">
+                                className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[#1E5C42] px-4 py-3 font-semibold text-white hover:bg-[#163628]">
                                 <Brain className="h-4 w-4" /> Learn it
                             </button>
                             <button onClick={() => onPractise?.(next.topic)}
-                                className="flex flex-1 items-center justify-center gap-2 rounded-2xl border-2 border-[#C8A288] px-4 py-3 font-semibold hover:bg-[#FDF6F0]" style={{ color: bodyText }}>
+                                className="flex flex-1 items-center justify-center gap-2 rounded-2xl border-2 border-[#1E5C42] px-4 py-3 font-semibold hover:bg-[#FDF6F0]" style={{ color: bodyText }}>
                                 I know it — test me <ArrowRight className="h-4 w-4" />
                             </button>
                         </>
                     )}
                 </div>
             </motion.div>
+
+            {/* The memory curve: what reviews protect, from this student's own answers */}
+            <MemoryCurve
+                profile={data.profile}
+                compact
+                action={(() => {
+                    const due = (data.profile || []).find((r) => r.due);
+                    return due ? (
+                        <button type="button" className="lumina-curve__cta" onClick={() => onPractise?.(due.topic)}>
+                            Review “{due.topic}” before it fades · 3 min <ArrowRight className="h-4 w-4" />
+                        </button>
+                    ) : null;
+                })()}
+            />
 
             {/* Then */}
             {then.length > 0 && (
@@ -217,7 +232,7 @@ const AdaptivePlan = ({ projectId, selectedDocuments, onLearn, onPractise, color
                     </div>
                 </div>
 
-                <button onClick={() => setShowAll((v) => !v)} className="mt-4 flex items-center gap-1 text-sm font-semibold text-[#B08B72] hover:underline">
+                <button onClick={() => setShowAll((v) => !v)} className="mt-4 flex items-center gap-1 text-sm font-semibold text-[#163628] hover:underline">
                     {showAll ? 'Hide topics' : 'See every topic'} <ChevronDown className={`h-4 w-4 transition-transform ${showAll ? 'rotate-180' : ''}`} />
                 </button>
                 {showAll && (
@@ -259,7 +274,7 @@ const AdaptivePlan = ({ projectId, selectedDocuments, onLearn, onPractise, color
                 {showMetrics && (
                     <div className="px-5 pb-5">
                         {!metrics ? (
-                            <div className="flex items-center gap-2 text-sm" style={{ color: mutedText }}><Loader2 className="h-4 w-4 animate-spin text-[#C8A288]" /> Measuring…</div>
+                            <div className="flex items-center gap-2 text-sm" style={{ color: mutedText }}><Loader2 className="h-4 w-4 animate-spin text-[#1E5C42]" /> Measuring…</div>
                         ) : metrics.error ? (
                             <p className="text-sm" style={{ color: mutedText }}>Couldn't load your metrics right now.</p>
                         ) : !metrics.events ? (
@@ -290,7 +305,7 @@ const AdaptivePlan = ({ projectId, selectedDocuments, onLearn, onPractise, color
                                                 const top = Math.max(...metrics.daily.map((d) => d.answers), 1);
                                                 return metrics.daily.map((d) => (
                                                     <div key={d.day} title={`${d.day}: ${d.correct}/${d.answers} correct`} className="flex-1 rounded-t"
-                                                        style={{ height: `${Math.max(6, (d.answers / top) * 100)}%`, background: `color-mix(in srgb, #C8A288 ${30 + 70 * (d.correct / Math.max(d.answers, 1))}%, #F1E6DD)` }} />
+                                                        style={{ height: `${Math.max(6, (d.answers / top) * 100)}%`, background: `color-mix(in srgb, #1E5C42 ${30 + 70 * (d.correct / Math.max(d.answers, 1))}%, #F1E6DD)` }} />
                                                 ));
                                             })()}
                                         </div>
@@ -310,10 +325,10 @@ const AdaptivePlan = ({ projectId, selectedDocuments, onLearn, onPractise, color
                 <div className="rounded-2xl border p-4 text-sm leading-relaxed" style={{ background: card, borderColor: cardBorder, color: bodyText }}>
                     <p className="mb-2">Each topic is scored on what it's worth to you right now, divided by the minutes it takes:</p>
                     <ul className="space-y-1">
-                        <li className="flex gap-2"><GitBranch className="mt-0.5 h-4 w-4 shrink-0 text-[#C8A288]" /> <span><b>Leverage</b>: how much else it unlocks, and how it helps related topics.</span></li>
-                        <li className="flex gap-2"><Scale className="mt-0.5 h-4 w-4 shrink-0 text-[#C8A288]" /> <span><b>Importance</b>: how much of your material it covers.</span></li>
-                        <li className="flex gap-2"><Brain className="mt-0.5 h-4 w-4 shrink-0 text-[#C8A288]" /> <span><b>Your gap</b>: how far your answers say you are from mastering it.</span></li>
-                        <li className="flex gap-2"><RotateCcw className="mt-0.5 h-4 w-4 shrink-0 text-[#C8A288]" /> <span><b>Fading</b>: topics you knew come back before you forget them.</span></li>
+                        <li className="flex gap-2"><GitBranch className="mt-0.5 h-4 w-4 shrink-0 text-[#1E5C42]" /> <span><b>Leverage</b>: how much else it unlocks, and how it helps related topics.</span></li>
+                        <li className="flex gap-2"><Scale className="mt-0.5 h-4 w-4 shrink-0 text-[#1E5C42]" /> <span><b>Importance</b>: how much of your material it covers.</span></li>
+                        <li className="flex gap-2"><Brain className="mt-0.5 h-4 w-4 shrink-0 text-[#1E5C42]" /> <span><b>Your gap</b>: how far your answers say you are from mastering it.</span></li>
+                        <li className="flex gap-2"><RotateCcw className="mt-0.5 h-4 w-4 shrink-0 text-[#1E5C42]" /> <span><b>Fading</b>: topics you knew come back before you forget them.</span></li>
                     </ul>
                     <p className="mt-2" style={{ color: mutedText }}>A topic only comes up once the topics it depends on are solid. Every answer you give updates your estimates, so the plan keeps adjusting.</p>
                 </div>

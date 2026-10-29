@@ -261,7 +261,7 @@ export const AuthProvider = ({ children }) => {
             {loading ? (
                 // Not a blank screen while the saved sign-in is checked
                 <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FDF6F0' }}>
-                    <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-[#E6D5CC] border-t-[#C8A288]" />
+                    <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-[#E6D5CC] border-t-[#1E5C42]" />
                 </div>
             ) : children}
         </AuthContext.Provider >

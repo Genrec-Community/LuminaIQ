@@ -88,14 +88,14 @@ const LazyPage = ({ pageNumber, width, estHeight, active, target, highlight, onV
 
     return (
         <div ref={ref} data-page={pageNumber}
-            className={`relative mx-auto bg-white shadow-md rounded ${active ? 'ring-2 ring-[#C8A288]/40' : ''}`}
+            className={`relative mx-auto bg-white shadow-md rounded ${active ? 'ring-2 ring-[#1E5C42]/40' : ''}`}
             style={{ width, minHeight: near ? undefined : estHeight }}>
             {near && (
                 <Page pageNumber={pageNumber} width={width} renderAnnotationLayer={false} renderTextLayer
                     customTextRenderer={highlight ? renderer : undefined}
-                    loading={<div style={{ height: estHeight }} className="flex items-center justify-center text-[#8a6a5c] text-sm">Page {pageNumber}…</div>} />
+                    loading={<div style={{ height: estHeight }} className="flex items-center justify-center text-[#5E5046] text-sm">Page {pageNumber}…</div>} />
             )}
-            <span className="absolute -left-1 top-2 -translate-x-full pr-2 text-[10px] tabular-nums text-[#8a6a5c] hidden md:block">{pageNumber}</span>
+            <span className="absolute -left-1 top-2 -translate-x-full pr-2 text-[10px] tabular-nums text-[#5E5046] hidden md:block">{pageNumber}</span>
         </div>
     );
 };
@@ -190,7 +190,7 @@ const PdfView = ({ url, passage, onLocated, jumpSignal }) => {
 
     return (
         <div className="flex-1 min-h-0 flex flex-col">
-            <div className="flex items-center justify-between gap-2 px-3 py-2 bg-white border-b border-[#E6D5CC] text-[#4A3B32]">
+            <div className="flex items-center justify-between gap-2 px-3 py-2 bg-white border-b border-[#E6D5CC] text-[#163628]">
                 <div className="flex items-center gap-1">
                     <button onClick={() => scrollToPage(Math.max(1, current - 1))} disabled={current <= 1}
                         className="p-1.5 rounded-lg hover:bg-[#FDF6F0] disabled:opacity-40" aria-label="Previous page"><ChevronLeft className="h-4 w-4" /></button>
@@ -198,7 +198,7 @@ const PdfView = ({ url, passage, onLocated, jumpSignal }) => {
                     <button onClick={() => scrollToPage(Math.min(numPages, current + 1))} disabled={current >= numPages}
                         className="p-1.5 rounded-lg hover:bg-[#FDF6F0] disabled:opacity-40" aria-label="Next page"><ChevronRight className="h-4 w-4" /></button>
                 </div>
-                {searching && <span className="flex items-center gap-1.5 text-xs text-[#8a6a5c]"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Finding the passage…</span>}
+                {searching && <span className="flex items-center gap-1.5 text-xs text-[#5E5046]"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Finding the passage…</span>}
                 <div className="flex items-center gap-1">
                     <button onClick={() => setZoom((z) => Math.max(0.5, +(z - 0.15).toFixed(2)))} className="p-1.5 rounded-lg hover:bg-[#FDF6F0]" aria-label="Zoom out"><ZoomOut className="h-4 w-4" /></button>
                     <span className="text-xs font-semibold w-10 text-center tabular-nums">{Math.round(zoom * 100)}%</span>
@@ -209,12 +209,12 @@ const PdfView = ({ url, passage, onLocated, jumpSignal }) => {
                 {error ? (
                     <div className="flex flex-col items-center justify-center p-8 text-center max-w-sm mx-auto">
                         <AlertCircle className="h-10 w-10 text-red-400 mb-2" />
-                        <p className="text-sm text-[#4A3B32]">{error}</p>
+                        <p className="text-sm text-[#163628]">{error}</p>
                     </div>
                 ) : (
                     <Document file={url} onLoadSuccess={onLoad}
                         onLoadError={() => setError("This PDF couldn't be opened. It may have been removed.")}
-                        loading={<div className="flex items-center justify-center gap-2 py-24 text-[#8a6a5c]"><Loader2 className="h-5 w-5 animate-spin" /> Opening the book…</div>}
+                        loading={<div className="flex items-center justify-center gap-2 py-24 text-[#5E5046]"><Loader2 className="h-5 w-5 animate-spin" /> Opening the book…</div>}
                         className="flex flex-col gap-4">
                         {Array.from({ length: numPages }, (_, i) => i + 1).map((n) => (
                             <LazyPage key={n} pageNumber={n} width={width} estHeight={Math.round(width * aspect)}
@@ -260,7 +260,7 @@ const TextView = ({ text, passage, onLocated, jumpSignal }) => {
 
     return (
         <div className="flex-1 overflow-auto bg-[#EFE6DF] p-4">
-            <article className="mx-auto max-w-3xl rounded bg-white p-6 md:p-10 shadow-md text-[15px] leading-7 text-[#2f2620] whitespace-pre-wrap break-words">
+            <article className="mx-auto max-w-3xl rounded bg-white p-6 md:p-10 shadow-md text-[15px] leading-7 text-[#213028] whitespace-pre-wrap break-words">
                 {parts.before}
                 {parts.hit && <mark ref={markRef} className="lumina-cite">{parts.hit}</mark>}
                 {parts.after}
@@ -309,17 +309,17 @@ const DocumentReader = ({ projectId, documentId, title, passage, onClose }) => {
     const cleanPassage = passage ? passage.replace(/\.\.\.$/, '').trim() : '';
 
     return (
-        <div className="fixed inset-0 z-[100] bg-[#4A3B32]/40 backdrop-blur-sm flex items-stretch md:items-center justify-center md:p-6"
+        <div className="fixed inset-0 z-[100] bg-[#163628]/40 backdrop-blur-sm flex items-stretch md:items-center justify-center md:p-6"
             role="dialog" aria-modal="true" aria-label={title}>
             <div className="flex flex-col bg-[#FDF6F0] w-full md:max-w-5xl h-full md:h-[92vh] md:rounded-3xl md:border border-[#E6D5CC] overflow-hidden shadow-2xl">
                 <div className="flex items-center gap-2 px-4 py-3 bg-white border-b border-[#E6D5CC]">
-                    <FileText className="h-4 w-4 text-[#C8A288] shrink-0" />
-                    <h3 className="flex-1 text-sm font-bold text-[#4A3B32] truncate" title={title}>{title}</h3>
-                    <button onClick={onClose} className="p-1.5 rounded-lg text-[#8a6a5c] hover:text-red-500 hover:bg-red-50" aria-label="Close reader"><X className="h-5 w-5" /></button>
+                    <FileText className="h-4 w-4 text-[#1E5C42] shrink-0" />
+                    <h3 className="flex-1 text-sm font-bold text-[#163628] truncate" title={title}>{title}</h3>
+                    <button onClick={onClose} className="p-1.5 rounded-lg text-[#5E5046] hover:text-red-500 hover:bg-red-50" aria-label="Close reader"><X className="h-5 w-5" /></button>
                 </div>
 
                 {cleanPassage && (
-                    <div className="px-4 py-3 bg-amber-50 border-b border-amber-200 text-[#4A3B32]">
+                    <div className="px-4 py-3 bg-amber-50 border-b border-amber-200 text-[#163628]">
                         <div className="flex items-center gap-2">
                             <Quote className="h-4 w-4 text-amber-600 shrink-0" />
                             <span className="text-xs font-bold uppercase tracking-wide text-amber-800">Cited passage</span>
@@ -344,10 +344,10 @@ const DocumentReader = ({ projectId, documentId, title, passage, onClose }) => {
                 {error ? (
                     <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
                         <AlertCircle className="h-10 w-10 text-red-400 mb-2" />
-                        <p className="text-sm text-[#4A3B32]">{error}</p>
+                        <p className="text-sm text-[#163628]">{error}</p>
                     </div>
                 ) : !source ? (
-                    <div className="flex-1 flex items-center justify-center gap-2 text-[#8a6a5c]"><Loader2 className="h-5 w-5 animate-spin" /> Opening…</div>
+                    <div className="flex-1 flex items-center justify-center gap-2 text-[#5E5046]"><Loader2 className="h-5 w-5 animate-spin" /> Opening…</div>
                 ) : source.kind === 'pdf' ? (
                     <PdfView url={source.url} passage={cleanPassage} onLocated={onLocated} jumpSignal={jump} />
                 ) : (

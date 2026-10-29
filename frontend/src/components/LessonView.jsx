@@ -27,15 +27,15 @@ const Card = ({ children, className = '' }) => (
 );
 
 const Label = ({ children }) => (
-    <div className="mb-1.5 text-xs font-bold uppercase tracking-wide text-[#C8A288]">{children}</div>
+    <div className="mb-1.5 text-xs font-bold uppercase tracking-wide text-[#1E5C42]">{children}</div>
 );
 
 const Primary = ({ children, ...props }) => (
-    <button {...props} className={`inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#C8A288] px-5 py-3 font-semibold text-white hover:bg-[#B08B72] disabled:opacity-50 sm:w-auto ${props.className || ''}`}>{children}</button>
+    <button {...props} className={`inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#1E5C42] px-5 py-3 font-semibold text-white hover:bg-[#163628] disabled:opacity-50 sm:w-auto ${props.className || ''}`}>{children}</button>
 );
 
 const Secondary = ({ children, ...props }) => (
-    <button {...props} className={`inline-flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-[#E6D5CC] px-5 py-3 font-semibold text-[#4A3B32] hover:border-[#C8A288] hover:bg-[#FDF6F0] sm:w-auto ${props.className || ''}`}>{children}</button>
+    <button {...props} className={`inline-flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-[#E6D5CC] px-5 py-3 font-semibold text-[#163628] hover:border-[#1E5C42] hover:bg-[#FDF6F0] sm:w-auto ${props.className || ''}`}>{children}</button>
 );
 
 /** One multiple-choice question; reports right/wrong once. */
@@ -49,25 +49,25 @@ const Question = ({ item, index, total, onAnswered, badge }) => {
     };
     return (
         <Card>
-            <div className="mb-2 flex items-center justify-between text-xs text-[#8a6a5c]">
+            <div className="mb-2 flex items-center justify-between text-xs text-[#5E5046]">
                 <span>{badge || `Question ${index + 1} of ${total}`}</span>
                 {item.difficulty === 'hard' && <span className="rounded-full bg-[#FDF6F0] px-2 py-0.5 font-semibold">harder</span>}
             </div>
-            <p className="font-semibold leading-relaxed text-[#4A3B32]">{item.q}</p>
+            <p className="font-semibold leading-relaxed text-[#163628]">{item.q}</p>
             <div className="mt-3 space-y-2">
                 {item.options.map((o, i) => {
                     const right = answered && i === item.answer_index;
                     const wrong = answered && i === picked && i !== item.answer_index;
                     return (
                         <button key={i} onClick={() => choose(i)} disabled={answered}
-                            className={`flex w-full items-start gap-2 rounded-xl border-2 px-3 py-2.5 text-left text-sm transition-colors ${right ? 'border-emerald-400 bg-emerald-50' : wrong ? 'border-rose-300 bg-rose-50' : 'border-[#E6D5CC] hover:border-[#C8A288]'}`}>
+                            className={`flex w-full items-start gap-2 rounded-xl border-2 px-3 py-2.5 text-left text-sm transition-colors ${right ? 'border-emerald-400 bg-emerald-50' : wrong ? 'border-rose-300 bg-rose-50' : 'border-[#E6D5CC] hover:border-[#1E5C42]'}`}>
                             {right ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /> : wrong ? <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-500" /> : <span className="mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 border-[#E6D5CC]" />}
-                            <span className="text-[#4A3B32]">{o}</span>
+                            <span className="text-[#163628]">{o}</span>
                         </button>
                     );
                 })}
             </div>
-            {answered && item.why && <p className="mt-3 rounded-xl bg-[#FDF6F0] p-3 text-sm text-[#4A3B32]">{item.why}</p>}
+            {answered && item.why && <p className="mt-3 rounded-xl bg-[#FDF6F0] p-3 text-sm text-[#163628]">{item.why}</p>}
         </Card>
     );
 };
@@ -155,10 +155,10 @@ const LessonView = ({ projectId, topic, selectedDocuments = [], onClose, onNextT
             <div className="border-b border-[#E6D5CC] bg-white/80 px-4 py-3 backdrop-blur">
                 <div className="mx-auto flex max-w-2xl items-center gap-3">
                     <div className="min-w-0 flex-1">
-                        <div className="text-xs font-semibold text-[#8a6a5c]">Lesson</div>
-                        <div className="truncate font-bold text-[#4A3B32]">{topic}</div>
+                        <div className="text-xs font-semibold text-[#5E5046]">Lesson</div>
+                        <div className="truncate font-bold text-[#163628]">{topic}</div>
                     </div>
-                    <button onClick={onClose} aria-label="Close lesson" className="rounded-xl p-2 text-[#8a6a5c] hover:bg-[#FDF6F0]"><X className="h-5 w-5" /></button>
+                    <button onClick={onClose} aria-label="Close lesson" className="rounded-xl p-2 text-[#5E5046] hover:bg-[#FDF6F0]"><X className="h-5 w-5" /></button>
                 </div>
                 <div className="mx-auto mt-3 flex max-w-2xl items-center gap-1.5">
                     {STEPS.map((s, i) => {
@@ -167,10 +167,10 @@ const LessonView = ({ projectId, topic, selectedDocuments = [], onClose, onNextT
                         const current = i === stepIndex;
                         return (
                             <div key={s.id} className="flex flex-1 flex-col items-center gap-1">
-                                <div className={`flex h-7 w-7 items-center justify-center rounded-full ${current ? 'bg-[#C8A288] text-white' : done ? 'bg-[#E6D5CC] text-[#8a6a5c]' : 'bg-white text-[#cbb8ab] border border-[#E6D5CC]'}`}>
+                                <div className={`flex h-7 w-7 items-center justify-center rounded-full ${current ? 'bg-[#1E5C42] text-white' : done ? 'bg-[#E6D5CC] text-[#5E5046]' : 'bg-white text-[#cbb8ab] border border-[#E6D5CC]'}`}>
                                     <Icon className="h-3.5 w-3.5" />
                                 </div>
-                                <span className={`hidden text-[10px] sm:block ${current ? 'font-bold text-[#4A3B32]' : 'text-[#8a6a5c]'}`}>{s.label}</span>
+                                <span className={`hidden text-[10px] sm:block ${current ? 'font-bold text-[#163628]' : 'text-[#5E5046]'}`}>{s.label}</span>
                             </div>
                         );
                     })}
@@ -181,15 +181,15 @@ const LessonView = ({ projectId, topic, selectedDocuments = [], onClose, onNextT
                 <div className="mx-auto max-w-2xl p-4 md:p-6">
                     {error ? (
                         <Card className="text-center">
-                            <p className="text-[#4A3B32]">{error}</p>
+                            <p className="text-[#163628]">{error}</p>
                             <div className="mt-3 flex justify-center gap-2">
                                 <Primary onClick={() => load(true)}>Try again</Primary>
                                 <Secondary onClick={onClose}>Close</Secondary>
                             </div>
                         </Card>
                     ) : !lesson ? (
-                        <div className="flex items-center justify-center gap-3 py-20 text-[#8a6a5c]">
-                            <Loader2 className="h-5 w-5 animate-spin text-[#C8A288]" /> Preparing your lesson…
+                        <div className="flex items-center justify-center gap-3 py-20 text-[#5E5046]">
+                            <Loader2 className="h-5 w-5 animate-spin text-[#1E5C42]" /> Preparing your lesson…
                         </div>
                     ) : (
                         <AnimatePresence mode="wait">
@@ -197,8 +197,8 @@ const LessonView = ({ projectId, topic, selectedDocuments = [], onClose, onNextT
                                 {step === 'diagnose' && (
                                     <>
                                         <div>
-                                            <h2 className="text-xl font-bold text-[#4A3B32]">First, what do you already know?</h2>
-                                            <p className="mt-1 text-sm text-[#8a6a5c]">Two quick questions. If you nail them, we skip ahead.</p>
+                                            <h2 className="text-xl font-bold text-[#163628]">First, what do you already know?</h2>
+                                            <p className="mt-1 text-sm text-[#5E5046]">Two quick questions. If you nail them, we skip ahead.</p>
                                         </div>
                                         {diagRight === null ? (
                                             <QuestionRun items={lesson.diagnose} onAnswer={(item, ok) => evidence(item, ok)}
@@ -207,8 +207,8 @@ const LessonView = ({ projectId, topic, selectedDocuments = [], onClose, onNextT
                                             <Card>
                                                 {diagRight === lesson.diagnose.length ? (
                                                     <>
-                                                        <p className="font-semibold text-[#4A3B32]">You already have the basics.</p>
-                                                        <p className="mt-1 text-sm text-[#8a6a5c]">Skip to applying it, or walk through it anyway.</p>
+                                                        <p className="font-semibold text-[#163628]">You already have the basics.</p>
+                                                        <p className="mt-1 text-sm text-[#5E5046]">Skip to applying it, or walk through it anyway.</p>
                                                         <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                                                             <Primary onClick={() => setStep('apply')}>Skip to applying <ArrowRight className="h-4 w-4" /></Primary>
                                                             <Secondary onClick={() => setStep('model')}>Walk me through it</Secondary>
@@ -216,8 +216,8 @@ const LessonView = ({ projectId, topic, selectedDocuments = [], onClose, onNextT
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <p className="font-semibold text-[#4A3B32]">{diagRight ? 'A good start.' : 'No problem — that is what this lesson is for.'}</p>
-                                                        <p className="mt-1 text-sm text-[#8a6a5c]">Let's build the idea properly.</p>
+                                                        <p className="font-semibold text-[#163628]">{diagRight ? 'A good start.' : 'No problem — that is what this lesson is for.'}</p>
+                                                        <p className="mt-1 text-sm text-[#5E5046]">Let's build the idea properly.</p>
                                                         <Primary className="mt-3" onClick={() => setStep('model')}>Start <ArrowRight className="h-4 w-4" /></Primary>
                                                     </>
                                                 )}
@@ -228,10 +228,10 @@ const LessonView = ({ projectId, topic, selectedDocuments = [], onClose, onNextT
 
                                 {step === 'model' && (
                                     <>
-                                        <h2 className="text-xl font-bold text-[#4A3B32]">The idea</h2>
-                                        <Card><Label>In a nutshell</Label><p className="leading-relaxed text-[#4A3B32]">{lesson.model.core}</p></Card>
-                                        {lesson.model.why && <Card><Label>Why it exists</Label><p className="leading-relaxed text-[#4A3B32]">{lesson.model.why}</p></Card>}
-                                        {lesson.model.connects && <Card><Label>How it connects</Label><p className="leading-relaxed text-[#4A3B32]">{lesson.model.connects}</p></Card>}
+                                        <h2 className="text-xl font-bold text-[#163628]">The idea</h2>
+                                        <Card><Label>In a nutshell</Label><p className="leading-relaxed text-[#163628]">{lesson.model.core}</p></Card>
+                                        {lesson.model.why && <Card><Label>Why it exists</Label><p className="leading-relaxed text-[#163628]">{lesson.model.why}</p></Card>}
+                                        {lesson.model.connects && <Card><Label>How it connects</Label><p className="leading-relaxed text-[#163628]">{lesson.model.connects}</p></Card>}
                                         {lesson.model.example && (
                                             <Card className="border-amber-200 bg-amber-50">
                                                 <div className="mb-1.5 flex items-center gap-1 text-xs font-bold uppercase tracking-wide text-amber-800"><Sparkles className="h-3.5 w-3.5" /> For example</div>
@@ -244,31 +244,31 @@ const LessonView = ({ projectId, topic, selectedDocuments = [], onClose, onNextT
 
                                 {step === 'worked' && (
                                     <>
-                                        <h2 className="text-xl font-bold text-[#4A3B32]">Worked example</h2>
+                                        <h2 className="text-xl font-bold text-[#163628]">Worked example</h2>
                                         <Card>
                                             <Label>Problem</Label>
-                                            <p className="leading-relaxed text-[#4A3B32]">{lesson.worked_example.problem}</p>
+                                            <p className="leading-relaxed text-[#163628]">{lesson.worked_example.problem}</p>
                                             <ol className="mt-3 space-y-2">
                                                 {lesson.worked_example.steps.slice(0, workedShown).map((s, i) => (
                                                     <motion.li key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3">
-                                                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#C8A288] text-xs font-bold text-white">{i + 1}</span>
-                                                        <span className="leading-relaxed text-[#4A3B32]">{s}</span>
+                                                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#1E5C42] text-xs font-bold text-white">{i + 1}</span>
+                                                        <span className="leading-relaxed text-[#163628]">{s}</span>
                                                     </motion.li>
                                                 ))}
                                             </ol>
                                             {workedShown < lesson.worked_example.steps.length ? (
-                                                <button onClick={() => setWorkedShown((n) => n + 1)} className="mt-3 text-sm font-semibold text-[#B08B72] hover:underline">Next step →</button>
+                                                <button onClick={() => setWorkedShown((n) => n + 1)} className="mt-3 text-sm font-semibold text-[#163628] hover:underline">Next step →</button>
                                             ) : lesson.worked_example.takeaway && (
-                                                <p className="mt-3 rounded-xl bg-[#FDF6F0] p-3 text-sm font-semibold text-[#4A3B32]">{lesson.worked_example.takeaway}</p>
+                                                <p className="mt-3 rounded-xl bg-[#FDF6F0] p-3 text-sm font-semibold text-[#163628]">{lesson.worked_example.takeaway}</p>
                                             )}
                                         </Card>
 
                                         {workedShown >= lesson.worked_example.steps.length && lesson.guided.problem && (
                                             <Card>
                                                 <Label>Your turn</Label>
-                                                <p className="leading-relaxed text-[#4A3B32]">{lesson.guided.problem}</p>
+                                                <p className="leading-relaxed text-[#163628]">{lesson.guided.problem}</p>
                                                 <textarea value={guidedTry} onChange={(e) => setGuidedTry(e.target.value)} rows={3} placeholder="Work it out here (optional)…"
-                                                    className="mt-3 w-full rounded-xl border border-[#E6D5CC] p-3 text-sm text-[#4A3B32] focus:border-[#C8A288] focus:outline-none" />
+                                                    className="mt-3 w-full rounded-xl border border-[#E6D5CC] p-3 text-sm text-[#163628] focus:border-[#1E5C42] focus:outline-none" />
                                                 {hintShown && lesson.guided.hint && <p className="mt-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-950"><b>Hint:</b> {lesson.guided.hint}</p>}
                                                 {solutionShown && <p className="mt-2 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-950"><b>Answer:</b> {lesson.guided.solution}</p>}
                                                 <div className="mt-3 flex flex-wrap gap-2">
@@ -292,14 +292,14 @@ const LessonView = ({ projectId, topic, selectedDocuments = [], onClose, onNextT
                                 {step === 'recall' && (
                                     <>
                                         <div>
-                                            <h2 className="text-xl font-bold text-[#4A3B32]">From memory</h2>
-                                            <p className="mt-1 text-sm text-[#8a6a5c]">No peeking. Putting it in your own words is what makes it stick.</p>
+                                            <h2 className="text-xl font-bold text-[#163628]">From memory</h2>
+                                            <p className="mt-1 text-sm text-[#5E5046]">No peeking. Putting it in your own words is what makes it stick.</p>
                                         </div>
                                         <Card>
-                                            <p className="font-semibold leading-relaxed text-[#4A3B32]">{lesson.recall.prompt}</p>
+                                            <p className="font-semibold leading-relaxed text-[#163628]">{lesson.recall.prompt}</p>
                                             <textarea value={recallText} onChange={(e) => setRecallText(e.target.value)} rows={6} disabled={!!grade}
                                                 placeholder="Write your explanation…"
-                                                className="mt-3 w-full rounded-xl border border-[#E6D5CC] p-3 text-sm text-[#4A3B32] focus:border-[#C8A288] focus:outline-none disabled:bg-[#FDF6F0]" />
+                                                className="mt-3 w-full rounded-xl border border-[#E6D5CC] p-3 text-sm text-[#163628] focus:border-[#1E5C42] focus:outline-none disabled:bg-[#FDF6F0]" />
                                             {!grade && (
                                                 <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                                                     <Primary disabled={grading || recallText.trim().length < 15} onClick={async () => {
@@ -316,13 +316,13 @@ const LessonView = ({ projectId, topic, selectedDocuments = [], onClose, onNextT
                                             <Card>
                                                 {grade.score != null && (
                                                     <div className="mb-3 flex items-center gap-3">
-                                                        <div className="text-3xl font-bold text-[#4A3B32]">{Math.round(grade.score * 100)}%</div>
+                                                        <div className="text-3xl font-bold text-[#163628]">{Math.round(grade.score * 100)}%</div>
                                                         <div className="h-2 flex-1 overflow-hidden rounded-full bg-[#F1E6DD]">
-                                                            <div className="h-full rounded-full bg-[#C8A288]" style={{ width: `${Math.round(grade.score * 100)}%` }} />
+                                                            <div className="h-full rounded-full bg-[#1E5C42]" style={{ width: `${Math.round(grade.score * 100)}%` }} />
                                                         </div>
                                                     </div>
                                                 )}
-                                                {grade.feedback && <p className="leading-relaxed text-[#4A3B32]">{grade.feedback}</p>}
+                                                {grade.feedback && <p className="leading-relaxed text-[#163628]">{grade.feedback}</p>}
                                                 {grade.covered?.length > 0 && (
                                                     <ul className="mt-3 space-y-1 text-sm">{grade.covered.map((c) => <li key={c} className="flex gap-2 text-emerald-800"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />{c}</li>)}</ul>
                                                 )}
@@ -339,8 +339,8 @@ const LessonView = ({ projectId, topic, selectedDocuments = [], onClose, onNextT
                                 {step === 'apply' && (
                                     <>
                                         <div>
-                                            <h2 className="text-xl font-bold text-[#4A3B32]">Use it somewhere new</h2>
-                                            <p className="mt-1 text-sm text-[#8a6a5c]">Unfamiliar situations show whether you really understand it{lesson.contrast ? `, and how it differs from “${lesson.contrast.with}”` : ''}.</p>
+                                            <h2 className="text-xl font-bold text-[#163628]">Use it somewhere new</h2>
+                                            <p className="mt-1 text-sm text-[#5E5046]">Unfamiliar situations show whether you really understand it{lesson.contrast ? `, and how it differs from “${lesson.contrast.with}”` : ''}.</p>
                                         </div>
                                         {applyRight === null ? (
                                             <QuestionRun items={applyItems}
@@ -354,33 +354,33 @@ const LessonView = ({ projectId, topic, selectedDocuments = [], onClose, onNextT
                                 {step === 'done' && (
                                     <>
                                         <div className="text-center">
-                                            <CheckCircle2 className="mx-auto h-12 w-12 text-[#C8A288]" />
-                                            <h2 className="mt-2 text-2xl font-bold text-[#4A3B32]">Lesson done</h2>
-                                            {applyRight != null && <p className="mt-1 text-[#8a6a5c]">{applyRight} of {applyItems.length} new situations handled.</p>}
+                                            <CheckCircle2 className="mx-auto h-12 w-12 text-[#1E5C42]" />
+                                            <h2 className="mt-2 text-2xl font-bold text-[#163628]">Lesson done</h2>
+                                            {applyRight != null && <p className="mt-1 text-[#5E5046]">{applyRight} of {applyItems.length} new situations handled.</p>}
                                         </div>
                                         <Card>
                                             {!outcome ? (
-                                                <div className="flex items-center gap-2 text-sm text-[#8a6a5c]"><Loader2 className="h-4 w-4 animate-spin text-[#C8A288]" /> Updating what you know…</div>
+                                                <div className="flex items-center gap-2 text-sm text-[#5E5046]"><Loader2 className="h-4 w-4 animate-spin text-[#1E5C42]" /> Updating what you know…</div>
                                             ) : (
                                                 <div className="space-y-3">
                                                     {outcome.row && (
                                                         <div>
                                                             <div className="flex items-baseline justify-between">
-                                                                <span className="font-semibold text-[#4A3B32]">Your mastery of this topic</span>
-                                                                <span className="text-lg font-bold text-[#4A3B32]">{Math.round(outcome.row.mastery * 100)}%</span>
+                                                                <span className="font-semibold text-[#163628]">Your mastery of this topic</span>
+                                                                <span className="text-lg font-bold text-[#163628]">{Math.round(outcome.row.mastery * 100)}%</span>
                                                             </div>
-                                                            <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-[#F1E6DD]"><div className="h-full rounded-full bg-[#C8A288]" style={{ width: `${Math.round(outcome.row.mastery * 100)}%` }} /></div>
-                                                            <p className="mt-1 text-xs text-[#8a6a5c]">Estimate {outcome.row.confidence}{outcome.row.mastery < 0.85 ? ' — a bit more practice will lock it in.' : '.'}</p>
+                                                            <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-[#F1E6DD]"><div className="h-full rounded-full bg-[#1E5C42]" style={{ width: `${Math.round(outcome.row.mastery * 100)}%` }} /></div>
+                                                            <p className="mt-1 text-xs text-[#5E5046]">Estimate {outcome.row.confidence}{outcome.row.mastery < 0.85 ? ' — a bit more practice will lock it in.' : '.'}</p>
                                                         </div>
                                                     )}
                                                     {reviewDays && (
-                                                        <p className="flex items-center gap-2 text-sm text-[#4A3B32]"><RotateCcw className="h-4 w-4 text-[#5E8C6A]" /> Lumina will bring it back for review in about <b>{reviewDays} day{reviewDays > 1 ? 's' : ''}</b>, just before you'd start forgetting.</p>
+                                                        <p className="flex items-center gap-2 text-sm text-[#163628]"><RotateCcw className="h-4 w-4 text-[#5E8C6A]" /> Lumina will bring it back for review in about <b>{reviewDays} day{reviewDays > 1 ? 's' : ''}</b>, just before you'd start forgetting.</p>
                                                     )}
                                                     {outcome.next && (
                                                         <div className="rounded-xl bg-[#FDF6F0] p-3">
-                                                            <div className="text-xs font-bold uppercase tracking-wide text-[#C8A288]">Up next</div>
-                                                            <div className="font-semibold text-[#4A3B32]">{outcome.next.topic}</div>
-                                                            <div className="text-xs text-[#8a6a5c]">{outcome.next.reason}</div>
+                                                            <div className="text-xs font-bold uppercase tracking-wide text-[#1E5C42]">Up next</div>
+                                                            <div className="font-semibold text-[#163628]">{outcome.next.topic}</div>
+                                                            <div className="text-xs text-[#5E5046]">{outcome.next.reason}</div>
                                                         </div>
                                                     )}
                                                 </div>
@@ -392,7 +392,7 @@ const LessonView = ({ projectId, topic, selectedDocuments = [], onClose, onNextT
                                             )}
                                             <Secondary onClick={onClose}>Back to my path</Secondary>
                                         </div>
-                                        {lesson.contrast && <p className="flex items-center justify-center gap-1.5 text-xs text-[#8a6a5c]"><Scale className="h-3.5 w-3.5" /> Tip: revisit “{lesson.contrast.with}” soon to keep the two apart.</p>}
+                                        {lesson.contrast && <p className="flex items-center justify-center gap-1.5 text-xs text-[#5E5046]"><Scale className="h-3.5 w-3.5" /> Tip: revisit “{lesson.contrast.with}” soon to keep the two apart.</p>}
                                     </>
                                 )}
                             </motion.div>

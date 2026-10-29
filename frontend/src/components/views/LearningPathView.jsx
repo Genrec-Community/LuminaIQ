@@ -67,11 +67,11 @@ const LearningPathView = ({
     const isDark = settings?.darkMode ?? false;
 
     // Dark-mode colour tokens
-    const card  = isDark ? '#252018'  : '#FFFFFF';
-    const cardBorder = isDark ? '#3d3028' : '#E6D5CC';
-    const cardBg2 = isDark ? '#1e1a16' : '#FDF6F0';
-    const bodyText = isDark ? '#e8d8c0' : '#4A3B32';
-    const mutedText = isDark ? '#b09878' : '#8a6a5c';
+    const card  = isDark ? '#182C21'  : '#FFFFFF';
+    const cardBorder = isDark ? '#293E34' : '#E6D5CC';
+    const cardBg2 = isDark ? '#161F1B' : '#FDF6F0';
+    const bodyText = isDark ? '#E9EFD6' : '#163628';
+    const mutedText = isDark ? '#B7C2B4' : '#5E5046';
 
     const [loading, setLoading] = useState(true);
     const [building, setBuilding] = useState(false);
@@ -314,14 +314,14 @@ const LearningPathView = ({
             <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-6 px-4">
                 <div className="relative">
                     <div className="h-20 w-20 border-4 border-[#E6D5CC] rounded-full"></div>
-                    <div className="absolute inset-0 h-20 w-20 border-4 border-[#C8A288] rounded-full border-t-transparent animate-spin"></div>
-                    <Brain className="absolute inset-0 m-auto h-8 w-8 text-[#C8A288] animate-pulse" />
+                    <div className="absolute inset-0 h-20 w-20 border-4 border-[#1E5C42] rounded-full border-t-transparent animate-spin"></div>
+                    <Brain className="absolute inset-0 m-auto h-8 w-8 text-[#1E5C42] animate-pulse" />
                 </div>
                 <div className="text-center max-w-[80vw] md:max-w-[60vw]">
-                    <p className="text-[#C8A288] font-bold uppercase tracking-widest text-xs mb-3">
+                    <p className="text-[#1E5C42] font-bold uppercase tracking-widest text-xs mb-3">
                         {building ? 'Synthesizing Path' : 'Loading Path'}
                     </p>
-                    <p className="text-[#4A3B32] font-medium italic whitespace-pre-line leading-relaxed text-sm md:text-base selection:bg-[#C8A288] selection:text-white transition-opacity duration-300">
+                    <p className="text-[#163628] font-medium italic whitespace-pre-line leading-relaxed text-sm md:text-base selection:bg-[#1E5C42] selection:text-white transition-opacity duration-300">
                         {getRotatingLoadingMessage(loadingMsgIdx)}
                     </p>
                 </div>
@@ -333,13 +333,9 @@ const LearningPathView = ({
         <div className="h-full flex flex-col" style={{ color: bodyText }}>
             <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8 max-w-4xl mx-auto w-full">
                 {/* Header */}
-                <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center p-4 rounded-2xl shadow-sm border mb-4"
-                        style={{ background: card, borderColor: cardBorder }}>
-                        <Target className="h-8 w-8 text-[#C8A288]" />
-                    </div>
-                    <h2 className="text-2xl font-bold mb-2" style={{ color: bodyText }}>Learning Path</h2>
-                    <p style={{ color: mutedText }}>Your personalized study sequence</p>
+                <div className="mb-10 pt-2">
+                    <h2 className="display h-l mark-em" style={{ color: bodyText }}>Your learning <em>path</em></h2>
+                    <p className="lede mt-3 max-w-[40ch]">Foundations first, the ideas that unlock the most next, and a review the day before you forget.</p>
                 </div>
 
                 {/* Adaptive plan from the learning engine: next step, why, what you know */}
@@ -357,12 +353,12 @@ const LearningPathView = ({
                     <div className="rounded-xl border p-5 mb-6" style={{ background: card, borderColor: cardBorder }}>
                         <div className="flex items-center justify-between mb-3">
                             <span className="text-sm font-bold" style={{ color: bodyText }}>Overall Progress</span>
-                            <span className="text-sm font-black tabular-nums" style={{ color: '#C8A288', textShadow: isDark ? '0 0 12px rgba(200,162,136,0.6)' : 'none' }}>
+                            <span className="text-sm font-black tabular-nums" style={{ color: 'var(--lumina-accent)', textShadow: isDark ? '0 0 12px rgba(200,162,136,0.6)' : 'none' }}>
                                 {calculateProgress()}%
                             </span>
                         </div>
                         {/* Track */}
-                        <div className="h-4 rounded-full overflow-hidden" style={{ background: isDark ? '#2e2318' : '#E6D5CC' }}>
+                        <div className="h-4 rounded-full overflow-hidden" style={{ background: isDark ? '#20382B' : '#E6D5CC' }}>
                             <div
                                 className="h-full rounded-full transition-all duration-700 ease-out"
                                 style={{
@@ -370,8 +366,8 @@ const LearningPathView = ({
                                     background: calculateProgress() === 0
                                         ? 'transparent'
                                         : isDark
-                                            ? 'linear-gradient(90deg, #a06820 0%, #C8A288 60%, #e8c878 100%)'
-                                            : 'linear-gradient(90deg, #C8A288 0%, #a8d060 100%)',
+                                            ? 'linear-gradient(90deg, #a06820 0%, #1E5C42 60%, #e8c878 100%)'
+                                            : 'linear-gradient(90deg, #1E5C42 0%, #a8d060 100%)',
                                     boxShadow: isDark && calculateProgress() > 0
                                         ? '0 0 12px rgba(200,162,136,0.55), 0 0 4px rgba(200,162,136,0.35)'
                                         : 'none'
@@ -379,11 +375,11 @@ const LearningPathView = ({
                             />
                         </div>
                         <div className="mt-2.5 flex items-center gap-1.5">
-                            <span className="text-xs font-semibold" style={{ color: isDark ? '#C8A288' : '#8a6a5c' }}>
+                            <span className="text-xs font-semibold" style={{ color: isDark ? '#1E5C42' : '#5E5046' }}>
                                 {completedTopics.size}
                             </span>
                             <span className="text-xs" style={{ color: mutedText }}>of</span>
-                            <span className="text-xs font-semibold" style={{ color: isDark ? '#C8A288' : '#8a6a5c' }}>
+                            <span className="text-xs font-semibold" style={{ color: isDark ? '#1E5C42' : '#5E5046' }}>
                                 {learningPath.learning_path.length}
                             </span>
                             <span className="text-xs" style={{ color: mutedText }}>topics completed</span>
@@ -399,7 +395,7 @@ const LearningPathView = ({
                             <select
                                 value={selectedDoc}
                                 onChange={(e) => setSelectedDoc(e.target.value)}
-                                className="w-full sm:w-auto px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#C8A288] font-medium max-w-full truncate"
+                                className="w-full sm:w-auto px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#1E5C42] font-medium max-w-full truncate"
                                 style={{ background: cardBg2, borderColor: cardBorder, color: bodyText, maxWidth: '100%' }}
                             >
                                 <option value="all">All Documents ({Math.max(availableTopics?.length || 0, learningPath?.learning_path?.length || 0)} topics)</option>
@@ -422,10 +418,10 @@ const LearningPathView = ({
                             disabled={building}
                             className="px-5 py-3 rounded-xl font-bold disabled:opacity-50 flex items-center gap-2 whitespace-nowrap flex-shrink-0 transition-all duration-200"
                             style={isDark ? {
-                                background: 'linear-gradient(135deg, #C8A288 0%, #a8824a 100%)',
-                                color: '#fff',
+                                background: '#D3EE6A',
+                                color: '#0f271c',
                                 boxShadow: '0 4px 14px rgba(200,162,136,0.35), 0 0 0 1px rgba(200,162,136,0.25)'
-                            } : { background: '#C8A288', color: '#fff' }}
+                            } : { background: '#1E5C42', color: '#fff' }}
                         >
                             {building ? (
                                 <><Loader2 className="h-5 w-5 animate-spin" />Synthesizing...</>
@@ -440,7 +436,7 @@ const LearningPathView = ({
                 {!learningPath?.learning_path?.length ? (
                     <div className="rounded-2xl border p-8 text-center"
                         style={{ background: cardBg2, borderColor: cardBorder }}>
-                        <Sparkles className="h-12 w-12 text-[#C8A288] mx-auto mb-4" />
+                        <Sparkles className="h-12 w-12 text-[#1E5C42] mx-auto mb-4" />
                         <h3 className="text-xl font-bold mb-2" style={{ color: bodyText }}>No Learning Path Yet</h3>
                         <p className="mb-6 max-w-md mx-auto" style={{ color: mutedText }}>
                             Click "Generate Path" to create an AI-powered learning sequence based on topic dependencies.
@@ -455,12 +451,12 @@ const LearningPathView = ({
                         {/* Legend */}
                         <div className="flex flex-wrap gap-4 text-xs font-medium mb-4">
                             <div className="flex items-center gap-1.5">
-                                <Play className="h-3 w-3 text-[#C8A288]" />
+                                <Play className="h-3 w-3 text-[#1E5C42]" />
                                 <span style={{ color: mutedText }}>Ready</span>
                             </div>
                             <div className="flex items-center gap-1.5">
                                 <div className="h-3 w-3 rounded-full bg-[#d4974a]"></div>
-                                <span style={{ color: isDark ? '#c8922a' : '#7a5e30' }}>In Progress</span>
+                                <span style={{ color: isDark ? '#c8922a' : '#367857' }}>In Progress</span>
                             </div>
                             <div className="flex items-center gap-1.5">
                                 <CheckCircle className="h-3 w-3 text-[#5a8a5a]" />
@@ -484,7 +480,7 @@ const LearningPathView = ({
                                         <div className={`absolute left-6 top-16 w-0.5 h-8 ${
                                             status.status === 'completed'
                                                 ? isDark ? 'bg-green-700' : 'bg-green-300'
-                                                : isDark ? 'bg-[#4a3020]' : 'bg-[#E6D5CC]'
+                                                : isDark ? 'bg-[#224B36]' : 'bg-[#E6D5CC]'
                                         }`}></div>
                                     )}
                                     
@@ -492,8 +488,8 @@ const LearningPathView = ({
                                     <div
                                         className="rounded-xl border-2 transition-all"
                                         style={isExpanded ? {
-                                            borderColor: '#C8A288',
-                                            background: isDark ? '#2a1e12' : '#fff',
+                                            borderColor: 'var(--lumina-accent)',
+                                            background: isDark ? '#132A1F' : '#fff',
                                             boxShadow: isDark ? '0 0 0 2px rgba(200,162,136,0.20), 0 8px 24px rgba(0,0,0,0.35)' : '0 4px 16px rgba(200,162,136,0.15)'
                                         } : status.status === 'completed' ? {
                                             borderColor: isDark ? '#2a5a3a' : '#bbf7d0',
@@ -502,8 +498,8 @@ const LearningPathView = ({
                                             borderColor: isDark ? '#7a4a10' : '#fde68a',
                                             background: isDark ? '#241808' : 'rgba(255,251,235,0.5)'
                                         } : {
-                                            borderColor: isDark ? '#3d3028' : '#E6D5CC',
-                                            background: isDark ? '#252018' : '#fff'
+                                            borderColor: isDark ? '#293E34' : '#E6D5CC',
+                                            background: isDark ? '#182C21' : '#fff'
                                         }}
                                     >
                                         {/* Main Card Content */}
@@ -519,7 +515,7 @@ const LearningPathView = ({
                                                         ? { background: isDark ? '#2a5a3a' : 'rgba(61,122,74,0.12)', color: isDark ? '#6adc8a' : '#2e6b3e', border: `2px solid ${isDark ? '#3a7a4a' : '#3d7a4a'}` }
                                                         : status.status === 'in_progress'
                                                             ? { background: isDark ? '#3a2008' : 'rgba(200,131,42,0.10)', color: isDark ? '#e8a040' : '#8a5210', border: `2px solid ${isDark ? '#c8832a' : '#c8832a'}` }
-                                                            : { background: isDark ? '#2e1f10' : 'rgba(200,162,136,0.12)', color: isDark ? '#d4aa82' : '#7a5030', border: `2px solid ${isDark ? '#5a3820' : '#C8A288'}` }
+                                                            : { background: isDark ? '#142C20' : 'rgba(200,162,136,0.12)', color: isDark ? '#D3EE6A' : '#367857', border: `2px solid ${isDark ? '#27563E' : '#1E5C42'}` }
                                                     }
                                                 >
                                                     {status.status === 'completed' ? (
@@ -538,8 +534,8 @@ const LearningPathView = ({
                                                             {docsWithTopic.length > 0 && (
                                                                 <span className={`text-xs px-2 py-0.5 rounded-full`}
                                                                     style={docsInContext > 0
-                                                                        ? { background: isDark ? '#3a2a1a' : '#e8ddd5', color: isDark ? '#c8a060' : '#6b5044' }
-                                                                        : { background: isDark ? '#2e2820' : '#ece8e5', color: isDark ? '#a09080' : '#8a7870' }
+                                                                        ? { background: isDark ? '#1B3B2B' : '#e8ddd5', color: isDark ? '#D3EE6A' : '#456D59' }
+                                                                        : { background: isDark ? '#212F28' : '#ece8e5', color: isDark ? '#a09080' : '#8a7870' }
                                                                     }>
                                                                     {docsInContext}/{docsWithTopic.length} docs
                                                                 </span>
@@ -548,7 +544,7 @@ const LearningPathView = ({
                                                             <span className={`text-xs font-bold px-2 py-1 rounded-full whitespace-nowrap ${
                                                                 status.status === 'completed' ? 'bg-[#d4edda] text-[#2e6b3e]' :
                                                                 status.status === 'in_progress' ? 'bg-[#fde8c8] text-[#7a4f1a]' :
-                                                                'bg-[#ede3da] text-[#6b4c38]'
+                                                                'bg-[#ede3da] text-[#396D53]'
                                                             }`}>
                                                                 {status.label}
                                                             </span>
@@ -568,7 +564,7 @@ const LearningPathView = ({
                                                     
                                                     {/* Click to expand hint */}
                                                     {!isExpanded && status.status !== 'completed' && (
-                                                        <div className="flex items-center gap-2 mt-3 text-sm text-[#C8A288] font-medium">
+                                                        <div className="flex items-center gap-2 mt-3 text-sm text-[#1E5C42] font-medium">
                                                             <Play className="h-4 w-4" />
                                                             <span>Click to see options</span>
                                                         </div>
@@ -593,21 +589,21 @@ const LearningPathView = ({
                                                 <div className="bg-[#FDF6F0] rounded-xl p-4 shadow-inner">
                                                     
                                                     {isFirstUncompleted ? (
-                                                        <div className="bg-white rounded-xl p-5 mb-5 border-2 border-[#C8A288] shadow-md relative overflow-hidden">
+                                                        <div className="bg-white rounded-xl p-5 mb-5 border-2 border-[#1E5C42] shadow-md relative overflow-hidden">
                                                             <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-[#FDF6F0] to-[#E6D5CC] rounded-bl-full -z-10 opacity-50"></div>
-                                                            <h5 className="font-black text-[#C8A288] text-[10px] uppercase tracking-[0.2em] mb-3 flex items-center gap-1.5">
+                                                            <h5 className="font-black text-[#1E5C42] text-[10px] uppercase tracking-[0.2em] mb-3 flex items-center gap-1.5">
                                                                 <Target className="h-3 w-3" />
                                                                 Next Step in Your Learning Path
                                                             </h5>
-                                                            <h3 className="text-xl font-black text-[#4A3B32] mb-3">{item.topic}</h3>
+                                                            <h3 className="text-xl font-black text-[#163628] mb-3">{item.topic}</h3>
                                                             
                                                             <div className="flex gap-6 text-sm mt-3 mb-4">
-                                                                <div className="flex flex-col"><span className="text-[10px] uppercase font-bold text-[#8a6a5c]">Difficulty</span> <span className="font-bold text-[#4A3B32]">Dynamic</span></div>
-                                                                <div className="flex flex-col"><span className="text-[10px] uppercase font-bold text-[#8a6a5c]">Study time</span> <span className="font-bold text-[#4A3B32]">~20 mins</span></div>
+                                                                <div className="flex flex-col"><span className="text-[10px] uppercase font-bold text-[#5E5046]">Difficulty</span> <span className="font-bold text-[#163628]">Dynamic</span></div>
+                                                                <div className="flex flex-col"><span className="text-[10px] uppercase font-bold text-[#5E5046]">Study time</span> <span className="font-bold text-[#163628]">~20 mins</span></div>
                                                             </div>
                                                             
-                                                            <div className="bg-[#fef3e2] text-[#7a4a1a] p-3 rounded-xl text-sm border-l-4 border-[#c49a6c] flex gap-3 items-start mt-2">
-                                                                <Sparkles className="h-5 w-5 shrink-0 mt-0.5 text-[#c49a6c]" />
+                                                            <div className="bg-[#fef3e2] text-[#7a4a1a] p-3 rounded-xl text-sm border-l-4 border-[#9CC23F] flex gap-3 items-start mt-2">
+                                                                <Sparkles className="h-5 w-5 shrink-0 mt-0.5 text-[#9CC23F]" />
                                                                 <div>
                                                                     <span className="font-black block mb-0.5 text-xs uppercase tracking-wider text-[#5a3010]">Why learn this now?</span>
                                                                     <span className="font-medium text-[#7a4a1a]">{getStableHumor(item.topic)}</span>
@@ -615,8 +611,8 @@ const LearningPathView = ({
                                                             </div>
                                                         </div>
                                                     ) : (
-                                                        <h5 className="font-bold text-[#4A3B32] mb-4 flex items-center gap-2">
-                                                            <Play className="h-4 w-4 text-[#C8A288]" />
+                                                        <h5 className="font-bold text-[#163628] mb-4 flex items-center gap-2">
+                                                            <Play className="h-4 w-4 text-[#1E5C42]" />
                                                             Study Hub: {item.topic}
                                                         </h5>
                                                     )}
@@ -625,7 +621,7 @@ const LearningPathView = ({
                                                     {docsWithTopic.length > 0 && docsInContext < docsWithTopic.length && (
                                                         <div className="mb-4 p-3 bg-white rounded-lg border border-[#E6D5CC]">
                                                             <div className="flex items-center justify-between">
-                                                                <div className="text-sm text-[#8a6a5c]">
+                                                                <div className="text-sm text-[#5E5046]">
                                                                     <span className="font-medium">{docsWithTopic.length - docsInContext}</span> document(s) with this topic not in context
                                                                 </div>
                                                                 <button
@@ -644,34 +640,34 @@ const LearningPathView = ({
 
                                                     {/* LEARN — warm tan family */}
                                                     <div className="mb-4">
-                                                        <p className="text-[10px] font-bold text-[#8a6a5c] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                                        <p className="text-[10px] font-bold text-[#5E5046] uppercase tracking-wider mb-2 flex items-center gap-1.5">
                                                             <BookOpen className="h-3 w-3" />
                                                             Learn
                                                         </p>
                                                         <div className="grid grid-cols-2 gap-2">
                                                             <button
                                                                 onClick={(e) => { e.stopPropagation(); handleGenerateNotes(idx); }}
-                                                                className="p-3 bg-white border border-[#E6D5CC] rounded-xl hover:border-[#C8A288] hover:bg-[#FDF6F0] transition-all flex items-center gap-3 group shadow-sm"
+                                                                className="p-3 bg-white border border-[#E6D5CC] rounded-xl hover:border-[#1E5C42] hover:bg-[#FDF6F0] transition-all flex items-center gap-3 group shadow-sm"
                                                             >
                                                                 <div className="h-10 w-10 bg-[#f5ede3] rounded-lg flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                                                                    <FileText className="h-5 w-5 text-[#9b7055]" />
+                                                                    <FileText className="h-5 w-5 text-[#8FA093]" />
                                                                 </div>
                                                                 <div className="text-left">
-                                                                    <div className="font-bold text-sm text-[#4A3B32]">Notes</div>
-                                                                    <div className="text-[10px] text-[#8a6a5c]">Generate readables</div>
+                                                                    <div className="font-bold text-sm text-[#163628]">Notes</div>
+                                                                    <div className="text-[10px] text-[#5E5046]">Generate readables</div>
                                                                 </div>
                                                             </button>
 
                                                             <button
                                                                 onClick={(e) => { e.stopPropagation(); handleOpenTutor(idx); }}
-                                                                className="p-3 bg-white border border-[#E6D5CC] rounded-xl hover:border-[#C8A288] hover:bg-[#FDF6F0] transition-all flex items-center gap-3 group shadow-sm"
+                                                                className="p-3 bg-white border border-[#E6D5CC] rounded-xl hover:border-[#1E5C42] hover:bg-[#FDF6F0] transition-all flex items-center gap-3 group shadow-sm"
                                                             >
                                                                 <div className="h-10 w-10 bg-[#f5ede3] rounded-lg flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                                                                    <MessageSquare className="h-5 w-5 text-[#9b7055]" />
+                                                                    <MessageSquare className="h-5 w-5 text-[#8FA093]" />
                                                                 </div>
                                                                 <div className="text-left">
-                                                                    <div className="font-bold text-sm text-[#4A3B32]">AI Tutor</div>
-                                                                    <div className="text-[10px] text-[#8a6a5c]">Chat &amp; Ask</div>
+                                                                    <div className="font-bold text-sm text-[#163628]">AI Tutor</div>
+                                                                    <div className="text-[10px] text-[#5E5046]">Chat &amp; Ask</div>
                                                                 </div>
                                                             </button>
                                                         </div>
@@ -679,7 +675,7 @@ const LearningPathView = ({
 
                                                     {/* EXPLORE — muted warm gray-brown family */}
                                                     <div className="mb-4">
-                                                        <p className="text-[10px] font-bold text-[#8a6a5c] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                                        <p className="text-[10px] font-bold text-[#5E5046] uppercase tracking-wider mb-2 flex items-center gap-1.5">
                                                             <GitBranch className="h-3 w-3" />
                                                             Explore
                                                         </p>
@@ -690,11 +686,11 @@ const LearningPathView = ({
                                                                     className="p-3 bg-white border border-[#E6D5CC] rounded-xl hover:border-[#b8a090] hover:bg-[#f7f0e8] transition-all flex items-center gap-3 group shadow-sm"
                                                                 >
                                                                     <div className="h-10 w-10 bg-[#ede5dc] rounded-lg flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                                                                        <GitBranch className="h-5 w-5 text-[#7a6050]" />
+                                                                        <GitBranch className="h-5 w-5 text-[#7F8F82]" />
                                                                     </div>
                                                                     <div className="text-left flex-1">
-                                                                        <div className="font-bold text-sm text-[#4A3B32]">Mindmap</div>
-                                                                        <div className="text-[10px] text-[#8a6a5c]">Visualize concepts</div>
+                                                                        <div className="font-bold text-sm text-[#163628]">Mindmap</div>
+                                                                        <div className="text-[10px] text-[#5E5046]">Visualize concepts</div>
                                                                     </div>
                                                                 </button>
                                                             )}
@@ -705,11 +701,11 @@ const LearningPathView = ({
                                                                     className="p-3 bg-white border border-[#E6D5CC] rounded-xl hover:border-[#b8a090] hover:bg-[#f7f0e8] transition-all flex items-center gap-3 group shadow-sm"
                                                                 >
                                                                     <div className="h-10 w-10 bg-[#ede5dc] rounded-lg flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                                                                        <Network className="h-5 w-5 text-[#7a6050]" />
+                                                                        <Network className="h-5 w-5 text-[#7F8F82]" />
                                                                     </div>
                                                                     <div className="text-left flex-1">
-                                                                        <div className="font-bold text-sm text-[#4A3B32]">Knowledge Graph</div>
-                                                                        <div className="text-[10px] text-[#8a6a5c]">Explore relation paths</div>
+                                                                        <div className="font-bold text-sm text-[#163628]">Knowledge Graph</div>
+                                                                        <div className="text-[10px] text-[#5E5046]">Explore relation paths</div>
                                                                     </div>
                                                                 </button>
                                                             )}
@@ -718,35 +714,35 @@ const LearningPathView = ({
 
                                                     {/* PRACTICE — golden amber family */}
                                                     <div className="mb-4">
-                                                        <p className="text-[10px] font-bold text-[#8a6a5c] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                                        <p className="text-[10px] font-bold text-[#5E5046] uppercase tracking-wider mb-2 flex items-center gap-1.5">
                                                             <Layers className="h-3 w-3" />
                                                             Practice
                                                         </p>
                                                         <div className="grid grid-cols-2 gap-2">
                                                             <button
                                                                 onClick={(e) => { e.stopPropagation(); handleStartQA(idx); }}
-                                                                className="p-3 bg-white border border-[#E6D5CC] rounded-xl hover:border-[#c49a6c] hover:bg-[#fdf4e8] transition-all flex items-center gap-3 group shadow-sm"
+                                                                className="p-3 bg-white border border-[#E6D5CC] rounded-xl hover:border-[#9CC23F] hover:bg-[#fdf4e8] transition-all flex items-center gap-3 group shadow-sm"
                                                             >
                                                                 <div className="h-10 w-10 bg-[#faebd6] rounded-lg flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                                                                     <HelpCircle className="h-5 w-5 text-[#a06820]" />
                                                                 </div>
                                                                 <div className="text-left">
-                                                                    <div className="font-bold text-sm text-[#4A3B32]">Q&amp;A</div>
-                                                                    <div className="text-[10px] text-[#8a6a5c]">Direct questions</div>
+                                                                    <div className="font-bold text-sm text-[#163628]">Q&amp;A</div>
+                                                                    <div className="text-[10px] text-[#5E5046]">Direct questions</div>
                                                                 </div>
                                                             </button>
 
                                                             {onOpenFlashcards && (
                                                                 <button
                                                                     onClick={(e) => { e.stopPropagation(); handleOpenFlashcards(idx); }}
-                                                                    className="p-3 bg-white border border-[#E6D5CC] rounded-xl hover:border-[#c49a6c] hover:bg-[#fdf4e8] transition-all flex items-center gap-3 group shadow-sm"
+                                                                    className="p-3 bg-white border border-[#E6D5CC] rounded-xl hover:border-[#9CC23F] hover:bg-[#fdf4e8] transition-all flex items-center gap-3 group shadow-sm"
                                                                 >
                                                                     <div className="h-10 w-10 bg-[#faebd6] rounded-lg flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                                                                         <Layers className="h-5 w-5 text-[#a06820]" />
                                                                     </div>
                                                                     <div className="text-left">
-                                                                        <div className="font-bold text-sm text-[#4A3B32]">Flashcards</div>
-                                                                        <div className="text-[10px] text-[#8a6a5c]">Spaced study</div>
+                                                                        <div className="font-bold text-sm text-[#163628]">Flashcards</div>
+                                                                        <div className="text-[10px] text-[#5E5046]">Spaced study</div>
                                                                     </div>
                                                                 </button>
                                                             )}
@@ -755,30 +751,30 @@ const LearningPathView = ({
                                                     
                                                     {/* TEST — deeper warm tan family */}
                                                     <div className="mb-3">
-                                                        <p className="text-[10px] font-bold text-[#8a6a5c] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                                        <p className="text-[10px] font-bold text-[#5E5046] uppercase tracking-wider mb-2 flex items-center gap-1.5">
                                                             <Zap className="h-3 w-3" />
                                                             Test
                                                         </p>
                                                         <div className="grid grid-cols-3 gap-2">
                                                             <button
                                                                 onClick={(e) => { e.stopPropagation(); handleStartQuiz(idx, 'mcq'); }}
-                                                                className="p-3 bg-white border border-[#E6D5CC] rounded-xl hover:border-[#C8A288] hover:bg-[#FDF6F0] transition-all flex flex-col items-center justify-center group shadow-sm"
+                                                                className="p-3 bg-white border border-[#E6D5CC] rounded-xl hover:border-[#1E5C42] hover:bg-[#FDF6F0] transition-all flex flex-col items-center justify-center group shadow-sm"
                                                             >
-                                                                <CheckSquare className="h-5 w-5 text-[#9b7055] mb-1 group-hover:scale-110 transition-transform" />
-                                                                <span className="font-bold text-[11px] text-[#4A3B32]">MCQ</span>
+                                                                <CheckSquare className="h-5 w-5 text-[#8FA093] mb-1 group-hover:scale-110 transition-transform" />
+                                                                <span className="font-bold text-[11px] text-[#163628]">MCQ</span>
                                                             </button>
                                                             
                                                             <button
                                                                 onClick={(e) => { e.stopPropagation(); handleStartQuiz(idx, 'subjective'); }}
-                                                                className="p-3 bg-white border border-[#E6D5CC] rounded-xl hover:border-[#C8A288] hover:bg-[#FDF6F0] transition-all flex flex-col items-center justify-center group shadow-sm"
+                                                                className="p-3 bg-white border border-[#E6D5CC] rounded-xl hover:border-[#1E5C42] hover:bg-[#FDF6F0] transition-all flex flex-col items-center justify-center group shadow-sm"
                                                             >
-                                                                <FileText className="h-5 w-5 text-[#9b7055] mb-1 group-hover:scale-110 transition-transform" />
-                                                                <span className="font-bold text-[11px] text-[#4A3B32]">Subjective</span>
+                                                                <FileText className="h-5 w-5 text-[#8FA093] mb-1 group-hover:scale-110 transition-transform" />
+                                                                <span className="font-bold text-[11px] text-[#163628]">Subjective</span>
                                                             </button>
                                                             
                                                             <button
                                                                 onClick={(e) => { e.stopPropagation(); handleStartQuiz(idx, 'both'); }}
-                                                                className="p-3 bg-gradient-to-br from-[#C8A288] to-[#A08072] text-white border-2 border-transparent rounded-xl hover:shadow-lg transition-all flex flex-col items-center justify-center group"
+                                                                className="p-3 bg-gradient-to-br from-[#1E5C42] to-[#163628] text-white border-2 border-transparent rounded-xl hover:shadow-lg transition-all flex flex-col items-center justify-center group"
                                                             >
                                                                 <Brain className="h-5 w-5 mb-1 group-hover:scale-110 transition-transform" />
                                                                 <span className="font-bold text-[11px]">Full Quiz</span>
@@ -795,7 +791,7 @@ const LearningPathView = ({
                                     {!isLast && (
                                         <div className="flex justify-center py-2">
                                             <ArrowRight className={`h-5 w-5 rotate-90 ${
-                                                status.status === 'completed' ? 'text-green-400' : 'text-[#C8A288]'
+                                                status.status === 'completed' ? 'text-green-400' : 'text-[#1E5C42]'
                                             }`} />
                                         </div>
                                     )}
@@ -815,11 +811,11 @@ const LearningPathView = ({
                 )}
 
                 {/* Help Text */}
-                <div className="mt-8 p-4 bg-[#FDF6F0] rounded-xl border border-[#E6D5CC] text-sm text-[#8a6a5c]">
+                <div className="mt-8 p-4 bg-[#FDF6F0] rounded-xl border border-[#E6D5CC] text-sm text-[#5E5046]">
                     <div className="flex gap-3">
-                        <AlertTriangle className="h-5 w-5 text-[#C8A288] flex-shrink-0 mt-0.5" />
+                        <AlertTriangle className="h-5 w-5 text-[#1E5C42] flex-shrink-0 mt-0.5" />
                         <div>
-                            <p className="font-bold text-[#4A3B32] mb-1">How It Works</p>
+                            <p className="font-bold text-[#163628] mb-1">How It Works</p>
                             <ul className="space-y-1">
                                 <li>1. Click on any topic to open the Study Hub</li>
                                 <li>2. Use <strong>Learn & Review</strong> tools: Notes, Q&A, AI Tutor</li>

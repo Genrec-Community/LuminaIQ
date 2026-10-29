@@ -126,13 +126,13 @@ const AdvancedAnalytics = ({ projectId, documents = [], bookIsolation = true }) 
                     </div>
                 )}
             </div>
-            <p className="text-2xl font-bold text-[#4A3B32] mt-3">{value}</p>
-            <p className="text-sm text-[#8a6a5c]">{label}</p>
-            {subValue && <p className="text-xs text-[#C8A288] mt-1">{subValue}</p>}
+            <p className="text-2xl font-bold text-[#163628] mt-3">{value}</p>
+            <p className="text-sm text-[#5E5046]">{label}</p>
+            {subValue && <p className="text-xs text-[#1E5C42] mt-1">{subValue}</p>}
         </div>
     );
 
-    const ProgressBar = ({ value, max, color = 'bg-[#C8A288]', showLabel = true }) => (
+    const ProgressBar = ({ value, max, color = 'bg-[#1E5C42]', showLabel = true }) => (
         <div className="w-full">
             <div className="h-2 bg-[#E6D5CC] rounded-full overflow-hidden">
                 <div
@@ -141,7 +141,7 @@ const AdvancedAnalytics = ({ projectId, documents = [], bookIsolation = true }) 
                 />
             </div>
             {showLabel && (
-                <div className="flex justify-between text-xs text-[#8a6a5c] mt-1">
+                <div className="flex justify-between text-xs text-[#5E5046] mt-1">
                     <span>{value}</span>
                     <span>{max}</span>
                 </div>
@@ -155,10 +155,10 @@ const AdvancedAnalytics = ({ projectId, documents = [], bookIsolation = true }) 
                 <div className="text-center">
                     <div className="relative w-16 h-16 mx-auto mb-4">
                         <div className="absolute inset-0 border-4 border-[#E6D5CC] rounded-full" />
-                        <div className="absolute inset-0 border-4 border-[#C8A288] rounded-full border-t-transparent animate-spin" />
-                        <BarChart3 className="absolute inset-0 m-auto h-6 w-6 text-[#C8A288]" />
+                        <div className="absolute inset-0 border-4 border-[#1E5C42] rounded-full border-t-transparent animate-spin" />
+                        <BarChart3 className="absolute inset-0 m-auto h-6 w-6 text-[#1E5C42]" />
                     </div>
-                    <p className="text-[#8a6a5c]">Loading analytics...</p>
+                    <p className="text-[#5E5046]">Loading analytics...</p>
                 </div>
             </div>
         );
@@ -169,11 +169,11 @@ const AdvancedAnalytics = ({ projectId, documents = [], bookIsolation = true }) 
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h2 className="text-2xl font-bold text-[#4A3B32] flex items-center gap-2">
-                        <BarChart3 className="h-7 w-7 text-[#C8A288]" />
+                    <h2 className="text-2xl font-bold text-[#163628] flex items-center gap-2">
+                        <BarChart3 className="h-7 w-7 text-[#1E5C42]" />
                         Learning Analytics
                     </h2>
-                    <p className="text-[#8a6a5c]">Track your progress and identify areas to improve</p>
+                    <p className="text-[#5E5046]">Track your progress and identify areas to improve</p>
                 </div>
 
                 {/* Book Selector (if isolation enabled) */}
@@ -181,7 +181,7 @@ const AdvancedAnalytics = ({ projectId, documents = [], bookIsolation = true }) 
                     <select
                         value={selectedBook}
                         onChange={(e) => setSelectedBook(e.target.value)}
-                        className="px-4 py-2 bg-white border border-[#E6D5CC] rounded-xl focus:ring-2 focus:ring-[#C8A288] text-[#4A3B32] font-medium"
+                        className="px-4 py-2 bg-white border border-[#E6D5CC] rounded-xl focus:ring-2 focus:ring-[#1E5C42] text-[#163628] font-medium"
                     >
                         <option value="all">All Books</option>
                         {documents.map(doc => (
@@ -247,18 +247,18 @@ const AdvancedAnalytics = ({ projectId, documents = [], bookIsolation = true }) 
                     className="w-full p-4 flex items-center justify-between hover:bg-[#FDF6F0] transition-colors"
                 >
                     <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 bg-[#C8A288]/20 rounded-xl flex items-center justify-center">
-                            <Activity className="h-5 w-5 text-[#C8A288]" />
+                        <div className="h-10 w-10 bg-[#1E5C42]/20 rounded-xl flex items-center justify-center">
+                            <Activity className="h-5 w-5 text-[#1E5C42]" />
                         </div>
                         <div className="text-left">
-                            <h3 className="font-bold text-[#4A3B32]">Performance Overview</h3>
-                            <p className="text-sm text-[#8a6a5c]">Topic-by-topic breakdown</p>
+                            <h3 className="font-bold text-[#163628]">Performance Overview</h3>
+                            <p className="text-sm text-[#5E5046]">Topic-by-topic breakdown</p>
                         </div>
                     </div>
                     {expandedSection === 'overview' ? (
-                        <ChevronUp className="h-5 w-5 text-[#8a6a5c]" />
+                        <ChevronUp className="h-5 w-5 text-[#5E5046]" />
                     ) : (
-                        <ChevronDown className="h-5 w-5 text-[#8a6a5c]" />
+                        <ChevronDown className="h-5 w-5 text-[#5E5046]" />
                     )}
                 </button>
 
@@ -281,7 +281,7 @@ const AdvancedAnalytics = ({ projectId, documents = [], bookIsolation = true }) 
                                                 ) : (
                                                     <XCircle className="h-4 w-4 text-red-500" />
                                                 )}
-                                                <span className="font-medium text-[#4A3B32] truncate max-w-[200px]">
+                                                <span className="font-medium text-[#163628] truncate max-w-[200px]">
                                                     {topic.topic}
                                                 </span>
                                             </div>
@@ -298,7 +298,7 @@ const AdvancedAnalytics = ({ projectId, documents = [], bookIsolation = true }) 
                                             color={accuracy >= 80 ? 'bg-green-500' : accuracy >= 60 ? 'bg-amber-500' : 'bg-red-500'}
                                             showLabel={false}
                                         />
-                                        <div className="flex justify-between text-xs text-[#8a6a5c] mt-1">
+                                        <div className="flex justify-between text-xs text-[#5E5046] mt-1">
                                             <span>{topic.correct_count || 0} correct</span>
                                             <span>{topic.wrong_count || 0} wrong</span>
                                         </div>
@@ -306,7 +306,7 @@ const AdvancedAnalytics = ({ projectId, documents = [], bookIsolation = true }) 
                                 );
                             })
                         ) : (
-                            <div className="text-center py-8 text-[#8a6a5c]">
+                            <div className="text-center py-8 text-[#5E5046]">
                                 <Brain className="h-12 w-12 mx-auto mb-3 opacity-50" />
                                 <p>No quiz data yet. Complete some quizzes to see your performance!</p>
                             </div>
@@ -326,14 +326,14 @@ const AdvancedAnalytics = ({ projectId, documents = [], bookIsolation = true }) 
                             <Target className="h-5 w-5 text-red-500" />
                         </div>
                         <div className="text-left">
-                            <h3 className="font-bold text-[#4A3B32]">Areas to Improve</h3>
-                            <p className="text-sm text-[#8a6a5c]">{analytics?.weakTopics?.length || 0} topics need attention</p>
+                            <h3 className="font-bold text-[#163628]">Areas to Improve</h3>
+                            <p className="text-sm text-[#5E5046]">{analytics?.weakTopics?.length || 0} topics need attention</p>
                         </div>
                     </div>
                     {expandedSection === 'weak' ? (
-                        <ChevronUp className="h-5 w-5 text-[#8a6a5c]" />
+                        <ChevronUp className="h-5 w-5 text-[#5E5046]" />
                     ) : (
-                        <ChevronDown className="h-5 w-5 text-[#8a6a5c]" />
+                        <ChevronDown className="h-5 w-5 text-[#5E5046]" />
                     )}
                 </button>
 
@@ -343,16 +343,16 @@ const AdvancedAnalytics = ({ projectId, documents = [], bookIsolation = true }) 
                             analytics.weakTopics.map((topic, idx) => (
                                 <div key={idx} className="p-3 bg-red-50 rounded-xl border border-red-100">
                                     <div className="flex items-center justify-between">
-                                        <span className="font-medium text-[#4A3B32]">{topic.topic}</span>
+                                        <span className="font-medium text-[#163628]">{topic.topic}</span>
                                         <span className="text-sm text-red-600 font-medium">
                                             {Math.round((1 - topic.weakness_score) * 100)}% accuracy
                                         </span>
                                     </div>
-                                    <p className="text-sm text-[#8a6a5c] mt-1">{topic.recommendation}</p>
+                                    <p className="text-sm text-[#5E5046] mt-1">{topic.recommendation}</p>
                                 </div>
                             ))
                         ) : (
-                            <div className="text-center py-8 text-[#8a6a5c]">
+                            <div className="text-center py-8 text-[#5E5046]">
                                 <Award className="h-12 w-12 mx-auto mb-3 opacity-50" />
                                 <p>Great job! No weak topics detected.</p>
                             </div>
@@ -404,12 +404,12 @@ const StudyActivityHeatmap = ({ projectId }) => {
         <div className="bg-white rounded-2xl border border-[#E6D5CC] p-4">
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 bg-[#C8A288]/20 rounded-xl flex items-center justify-center">
-                        <Calendar className="h-5 w-5 text-[#C8A288]" />
+                    <div className="h-10 w-10 bg-[#1E5C42]/20 rounded-xl flex items-center justify-center">
+                        <Calendar className="h-5 w-5 text-[#1E5C42]" />
                     </div>
                     <div>
-                        <h3 className="font-bold text-[#4A3B32]">Study Activity</h3>
-                        <p className="text-sm text-[#8a6a5c]">
+                        <h3 className="font-bold text-[#163628]">Study Activity</h3>
+                        <p className="text-sm text-[#5E5046]">
                             {totalActivities > 0
                                 ? `${totalActivities} activities across ${activeDays} day${activeDays !== 1 ? 's' : ''}`
                                 : 'No activity recorded yet'}
@@ -429,8 +429,8 @@ const StudyActivityHeatmap = ({ projectId }) => {
                             onClick={() => setHeatmapRange(value)}
                             className={`px-2.5 py-1 text-xs font-medium rounded-lg transition-colors ${
                                 heatmapRange === value
-                                    ? 'bg-[#C8A288] text-white'
-                                    : 'text-[#8a6a5c] hover:bg-[#FDF6F0]'
+                                    ? 'bg-[#1E5C42] text-white'
+                                    : 'text-[#5E5046] hover:bg-[#FDF6F0]'
                             }`}
                         >
                             {label}
@@ -446,13 +446,13 @@ const StudyActivityHeatmap = ({ projectId }) => {
             }`}>
                 {heatmapData.map((day) => (
                     <div key={day.date} className="text-center group relative">
-                        <p className="text-xs text-[#8a6a5c] mb-1">{day.dayName}</p>
+                        <p className="text-xs text-[#5E5046] mb-1">{day.dayName}</p>
                         <div
-                            className={`h-8 rounded-lg ${getIntensityClass(day.total)} transition-all hover:ring-2 hover:ring-[#C8A288]/40 cursor-default`}
+                            className={`h-8 rounded-lg ${getIntensityClass(day.total)} transition-all hover:ring-2 hover:ring-[#1E5C42]/40 cursor-default`}
                         />
                         {/* Tooltip on hover */}
                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10">
-                            <div className="bg-[#4A3B32] text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg">
+                            <div className="bg-[#163628] text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg">
                                 <p className="font-medium">{day.date}</p>
                                 {day.total > 0 ? (
                                     <div className="mt-1 space-y-0.5 text-[#E6D5CC]">
@@ -477,14 +477,14 @@ const StudyActivityHeatmap = ({ projectId }) => {
 
             {/* Legend */}
             <div className="flex items-center justify-end gap-2 mt-3">
-                <span className="text-xs text-[#8a6a5c]">Less</span>
+                <span className="text-xs text-[#5E5046]">Less</span>
                 <div className="flex gap-1">
                     <div className="h-3 w-3 rounded bg-[#E6D5CC]" />
                     <div className="h-3 w-3 rounded bg-green-100" />
                     <div className="h-3 w-3 rounded bg-green-300" />
                     <div className="h-3 w-3 rounded bg-green-500" />
                 </div>
-                <span className="text-xs text-[#8a6a5c]">More</span>
+                <span className="text-xs text-[#5E5046]">More</span>
             </div>
         </div>
     );

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, lazy, Suspense } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import Logo from '../components/brand/Logo';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
     MessageSquare,
     FileText,
@@ -127,7 +128,7 @@ const ChatMarkdown = React.memo(({ content, role, sources, onOpenSource }) => (
                         return (
                             <button
                                 onClick={(e) => { e.preventDefault(); onOpenSource(source); }}
-                                className="inline-flex items-center justify-center gap-0.5 min-w-[32px] h-[20px] px-1.5 mx-0.5 text-[10px] font-bold text-white bg-[#C8A288]/90 hover:bg-[#A08072] rounded shadow-sm transition-all cursor-pointer align-text-top"
+                                className="inline-flex items-center justify-center gap-0.5 min-w-[32px] h-[20px] px-1.5 mx-0.5 text-[10px] font-bold text-white bg-[#1E5C42]/90 hover:bg-[#163628] rounded shadow-sm transition-all cursor-pointer align-text-top"
                                 title={`Source ${props.href}: ${source.doc_name}`}
                             >
                                 <FileText className="h-2.5 w-2.5 opacity-80 shrink-0" />
@@ -137,12 +138,12 @@ const ChatMarkdown = React.memo(({ content, role, sources, onOpenSource }) => (
                     }
                 }
                 if (props.href && props.href.startsWith('http') && !props.href.includes(window.location.origin)) {
-                    return <a {...props} target="_blank" rel="noopener noreferrer" className="text-[#C8A288] hover:underline" />;
+                    return <a {...props} target="_blank" rel="noopener noreferrer" className="text-[#1E5C42] hover:underline" />;
                 }
                 return (
                     <button
                         onClick={(e) => { e.preventDefault(); onOpenSource({ doc_name: String(props.children) }); }}
-                        className="text-[#C8A288] hover:underline hover:text-[#A08072] cursor-pointer bg-transparent border-none p-0 inline font-medium"
+                        className="text-[#1E5C42] hover:underline hover:text-[#6B5F55] cursor-pointer bg-transparent border-none p-0 inline font-medium"
                         title={`Open document: ${props.children}`}
                     >
                         {props.children}
@@ -194,7 +195,7 @@ const welcomeMessage = (settings) => ({
 
 const ViewLoader = () => (
     <div className="h-full flex items-center justify-center">
-        <div className="h-10 w-10 rounded-2xl bg-[#C8A288]/70 animate-pulse" />
+        <div className="h-10 w-10 rounded-2xl bg-[#1E5C42]/70 animate-pulse" />
     </div>
 );
 
@@ -214,7 +215,8 @@ const ProjectView = () => {
         if (tool && tool !== 'general') return tool;
         const saved = sessionStorage.getItem(`lumina_tab_${projectId}`);
         // 'general' was a menu toggle, not a real view
-        return saved && saved !== 'general' ? saved : 'power';
+        // First visit opens on the Learning Path: one clear next step, plus the memory curve
+        return saved && saved !== 'general' ? saved : 'path';
     });
     const [labTopic, setLabTopic] = useState('');
     // Six-step lesson opened from the adaptive plan; planVersion refreshes the plan after it
@@ -737,19 +739,17 @@ const ProjectView = () => {
         }
     }, [selectedDocuments, documentTopics, allProjectTopics]);
 
-    // Default Selection: If only 1 document, select it.
+    // Default selection: start with every ready document selected, so study
+    // tools work straight away (once; a later "Deselect all" is respected)
+    const autoSelected = useRef(false);
     useEffect(() => {
-        if (documents.length === 1 && selectedDocuments.length === 0) {
-            // Need to pass array to setSelectedDocuments?
-            // Wait, setSelectedDocuments is passed from context or protected route?
-            // No, it's not defined in ProjectView props usually.
-            // Let's check where selectedDocuments comes from.
-            // It's likely state in ProjectView.
-            // Lines 70-80 usually define it.
-            if (typeof setSelectedDocuments === 'function') {
-                setSelectedDocuments([documents[0].id]);
-            }
+        if (autoSelected.current || selectedDocuments.length) return;
+        const ready = documents.filter(d => d.upload_status === 'completed');
+        if (ready.length) {
+            autoSelected.current = true;
+            setSelectedDocuments(ready.map(d => d.id));
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [documents]);
 
     // Keyboard shortcuts
@@ -1227,8 +1227,8 @@ const ProjectView = () => {
             <div className="relative">
                 <ProjectViewSkeleton />
                 {isSlowLoad && (
-                    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-[#4A3B32] text-white px-5 py-3 rounded-2xl shadow-xl text-sm">
-                        <WifiOff className="h-4 w-4 shrink-0 text-[#C8A288]" />
+                    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-[#163628] text-white px-5 py-3 rounded-2xl shadow-xl text-sm">
+                        <WifiOff className="h-4 w-4 shrink-0 text-[#1E5C42]" />
                         <span>Taking longer than expected… backend may be waking up</span>
                     </div>
                 )}
@@ -1242,10 +1242,10 @@ const ProjectView = () => {
             <div className="min-h-screen bg-[#FDF6F0] flex items-center justify-center p-4">
                 <div className="text-center max-w-sm">
                     <div className="h-16 w-16 bg-[#FDF6F0] border-2 border-[#E6D5CC] rounded-2xl flex items-center justify-center mx-auto mb-4">
-                        <WifiOff className="h-8 w-8 text-[#C8A288]" />
+                        <WifiOff className="h-8 w-8 text-[#1E5C42]" />
                     </div>
-                    <h2 className="text-xl font-bold text-[#4A3B32] mb-2">Couldn't load project</h2>
-                    <p className="text-[#8a6a5c] text-sm mb-6">
+                    <h2 className="text-xl font-bold text-[#163628] mb-2">Couldn't load project</h2>
+                    <p className="text-[#5E5046] text-sm mb-6">
                         Your world has been paused, kindly wait for it to spin again...
                     </p>
                     <button
@@ -1255,7 +1255,7 @@ const ProjectView = () => {
                             // Trigger remount by navigating to same route (or just re-run)
                             window.location.reload();
                         }}
-                        className="inline-flex items-center gap-2 px-6 py-3 bg-[#C8A288] text-white rounded-xl font-medium hover:bg-[#B08B72] transition-colors shadow-lg shadow-[#C8A288]/20"
+                        className="inline-flex items-center gap-2 px-6 py-3 bg-[#1E5C42] text-white rounded-xl font-medium hover:bg-[#163628] transition-colors shadow-lg shadow-[#1E5C42]/20"
                     >
                         <RefreshCw className="h-4 w-4" />
                         Retry
@@ -1270,7 +1270,7 @@ const ProjectView = () => {
             style={{ ...(APP_SHELL ? { paddingBottom: 'var(--sab)' } : {}), ...(isDark ? {
                 background: 'radial-gradient(ellipse at 20% 0%, color-mix(in srgb, var(--dm-accent) 10%, var(--dm-bg)) 0%, var(--dm-bg) 45%, var(--dm-bg) 100%)',
                 color: '#e8e2dc'
-            } : { background: 'var(--th-bg, #FDF6F0)', color: 'var(--th-text, #4A3B32)' }) }}>
+            } : { background: 'var(--th-bg, #FDF6F0)', color: 'var(--th-text, #163628)' }) }}>
 
             <Joyride
                 onEvent={handleJoyrideCallback}
@@ -1316,18 +1316,13 @@ const ProjectView = () => {
                     <div className={`flex-1 flex flex-col min-h-0 ${leftCollapsed ? 'p-3' : 'px-4 pt-5 pb-3'}`}>
                         <div className={`flex items-center ${leftCollapsed ? 'justify-center' : 'justify-between px-1.5'} mb-6`}>
                             {!leftCollapsed && (
-                                <div className="flex items-center gap-3">
-                                    <div className="h-10 w-10 bg-gradient-to-br from-[#C8A288] to-[#A08072] rounded-xl flex items-center justify-center text-white shadow-lg shadow-[#C8A288]/20">
-                                        <BookOpen className="h-6 w-6" />
-                                    </div>
-                                    <h1 className="text-2xl font-bold text-[#4A3B32] tracking-tight">Lumina IQ</h1>
-                                </div>
+                                <Link to="/dashboard" title="Back to your books" className="rounded-xl"><Logo /></Link>
                             )}
                             <div className="flex items-center gap-1">
                                 {/* Desktop collapse toggle */}
                                 <button
                                     onClick={() => setIsLeftCollapsed(!isLeftCollapsed)}
-                                    className="hidden md:block p-2 hover:bg-[#E6D5CC]/30 rounded-full text-[#8a6a5c] transition-colors"
+                                    className="hidden md:block p-2 hover:bg-[#E6D5CC]/30 rounded-full text-[#5E5046] transition-colors"
                                     title={isLeftCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                                 >
                                     {leftCollapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
@@ -1335,7 +1330,7 @@ const ProjectView = () => {
                                 {/* Close button for mobile */}
                                 <button
                                     onClick={() => setIsMobileMenuOpen(false)}
-                                    className="md:hidden p-2 hover:bg-[#E6D5CC]/30 rounded-full text-[#8a6a5c] transition-colors"
+                                    className="md:hidden p-2 hover:bg-[#E6D5CC]/30 rounded-full text-[#5E5046] transition-colors"
                                 >
                                     <X className="h-6 w-6" />
                                 </button>
@@ -1356,18 +1351,18 @@ const ProjectView = () => {
                             <div className={`w-full flex items-center ${leftCollapsed ? 'justify-center' : 'gap-1'}`}>
                                 <button
                                     onClick={() => setShowProfileMenu(!showProfileMenu)}
-                                    className={`profile-dropdown flex-1 flex items-center ${leftCollapsed ? 'justify-center p-3' : 'gap-3 px-3 py-3'} rounded-xl transition-all group ${isDark ? 'hover:bg-[#2e2318]/80' : 'hover:bg-[#E6D5CC] hover:shadow-sm'}`}
+                                    className={`profile-dropdown flex-1 flex items-center ${leftCollapsed ? 'justify-center p-3' : 'gap-3 px-3 py-3'} rounded-xl transition-all group ${isDark ? 'hover:bg-[#20382B]/80' : 'hover:bg-[#E6D5CC] hover:shadow-sm'}`}
                                     title={leftCollapsed ? 'Profile' : undefined}
                                 >
-                                    <div className="h-10 w-10 bg-gradient-to-br from-[#C8A288] to-[#A08072] rounded-full flex items-center justify-center text-white shadow-md group-hover:shadow-lg transition-shadow shrink-0">
+                                    <div className="h-10 w-10 bg-gradient-to-br from-[#1E5C42] to-[#163628] rounded-full flex items-center justify-center text-white shadow-md group-hover:shadow-lg transition-shadow shrink-0">
                                         <span className="text-lg leading-none">{settings?.userAvatar || '🦊'}</span>
                                     </div>
                                     {!leftCollapsed && (
                                         <div className="flex-1 text-left min-w-0">
-                                            <p className={`text-sm font-bold truncate ${isDark ? 'text-[#e8d8c0]' : 'text-[#4A3B32]'}`}>
+                                            <p className={`text-sm font-bold truncate ${isDark ? 'text-[#E9EFD6]' : 'text-[#163628]'}`}>
                                                 {settings?.nickname || settings?.studentName || 'Profile'}
                                             </p>
-                                            <p className={`text-xs ${isDark ? 'text-[#9a7858]' : 'text-[#8a6a5c]'}`}>Menu</p>
+                                            <p className={`text-xs ${isDark ? 'text-[#8FA093]' : 'text-[#5E5046]'}`}>Menu</p>
                                         </div>
                                     )}
                                 </button>
@@ -1377,10 +1372,10 @@ const ProjectView = () => {
                                             e.stopPropagation();
                                             navigate('/settings');
                                         }}
-                                        className={`shrink-0 p-3 rounded-xl transition-all group ${isDark ? 'hover:bg-[#2e2318]/80' : 'hover:bg-[#E6D5CC] hover:shadow-sm'}`}
+                                        className={`shrink-0 p-3 rounded-xl transition-all group ${isDark ? 'hover:bg-[#20382B]/80' : 'hover:bg-[#E6D5CC] hover:shadow-sm'}`}
                                         title="Settings"
                                     >
-                                        <Settings className="h-5 w-5 text-[#8a6a5c] group-hover:text-[#C8A288] transition-colors" />
+                                        <Settings className="h-5 w-5 text-[#5E5046] group-hover:text-[#1E5C42] transition-colors" />
                                     </button>
                                 )}
                             </div>
@@ -1390,7 +1385,7 @@ const ProjectView = () => {
             )}
 
             {/* Main Content Area */}
-            <div className={`flex-1 flex flex-col min-w-0 overflow-hidden backdrop-blur-sm transition-colors duration-300`}
+            <div className={`lumina-workspace flex-1 flex flex-col min-w-0 overflow-hidden backdrop-blur-sm transition-colors duration-300`}
                 style={zenMode
                     ? { background: isDark ? 'var(--dm-bg)' : 'var(--th-surface, #fff)' }
                     : isDark
@@ -1409,7 +1404,7 @@ const ProjectView = () => {
                             {APP_SHELL ? (
                                 <button
                                     onClick={() => (window.history.length > 1 ? navigate(-1) : navigate(`/app/book/${projectId}`))}
-                                    className="p-2 -ml-1.5 rounded-full text-[#4A3B32] active:bg-[#E6D5CC]/40 shrink-0"
+                                    className="p-2 -ml-1.5 rounded-full text-[#163628] active:bg-[#E6D5CC]/40 shrink-0"
                                     aria-label="Back"
                                 >
                                     <ChevronLeft className="h-6 w-6" />
@@ -1417,7 +1412,7 @@ const ProjectView = () => {
                             ) : (
                                 <button
                                     onClick={() => setIsMobileMenuOpen(true)}
-                                    className="md:hidden p-2 -ml-1 hover:bg-[#E6D5CC]/30 rounded-lg text-[#4A3B32] transition-colors shrink-0"
+                                    className="md:hidden p-2 -ml-1 hover:bg-[#E6D5CC]/30 rounded-lg text-[#163628] transition-colors shrink-0"
                                 >
                                     <Menu className="h-5 w-5" />
                                 </button>
@@ -1425,7 +1420,7 @@ const ProjectView = () => {
 
                             {/* Left: Tab name + Summary */}
                             <div className="flex items-center gap-2 min-w-0 shrink-0">
-                                <h2 className={`text-base font-bold whitespace-nowrap ${isDark ? 'text-[#e8d8c0]' : 'text-[#4A3B32]'}`}>
+                                <h2 className={`text-base font-bold whitespace-nowrap ${isDark ? 'text-[#E9EFD6]' : 'text-[#163628]'}`}>
                                     {activeTab === 'cram' && 'Exam Tonight'}
                                     {activeTab === 'lab' && 'Visual Lab'}
                                     {activeTab === 'power' && 'Power Hour'}
@@ -1446,8 +1441,8 @@ const ProjectView = () => {
                                     <button
                                         onClick={toggleSummary}
                                         className={`hidden sm:flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full transition-all shrink-0 ${showSummary
-                                            ? 'bg-[#C8A288] text-white'
-                                            : 'bg-[#FDF6F0] text-[#C8A288] border border-[#E6D5CC] hover:border-[#C8A288]/40'
+                                            ? 'bg-[#1E5C42] text-white'
+                                            : 'bg-[#FDF6F0] text-[#1E5C42] border border-[#E6D5CC] hover:border-[#1E5C42]/40'
                                             }`}
                                     >
                                         <FileText className="h-3 w-3" />
@@ -1466,28 +1461,28 @@ const ProjectView = () => {
                                 <div className="flex items-center">
                                     <button
                                         onClick={() => setShowSearch(true)}
-                                        className="p-2.5 rounded-lg text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30 transition-colors"
+                                        className="p-2.5 rounded-lg text-[#5E5046] hover:text-[#163628] hover:bg-[#E6D5CC]/30 transition-colors"
                                         title="Search (Ctrl+K)"
                                     >
                                         <Search className="h-5 w-5" />
                                     </button>
                                     <button
                                         onClick={() => setShowAITutor(!showAITutor)}
-                                        className={`p-2.5 rounded-lg transition-colors ${showAITutor ? 'bg-[#C8A288] text-white' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30'}`}
+                                        className={`p-2.5 rounded-lg transition-colors ${showAITutor ? 'bg-[#1E5C42] text-white' : 'text-[#5E5046] hover:text-[#163628] hover:bg-[#E6D5CC]/30'}`}
                                         title="AI Tutor"
                                     >
                                         <Brain className="h-5 w-5" />
                                     </button>
                                     <button
                                         onClick={() => setShowPomodoro(!showPomodoro)}
-                                        className={`p-2.5 rounded-lg transition-colors ${showPomodoro ? 'bg-[#C8A288] text-white' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30'}`}
+                                        className={`p-2.5 rounded-lg transition-colors ${showPomodoro ? 'bg-[#1E5C42] text-white' : 'text-[#5E5046] hover:text-[#163628] hover:bg-[#E6D5CC]/30'}`}
                                         title="Pomodoro Timer"
                                     >
                                         <Timer className="h-5 w-5" />
                                     </button>
                                     <button
                                         onClick={() => setShowBookmarks(!showBookmarks)}
-                                        className={`p-2.5 rounded-lg transition-colors ${showBookmarks ? 'bg-[#C8A288] text-white' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30'}`}
+                                        className={`p-2.5 rounded-lg transition-colors ${showBookmarks ? 'bg-[#1E5C42] text-white' : 'text-[#5E5046] hover:text-[#163628] hover:bg-[#E6D5CC]/30'}`}
                                         title="Bookmarks & Highlights"
                                     >
                                         <Bookmark className="h-5 w-5" />
@@ -1501,14 +1496,14 @@ const ProjectView = () => {
                                 <div className="hidden sm:flex items-center">
                                     <button
                                         onClick={() => setZenMode(true)}
-                                        className="p-2.5 rounded-lg text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30 transition-colors"
+                                        className="p-2.5 rounded-lg text-[#5E5046] hover:text-[#163628] hover:bg-[#E6D5CC]/30 transition-colors"
                                         title="Focus Mode (Ctrl+Shift+Z)"
                                     >
                                         <Maximize2 className="h-5 w-5" />
                                     </button>
                                     <button
                                         onClick={() => setIsRightCollapsed(!isRightCollapsed)}
-                                        className={`p-2.5 rounded-lg transition-colors ${!isRightCollapsed ? 'bg-[#C8A288]/10 text-[#C8A288]' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30'}`}
+                                        className={`p-2.5 rounded-lg transition-colors ${!isRightCollapsed ? 'bg-[#1E5C42]/10 text-[#1E5C42]' : 'text-[#5E5046] hover:text-[#163628] hover:bg-[#E6D5CC]/30'}`}
                                         title={isRightCollapsed ? 'Show Documents Panel' : 'Hide Documents Panel'}
                                     >
                                         <PanelRight className="h-5 w-5" />
@@ -1522,8 +1517,8 @@ const ProjectView = () => {
                                 <button
                                     onClick={() => setShowGamification(!showGamification)}
                                     className={`hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-lg transition-all ${showGamification
-                                        ? 'bg-[#C8A288] text-white'
-                                        : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30'
+                                        ? 'bg-[#1E5C42] text-white'
+                                        : 'text-[#5E5046] hover:text-[#163628] hover:bg-[#E6D5CC]/30'
                                         }`}
                                     title="Progress & XP"
                                 >
@@ -1538,7 +1533,7 @@ const ProjectView = () => {
                                 {/* Documents Sidebar Toggle (Mobile) */}
                                 <button
                                     onClick={() => setIsMobileDocsOpen(!isMobileDocsOpen)}
-                                    className={`md:hidden p-2.5 rounded-lg transition-colors ${isMobileDocsOpen ? 'bg-[#C8A288] text-white' : 'text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30'}`}
+                                    className={`md:hidden p-2.5 rounded-lg transition-colors ${isMobileDocsOpen ? 'bg-[#1E5C42] text-white' : 'text-[#5E5046] hover:text-[#163628] hover:bg-[#E6D5CC]/30'}`}
                                     title="Documents"
                                 >
                                     <PanelRight className="h-5 w-5" />
@@ -1547,7 +1542,7 @@ const ProjectView = () => {
                                 {/* Exit */}
                                 {!APP_SHELL && <button
                                     onClick={() => navigate('/dashboard')}
-                                    className="p-2.5 rounded-lg text-[#8a6a5c]/50 hover:bg-red-50 hover:text-red-500 transition-colors ml-0.5"
+                                    className="p-2.5 rounded-lg text-[#5E5046]/50 hover:bg-red-50 hover:text-red-500 transition-colors ml-0.5"
                                     title="Back to Dashboard"
                                 >
                                     <LogOut className="h-5 w-5" />
@@ -1558,7 +1553,7 @@ const ProjectView = () => {
                             <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 pt-1.5" style={{ scrollbarWidth: 'none' }}>
                                 {APP_TOOLS.map(([id, label]) => (
                                     <button key={id} onClick={() => setActiveTab(id)}
-                                        className={`shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${activeTab === id ? 'bg-[#C8A288] text-white' : isDark ? 'bg-[#2e2318] text-[#c4a882]' : 'bg-[#F3E8DF] text-[#6b4c38]'}`}>
+                                        className={`shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${activeTab === id ? 'bg-[#1E5C42] text-white' : isDark ? 'bg-[#20382B] text-[#B7C2B4]' : 'bg-[#F3E8DF] text-[#396D53]'}`}>
                                         {id === 'chat' ? `Ask ${aiName(settings)}` : label}
                                     </button>
                                 ))}
@@ -1569,7 +1564,7 @@ const ProjectView = () => {
                         {showSummary && (
                             <div className="absolute top-full left-4 right-4 md:left-auto md:right-4 md:w-96 mt-1 p-5 bg-white/95 backdrop-blur-xl rounded-2xl border border-[#E6D5CC] shadow-2xl animate-in slide-in-from-top-2 z-50">
                                 <div className="flex justify-between items-center mb-3">
-                                    <h4 className="font-bold text-sm text-[#4A3B32] uppercase tracking-wide">
+                                    <h4 className="font-bold text-sm text-[#163628] uppercase tracking-wide">
                                         {selectedDocuments.length > 0 ? (selectedDocuments.length === 1 ? 'Document Summary' : 'Selection Summary') : 'Project Summary'}
                                     </h4>
                                     <div className="flex items-center gap-1">
@@ -1593,21 +1588,21 @@ const ProjectView = () => {
                                     <div className="flex flex-col items-center justify-center py-12 gap-4">
                                         <div className="relative">
                                             <div className="h-16 w-16 border-4 border-[#E6D5CC] rounded-full"></div>
-                                            <div className="absolute inset-0 h-16 w-16 border-4 border-[#C8A288] rounded-full border-t-transparent animate-spin"></div>
-                                            <FileText className="absolute inset-0 m-auto h-6 w-6 text-[#C8A288]" />
+                                            <div className="absolute inset-0 h-16 w-16 border-4 border-[#1E5C42] rounded-full border-t-transparent animate-spin"></div>
+                                            <FileText className="absolute inset-0 m-auto h-6 w-6 text-[#1E5C42]" />
                                         </div>
                                         <div className="text-center">
-                                            <p className="text-sm font-bold text-[#4A3B32]">Generating Summary</p>
-                                            <p className="text-xs text-[#8a6a5c] mt-1">Analyzing your documents...</p>
+                                            <p className="text-sm font-bold text-[#163628]">Generating Summary</p>
+                                            <p className="text-xs text-[#5E5046] mt-1">Analyzing your documents...</p>
                                         </div>
                                         <div className="flex gap-1">
-                                            <div className="h-2 w-2 bg-[#C8A288] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                                            <div className="h-2 w-2 bg-[#C8A288] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                                            <div className="h-2 w-2 bg-[#C8A288] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                                            <div className="h-2 w-2 bg-[#1E5C42] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                                            <div className="h-2 w-2 bg-[#1E5C42] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                                            <div className="h-2 w-2 bg-[#1E5C42] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="prose prose-sm max-w-none text-sm text-[#4A3B32] max-h-[60vh] overflow-y-auto overflow-x-auto pr-2 custom-scrollbar">
+                                    <div className="prose prose-sm max-w-none text-sm text-[#163628] max-h-[60vh] overflow-y-auto overflow-x-auto pr-2 custom-scrollbar">
                                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{summaryContent}</ReactMarkdown>
                                     </div>
                                 )}
@@ -1619,13 +1614,13 @@ const ProjectView = () => {
                 {/* Zen Mode Floating Controls */}
                 {zenMode && (
                     <div className="absolute top-3 right-3 z-50 flex items-center gap-2 animate-in fade-in duration-300">
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-[#4A3B32]/80 backdrop-blur-md text-white/90 rounded-full text-xs font-medium shadow-lg">
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-[#163628]/80 backdrop-blur-md text-white/90 rounded-full text-xs font-medium shadow-lg">
                             <div className="h-2 w-2 bg-green-400 rounded-full animate-pulse" />
                             Focus Mode
                         </div>
                         <button
                             onClick={() => setZenMode(false)}
-                            className="p-2 bg-[#4A3B32]/80 backdrop-blur-md text-white/90 rounded-full hover:bg-[#4A3B32] transition-colors shadow-lg"
+                            className="p-2 bg-[#163628]/80 backdrop-blur-md text-white/90 rounded-full hover:bg-[#163628] transition-colors shadow-lg"
                             title="Exit Focus Mode (Esc)"
                         >
                             <Minimize2 className="h-4 w-4" />
@@ -1653,7 +1648,7 @@ const ProjectView = () => {
                                         const prevStamp = messages.slice(0, idx).reverse().find(m => m.timestamp)?.timestamp;
                                         const label = chatDayLabel(msg.timestamp);
                                         return (!prevStamp || chatDayLabel(prevStamp) !== label) ? (
-                                            <div className="flex items-center gap-3 my-2 text-[11px] font-semibold uppercase tracking-wide text-[#8a6a5c]">
+                                            <div className="flex items-center gap-3 my-2 text-[11px] font-semibold uppercase tracking-wide text-[#5E5046]">
                                                 <span className="h-px flex-1 bg-[#E6D5CC]" />
                                                 {label}
                                                 <span className="h-px flex-1 bg-[#E6D5CC]" />
@@ -1687,7 +1682,7 @@ const ProjectView = () => {
 
                                         {/* Companion label on assistant replies */}
                                         {msg.role === 'assistant' && (!msg.type || msg.type === 'tool_command') && (
-                                            <div className="flex items-center gap-1.5 mb-1 ml-1 text-xs font-semibold text-[#C8A288]">
+                                            <div className="flex items-center gap-1.5 mb-1 ml-1 text-xs font-semibold text-[#1E5C42]">
                                                 <span className="text-base leading-none">{settings.aiAvatar || '✨'}</span>
                                                 {aiName(settings)}
                                             </div>
@@ -1696,15 +1691,15 @@ const ProjectView = () => {
                                         {/* Regular message (no type or tool_command) */}
                                         {(!msg.type || msg.type === 'tool_command') && (
                                             <div className={`max-w-[95%] md:max-w-[85%] break-words rounded-2xl px-4 py-3 md:px-6 md:py-4 ${msg.role === 'user'
-                                                ? 'bg-[#C8A288] text-white rounded-br-none'
-                                                : 'bg-[#FDF6F0] text-[#4A3B32] rounded-bl-none'
+                                                ? 'bg-[#1E5C42] text-white rounded-br-none'
+                                                : 'bg-[#FDF6F0] text-[#163628] rounded-bl-none'
                                                 }`}>
                                                 {msg.content ? (
-                                                    <div className={`chat-text leading-relaxed ${msg.role === 'assistant' ? 'prose prose-sm max-w-none overflow-x-auto prose-p:my-2 prose-headings:text-[#4A3B32] prose-a:text-[#C8A288]' : ''}`}>
+                                                    <div className={`chat-text leading-relaxed ${msg.role === 'assistant' ? 'prose prose-sm max-w-none overflow-x-auto prose-p:my-2 prose-headings:text-[#163628] prose-a:text-[#1E5C42]' : ''}`}>
                                                         <ChatMarkdown content={msg.content} role={msg.role} sources={msg.sources} onOpenSource={openSourceStable} />
                                                     </div>
                                                 ) : (
-                                                    <Loader2 className="h-5 w-5 animate-spin text-[#8a6a5c]" />
+                                                    <Loader2 className="h-5 w-5 animate-spin text-[#5E5046]" />
                                                 )}
 
                                                 {/* Citations are now rendered inline within ReactMarkdown */}
@@ -1714,7 +1709,7 @@ const ProjectView = () => {
                                         {/* Time log */}
                                         {msg.timestamp && msg.role !== 'system' && (
                                             <div
-                                                className={`mt-1 px-1 text-[11px] text-[#8a6a5c] ${msg.role === 'user' ? 'text-right' : ''}`}
+                                                className={`mt-1 px-1 text-[11px] text-[#5E5046] ${msg.role === 'user' ? 'text-right' : ''}`}
                                                 title={new Date(msg.timestamp).toLocaleString()}
                                             >
                                                 {formatChatTime(msg.timestamp)}
@@ -1771,7 +1766,7 @@ const ProjectView = () => {
                             {showJumpToLatest && (
                                 <button
                                     onClick={() => scrollToBottom(true)}
-                                    className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 rounded-full bg-[#C8A288] px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-[#C8A288]/30 hover:bg-[#B08B72]"
+                                    className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 rounded-full bg-[#1E5C42] px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-[#1E5C42]/30 hover:bg-[#163628]"
                                 >
                                     <ChevronDown className="h-4 w-4" /> Latest
                                 </button>
@@ -1806,8 +1801,8 @@ const ProjectView = () => {
                                             aria-pressed={deepMode}
                                             title={deepMode ? (deepUnlimited ? 'Deep mode on' : `Deep mode on · ${deepLeft} left this month`) : 'Deep mode: our most capable model for tricky questions'}
                                             className={`shrink-0 flex items-center gap-1 rounded-full px-3 py-2.5 text-xs font-semibold transition-colors ${deepMode
-                                                ? 'bg-[#4A3B32] text-white shadow-md'
-                                                : 'bg-[#FDF6F0] text-[#8a6a5c] hover:text-[#4A3B32]'}`}
+                                                ? 'bg-[#163628] text-white shadow-md'
+                                                : 'bg-[#FDF6F0] text-[#5E5046] hover:text-[#163628]'}`}
                                         >
                                             <Brain className="h-4 w-4" />
                                             <span className="hidden sm:inline">Deep{deepMode && !deepUnlimited ? ` · ${deepLeft}` : ''}</span>
@@ -1818,13 +1813,13 @@ const ProjectView = () => {
                                                 value={inputMessage}
                                                 onChange={handleInputChange}
                                                 placeholder="Ask a question or type @ for AI tools..."
-                                                className="w-full pl-4 md:pl-6 pr-12 py-3 bg-[#FDF6F0] border-none rounded-full focus:ring-2 focus:ring-[#C8A288] outline-none text-[#4A3B32] placeholder-[#8a6a5c] text-sm md:text-base"
+                                                className="w-full pl-4 md:pl-6 pr-12 py-3 bg-[#FDF6F0] border-none rounded-full focus:ring-2 focus:ring-[#1E5C42] outline-none text-[#163628] placeholder-[#5E5046] text-sm md:text-base"
                                                 disabled={loading || toolLoading}
                                             />
                                             <button
                                                 type="submit"
                                                 disabled={loading || toolLoading || !inputMessage.trim()}
-                                                className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 bg-[#C8A288] text-white rounded-full hover:bg-[#B08B72] transition-colors disabled:opacity-50"
+                                                className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 bg-[#1E5C42] text-white rounded-full hover:bg-[#163628] transition-colors disabled:opacity-50"
                                             >
                                                 <Send className="h-4 w-4" />
                                             </button>
@@ -2116,19 +2111,19 @@ const ProjectView = () => {
                                 onDoubleClick={() => { setDocsWidth(DOCS_DEFAULT); try { localStorage.setItem('lumina_docs_width', String(DOCS_DEFAULT)); } catch { /* ignore */ } }}
                                 className="group/resize absolute inset-y-0 -left-1.5 z-10 hidden w-3 cursor-col-resize md:block"
                             >
-                                <span className={`absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 rounded-full transition-colors ${resizingDocs ? 'bg-[#C8A288]' : 'bg-transparent group-hover/resize:bg-[#C8A288]/60'}`} />
+                                <span className={`absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 rounded-full transition-colors ${resizingDocs ? 'bg-[#1E5C42]' : 'bg-transparent group-hover/resize:bg-[#1E5C42]/60'}`} />
                             </div>
                         )}
                         {/* Right Sidebar Header */}
                         <div className="shrink-0 px-5 py-4 border-b border-[#E6D5CC]/50 bg-gradient-to-br from-[#FDF6F0] to-white/80">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2.5">
-                                    <div className="h-8 w-8 bg-gradient-to-br from-[#C8A288] to-[#A08072] rounded-lg flex items-center justify-center text-white shadow-sm">
+                                    <div className="h-8 w-8 bg-gradient-to-br from-[#1E5C42] to-[#163628] rounded-lg flex items-center justify-center text-white shadow-sm">
                                         <FileText className="h-4 w-4" />
                                     </div>
                                     <div>
-                                        <h3 className="text-sm font-bold text-[#4A3B32] leading-tight">Documents</h3>
-                                        <p className="text-[10px] text-[#8a6a5c]">
+                                        <h3 className="text-sm font-bold text-[#163628] leading-tight">Documents</h3>
+                                        <p className="text-[10px] text-[#5E5046]">
                                             {selectedDocuments.length > 0
                                                 ? `${selectedDocuments.length} of ${documents.length} selected`
                                                 : `${documents.length} document${documents.length !== 1 ? 's' : ''}`
@@ -2140,7 +2135,7 @@ const ProjectView = () => {
                                     {/* Collapse toggle (desktop) */}
                                     <button
                                         onClick={() => setIsRightCollapsed(!isRightCollapsed)}
-                                        className="hidden md:block p-1.5 hover:bg-[#E6D5CC]/40 rounded-lg text-[#8a6a5c] transition-colors"
+                                        className="hidden md:block p-1.5 hover:bg-[#E6D5CC]/40 rounded-lg text-[#5E5046] transition-colors"
                                         title={isRightCollapsed ? 'Expand' : 'Collapse'}
                                     >
                                         <ChevronRight className="h-4 w-4" />
@@ -2148,7 +2143,7 @@ const ProjectView = () => {
                                     {/* Close (mobile) */}
                                     <button
                                         onClick={() => setIsMobileDocsOpen(false)}
-                                        className="md:hidden p-1.5 hover:bg-[#E6D5CC]/40 rounded-lg text-[#8a6a5c] transition-colors"
+                                        className="md:hidden p-1.5 hover:bg-[#E6D5CC]/40 rounded-lg text-[#5E5046] transition-colors"
                                     >
                                         <X className="h-4 w-4" />
                                     </button>
@@ -2160,7 +2155,7 @@ const ProjectView = () => {
                         <div className="shrink-0 px-4 pt-3 pb-2">
                             <button
                                 onClick={() => setShowAddDocModal(true)}
-                                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-gradient-to-r from-[#C8A288] to-[#B08B72] text-white shadow-md hover:shadow-lg hover:scale-[1.01] transition-all"
+                                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-gradient-to-r from-[#1E5C42] to-[#163628] text-white shadow-md hover:shadow-lg hover:scale-[1.01] transition-all"
                             >
                                 <Plus className="h-4 w-4" />
                                 Add Document
@@ -2175,14 +2170,14 @@ const ProjectView = () => {
                                         const readyDocs = documents.filter(d => d.upload_status === 'completed' || d.upload_status === 'ready');
                                         setSelectedDocuments(readyDocs.map(d => d.id));
                                     }}
-                                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#C8A288]/10 text-[#C8A288] hover:bg-[#C8A288]/20 transition-colors"
+                                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#1E5C42]/10 text-[#1E5C42] hover:bg-[#1E5C42]/20 transition-colors"
                                 >
                                     <Eye className="h-3 w-3" />
                                     Select All
                                 </button>
                                 <button
                                     onClick={() => setSelectedDocuments([])}
-                                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#FDF6F0] text-[#8a6a5c] hover:bg-[#E6D5CC]/50 transition-colors"
+                                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#FDF6F0] text-[#5E5046] hover:bg-[#E6D5CC]/50 transition-colors"
                                 >
                                     <EyeOff className="h-3 w-3" />
                                     Deselect All
@@ -2219,21 +2214,21 @@ const ProjectView = () => {
                             )}
                             {pausedUploads.filter(p => !uploadsInFlight.some(u => u.name === p.name && u.size === p.size)).map((p) => (
                                 <div key={p.key} className="p-3 rounded-xl bg-[#FDF6F0] border border-dashed border-[#d2bab0]">
-                                    <p className="text-sm font-medium truncate leading-tight text-[#5a4a42]">{p.name}</p>
+                                    <p className="text-sm font-medium truncate leading-tight text-[#2B3F35]">{p.name}</p>
                                     <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[#F1E6DD]">
                                         <div className="h-full rounded-full bg-[#d9c2b2]" style={{ width: `${Math.max(3, p.pct)}%` }} />
                                     </div>
-                                    <p className="mt-1 text-[10px] text-[#8a6a5c]">Paused at {p.pct}%. Choose the same file and it carries on from there.</p>
+                                    <p className="mt-1 text-[10px] text-[#5E5046]">Paused at {p.pct}%. Choose the same file and it carries on from there.</p>
                                     <div className="mt-2 flex gap-2">
                                         <button
                                             onClick={() => resumeInputRef.current?.click()}
-                                            className="rounded-lg bg-[#C8A288] px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-[#B08B72]"
+                                            className="rounded-lg bg-[#1E5C42] px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-[#163628]"
                                         >
                                             Resume upload
                                         </button>
                                         <button
                                             onClick={() => { forgetPendingUpload(p.key); setPausedUploads(pendingUploads(projectId)); }}
-                                            className="rounded-lg px-2.5 py-1 text-[11px] font-semibold text-[#8a6a5c] hover:bg-[#E6D5CC]/50"
+                                            className="rounded-lg px-2.5 py-1 text-[11px] font-semibold text-[#5E5046] hover:bg-[#E6D5CC]/50"
                                         >
                                             Discard
                                         </button>
@@ -2242,7 +2237,7 @@ const ProjectView = () => {
                             ))}
                             {uploadsInFlight.map((u) => (
                                 <div key={u.key} className="p-3 rounded-xl bg-white/70 border border-[#E6D5CC]/70">
-                                    <p className="text-sm font-medium truncate leading-tight text-[#5a4a42]">{u.name}</p>
+                                    <p className="text-sm font-medium truncate leading-tight text-[#2B3F35]">{u.name}</p>
                                     {u.pct === 0 && Date.now() - (u.startedAt || Date.now()) > 45000 && (
                                         <div className="mt-1.5 flex items-center gap-2 text-[10px] text-amber-700">
                                             <span className="flex-1">The upload hasn't started. Check your connection, or refresh the page and try again.</span>
@@ -2252,7 +2247,7 @@ const ProjectView = () => {
                                                     setUploadsInFlight(prev => prev.filter(x => x.key !== u.key));
                                                     if (file) handleFileUpload([file]);
                                                 }}
-                                                className="shrink-0 rounded-md bg-[#C8A288] px-2 py-0.5 font-semibold text-white hover:bg-[#B08B72]"
+                                                className="shrink-0 rounded-md bg-[#1E5C42] px-2 py-0.5 font-semibold text-white hover:bg-[#163628]"
                                             >
                                                 Retry
                                             </button>
@@ -2284,7 +2279,7 @@ const ProjectView = () => {
                                                 : isFailed
                                                     ? 'bg-red-50/60 border border-red-200/70 opacity-80'
                                                     : isSelected
-                                                        ? 'bg-[#C8A288]/15 border border-[#C8A288]/40 shadow-sm'
+                                                        ? 'bg-[#1E5C42]/15 border border-[#1E5C42]/40 shadow-sm'
                                                         : 'bg-white/60 border border-transparent hover:bg-[#FDF6F0] hover:border-[#E6D5CC]/60'
                                                 }`}
                                             onClick={() => {
@@ -2299,9 +2294,9 @@ const ProjectView = () => {
                                         >
                                             {/* Checkbox */}
                                             <div className={`shrink-0 mt-0.5 h-5 w-5 rounded-md border-2 flex items-center justify-center transition-all ${isSelected
-                                                ? 'bg-[#C8A288] border-[#C8A288] text-white shadow-sm'
+                                                ? 'bg-[#1E5C42] border-[#1E5C42] text-white shadow-sm'
                                                 : isReady
-                                                    ? 'border-[#d2bab0] group-hover:border-[#C8A288]'
+                                                    ? 'border-[#d2bab0] group-hover:border-[#1E5C42]'
                                                     : 'border-[#E6D5CC] opacity-50'
                                                 }`}>
                                                 {isSelected && <Check className="h-3 w-3" />}
@@ -2315,7 +2310,7 @@ const ProjectView = () => {
                                                         e.stopPropagation();
                                                         handleOpenSource({ doc_id: doc.id, doc_name: doc.filename });
                                                     }}
-                                                    className={`text-sm font-medium truncate leading-tight hover:underline cursor-pointer ${isSelected ? 'text-[#4A3B32]' : 'text-[#5a4a42]'
+                                                    className={`text-sm font-medium truncate leading-tight hover:underline cursor-pointer ${isSelected ? 'text-[#163628]' : 'text-[#2B3F35]'
                                                     }`}
                                                     title="Read this book"
                                                 >
@@ -2353,7 +2348,7 @@ const ProjectView = () => {
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); retryDoc(doc); }}
                                                             disabled={retryingIds.has(doc.id)}
-                                                            className="rounded-md bg-[#C8A288] px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-[#B08B72] disabled:opacity-60"
+                                                            className="rounded-md bg-[#1E5C42] px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-[#163628] disabled:opacity-60"
                                                         >
                                                             {retryingIds.has(doc.id) ? 'Retrying…' : 'Retry'}
                                                         </button>
@@ -2369,7 +2364,7 @@ const ProjectView = () => {
                                                             e.stopPropagation();
                                                             handleOpenSource({ doc_id: doc.id, doc_name: doc.filename });
                                                         }}
-                                                        className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-[#E6D5CC]/50 text-[#8a6a5c] text-[11px] font-semibold transition-all"
+                                                        className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-[#E6D5CC]/50 text-[#5E5046] text-[11px] font-semibold transition-all"
                                                         title="Read this book"
                                                     >
                                                         <BookOpen className="h-3.5 w-3.5" /> Read
@@ -2380,7 +2375,7 @@ const ProjectView = () => {
                                                         e.stopPropagation();
                                                         requestDelete(doc);
                                                     }}
-                                                    className="p-1.5 rounded-lg hover:bg-red-50 hover:text-red-500 text-[#8a6a5c] transition-all"
+                                                    className="p-1.5 rounded-lg hover:bg-red-50 hover:text-red-500 text-[#5E5046] transition-all"
                                                     title="Delete document"
                                                 >
                                                     <Trash2 className="h-3.5 w-3.5" />
@@ -2392,13 +2387,13 @@ const ProjectView = () => {
                             ) : (
                                 <div className="flex flex-col items-center justify-center py-12 text-center">
                                     <div className="h-16 w-16 bg-[#E6D5CC]/30 rounded-2xl flex items-center justify-center mb-4">
-                                        <Upload className="h-7 w-7 text-[#C8A288]/60" />
+                                        <Upload className="h-7 w-7 text-[#1E5C42]/60" />
                                     </div>
-                                    <p className="text-sm font-medium text-[#8a6a5c]">No documents yet</p>
-                                    <p className="text-xs text-[#8a6a5c]/60 mt-1">Upload PDF, TXT, or DOCX files</p>
+                                    <p className="text-sm font-medium text-[#5E5046]">No documents yet</p>
+                                    <p className="text-xs text-[#5E5046]/60 mt-1">Upload PDF, TXT, or DOCX files</p>
                                     <button
                                         onClick={() => setShowAddDocModal(true)}
-                                        className="mt-4 px-4 py-2 bg-[#C8A288] text-white text-xs font-semibold rounded-lg hover:bg-[#B08B72] transition-colors shadow-sm"
+                                        className="mt-4 px-4 py-2 bg-[#1E5C42] text-white text-xs font-semibold rounded-lg hover:bg-[#163628] transition-colors shadow-sm"
                                     >
                                         Upload First Document
                                     </button>
@@ -2415,15 +2410,15 @@ const ProjectView = () => {
                 deleteConfirmDoc && (
                     <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
                         <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 animate-in fade-in zoom-in-95 duration-200">
-                            <h3 className="text-xl font-bold text-[#4A3B32] mb-2">Delete Document?</h3>
-                            <p className="text-[#8a6a5c] mb-6">
-                                Are you sure you want to delete <span className="font-semibold text-[#4A3B32]">{deleteConfirmDoc.filename}</span>?
+                            <h3 className="text-xl font-bold text-[#163628] mb-2">Delete Document?</h3>
+                            <p className="text-[#5E5046] mb-6">
+                                Are you sure you want to delete <span className="font-semibold text-[#163628]">{deleteConfirmDoc.filename}</span>?
                                 This action cannot be undone.
                             </p>
                             <div className="flex gap-3 justify-end">
                                 <button
                                     onClick={() => setDeleteConfirmDoc(null)}
-                                    className="px-4 py-2 rounded-lg text-[#4A3B32] hover:bg-[#FDF6F0] font-medium transition-colors"
+                                    className="px-4 py-2 rounded-lg text-[#163628] hover:bg-[#FDF6F0] font-medium transition-colors"
                                 >
                                     Cancel
                                 </button>
@@ -2507,7 +2502,7 @@ const ProjectView = () => {
                     {/* Profile Menu */}
                     <div className={`profile-dropdown fixed z-[70] animate-in duration-200 slide-in-from-bottom-4 md:slide-in-from-left-2 left-0 right-0 bottom-0 md:left-auto md:right-auto md:bottom-6 ${leftCollapsed ? 'md:left-24' : 'md:left-[340px]'}`}>
                         <div className="bg-white rounded-t-3xl md:rounded-xl shadow-xl border-t md:border border-[#E6D5CC] overflow-hidden min-w-[200px] max-w-full md:max-w-sm">
-                            <div className="bg-gradient-to-r from-[#C8A288] to-[#A08072] p-4 md:p-4 text-white">
+                            <div className="bg-gradient-to-r from-[#1E5C42] to-[#163628] p-4 md:p-4 text-white">
                                 <div className="flex items-center justify-between md:justify-start gap-3">
                                     <div className="flex items-center gap-3">
                                         <div className="h-12 w-12 md:h-10 md:w-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-md">
@@ -2533,9 +2528,9 @@ const ProjectView = () => {
                                         setActiveTab('study');
                                         setShowProfileMenu(false);
                                     }}
-                                    className="w-full flex items-center gap-3 px-4 py-4 md:py-3 text-[#4A3B32] hover:bg-[#FDF6F0] transition-colors active:bg-[#E6D5CC]"
+                                    className="w-full flex items-center gap-3 px-4 py-4 md:py-3 text-[#163628] hover:bg-[#FDF6F0] transition-colors active:bg-[#E6D5CC]"
                                 >
-                                    <Brain className="h-6 w-6 md:h-5 md:w-5 text-[#C8A288]" />
+                                    <Brain className="h-6 w-6 md:h-5 md:w-5 text-[#1E5C42]" />
                                     <span className="font-medium text-base md:text-sm">Study Dashboard</span>
                                 </button>
                                 <button
@@ -2543,9 +2538,9 @@ const ProjectView = () => {
                                         setActiveTab('analytics');
                                         setShowProfileMenu(false);
                                     }}
-                                    className="w-full flex items-center gap-3 px-4 py-4 md:py-3 text-[#4A3B32] hover:bg-[#FDF6F0] transition-colors active:bg-[#E6D5CC]"
+                                    className="w-full flex items-center gap-3 px-4 py-4 md:py-3 text-[#163628] hover:bg-[#FDF6F0] transition-colors active:bg-[#E6D5CC]"
                                 >
-                                    <BarChart3 className="h-6 w-6 md:h-5 md:w-5 text-[#C8A288]" />
+                                    <BarChart3 className="h-6 w-6 md:h-5 md:w-5 text-[#1E5C42]" />
                                     <span className="font-medium text-base md:text-sm">Analytics</span>
                                 </button>
                                 <div className="border-t border-[#E6D5CC]/50 my-1" />
@@ -2554,9 +2549,9 @@ const ProjectView = () => {
                                         navigate('/settings');
                                         setShowProfileMenu(false);
                                     }}
-                                    className="w-full flex items-center gap-3 px-4 py-4 md:py-3 text-[#4A3B32] hover:bg-[#FDF6F0] transition-colors active:bg-[#E6D5CC]"
+                                    className="w-full flex items-center gap-3 px-4 py-4 md:py-3 text-[#163628] hover:bg-[#FDF6F0] transition-colors active:bg-[#E6D5CC]"
                                 >
-                                    <Settings className="h-6 w-6 md:h-5 md:w-5 text-[#C8A288]" />
+                                    <Settings className="h-6 w-6 md:h-5 md:w-5 text-[#1E5C42]" />
                                     <span className="font-medium text-base md:text-sm">Settings</span>
                                 </button>
                                 {/* Safe area padding for mobile */}

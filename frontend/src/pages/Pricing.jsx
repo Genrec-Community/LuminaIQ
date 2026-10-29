@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import SiteHeader from '../components/site/SiteHeader';
+import Logo from '../components/brand/Logo';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Check, Crown, Loader2, Moon, Building2, PartyPopper } from 'lucide-react';
@@ -106,11 +108,11 @@ const Pricing = () => {
             <div className="min-h-[100dvh] bg-[#FDF6F0] flex items-center justify-center p-6">
                 <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
                     className="max-w-md w-full rounded-3xl border border-[#E6D5CC] bg-white p-8 text-center">
-                    <PartyPopper className="mx-auto h-12 w-12 text-[#C8A288]" />
-                    <h1 className="mt-3 text-2xl font-bold text-[#4A3B32]">{success.title}</h1>
-                    <p className="mt-1 text-[#8a6a5c]">{success.body}</p>
+                    <PartyPopper className="mx-auto h-12 w-12 text-[#1E5C42]" />
+                    <h1 className="mt-3 text-2xl font-bold text-[#163628]">{success.title}</h1>
+                    <p className="mt-1 text-[#5E5046]">{success.body}</p>
                     <button onClick={() => navigate('/dashboard')}
-                        className="mt-6 w-full rounded-2xl bg-[#C8A288] px-4 py-3 font-semibold text-white hover:bg-[#B08B72]">
+                        className="mt-6 w-full rounded-2xl bg-[#1E5C42] px-4 py-3 font-semibold text-white hover:bg-[#163628]">
                         Start studying
                     </button>
                 </motion.div>
@@ -119,23 +121,24 @@ const Pricing = () => {
     }
 
     return (
-        <div className="min-h-[100dvh] bg-[#FDF6F0] text-[#4A3B32]">
-            <header className="mx-auto max-w-6xl px-4 py-5 flex items-center justify-between">
-                <button onClick={() => navigate(user ? '/dashboard' : '/')}
-                    className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold hover:bg-white">
-                    <ArrowLeft className="h-4 w-4" /> Back
-                </button>
-                {myPlan && (
-                    <span className="rounded-full border border-[#E6D5CC] bg-white px-3 py-1 text-sm">
-                        You're on <b>{myPlan.plan_name}</b>
-                    </span>
-                )}
-            </header>
+        <div className="min-h-[100dvh] bg-[#FDF6F0] text-[#163628]">
+            {user ? (
+                <header className="app-header sticky top-0 z-30 border-b border-[#163628]/10 bg-[#FDF6F0]/90 backdrop-blur-md">
+                    <div className="site-wrap flex h-[4.5rem] items-center justify-between">
+                        <button onClick={() => navigate('/dashboard')} className="flex items-center gap-3 rounded-xl" title="Back to your books">
+                            <ArrowLeft className="h-4 w-4" /><Logo />
+                        </button>
+                        {myPlan && (
+                            <span className="rounded-full bg-[#F2E6DB] px-3 py-1.5 text-sm">You're on <b>{myPlan.plan_name}</b></span>
+                        )}
+                    </div>
+                </header>
+            ) : <SiteHeader />}
 
             <main className="mx-auto max-w-6xl px-4 pb-16">
                 <div className="text-center max-w-2xl mx-auto">
-                    <h1 className="text-3xl md:text-5xl font-bold tracking-tight">Pick your plan</h1>
-                    <p className="mt-3 text-[#8a6a5c]">
+                    <h1 className="display h-xl mark-em pt-6">Pick your <em>plan</em>.</h1>
+                    <p className="mt-3 text-[#5E5046]">
                         {mode === 'subscription'
                             ? 'Pay by UPI, card or netbanking. Cancel any time.'
                             : 'Pay once for a month or a year by UPI, card or netbanking. Nothing renews by itself.'}
@@ -147,7 +150,7 @@ const Pricing = () => {
                         <div className="mt-6 inline-flex rounded-full border border-[#E6D5CC] bg-white p-1" role="tablist" aria-label="Billing cycle">
                             {['monthly', 'yearly'].map((c) => (
                                 <button key={c} role="tab" aria-selected={cycle === c} onClick={() => setCycle(c)}
-                                    className={`rounded-full px-5 py-2 text-sm font-semibold capitalize transition-colors ${cycle === c ? 'bg-[#C8A288] text-white' : 'text-[#8a6a5c]'}`}>
+                                    className={`chip capitalize ${cycle === c ? 'chip--on' : ''}`}>
                                     {c}{c === 'yearly' && <span className="ml-1.5 text-xs opacity-90">save ~30%</span>}
                                 </button>
                             ))}
@@ -156,7 +159,7 @@ const Pricing = () => {
                 </div>
 
                 {native && (
-                    <p className="mt-6 mx-auto max-w-xl rounded-2xl border border-[#E6D5CC] bg-white p-4 text-center text-sm text-[#8a6a5c]">
+                    <p className="mt-6 mx-auto max-w-xl rounded-2xl border border-[#E6D5CC] bg-white p-4 text-center text-sm text-[#5E5046]">
                         Plans can't be bought inside the app. Your plan works everywhere you sign in.
                     </p>
                 )}
@@ -166,7 +169,7 @@ const Pricing = () => {
                     </p>
                 )}
                 {school && !native && (
-                    <p className="mt-6 mx-auto max-w-xl rounded-2xl border border-[#E6D5CC] bg-white p-4 text-center text-sm text-[#8a6a5c]">
+                    <p className="mt-6 mx-auto max-w-xl rounded-2xl border border-[#E6D5CC] bg-white p-4 text-center text-sm text-[#5E5046]">
                         Your school gives you the {myPlan.plan_name} plan. The Exam Night Pass still works on top of it.
                     </p>
                 )}
@@ -184,17 +187,17 @@ const Pricing = () => {
                         const featured = highlight ? highlight === p.key : p.popular;
                         return (
                             <div key={p.key}
-                                className={`relative rounded-3xl border-2 bg-white p-6 flex flex-col ${featured ? 'border-[#C8A288] shadow-xl shadow-[#C8A288]/15' : 'border-[#E6D5CC]'}`}>
+                                className={`relative rounded-3xl border-2 bg-white p-6 flex flex-col ${featured ? 'border-[#1E5C42] shadow-xl shadow-[#1E5C42]/15' : 'border-[#E6D5CC]'}`}>
                                 {p.popular && (
-                                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-[#C8A288] px-3 py-1 text-xs font-bold text-white">Most popular</span>
+                                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-[#1E5C42] px-3 py-1 text-xs font-bold text-white">Most popular</span>
                                 )}
                                 <h2 className="text-xl font-bold flex items-center gap-2">
-                                    {p.key === 'topper' && <Crown className="h-5 w-5 text-[#C8A288]" />}{p.name}
+                                    {p.key === 'topper' && <Crown className="h-5 w-5 text-[#1E5C42]" />}{p.name}
                                 </h2>
-                                <p className="text-sm text-[#8a6a5c]">{p.tagline}</p>
+                                <p className="text-sm text-[#5E5046]">{p.tagline}</p>
                                 <div className="mt-4 flex items-baseline gap-1">
                                     <span className="text-4xl font-bold">{inr(price)}</span>
-                                    <span className="text-sm text-[#8a6a5c]">{p.monthly ? (cycle === 'monthly' ? '/month' : '/year') : 'forever'}</span>
+                                    <span className="text-sm text-[#5E5046]">{p.monthly ? (cycle === 'monthly' ? '/month' : '/year') : 'forever'}</span>
                                 </div>
                                 {cycle === 'yearly' && p.monthly > 0 && (
                                     <p className="text-xs text-emerald-700 mt-1">{inr(Math.round(p.yearly / 12))}/month · save {yearlySaving(p)}%</p>
@@ -206,12 +209,12 @@ const Pricing = () => {
                                 </ul>
                                 {p.key === 'free' ? (
                                     <Link to={user ? '/dashboard' : '/login'}
-                                        className="mt-6 block rounded-2xl border-2 border-[#E6D5CC] px-4 py-3 text-center font-semibold hover:border-[#C8A288]">
+                                        className="mt-6 block rounded-2xl border-2 border-[#E6D5CC] px-4 py-3 text-center font-semibold hover:border-[#1E5C42]">
                                         {current === 'free' ? 'Your plan' : user ? 'Go to dashboard' : 'Start free'}
                                     </Link>
                                 ) : native ? null : (
                                     <button onClick={() => buyPlan(p.key)} disabled={!enabled || !!busy || isCurrent || school}
-                                        className={`mt-6 flex items-center justify-center gap-2 rounded-2xl px-4 py-3 font-semibold transition-colors disabled:opacity-60 ${featured ? 'bg-[#C8A288] text-white hover:bg-[#B08B72]' : 'border-2 border-[#C8A288] hover:bg-[#FDF6F0]'}`}>
+                                        className={`mt-6 flex items-center justify-center gap-2 rounded-2xl px-4 py-3 font-semibold transition-colors disabled:opacity-60 ${featured ? 'bg-[#1E5C42] text-white hover:bg-[#163628]' : 'border-2 border-[#1E5C42] hover:bg-[#FDF6F0]'}`}>
                                         {busy === p.key ? <Loader2 className="h-5 w-5 animate-spin" /> : isCurrent ? 'Your plan'
                                             : extend ? `Add 1 ${cycle === 'monthly' ? 'month' : 'year'}` : `Get ${p.name}`}
                                     </button>
@@ -221,15 +224,15 @@ const Pricing = () => {
                     })}
                 </div>
 
-                <div id="pass" className="mt-8 rounded-3xl bg-gradient-to-br from-[#2a1f3d] via-[#3b2a52] to-[#1f2a44] p-6 md:p-8 text-white flex flex-col md:flex-row md:items-center gap-5 justify-between">
+                <div id="pass" className="mt-8 rounded-3xl bg-gradient-to-br from-[#163628] via-[#1b4331] to-[#0f271c] p-6 md:p-8 text-white flex flex-col md:flex-row md:items-center gap-5 justify-between">
                     <div>
-                        <div className="flex items-center gap-2 text-amber-200 text-sm font-semibold"><Moon className="h-4 w-4" /> Exam Night Pass</div>
+                        <div className="flex items-center gap-2 text-[#D3EE6A] text-sm font-semibold"><Moon className="h-4 w-4" /> Exam Night Pass</div>
                         <h2 className="mt-1 text-2xl font-bold">Exam tomorrow? {inr(EXAM_NIGHT_PASS.price)} for {EXAM_NIGHT_PASS.hours} hours of Topper.</h2>
                         <p className="mt-1 text-white/75">Deep answers, unlimited books and Deep cram cards for the night that counts. One payment, no subscription.</p>
                     </div>
                     {!native && (
                         <button onClick={buyPass} disabled={!enabled || !!busy}
-                            className="shrink-0 rounded-2xl bg-amber-300 px-6 py-3 font-bold text-[#2a1f3d] hover:bg-amber-200 disabled:opacity-60 flex items-center justify-center gap-2">
+                            className="shrink-0 rounded-2xl bg-[#D3EE6A] px-6 py-3 font-bold text-[#0f271c] hover:bg-[#e0f590] disabled:opacity-60 flex items-center justify-center gap-2">
                             {busy === 'pass' ? <Loader2 className="h-5 w-5 animate-spin" /> : `Get the pass · ${inr(EXAM_NIGHT_PASS.price)}`}
                         </button>
                     )}
@@ -237,8 +240,8 @@ const Pricing = () => {
 
                 <div className="mt-8 rounded-3xl border-2 border-[#E6D5CC] bg-white p-6 md:p-8 grid md:grid-cols-[1fr_auto] gap-6 items-center">
                     <div>
-                        <h2 className="text-2xl font-bold flex items-center gap-2"><Building2 className="h-6 w-6 text-[#C8A288]" /> {INSTITUTION_PLAN.name}</h2>
-                        <p className="text-[#8a6a5c]">{INSTITUTION_PLAN.tagline} · {inr(INSTITUTION_PLAN.perSeat)} per student per month, paid for 1, 3, 6 or 12 months, from {INSTITUTION_PLAN.minSeats} students</p>
+                        <h2 className="text-2xl font-bold flex items-center gap-2"><Building2 className="h-6 w-6 text-[#1E5C42]" /> {INSTITUTION_PLAN.name}</h2>
+                        <p className="text-[#5E5046]">{INSTITUTION_PLAN.tagline} · {inr(INSTITUTION_PLAN.perSeat)} per student per month, paid for 1, 3, 6 or 12 months, from {INSTITUTION_PLAN.minSeats} students</p>
                         <ul className="mt-4 grid sm:grid-cols-2 gap-2">
                             {INSTITUTION_PLAN.features.map((f) => (
                                 <li key={f} className="flex gap-2 text-sm"><Check className="h-4 w-4 mt-0.5 shrink-0 text-emerald-600" />{f}</li>
@@ -246,7 +249,7 @@ const Pricing = () => {
                         </ul>
                     </div>
                     <Link to="/institution"
-                        className="rounded-2xl bg-[#4A3B32] px-6 py-3 text-center font-semibold text-white hover:bg-[#3a2e27]">
+                        className="rounded-2xl bg-[#163628] px-6 py-3 text-center font-semibold text-white hover:bg-[#283B31]">
                         Set up your institution
                     </Link>
                 </div>

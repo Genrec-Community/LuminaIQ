@@ -94,7 +94,7 @@ const OfflineNotice = () => {
         <AnimatePresence>
             {offline && (
                 <motion.div initial={{ y: -40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -40, opacity: 0 }}
-                    className="fixed left-1/2 top-[calc(var(--sat)+10px)] z-[10000] flex -translate-x-1/2 items-center gap-2 rounded-full bg-[#2a1d15] px-4 py-2 text-[13px] font-semibold text-white shadow-xl"
+                    className="fixed left-1/2 top-[calc(var(--sat)+10px)] z-[10000] flex -translate-x-1/2 items-center gap-2 rounded-full bg-[#142A1F] px-4 py-2 text-[13px] font-semibold text-white shadow-xl"
                     role="status">
                     <WifiOff className="h-4 w-4 text-amber-300" /> You're offline. We'll pick up where you left off.
                 </motion.div>
@@ -111,7 +111,7 @@ const MobileApp = () => {
     const navigate = useNavigate();
 
     useEffect(() => { hideSplash(); }, []);
-    useEffect(() => { setStatusBar(!!settings.darkMode, settings.darkMode ? '#1c1814' : '#FDF6F0'); }, [settings.darkMode]);
+    useEffect(() => { setStatusBar(!!settings.darkMode, settings.darkMode ? '#0F1D16' : '#FDF6F0'); }, [settings.darkMode]);
 
     // Keep the daily reminder scheduled (it only asks permission when turned on in "You")
     useEffect(() => {
@@ -151,6 +151,7 @@ const MobileApp = () => {
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/dashboard" element={<Navigate to="/app/home" replace />} />
                 <Route path="/pricing" element={<Navigate to="/app/me" replace />} />
+                <Route path="/plans" element={<Navigate to="/app/me" replace />} />
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/terms" element={<Terms />} />
 

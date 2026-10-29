@@ -26,7 +26,7 @@ const tools = (ai) => [
     { id: 'chat', icon: MessageSquare, label: `Ask ${ai}`, sub: 'Answers with pages', color: '#3b8fd6' },
     { id: 'quiz', icon: CheckSquare, label: 'Quiz', sub: 'Test yourself', color: '#2f9e7a' },
     { id: 'flashcards', icon: Layers, label: 'Flashcards', sub: 'Flip & remember', color: '#e46a91' },
-    { id: 'notes', icon: FileText, label: 'Notes', sub: 'Summaries in a tap', color: '#C8A288' },
+    { id: 'notes', icon: FileText, label: 'Notes', sub: 'Summaries in a tap', color: 'var(--lumina-accent)' },
     { id: 'mindmap', icon: Brain, label: 'Mind map', sub: 'See the big picture', color: '#e07a5f' },
     { id: 'path', icon: Target, label: 'Learning path', sub: 'Step by step', color: '#14b8a6' },
     { id: 'qa', icon: HelpCircle, label: 'Q&A practice', sub: 'Written answers, graded', color: '#a16207' },
@@ -175,7 +175,7 @@ const Book = () => {
                         </p>
                         <div className="mt-4 flex gap-2">
                             <button onClick={() => { tap('medium'); navigate('/app/feed', { state: { bookId } }); }} disabled={!ready}
-                                className="m-pressable flex h-11 items-center gap-2 rounded-full m-white px-5 text-[14px] font-bold text-[#2a1d15] disabled:opacity-50">
+                                className="m-pressable flex h-11 items-center gap-2 rounded-full m-white px-5 text-[14px] font-bold text-[#142A1F] disabled:opacity-50">
                                 <Flame className="h-4 w-4" fill="currentColor" /> Learn feed
                             </button>
                             <button onClick={() => { tap(); fileInput.current?.click(); }}

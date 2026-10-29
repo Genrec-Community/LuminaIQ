@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
-import { Flame, Zap, Trophy, CalendarClock, Play, Check, Moon } from 'lucide-react';
+import { CalendarClock, Play, Check, Moon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { useGamification } from '../context/GamificationContext';
@@ -16,25 +15,6 @@ const TIPS = [
     'Mix topics while practising — interleaving makes exam recall stronger.',
 ];
 
-const Ring = ({ value, size = 112, stroke = 10, children }) => {
-    const r = (size - stroke) / 2;
-    const c = 2 * Math.PI * r;
-    return (
-        <div className="relative" style={{ width: size, height: size }}>
-            <svg width={size} height={size} className="-rotate-90">
-                <circle cx={size / 2} cy={size / 2} r={r} stroke="#E6D5CC" strokeWidth={stroke} fill="none" opacity="0.6" />
-                <motion.circle
-                    cx={size / 2} cy={size / 2} r={r} stroke="#C8A288" strokeWidth={stroke} fill="none" strokeLinecap="round"
-                    strokeDasharray={c}
-                    initial={{ strokeDashoffset: c }}
-                    animate={{ strokeDashoffset: c * (1 - Math.min(1, value)) }}
-                    transition={{ duration: 1, ease: 'easeOut' }}
-                />
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">{children}</div>
-        </div>
-    );
-};
 
 /**
  * Dashboard hero: personal greeting from the AI companion, streak, daily goal,
@@ -67,125 +47,96 @@ const TodayHero = ({ onContinue, continueLabel, onCram }) => {
             ? `${streak}-day streak, ${name}! Let's not break the chain today. 🔥`
             : character.greet(name);
 
+    // Editorial voice: the site never puts emoji in display copy
+    const plain = (t) => t.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, '').trim();
+    const examSoon = examDays !== null && examDays >= 0;
+
     return (
-        <section className="mb-10 grid gap-4 lg:grid-cols-[1.6fr_1fr]">
-            {/* Greeting + companion */}
-            <motion.div
-                initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-                className="relative overflow-hidden rounded-3xl border border-[#E6D5CC] bg-white p-6 md:p-8"
-            >
-                <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-[#C8A288]/15 blur-2xl" />
-                <p className="text-sm font-medium text-[#8a6a5c]">{timeGreeting()},</p>
-                <h2 className="mt-1 text-3xl md:text-4xl font-bold text-[#4A3B32]">
-                    {name} <span className="inline-block">{settings.userAvatar || '👋'}</span>
+        <section className="mb-14 grid grid-cols-1 gap-10 lg:grid-cols-12 lg:items-end lg:gap-8" aria-label="Today">
+            {/* Greeting: the site's hero, set in the display face */}
+            <div className="lg:col-span-7">
+                <p data-reveal="fade" className="mb-4 text-sm font-semibold uppercase tracking-[0.14em] text-[#5E5046]">
+                    {new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}
+                </p>
+                <h2 className="display h-mega mark-em text-[#163628]">
+                    {timeGreeting()},<br /><em>{name}</em>.
                 </h2>
-
-                <div className="mt-5 flex items-start gap-3">
-                    <motion.div
-                        animate={{ y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 3, ease: 'easeInOut' }}
-                        className="h-12 w-12 shrink-0 rounded-2xl bg-gradient-to-br from-[#C8A288] to-[#e8c9a8] flex items-center justify-center text-2xl shadow-md shadow-[#C8A288]/30"
-                    >
+                <div data-reveal="up" data-delay="0.15" className="mt-6 flex items-start gap-3">
+                    <span className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#163628] text-lg" aria-hidden="true">
                         {settings.aiAvatar || '✨'}
-                    </motion.div>
-                    <div className="rounded-2xl rounded-tl-sm border border-[#E6D5CC] bg-[#FDF6F0] px-4 py-3 text-[#4A3B32]">
-                        <div className="text-xs font-semibold text-[#C8A288]">{aiName(settings)}</div>
-                        <div>{companionLine}</div>
-                        <div className="mt-1.5 text-xs text-[#8a6a5c]">💡 {tip}</div>
-                    </div>
+                    </span>
+                    <p className="lede max-w-[38ch]">
+                        <span className="font-semibold text-[#163628]">{aiName(settings)}:</span> {plain(companionLine)}{' '}
+                        <span className="text-base text-[#5E5046]/80">{plain(tip)}</span>
+                    </p>
                 </div>
-
-                <div className="mt-6 flex flex-wrap items-center gap-3">
+                <div data-reveal="up" data-delay="0.25" className="mt-8 flex flex-wrap items-center gap-3">
                     {onContinue && (
-                        <button
-                            onClick={onContinue}
-                            className="group flex items-center gap-2 rounded-2xl bg-[#C8A288] px-6 py-3.5 font-semibold text-white shadow-lg shadow-[#C8A288]/30 transition-all hover:bg-[#B08B72] active:scale-95"
-                        >
-                            <Play className="h-5 w-5 fill-white" />
-                            {continueLabel}
+                        <button onClick={onContinue} data-magnetic="0.25" className="btn btn--dark">
+                            <Play className="h-4 w-4 fill-current" />
+                            <span className="max-w-[16rem] truncate">{continueLabel}</span>
+                            <svg className="arrow" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9M8.5 4.5 12 8l-3.5 3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
                         </button>
                     )}
                     {onCram && (
-                        <button
-                            onClick={onCram}
-                            className="flex items-center gap-2 rounded-2xl border-2 border-[#C8A288] px-5 py-3 font-semibold text-[#4A3B32] transition-all hover:bg-[#FDF6F0] active:scale-95"
-                        >
-                            <Moon className="h-5 w-5 text-[#C8A288]" />
+                        <button onClick={onCram} className="btn btn--light">
+                            <Moon className="h-4 w-4" />
                             {examDays !== null && examDays >= 0 && examDays <= 1 ? 'Cram for it now' : 'Exam tonight?'}
                         </button>
                     )}
-                    {examDays !== null && examDays >= 0 && (
-                        <div className="flex items-center gap-2 rounded-2xl border border-[#E6D5CC] bg-[#FDF6F0] px-4 py-3 text-sm text-[#4A3B32]">
-                            <CalendarClock className="h-4 w-4 text-[#C8A288]" />
-                            <span><b>{examDays === 0 ? 'Today!' : `${examDays} day${examDays === 1 ? '' : 's'}`}</b> to {settings.examName || 'your exam'}</span>
-                        </div>
+                    {examSoon && (
+                        <span className="inline-flex min-h-[2.5rem] items-center gap-2 rounded-full bg-[#F2E6DB] px-4 text-sm text-[#163628]">
+                            <CalendarClock className="h-4 w-4" />
+                            <span><b>{examDays === 0 ? 'Today' : `${examDays} day${examDays === 1 ? '' : 's'}`}</b> to {settings.examName || 'your exam'}</span>
+                        </span>
                     )}
                 </div>
-            </motion.div>
+            </div>
 
-            {/* Stats + quests */}
-            <motion.div
-                initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}
-                className="rounded-3xl border border-[#E6D5CC] bg-white p-6"
-            >
-                <div className="flex items-center gap-5">
-                    <Ring value={goalPct}>
-                        <span className="text-2xl font-bold text-[#4A3B32]">{progress.minutes}</span>
-                        <span className="text-[11px] text-[#8a6a5c]">/ {goal} min</span>
-                    </Ring>
-                    <div className="flex-1 space-y-3">
-                        <div className="flex items-center gap-2">
-                            <motion.span animate={streak > 0 ? { scale: [1, 1.15, 1] } : {}} transition={{ repeat: Infinity, duration: 1.8 }}>
-                                <Flame className={`h-6 w-6 ${streak > 0 ? 'text-orange-500 fill-orange-400' : 'text-[#8a6a5c]'}`} />
-                            </motion.span>
-                            <span className="text-lg font-bold text-[#4A3B32]">{streak}</span>
-                            <span className="text-sm text-[#8a6a5c]">day streak</span>
-                        </div>
-                        <div>
-                            <div className="flex items-center justify-between text-sm">
-                                <span className="flex items-center gap-1.5 font-semibold text-[#4A3B32]">
-                                    <Trophy className="h-4 w-4 text-[#C8A288]" /> Lv {g?.level ?? 1}
-                                </span>
-                                <span className="text-xs text-[#8a6a5c]">{g?.level_title || 'Curious Reader'}</span>
-                            </div>
-                            <div className="mt-1 h-2 overflow-hidden rounded-full bg-[#E6D5CC]/60">
-                                <motion.div
-                                    className="h-full rounded-full bg-gradient-to-r from-[#C8A288] to-[#e0b48a]"
-                                    initial={{ width: 0 }}
-                                    animate={{ width: `${Math.min(100, g?.level_progress ?? 0)}%` }}
-                                    transition={{ duration: 1 }}
-                                />
-                            </div>
-                            <div className="mt-1 flex items-center gap-1 text-xs text-[#8a6a5c]">
-                                <Zap className="h-3 w-3" /> {(g?.total_xp ?? 0).toLocaleString()} XP total
-                            </div>
-                        </div>
+            {/* Today in numbers: the site's stats row, then the quests as a tick list */}
+            <div className="lg:col-span-5">
+                <ul className="grid grid-cols-3 gap-4 border-t border-[#163628]/15">
+                    {[
+                        { v: progress.minutes, unit: `/${goal}`, label: 'minutes today', mark: goalPct >= 1 },
+                        { v: streak, unit: streak === 1 ? ' day' : ' days', label: 'in a row', mark: streak > 2 },
+                        { v: g?.level ?? 1, unit: '', label: g?.level_title || 'Curious Reader', mark: false, pre: 'Lv ' },
+                    ].map((st, i) => (
+                        <li key={st.label} data-reveal="up" data-delay={0.1 + i * 0.06} className="pt-5">
+                            <p className="font-display text-[clamp(2.2rem,1.6rem+2vw,3.4rem)] font-light leading-none tracking-[-0.04em] tabular-nums text-[#163628]">
+                                {st.pre && <span className="text-[0.55em] italic">{st.pre}</span>}
+                                <span className={st.mark ? 'bg-[linear-gradient(#D3EE6A,#D3EE6A)] bg-[length:100%_0.28em] bg-[position:0_88%] bg-no-repeat' : ''}>{st.v}</span>
+                                <span className="text-[0.45em] italic text-[#5E5046]">{st.unit}</span>
+                            </p>
+                            <p className="mt-2 text-sm text-[#5E5046]">{st.label}</p>
+                        </li>
+                    ))}
+                </ul>
+                <div data-reveal="settle" data-delay="0.2" className="mt-6 rounded-[1.25rem] border border-[#163628]/10 bg-white p-5 shadow-[0_18px_40px_-26px_rgba(22,54,40,0.35)]">
+                    <div className="mb-3 flex items-baseline justify-between">
+                        <span className="font-display text-xl">Today&apos;s <em>quests</em></span>
+                        <span className="text-xs text-[#5E5046]">{questsDone} of {quests.length} · {(g?.total_xp ?? 0).toLocaleString()} XP</span>
                     </div>
-                </div>
-
-                <div className="mt-5">
-                    <div className="mb-2 flex items-center justify-between">
-                        <span className="text-sm font-semibold text-[#4A3B32]">Daily quests</span>
-                        <span className="text-xs text-[#8a6a5c]">{questsDone}/{quests.length} done</span>
-                    </div>
-                    <div className="space-y-2">
+                    <ul className="space-y-3">
                         {quests.map((q) => {
                             const done = q.value >= q.target;
                             return (
-                                <div key={q.id} className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${done ? 'border-emerald-300 bg-emerald-50' : 'border-[#E6D5CC] bg-[#FDF6F0]'}`}>
-                                    <span className="text-lg">{done ? '✅' : q.emoji}</span>
-                                    <div className="flex-1">
-                                        <div className={`text-sm ${done ? 'text-emerald-700 line-through' : 'text-[#4A3B32]'}`}>{q.label}</div>
-                                        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[#E6D5CC]/60">
-                                            <div className={`h-full rounded-full ${done ? 'bg-emerald-500' : 'bg-[#C8A288]'}`} style={{ width: `${(q.value / q.target) * 100}%` }} />
+                                <li key={q.id} className="flex items-center gap-3">
+                                    <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${done ? 'bg-[#163628]' : 'border border-[#163628]/25'}`}>
+                                        {done && <Check className="h-3.5 w-3.5 text-[#D3EE6A]" strokeWidth={3} />}
+                                    </span>
+                                    <div className="min-w-0 flex-1">
+                                        <div className={`text-sm ${done ? 'text-[#5E5046] line-through' : 'text-[#163628]'}`}>{q.label}</div>
+                                        <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-[#163628]/10">
+                                            <div className="h-full rounded-full bg-[#D3EE6A] shadow-[inset_0_0_0_1px_rgba(22,54,40,0.15)]" style={{ width: `${Math.min(100, (q.value / q.target) * 100)}%` }} />
                                         </div>
                                     </div>
-                                    <span className="text-xs tabular-nums text-[#8a6a5c]">{done ? <Check className="h-4 w-4 text-emerald-600" /> : `${q.value}/${q.target}`}</span>
-                                </div>
+                                    <span className="text-xs tabular-nums text-[#5E5046]">{q.value}/{q.target}</span>
+                                </li>
                             );
                         })}
-                    </div>
+                    </ul>
                 </div>
-            </motion.div>
+            </div>
         </section>
     );
 };

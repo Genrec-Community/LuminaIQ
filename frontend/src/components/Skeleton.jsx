@@ -140,7 +140,7 @@ export const TabsSkeleton = ({ className = '' }) => (
 
 // Dashboard skeleton - comprehensive layout
 export const DashboardSkeleton = () => (
-  <div className="min-h-screen bg-[#FDF6F0] font-sans text-[#4A3B32]">
+  <div className="min-h-screen bg-[#FDF6F0] font-sans text-[#163628]">
     {/* Header */}
     <header className="bg-white border-b border-[#E6D5CC] sticky top-0 z-10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
@@ -214,7 +214,7 @@ export const DashboardSkeleton = () => (
 
 // Project View skeleton
 export const ProjectViewSkeleton = () => (
-  <div className="min-h-screen bg-[#FDF6F0] font-sans text-[#4A3B32]">
+  <div className="min-h-screen bg-[#FDF6F0] font-sans text-[#163628]">
     {/* Sidebar */}
     <div className="fixed left-0 top-0 h-full w-64 bg-white border-r border-[#E6D5CC] p-4">
       <Skeleton className="h-10 w-10 rounded-xl mb-6" />

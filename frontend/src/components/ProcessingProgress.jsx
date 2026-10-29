@@ -111,16 +111,16 @@ const Steps = ({ current, done }) => (
                 <li key={name} className="flex flex-1 flex-col items-center gap-1 min-w-0">
                     <span
                         className={`relative flex h-4 w-4 items-center justify-center rounded-full border transition-colors duration-500 ${isDone
-                            ? 'border-[#B08B72] bg-[#C8A288] text-white'
+                            ? 'border-[#163628] bg-[#1E5C42] text-white'
                             : isNow
-                                ? 'border-[#C8A288] bg-white'
+                                ? 'border-[#1E5C42] bg-white'
                                 : 'border-[#E6D5CC] bg-white'
                             }`}
                     >
                         {isDone && <Check className="h-2.5 w-2.5" strokeWidth={3} />}
-                        {isNow && <span className="lumina-step-now h-1.5 w-1.5 rounded-full bg-[#C8A288]" />}
+                        {isNow && <span className="lumina-step-now h-1.5 w-1.5 rounded-full bg-[#1E5C42]" />}
                     </span>
-                    <span className={`text-[10px] truncate ${isDone || isNow ? 'text-[#6b4c38] font-semibold' : 'text-[#b8a094]'}`}>
+                    <span className={`text-[10px] truncate ${isDone || isNow ? 'text-[#396D53] font-semibold' : 'text-[#b8a094]'}`}>
                         {name}
                     </span>
                 </li>
@@ -152,12 +152,12 @@ const ProcessingProgress = ({ stage = 'processing', stagePct = 0, message = '', 
             aria-valuetext={`${info.label}, ${pct}%`}
         >
             <div
-                className="relative h-full rounded-full bg-gradient-to-r from-[#E2C9B6] via-[#C8A288] to-[#A9806A]"
+                className="relative h-full rounded-full bg-gradient-to-r from-[#E2C9B6] via-[#1E5C42] to-[#A9806A]"
                 style={{ width: `${Math.max(3, value)}%` }}
             >
                 {motion && !done && <span className="lumina-progress-sheen absolute inset-0 rounded-full" />}
                 {!done && (
-                    <span className="absolute right-0 top-1/2 h-full aspect-square -translate-y-1/2 translate-x-1/2 rounded-full bg-[#FDF6F0] shadow-[0_0_0_2px_#C8A288,0_0_8px_rgba(200,162,136,0.7)]" />
+                    <span className="absolute right-0 top-1/2 h-full aspect-square -translate-y-1/2 translate-x-1/2 rounded-full bg-[#FDF6F0] shadow-[0_0_0_2px_#1E5C42,0_0_8px_rgba(200,162,136,0.7)]" />
                 )}
             </div>
         </div>
@@ -168,8 +168,8 @@ const ProcessingProgress = ({ stage = 'processing', stagePct = 0, message = '', 
             <div className="mt-1.5 w-full">
                 {bar}
                 <div className="mt-1 flex items-center justify-between gap-2 text-[10px]">
-                    <span className="truncate font-medium text-[#8a6a5c]">{info.label}</span>
-                    <span className="shrink-0 tabular-nums font-semibold text-[#6b4c38]">{done ? 'Ready' : `${pct}%`}</span>
+                    <span className="truncate font-medium text-[#5E5046]">{info.label}</span>
+                    <span className="shrink-0 tabular-nums font-semibold text-[#396D53]">{done ? 'Ready' : `${pct}%`}</span>
                 </div>
                 {detail && <p className="truncate text-[10px] text-[#a08070]" title={detail}>{detail}</p>}
             </div>
@@ -179,16 +179,16 @@ const ProcessingProgress = ({ stage = 'processing', stagePct = 0, message = '', 
     return (
         <div className={`w-full rounded-2xl border border-[#E6D5CC] bg-gradient-to-br from-[#FFFBF7] to-[#FDF6F0] p-4 shadow-sm ${done ? 'lumina-progress-done' : ''}`}>
             <div className="flex items-start gap-3">
-                <div className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${done ? 'bg-[#C8A288] text-white' : 'bg-white text-[#C8A288] border border-[#E6D5CC]'}`}>
+                <div className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${done ? 'bg-[#1E5C42] text-white' : 'bg-white text-[#1E5C42] border border-[#E6D5CC]'}`}>
                     {done ? <Check className="h-5 w-5" strokeWidth={3} /> : <BookOpen className={`h-5 w-5 ${motion ? 'lumina-book-breathe' : ''}`} />}
                 </div>
                 <div className="min-w-0 flex-1">
                     {title && <p className="truncate text-xs font-semibold uppercase tracking-wide text-[#a08070]">{title}</p>}
                     <div className="flex items-baseline justify-between gap-3">
-                        <p className="truncate font-bold text-[#4A3B32]">{info.label}</p>
-                        <p className="shrink-0 tabular-nums text-lg font-bold text-[#6b4c38]">{pct}%</p>
+                        <p className="truncate font-bold text-[#163628]">{info.label}</p>
+                        <p className="shrink-0 tabular-nums text-lg font-bold text-[#396D53]">{pct}%</p>
                     </div>
-                    <p className="h-4 truncate text-xs text-[#8a6a5c]">
+                    <p className="h-4 truncate text-xs text-[#5E5046]">
                         {done ? 'Your book is ready. Pick a tool and start studying.' : detail || 'You can keep using the app while this runs.'}
                     </p>
                 </div>

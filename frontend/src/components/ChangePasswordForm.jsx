@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Loader2, Lock, Eye, EyeOff } from 'lucide-react';
 import { changePassword, apiErrorText } from '../api';
 
-const field = 'w-full rounded-2xl border border-[#E6D5CC] bg-[#FDF6F0] px-4 py-3 pr-11 outline-none focus:ring-2 focus:ring-[#C8A288] text-[#4A3B32]';
+const field = 'w-full rounded-2xl border border-[#E6D5CC] bg-[#FDF6F0] px-4 py-3 pr-11 outline-none focus:ring-2 focus:ring-[#1E5C42] text-[#163628]';
 
 /** Current + new password, used in Settings and on the first sign-in of a school account. */
 const ChangePasswordForm = ({ onDone, submitLabel = 'Change password' }) => {
@@ -39,7 +39,7 @@ const ChangePasswordForm = ({ onDone, submitLabel = 'Change password' }) => {
             <div className="relative">
                 <input type={type} required autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)}
                     placeholder="Current password" aria-label="Current password" className={field} />
-                <button type="button" onClick={() => setShow(!show)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8a6a5c]"
+                <button type="button" onClick={() => setShow(!show)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#5E5046]"
                     aria-label={show ? 'Hide passwords' : 'Show passwords'}>
                     {show ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
@@ -51,7 +51,7 @@ const ChangePasswordForm = ({ onDone, submitLabel = 'Change password' }) => {
             {problem && <p className="text-sm text-amber-700">{problem}</p>}
             {msg && <p className={`text-sm ${msg.ok ? 'text-emerald-700' : 'text-rose-600'}`}>{msg.text}</p>}
             <button disabled={busy || !current || !next || !again || !!problem}
-                className="w-full rounded-2xl bg-[#C8A288] px-4 py-3 font-semibold text-white hover:bg-[#B08B72] disabled:opacity-50 flex items-center justify-center gap-2">
+                className="w-full rounded-2xl bg-[#1E5C42] px-4 py-3 font-semibold text-white hover:bg-[#163628] disabled:opacity-50 flex items-center justify-center gap-2">
                 {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <><Lock className="h-4 w-4" /> {submitLabel}</>}
             </button>
         </form>

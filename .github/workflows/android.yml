@@ -63,6 +63,9 @@ jobs:
 
       - name: Build web app
         run: npm run build
+        env:
+          # The phone app is the app only: keep dist/index.html, skip the marketing site
+          SKIP_WEBSITE: "1"
 
       - name: Copy web app into Android project
         run: npx cap sync android

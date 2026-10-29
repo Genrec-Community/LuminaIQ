@@ -190,28 +190,28 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
                         text-align: center;
                         margin-bottom: 24px;
                         padding-bottom: 16px;
-                        border-bottom: 2px solid #C8A288;
+                        border-bottom: 2px solid #1E5C42;
                     }
                     .pdf-header h1 {
                         font-size: 22px;
                         font-weight: 700;
-                        color: #4A3B32;
+                        color: #163628;
                         margin: 0 0 4px 0;
                     }
                     .pdf-header p {
                         font-size: 13px;
-                        color: #8a6a5c;
+                        color: #5E5046;
                         margin: 0;
                     }
-                    .pdf-body h1 { font-size: 20px; font-weight: 700; color: #4A3B32; margin: 24px 0 10px 0; border-bottom: 1px solid #E6D5CC; padding-bottom: 6px; }
-                    .pdf-body h2 { font-size: 17px; font-weight: 700; color: #4A3B32; margin: 20px 0 8px 0; }
-                    .pdf-body h3 { font-size: 15px; font-weight: 600; color: #5a4a42; margin: 16px 0 6px 0; }
+                    .pdf-body h1 { font-size: 20px; font-weight: 700; color: #163628; margin: 24px 0 10px 0; border-bottom: 1px solid #E6D5CC; padding-bottom: 6px; }
+                    .pdf-body h2 { font-size: 17px; font-weight: 700; color: #163628; margin: 20px 0 8px 0; }
+                    .pdf-body h3 { font-size: 15px; font-weight: 600; color: #2B3F35; margin: 16px 0 6px 0; }
                     .pdf-body p { font-size: 12px; margin: 6px 0; }
                     .pdf-body ul, .pdf-body ol { font-size: 12px; padding-left: 22px; margin: 6px 0; }
                     .pdf-body li { margin-bottom: 4px; }
-                    .pdf-body strong { color: #4A3B32; }
+                    .pdf-body strong { color: #163628; }
                     .pdf-body blockquote {
-                        border-left: 3px solid #C8A288;
+                        border-left: 3px solid #1E5C42;
                         padding: 8px 14px;
                         margin: 10px 0;
                         background: #FDF6F0;
@@ -243,12 +243,12 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
                         font-size: 11px;
                     }
                     .pdf-body th {
-                        background: #C8A288;
+                        background: #1E5C42;
                         color: white;
                         font-weight: 600;
                         padding: 8px 10px;
                         text-align: left;
-                        border: 1px solid #b0917a;
+                        border: 1px solid #163628;
                     }
                     .pdf-body td {
                         padding: 7px 10px;
@@ -268,7 +268,7 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
                         border-top: 1px solid #E6D5CC;
                         text-align: center;
                         font-size: 10px;
-                        color: #8a6a5c;
+                        color: #5E5046;
                     }
                 </style>
                 <div class="pdf-wrapper">
@@ -331,17 +331,17 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
                 <div className="absolute inset-0 z-50 bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center animate-in fade-in duration-300">
                     <div className="relative mb-6">
                         <div className="h-20 w-20 border-4 border-[#E6D5CC] rounded-full"></div>
-                        <div className="absolute inset-0 h-20 w-20 border-4 border-[#C8A288] rounded-full border-t-transparent animate-spin"></div>
-                        <BookOpen className="absolute inset-0 m-auto h-8 w-8 text-[#C8A288]" />
+                        <div className="absolute inset-0 h-20 w-20 border-4 border-[#1E5C42] rounded-full border-t-transparent animate-spin"></div>
+                        <BookOpen className="absolute inset-0 m-auto h-8 w-8 text-[#1E5C42]" />
                     </div>
-                    <h3 className="text-xl font-bold text-[#4A3B32] mb-2">Generating Notes</h3>
-                    <p className="text-[#8a6a5c] text-center max-w-xs">
+                    <h3 className="text-xl font-bold text-[#163628] mb-2">Generating Notes</h3>
+                    <p className="text-[#5E5046] text-center max-w-xs">
                         Creating <span className="font-semibold">{notesType}</span> {notesTopic || notesTopicSelection ? `about ${notesTopic || notesTopicSelection}` : 'from your documents'}...
                     </p>
                     <div className="flex gap-1.5 mt-6">
-                        <div className="h-2 w-2 bg-[#C8A288] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                        <div className="h-2 w-2 bg-[#C8A288] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                        <div className="h-2 w-2 bg-[#C8A288] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                        <div className="h-2 w-2 bg-[#1E5C42] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                        <div className="h-2 w-2 bg-[#1E5C42] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                        <div className="h-2 w-2 bg-[#1E5C42] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                     </div>
                 </div>
             )}
@@ -351,12 +351,12 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
                 <div className="animate-in fade-in slide-in-from-bottom-4">
                     <div className="flex items-center justify-between mb-8">
                         <div>
-                            <h2 className="text-2xl font-bold text-[#4A3B32]">Study Notes</h2>
-                            <p className="text-[#8a6a5c]">Generate comprehensive summaries or targeted study guides</p>
+                            <h2 className="text-2xl font-bold text-[#163628]">Study Notes</h2>
+                            <p className="text-[#5E5046]">Generate comprehensive summaries or targeted study guides</p>
                         </div>
                         <button
                             onClick={() => setViewMode('form')}
-                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#C8A288] to-[#A08072] text-white rounded-lg hover:opacity-90 transition-opacity shadow-sm"
+                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#1E5C42] to-[#163628] text-white rounded-lg hover:opacity-90 transition-opacity shadow-sm"
                         >
                             <Plus className="h-4 w-4" />
                             New Notes
@@ -365,18 +365,18 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
 
                     {savedLoading ? (
                         <div className="flex items-center justify-center py-16">
-                            <Loader2 className="h-8 w-8 text-[#C8A288] animate-spin" />
+                            <Loader2 className="h-8 w-8 text-[#1E5C42] animate-spin" />
                         </div>
                     ) : savedNotes.length === 0 ? (
                         <div className="text-center py-16">
                             <div className="h-20 w-20 bg-[#FDF6F0] rounded-full flex items-center justify-center mx-auto mb-6">
-                                <BookOpen className="h-10 w-10 text-[#C8A288]" />
+                                <BookOpen className="h-10 w-10 text-[#1E5C42]" />
                             </div>
-                            <h3 className="text-xl font-bold text-[#4A3B32] mb-2">No Notes Yet</h3>
-                            <p className="text-[#8a6a5c] mb-6">Generate your first set of study notes</p>
+                            <h3 className="text-xl font-bold text-[#163628] mb-2">No Notes Yet</h3>
+                            <p className="text-[#5E5046] mb-6">Generate your first set of study notes</p>
                             <button
                                 onClick={() => setViewMode('form')}
-                                className="px-6 py-3 bg-gradient-to-r from-[#C8A288] to-[#A08072] text-white rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2 mx-auto"
+                                className="px-6 py-3 bg-gradient-to-r from-[#1E5C42] to-[#163628] text-white rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2 mx-auto"
                             >
                                 <BookOpen className="h-5 w-5" />
                                 Generate Notes
@@ -394,8 +394,8 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
                                     >
                                         <div className="flex items-start justify-between mb-3">
                                             <div className="flex-1 min-w-0">
-                                                <h3 className="font-bold text-[#4A3B32] mb-1 truncate">{note.title || note.note_type || 'Notes'}</h3>
-                                                <div className="flex items-center gap-1.5 text-xs text-[#8a6a5c]">
+                                                <h3 className="font-bold text-[#163628] mb-1 truncate">{note.title || note.note_type || 'Notes'}</h3>
+                                                <div className="flex items-center gap-1.5 text-xs text-[#5E5046]">
                                                     <Clock className="h-3 w-3" />
                                                     {formatDate(note.created_at)}
                                                 </div>
@@ -413,11 +413,11 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
                                             </div>
                                         )}
                                         {note.topic && (
-                                            <p className="text-xs text-[#8a6a5c] mb-3 truncate">{note.topic}</p>
+                                            <p className="text-xs text-[#5E5046] mb-3 truncate">{note.topic}</p>
                                         )}
                                         <button
                                             onClick={(e) => { e.stopPropagation(); handleViewSavedNote(note.id); }}
-                                            className="w-full py-2 bg-[#C8A288] text-white rounded-lg hover:bg-[#B08B72] transition-colors text-sm font-medium flex items-center justify-center gap-1.5"
+                                            className="w-full py-2 bg-[#1E5C42] text-white rounded-lg hover:bg-[#163628] transition-colors text-sm font-medium flex items-center justify-center gap-1.5"
                                         >
                                             <Eye className="h-3.5 w-3.5" />
                                             View
@@ -435,21 +435,21 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
                 <div className="text-center py-12 animate-in fade-in slide-in-from-bottom-4">
                     <button
                         onClick={() => setViewMode('list')}
-                        className="flex items-center gap-2 px-4 py-2 mb-4 text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-[#E6D5CC]/30 rounded-lg font-medium transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 mb-4 text-[#5E5046] hover:text-[#163628] hover:bg-[#E6D5CC]/30 rounded-lg font-medium transition-colors"
                     >
                         <ArrowLeft className="h-4 w-4" />
                         Back to Saved
                     </button>
 
                     <div className="h-20 w-20 bg-[#FDF6F0] rounded-full flex items-center justify-center mx-auto mb-6">
-                        <BookOpen className="h-10 w-10 text-[#C8A288]" />
+                        <BookOpen className="h-10 w-10 text-[#1E5C42]" />
                     </div>
-                    <h3 className="text-2xl font-bold mb-2 text-[#4A3B32]">Study Notes</h3>
-                    <p className="text-[#8a6a5c] mb-8">Generate comprehensive summaries or targeted study guides.</p>
+                    <h3 className="text-2xl font-bold mb-2 text-[#163628]">Study Notes</h3>
+                    <p className="text-[#5E5046] mb-8">Generate comprehensive summaries or targeted study guides.</p>
 
                     <div className="max-w-md mx-auto space-y-4 bg-white p-8 rounded-3xl border border-[#E6D5CC] shadow-sm text-left">
                         <div>
-                            <label className="block text-sm font-bold mb-2 text-[#4A3B32] uppercase tracking-wide opacity-80">Focus Topic (Optional)</label>
+                            <label className="block text-sm font-bold mb-2 text-[#163628] uppercase tracking-wide opacity-80">Focus Topic (Optional)</label>
                             {availableTopics.length > 0 ? (
                                 <div className="relative">
                                     <select
@@ -460,7 +460,7 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
                                             if (val !== '__custom__') setNotesTopic(val);
                                             else setNotesTopic('');
                                         }}
-                                        className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#C8A288] text-[#4A3B32] font-medium appearance-none"
+                                        className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#1E5C42] text-[#163628] font-medium appearance-none"
                                     >
                                         <option value="">General Summary (All)</option>
                                         {availableTopics.map((topic, idx) => (
@@ -468,14 +468,14 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
                                         ))}
                                         <option value="__custom__">Custom Topic...</option>
                                     </select>
-                                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8a6a5c] pointer-events-none" />
+                                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#5E5046] pointer-events-none" />
                                     {notesTopicSelection === '__custom__' && (
                                         <input
                                             type="text"
                                             value={notesTopic}
                                             onChange={(e) => setNotesTopic(e.target.value)}
                                             placeholder="Enter custom topic..."
-                                            className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#C8A288] mt-3 animate-in fade-in"
+                                            className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#1E5C42] mt-3 animate-in fade-in"
                                             autoFocus
                                         />
                                     )}
@@ -486,32 +486,32 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
                                     value={notesTopic}
                                     onChange={(e) => setNotesTopic(e.target.value)}
                                     placeholder="e.g. Chapter 4, Photosynthesis..."
-                                    className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#C8A288] mb-4"
+                                    className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#1E5C42] mb-4"
                                 />
                             )}
                         </div>
 
                         <div>
-                            <label className="block text-sm font-bold mb-2 text-[#4A3B32] uppercase tracking-wide opacity-80">Note Type</label>
+                            <label className="block text-sm font-bold mb-2 text-[#163628] uppercase tracking-wide opacity-80">Note Type</label>
                             <div className="relative">
                                 <select
                                     value={notesType}
                                     onChange={(e) => setNotesType(e.target.value)}
-                                    className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#C8A288] text-[#4A3B32] font-medium appearance-none"
+                                    className="w-full px-5 py-3.5 bg-[#FDF6F0] border-0 rounded-xl focus:ring-2 focus:ring-[#1E5C42] text-[#163628] font-medium appearance-none"
                                 >
                                     <option>Comprehensive Summary</option>
                                     <option>Bullet Point Key Facts</option>
                                     <option>Glossary of Terms</option>
                                     <option>Exam Cheat Sheet</option>
                                 </select>
-                                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8a6a5c] pointer-events-none" />
+                                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#5E5046] pointer-events-none" />
                             </div>
                         </div>
 
                         <button
                             onClick={handleGenerateNotes}
                             disabled={notesLoading}
-                            className="w-full py-4 bg-[#C8A288] text-white rounded-xl hover:bg-[#B08B72] font-bold shadow-lg shadow-[#C8A288]/20 disabled:opacity-50 transition-colors mt-4 flex items-center justify-center gap-2"
+                            className="w-full py-4 bg-[#1E5C42] text-white rounded-xl hover:bg-[#163628] font-bold shadow-lg shadow-[#1E5C42]/20 disabled:opacity-50 transition-colors mt-4 flex items-center justify-center gap-2"
                         >
                             {notesLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <BookOpen className="h-5 w-5" />}
                             {notesLoading ? 'Generating Notes...' : 'Generate Notes'}
@@ -528,20 +528,20 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
                         <div>
                             <button
                                 onClick={handleBackToList}
-                                className="flex items-center gap-1.5 text-sm text-[#8a6a5c] hover:text-[#4A3B32] mb-2 transition-colors"
+                                className="flex items-center gap-1.5 text-sm text-[#5E5046] hover:text-[#163628] mb-2 transition-colors"
                             >
                                 <ArrowLeft className="h-3.5 w-3.5" />
                                 Back to Saved
                             </button>
-                            <h3 className="text-xl md:text-2xl font-bold text-[#4A3B32]">{notesTitle || notesType}</h3>
+                            <h3 className="text-xl md:text-2xl font-bold text-[#163628]">{notesTitle || notesType}</h3>
                             {(notesTopic || notesTopicSelection) && (
-                                <p className="text-sm text-[#8a6a5c] font-medium mt-1">{notesTopic || notesTopicSelection}</p>
+                                <p className="text-sm text-[#5E5046] font-medium mt-1">{notesTopic || notesTopicSelection}</p>
                             )}
                         </div>
                         <div className="flex flex-wrap gap-2">
                             <button
                                 onClick={copyToClipboard}
-                                className="flex items-center gap-2 px-3 py-2 border border-[#E6D5CC] rounded-lg hover:bg-[#FDF6F0] text-[#8a6a5c] transition-colors text-sm"
+                                className="flex items-center gap-2 px-3 py-2 border border-[#E6D5CC] rounded-lg hover:bg-[#FDF6F0] text-[#5E5046] transition-colors text-sm"
                                 title="Copy to Clipboard"
                             >
                                 <Copy className="h-4 w-4" />
@@ -550,7 +550,7 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
                             <button
                                 onClick={handleDownloadPDF}
                                 disabled={pdfLoading || notesLoading}
-                                className="flex items-center gap-2 px-3 py-2 border border-[#C8A288] text-[#C8A288] rounded-lg hover:bg-[#C8A288] hover:text-white font-medium transition-colors disabled:opacity-50 text-sm"
+                                className="flex items-center gap-2 px-3 py-2 border border-[#1E5C42] text-[#1E5C42] rounded-lg hover:bg-[#1E5C42] hover:text-white font-medium transition-colors disabled:opacity-50 text-sm"
                                 title="Download as PDF"
                             >
                                 {pdfLoading ? (
@@ -562,7 +562,7 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
                             </button>
                             <button
                                 onClick={() => { setNotesContent(''); setNotesTopic(''); setNotesTopicSelection(''); setNotesTitle(''); setViewMode('form'); }}
-                                className="px-3 py-2 bg-[#C8A288] text-white rounded-lg hover:bg-[#B08B72] font-medium transition-colors text-sm"
+                                className="px-3 py-2 bg-[#1E5C42] text-white rounded-lg hover:bg-[#163628] font-medium transition-colors text-sm"
                             >
                                 New Notes
                             </button>
@@ -572,8 +572,8 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
                     {/* Notes Content */}
                     <div
                         ref={notesRef}
-                        className="bg-white p-6 md:p-10 rounded-2xl border border-[#E6D5CC] shadow-sm prose prose-base md:prose-lg max-w-none text-[#4A3B32] overflow-x-auto
-                        prose-headings:text-[#4A3B32] prose-headings:font-bold
+                        className="bg-white p-6 md:p-10 rounded-2xl border border-[#E6D5CC] shadow-sm prose prose-base md:prose-lg max-w-none text-[#163628] overflow-x-auto
+                        prose-headings:text-[#163628] prose-headings:font-bold
                         prose-h1:text-2xl prose-h1:mb-4 prose-h1:pb-2 prose-h1:border-b prose-h1:border-[#E6D5CC]
                         prose-h2:text-xl prose-h2:mb-3 prose-h2:mt-6
                         prose-h3:text-lg prose-h3:mb-2 prose-h3:mt-4
@@ -581,18 +581,18 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
                         prose-ul:my-4 prose-ul:list-disc prose-ul:pl-6
                         prose-ol:my-4 prose-ol:list-decimal prose-ol:pl-6
                         prose-li:mb-2
-                        prose-strong:text-[#4A3B32] prose-strong:font-semibold
-                        prose-code:bg-[#FDF6F0] prose-code:px-2 prose-code:py-1 prose-code:rounded prose-code:text-sm prose-code:text-[#C8A288]
+                        prose-strong:text-[#163628] prose-strong:font-semibold
+                        prose-code:bg-[#FDF6F0] prose-code:px-2 prose-code:py-1 prose-code:rounded prose-code:text-sm prose-code:text-[#1E5C42]
                         prose-pre:bg-[#FDF6F0] prose-pre:border prose-pre:border-[#E6D5CC] prose-pre:rounded-xl prose-pre:p-4
-                        prose-blockquote:border-l-4 prose-blockquote:border-[#C8A288] prose-blockquote:pl-4 prose-blockquote:italic prose-blockquote:text-[#8a6a5c]
-                        prose-a:text-[#C8A288] prose-a:no-underline hover:prose-a:underline
+                        prose-blockquote:border-l-4 prose-blockquote:border-[#1E5C42] prose-blockquote:pl-4 prose-blockquote:italic prose-blockquote:text-[#5E5046]
+                        prose-a:text-[#1E5C42] prose-a:no-underline hover:prose-a:underline
                         prose-table:border-collapse prose-table:w-full
-                        prose-th:bg-[#C8A288] prose-th:text-white prose-th:p-3 prose-th:text-left prose-th:font-semibold
+                        prose-th:bg-[#1E5C42] prose-th:text-white prose-th:p-3 prose-th:text-left prose-th:font-semibold
                         prose-td:border prose-td:border-[#E6D5CC] prose-td:p-3
                         prose-tr:even:bg-[#FDF6F0]"
                     >
                         {notesLoading && !notesContent ? (
-                            <div className="flex items-center justify-center h-40 gap-3 text-[#8a6a5c]">
+                            <div className="flex items-center justify-center h-40 gap-3 text-[#5E5046]">
                                 <Loader2 className="h-6 w-6 animate-spin" />
                                 <span className="font-medium">Writing your notes...</span>
                             </div>
@@ -602,8 +602,8 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
                             </ReactMarkdown>
                         )}
                         {notesLoading && notesContent && (
-                            <div className="mt-4 flex items-center gap-2 text-[#C8A288] animate-pulse">
-                                <span className="h-2 w-2 bg-[#C8A288] rounded-full" />
+                            <div className="mt-4 flex items-center gap-2 text-[#1E5C42] animate-pulse">
+                                <span className="h-2 w-2 bg-[#1E5C42] rounded-full" />
                                 <span className="text-sm font-bold uppercase tracking-wider">Continuing...</span>
                             </div>
                         )}

@@ -5,26 +5,26 @@ const CONTACT = 'support@luminaiq.fun';
 
 const Section = ({ title, children }) => (
     <section className="mt-8">
-        <h2 className="text-xl font-bold text-[#4A3B32]">{title}</h2>
-        <div className="mt-2 space-y-3 leading-relaxed text-[#5a4a42]">{children}</div>
+        <h2 className="text-xl font-bold text-[#163628]">{title}</h2>
+        <div className="mt-2 space-y-3 leading-relaxed text-[#2B3F35]">{children}</div>
     </section>
 );
 
 const Shell = ({ title, children }) => (
     <div className="min-h-screen bg-[#FDF6F0] px-5 py-10" style={{ paddingTop: 'calc(var(--sat) + 2.5rem)' }}>
         <article className="mx-auto max-w-2xl rounded-3xl bg-white p-6 shadow-sm md:p-10">
-            <button onClick={() => (window.history.length > 1 ? window.history.back() : window.location.assign('/'))} className="text-sm font-semibold text-[#C8A288]">← Back</button>
-            <h1 className="mt-4 text-3xl font-extrabold text-[#4A3B32]">{title}</h1>
-            <p className="mt-1 text-sm text-[#8a6a5c]">Last updated {UPDATED}</p>
+            <button onClick={() => (window.history.length > 1 ? window.history.back() : window.location.assign('/'))} className="text-sm font-semibold text-[#1E5C42]">← Back</button>
+            <h1 className="mt-4 text-3xl font-extrabold text-[#163628]">{title}</h1>
+            <p className="mt-1 text-sm text-[#5E5046]">Last updated {UPDATED}</p>
             {children}
-            <p className="mt-10 text-sm text-[#8a6a5c]">Questions? Email <a className="font-semibold text-[#C8A288]" href={`mailto:${CONTACT}`}>{CONTACT}</a>.</p>
+            <p className="mt-10 text-sm text-[#5E5046]">Questions? Email <a className="font-semibold text-[#1E5C42]" href={`mailto:${CONTACT}`}>{CONTACT}</a>.</p>
         </article>
     </div>
 );
 
 export const Privacy = () => (
     <Shell title="Privacy Policy">
-        <p className="mt-6 leading-relaxed text-[#5a4a42]">
+        <p className="mt-6 leading-relaxed text-[#2B3F35]">
             Lumina IQ (the website at luminaiq.fun and the Lumina IQ app) helps you study from your own books and notes.
             This policy explains what we collect, why, and the choices you have.
         </p>
@@ -45,7 +45,7 @@ export const Privacy = () => (
             <p>Your books and study data are private to your account. If you join a class through an institution, your teacher can see your class progress. We share data only with the providers above, or when the law requires it.</p>
         </Section>
         <Section title="Keeping and deleting your data">
-            <p>We keep your data while your account exists. You can delete a file or a book at any time, and you can delete your whole account in the app (You → Delete account) or by emailing us. Deleting your account permanently removes your files, extracted text, search index, study data and login. Payment records are kept where the law requires it. See <a className="font-semibold text-[#C8A288]" href="/delete-account">Delete your account</a> for the steps.</p>
+            <p>We keep your data while your account exists. You can delete a file or a book at any time, and you can delete your whole account in the app (You → Delete account) or by emailing us. Deleting your account permanently removes your files, extracted text, search index, study data and login. Payment records are kept where the law requires it. See <a className="font-semibold text-[#1E5C42]" href="/delete-account">Delete your account</a> for the steps.</p>
         </Section>
         <Section title="Security">
             <p>Data is sent over encrypted connections (HTTPS) and stored with access controls so only your account can reach your files.</p>
@@ -64,7 +64,7 @@ export const Privacy = () => (
 
 export const DeleteAccount = () => (
     <Shell title="Delete your Lumina IQ account">
-        <p className="mt-6 leading-relaxed text-[#5a4a42]">
+        <p className="mt-6 leading-relaxed text-[#2B3F35]">
             You can delete your Lumina IQ account and its data at any time, from the app or by email.
         </p>
         <Section title="Delete in the app">
@@ -75,7 +75,7 @@ export const DeleteAccount = () => (
             <p>On the website, sign in at luminaiq.fun and go to <b>Settings → Account → Delete account</b>.</p>
         </Section>
         <Section title="Delete by email">
-            <p>If you can't use the app, email <a className="font-semibold text-[#C8A288]" href={`mailto:${CONTACT}?subject=Delete%20my%20Lumina%20IQ%20account`}>{CONTACT}</a> from the address you signed up with, with the subject "Delete my Lumina IQ account". We'll delete the account within 30 days and reply to confirm.</p>
+            <p>If you can't use the app, email <a className="font-semibold text-[#1E5C42]" href={`mailto:${CONTACT}?subject=Delete%20my%20Lumina%20IQ%20account`}>{CONTACT}</a> from the address you signed up with, with the subject "Delete my Lumina IQ account". We'll delete the account within 30 days and reply to confirm.</p>
         </Section>
         <Section title="Delete only some of your data">
             <p>You don't have to delete your account to remove data. In the app you can delete any book or file at any time, which removes the file, its extracted text and its search index. To remove other data, such as your chat history or progress, email us and tell us what to delete.</p>

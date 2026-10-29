@@ -29,12 +29,12 @@ const DeleteAccountForm = () => {
 
     return (
         <form onSubmit={submit} className="space-y-3 rounded-2xl border border-red-200 bg-red-50/60 p-4">
-            <p className="text-sm text-[#5a4a42]">
+            <p className="text-sm text-[#5E5046]">
                 This permanently deletes your account, your books and files, and everything you made in Lumina IQ. It can't be undone.{' '}
-                <a href="/delete-account" className="font-semibold text-[#C8A288]">What gets deleted</a>
+                <a href="/delete-account" className="font-semibold text-[#1E5C42]">What gets deleted</a>
             </p>
             <input value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Type DELETE to confirm"
-                className="w-full rounded-2xl border border-red-200 bg-white px-4 py-3 outline-none focus:ring-2 focus:ring-red-300 text-[#4A3B32]" />
+                className="w-full rounded-2xl border border-red-200 bg-white px-4 py-3 outline-none focus:ring-2 focus:ring-red-300 text-[#163628]" />
             {error && <p className="text-sm text-red-600">{error}</p>}
             <button type="submit" disabled={busy || confirm !== 'DELETE'}
                 className="inline-flex items-center gap-2 rounded-2xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">
