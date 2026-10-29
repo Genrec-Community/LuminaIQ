@@ -419,3 +419,7 @@ html.dark .field > span { color: var(--lumina-on-ink); }
 .chip--on { background: var(--lumina-ink); color: var(--lumina-on-ink); }
 .chip:active { scale: 0.96; }
 @media (hover: hover) { .chip:not(.chip--on):hover { background: var(--lumina-lime); color: var(--lumina-ink); } }
+html.dark .mark-em em { background-image: linear-gradient(rgb(211 238 106 / 0.35), rgb(211 238 106 / 0.35)); }
+html.dark .site-header { background: color-mix(in srgb, var(--dm-bg) 94%, transparent); color: var(--lumina-on-ink); }
+html.dark .menu { background: var(--dm-bg); }
+html.dark .menu-button { background: rgb(244 238 226 / 0.06); }
