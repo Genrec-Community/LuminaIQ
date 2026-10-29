@@ -207,8 +207,11 @@ function counters() {
     document.querySelectorAll<HTMLElement>('[data-count]').forEach((el) => {
       const target = parseFloat(el.dataset.count || '0');
       const decimals = parseInt(el.dataset.decimals || '0', 10);
+      // A rating or a time is read as a fact, never as a running tally: only large counts move,
+      // and they start near the end so a passing glance never reads a wrong figure.
+      if (decimals > 0 || target < 1000) return;
       const final = el.textContent;
-      const o = { v: 0 };
+      const o = { v: Math.round(target * 0.9) };
       const fmt = (v: number) => v.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
       gsap.to(o, {
         v: target,
@@ -216,7 +219,7 @@ function counters() {
         ease: ease.out,
         scrollTrigger: { trigger: el, start: 'top 90%', once: true },
         onStart: () => {
-          el.textContent = fmt(0);
+          el.textContent = fmt(o.v);
         },
         onUpdate: () => {
           el.textContent = fmt(o.v);

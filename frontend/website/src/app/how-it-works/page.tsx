@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { breadcrumbs, ld, pageMeta } from '@/lib/seo';
 import { Faq } from '@/components/Faq';
 import { faqs, loop, pipeline, reviewDays } from '@/data/site';
+import { FlipCard } from '@/components/FlipCard';
 
 export const metadata: Metadata = pageMeta({
   title: 'How it works: from your PDF to cited answers',
@@ -16,7 +17,7 @@ export default function HowItWorks() {
   return (
     <>
       <section className="page-hero" aria-labelledby="how-title">
-        <div className="wrap page-hero__grid">
+        <div className="wrap page-hero__grid page-hero__grid--card">
           <h1 id="how-title" className="display h-mega rise">
             What happens after you <em>upload.</em>
           </h1>
@@ -26,6 +27,13 @@ export default function HowItWorks() {
               see each idea again.
             </p>
           </div>
+          <FlipCard
+            className="page-hero__card rise"
+            meta="Biology, ch. 8 · Review day 6"
+            question="Where in the chloroplast do the light reactions take place?"
+            answerMeta="Answer · from your file, p. 142"
+            answer="On the thylakoid membranes. Next review: day 15."
+          />
         </div>
       </section>
 

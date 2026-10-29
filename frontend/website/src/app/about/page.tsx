@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { breadcrumbs, ld, pageMeta } from '@/lib/seo';
 import Link from 'next/link';
 import { Arrow } from '@/components/Footer';
+import { FlipCard } from '@/components/FlipCard';
 import { Photo } from '@/components/Photo';
 import { photos, site } from '@/data/site';
 
@@ -35,7 +36,7 @@ export default function About() {
   return (
     <>
       <section className="page-hero" aria-labelledby="about-title">
-        <div className="wrap page-hero__grid">
+        <div className="wrap page-hero__grid page-hero__grid--card">
           <h1 id="about-title" className="display h-mega rise">
             Studying should be <em>practice,</em> not preparation.
           </h1>
@@ -45,6 +46,12 @@ export default function About() {
               Lumina IQ exists to hand those hours back.
             </p>
           </div>
+          <FlipCard
+            className="page-hero__card rise"
+            meta="Card 1 · How memory works"
+            question="What makes a fact stick: reading it again, or recalling it?"
+            answer="Recalling it. Each time you pull an answer out of memory, it lasts longer. That is the whole product."
+          />
         </div>
       </section>
 

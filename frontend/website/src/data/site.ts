@@ -54,7 +54,7 @@ export type Photo = { id: string; alt: string; src?: string; w?: number; h?: num
 // w × h is the capture's own size, so the frame never crops a product shot
 const shot = (file: string, w: number, h: number, alt: string): Photo => ({ id: file, src: `/shots/${file}`, w, h, alt });
 export const photos = {
-  hero: shot('feed.webp', 780, 974, 'The Lumina IQ phone app: a quick question on where the light reactions happen, answered correctly'),
+  hero: shot('feed.webp', 780, 930, 'The Lumina IQ phone app: a quick question on where the light reactions happen, answered correctly'),
   college: shot('dashboard.webp', 740, 540, 'The Lumina IQ dashboard: a greeting, a nudge from Lumi and the chapter to continue'),
   medlaw: shot('phone-home.webp', 780, 974, 'The phone home screen: a getting-started checklist and today\'s review feed'),
   teachers: shot('memory-curve.webp', 878, 531, 'The memory curve: how much of the studied topics is still remembered, and when it fades'),

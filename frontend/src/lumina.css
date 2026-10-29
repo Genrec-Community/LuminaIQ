@@ -308,6 +308,10 @@ html.dark .lumina-logo { color: var(--lumina-on-ink); }
 .btn--soft { background: var(--lumina-bg-2); color: var(--lumina-ink); }
 .btn--accent { background: var(--lumina-lime); color: var(--lumina-ink); }
 .btn--accent::before { background: var(--lumina-on-ink); }
+/* Secondary pills fill with paper, not lime, so the one lime fill always marks the main action */
+.btn--light::before, .btn--soft::before { background: var(--lumina-bg-2); }
+.btn--soft::before { background: rgb(22 54 40 / 0.1); }
+.btn--google::before { background: #f1f3f4; }
 .btn:focus-visible::before { transform: scaleX(1); }
 .btn:focus-visible { color: var(--lumina-ink); }
 .btn:active { scale: 0.97; }

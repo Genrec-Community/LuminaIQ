@@ -54,7 +54,7 @@ export function Specimen({ slug }: { slug: string }) {
         <div className="spec spec--map">
           <svg viewBox="0 0 240 140" aria-hidden="true">
             <g className="map__edges">
-              <path d="M120 70 L46 30 M120 70 L50 112 M120 70 L196 34 M120 70 L194 110 M46 30 L20 64" />
+              <path d="M120 70 L46 30 M120 70 L50 112 M120 70 L196 34 M120 70 L194 110 M46 30 L22 56" />
             </g>
             <g className="map__nodes">
               <rect x="78" y="58" width="84" height="24" rx="12" className="is-root" />
@@ -62,6 +62,7 @@ export function Specimen({ slug }: { slug: string }) {
               <rect x="14" y="102" width="72" height="20" rx="10" />
               <rect x="160" y="24" width="72" height="20" rx="10" />
               <rect x="158" y="100" width="72" height="20" rx="10" />
+              <rect x="2" y="56" width="40" height="18" rx="9" />
             </g>
             <g className="map__labels">
               <text x="120" y="74">Photosynthesis</text>
@@ -69,6 +70,7 @@ export function Specimen({ slug }: { slug: string }) {
               <text x="50" y="116">Calvin cycle</text>
               <text x="196" y="38">Chloroplast</text>
               <text x="194" y="114">Products</text>
+              <text x="22" y="69">ATP</text>
             </g>
           </svg>
         </div>
