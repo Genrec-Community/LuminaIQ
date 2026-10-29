@@ -23,11 +23,13 @@ const ILLUSTRATIVE = { days: 40, reviews: [1, 6, 15, 38], s0: 2.2 };
 
 function illustrative() {
     const { days, reviews, s0 } = ILLUSTRATIVE;
-    const once = (t) => Math.exp(-t / s0);
+    // Some of a chapter survives without review (savings), so neither curve reaches 0, same as the site's
+    const floor = 0.2;
+    const once = (t) => floor + (1 - floor) * Math.exp(-t / s0);
     const withReviews = (t) => {
         let k = 0; let last = 0;
         for (const r of reviews) if (t >= r) { k += 1; last = r; }
-        return Math.exp(-(t - last) / (s0 * 3 ** k));
+        return floor + (1 - floor) * Math.exp(-(t - last) / (s0 * 3 ** k));
     };
     return { days, once, withReviews, reviews, personal: false };
 }

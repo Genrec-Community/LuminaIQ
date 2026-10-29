@@ -13,12 +13,14 @@ const REVIEWS = [1, 6, 15, 38];
 const S0 = 2.2; // stability in days after one read
 const GROWTH = 3; // each successful review makes the memory this much more stable
 
-const once = (t: number) => Math.exp(-t / S0);
+const FLOOR = 0.2; // some of a chapter survives without any review (savings), so neither curve reaches 0
+
+const once = (t: number) => FLOOR + (1 - FLOOR) * Math.exp(-t / S0);
 function withReviews(t: number) {
   let k = 0;
   let last = 0;
   for (const r of REVIEWS) if (t >= r) { k++; last = r; }
-  return Math.exp(-(t - last) / (S0 * Math.pow(GROWTH, k)));
+  return FLOOR + (1 - FLOOR) * Math.exp(-(t - last) / (S0 * Math.pow(GROWTH, k)));
 }
 
 const W = 800;

@@ -2,6 +2,17 @@
    Lumina IQ. Tokens first (see DESIGN.md), then foundation, then sections.
    ========================================================================== */
 
+/* Digits only, from Plus Jakarta Sans (OFL; the app's former UI face): Atkinson Hyperlegible Next
+   draws a slashed zero, which reads as Ø in prices and counts. Scaled to Atkinson's cap height. */
+@font-face {
+  font-family: 'Lumina Digits';
+  src: url('/fonts/digits.woff2') format('woff2');
+  font-weight: 200 800;
+  font-display: swap;
+  unicode-range: U+0030-0039;
+  size-adjust: 90%;
+}
+
 :root {
   /* Color by role */
   --c-bg: #fdf6f0;          /* the app's own beige (frontend --color-bg-light) */
@@ -18,7 +29,7 @@
 
   /* Type */
   --f-display: var(--font-display), Georgia, 'Times New Roman', serif;
-  --f-body: var(--font-text), system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --f-body: 'Lumina Digits', var(--font-text), system-ui, -apple-system, 'Segoe UI', sans-serif;
   --t-mega: clamp(3.1rem, 1.55rem + 6.4vw, 7.4rem);
   --t-xl: clamp(2.35rem, 1.55rem + 3.4vw, 4.9rem);
   --t-l: clamp(1.8rem, 1.4rem + 1.6vw, 2.85rem);
@@ -33,7 +44,7 @@
   --max: 88rem;
   --radius: 1.25rem;
   --header-h: 4.5rem;
-  --sec: clamp(5rem, 3rem + 7vw, 10rem);
+  --sec: clamp(4.5rem, 2.75rem + 5.5vw, 8rem);
   --shadow: 0 1px 0 rgb(22 54 40 / 0.04), 0 18px 40px -22px rgb(22 54 40 / 0.35);
 
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -387,6 +398,7 @@ html.motion .thread__svg path { stroke-dashoffset: 1; }
 .node { display: inline-flex; align-items: center; gap: 0.6rem; margin-bottom: 1.4rem; font-size: var(--t-xs); color: var(--c-muted); }
 .node__dot { width: 1.05rem; height: 1.05rem; border-radius: 50%; background: var(--c-bg); box-shadow: inset 0 0 0 2px var(--c-fg); transition: background-color 0.4s, scale 0.6s var(--ease-out); }
 .node.is-on .node__dot { background: var(--c-accent); scale: 1.25; }
+.node__label { position: relative; padding: 0.15rem 0.45rem; border-radius: 999px; background: var(--c-bg); } /* the thread passes under it */
 .node__label b { color: var(--c-fg); font-weight: 600; }
 
 /* ---------- Stats ---------- */
@@ -428,7 +440,7 @@ html.motion .thread__svg path { stroke-dashoffset: 1; }
 .dial__center { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; font-family: var(--f-display); font-weight: 300; font-style: italic; font-size: clamp(2rem, 1.5rem + 2vw, 3.2rem); letter-spacing: -0.03em; line-height: 0.9; }
 .dial__center span { display: block; font-style: normal; font-family: var(--f-body); font-size: var(--t-xs); letter-spacing: 0; color: var(--c-muted); margin-bottom: 0.4rem; }
 .loop__chapters { grid-column: 7 / 13; grid-row: 2; list-style: none; padding: 0; display: grid; gap: clamp(4rem, 12vh, 9rem); padding-block: 4vh 8vh; }
-.chapter { display: grid; gap: 1rem; opacity: 0.38; transition: opacity 0.5s var(--ease-soft); }
+.chapter { display: grid; gap: 1rem; opacity: 0.78; transition: opacity 0.5s var(--ease-soft); } /* resting chapters stay readable (about 4.5:1 for body text) */
 .chapter.is-active { opacity: 1; }
 html:not(.motion) .chapter { opacity: 1; }
 .chapter__stage { font-size: var(--t-xs); font-weight: 600; color: var(--c-muted); }
@@ -623,6 +635,9 @@ html.motion .wall__media > div { scale: none; }
 .page-hero--center { text-align: center; }
 .page-hero--center h1 { max-width: 15ch; margin-inline: auto; }
 .page-hero--center .lede { margin: 1.75rem auto 0; max-width: 40ch; }
+/* Pricing: the plans are the content, so the heading steps back and the cards start in the first view */
+.page-hero--tight { padding-top: clamp(2.5rem, 1.5rem + 3vw, 4.5rem); padding-bottom: clamp(2rem, 1.5rem + 2vw, 3rem); }
+.page-hero--tight h1 { max-width: 22ch; }
 .stage-nav { grid-column: 7 / 13; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem var(--gutter); }
 .stage-nav__label { font-size: var(--t-xs); font-weight: 600; color: var(--c-muted); margin-bottom: 0.5rem; }
 .stage-nav ul { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 0.4rem; }

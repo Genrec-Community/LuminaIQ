@@ -26,9 +26,9 @@ function Cell({ v }: { v: string | boolean }) {
 export default function PricingPage() {
   return (
     <>
-      <section className="page-hero page-hero--center" aria-labelledby="pricing-title">
+      <section className="page-hero page-hero--center page-hero--tight" aria-labelledby="pricing-title">
         <div className="wrap">
-          <h1 id="pricing-title" className="display h-mega rise">
+          <h1 id="pricing-title" className="display h-xl rise">
             Free to start. <em>₹299</em> to keep going.
           </h1>
           <p className="lede rise" style={{ ['--d' as string]: '0.15s' }}>
