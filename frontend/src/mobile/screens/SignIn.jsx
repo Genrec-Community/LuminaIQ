@@ -5,7 +5,7 @@ import { Mail, Loader2, ChevronLeft, KeyRound } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { apiErrorText } from '../../api';
 import { tap, notify } from '../device';
-import logo from '../logo.png';
+import { Mark } from '../../components/brand/Logo';
 
 const GoogleLogo = () => (
     <svg viewBox="0 0 48 48" className="h-5 w-5" aria-hidden="true">
@@ -127,9 +127,9 @@ const SignIn = () => {
                     {step === 'choose' && (
                         <motion.div key="choose" className="flex flex-1 flex-col" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}>
                             <div className="flex flex-1 flex-col justify-center">
-                                <motion.img src={logo} alt="" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', damping: 12 }}
-                                    className="mb-8 h-20 w-20" />
-                                <h1 className="text-[34px] font-extrabold leading-[1.08] tracking-tight">Study smarter,<br />starting now.</h1>
+                                <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', damping: 12 }}
+                                    className="mb-8"><Mark className="h-16 w-16" /></motion.div>
+                                <h1 className="display mark-em text-[44px]">Study smarter,<br /><em>starting now</em>.</h1>
                                 <p className="mt-3 text-[16px]" style={{ color: 'var(--m-muted)' }}>One step and your books start working for you. No password needed.</p>
                             </div>
                             <div className="space-y-3 pb-6">

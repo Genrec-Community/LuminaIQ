@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, lazy, Suspense } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import Logo from '../components/brand/Logo';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
     MessageSquare,
     FileText,
@@ -1315,12 +1316,7 @@ const ProjectView = () => {
                     <div className={`flex-1 flex flex-col min-h-0 ${leftCollapsed ? 'p-3' : 'px-4 pt-5 pb-3'}`}>
                         <div className={`flex items-center ${leftCollapsed ? 'justify-center' : 'justify-between px-1.5'} mb-6`}>
                             {!leftCollapsed && (
-                                <div className="flex items-center gap-3">
-                                    <div className="h-10 w-10 bg-gradient-to-br from-[#1E5C42] to-[#163628] rounded-xl flex items-center justify-center text-white shadow-lg shadow-[#1E5C42]/20">
-                                        <BookOpen className="h-6 w-6" />
-                                    </div>
-                                    <h1 className="text-2xl font-bold text-[#163628] tracking-tight">Lumina IQ</h1>
-                                </div>
+                                <Link to="/dashboard" aria-label="Back to your books" className="rounded-xl"><Logo /></Link>
                             )}
                             <div className="flex items-center gap-1">
                                 {/* Desktop collapse toggle */}
@@ -1389,7 +1385,7 @@ const ProjectView = () => {
             )}
 
             {/* Main Content Area */}
-            <div className={`flex-1 flex flex-col min-w-0 overflow-hidden backdrop-blur-sm transition-colors duration-300`}
+            <div className={`lumina-workspace flex-1 flex flex-col min-w-0 overflow-hidden backdrop-blur-sm transition-colors duration-300`}
                 style={zenMode
                     ? { background: isDark ? 'var(--dm-bg)' : 'var(--th-surface, #fff)' }
                     : isDark

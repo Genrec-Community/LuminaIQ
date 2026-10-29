@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import SiteHeader from '../components/site/SiteHeader';
+import Logo from '../components/brand/Logo';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Check, Crown, Loader2, Moon, Building2, PartyPopper } from 'lucide-react';
@@ -120,29 +122,22 @@ const Pricing = () => {
 
     return (
         <div className="min-h-[100dvh] bg-[#FDF6F0] text-[#163628]">
-            <header className="mx-auto max-w-6xl px-4 py-5 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <button onClick={() => navigate(user ? '/dashboard' : '/')}
-                        className="flex min-h-[40px] items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold transition-colors hover:bg-white">
-                        <ArrowLeft className="h-4 w-4" /> {user ? 'Dashboard' : 'Lumina IQ'}
-                    </button>
-                    {!user && (
-                        <nav aria-label="Site" className="hidden items-center gap-4 text-sm sm:flex">
-                            <a href="/blog/" className="lumina-link">Blog</a>
-                            <a href="/login" className="lumina-link">Sign in</a>
-                        </nav>
-                    )}
-                </div>
-                {myPlan && (
-                    <span className="rounded-full border border-[#E6D5CC] bg-white px-3 py-1 text-sm">
-                        You're on <b>{myPlan.plan_name}</b>
-                    </span>
-                )}
-            </header>
+            {user ? (
+                <header className="app-header sticky top-0 z-30 border-b border-[#163628]/10 bg-[#FDF6F0]/90 backdrop-blur-md">
+                    <div className="site-wrap flex h-[4.5rem] items-center justify-between">
+                        <button onClick={() => navigate('/dashboard')} className="flex items-center gap-3 rounded-xl" aria-label="Back to your books">
+                            <ArrowLeft className="h-4 w-4" /><Logo />
+                        </button>
+                        {myPlan && (
+                            <span className="rounded-full bg-[#F2E6DB] px-3 py-1.5 text-sm">You're on <b>{myPlan.plan_name}</b></span>
+                        )}
+                    </div>
+                </header>
+            ) : <SiteHeader />}
 
             <main className="mx-auto max-w-6xl px-4 pb-16">
                 <div className="text-center max-w-2xl mx-auto">
-                    <h1 className="text-3xl md:text-5xl font-bold tracking-tight">Pick your plan</h1>
+                    <h1 className="display h-xl mark-em pt-6">Pick your <em>plan</em>.</h1>
                     <p className="mt-3 text-[#5E5046]">
                         {mode === 'subscription'
                             ? 'Pay by UPI, card or netbanking. Cancel any time.'
@@ -155,7 +150,7 @@ const Pricing = () => {
                         <div className="mt-6 inline-flex rounded-full border border-[#E6D5CC] bg-white p-1" role="tablist" aria-label="Billing cycle">
                             {['monthly', 'yearly'].map((c) => (
                                 <button key={c} role="tab" aria-selected={cycle === c} onClick={() => setCycle(c)}
-                                    className={`rounded-full px-5 py-2 text-sm font-semibold capitalize transition-colors ${cycle === c ? 'bg-[#1E5C42] text-white' : 'text-[#5E5046]'}`}>
+                                    className={`chip capitalize ${cycle === c ? 'chip--on' : ''}`}>
                                     {c}{c === 'yearly' && <span className="ml-1.5 text-xs opacity-90">save ~30%</span>}
                                 </button>
                             ))}

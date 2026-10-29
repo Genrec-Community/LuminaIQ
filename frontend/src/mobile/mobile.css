@@ -160,3 +160,6 @@ html.dark .m-app {
 @media (max-height: 500px) and (orientation: landscape) {
     .m-feed-col { top: calc(var(--m-safe-top) + 56px) !important; bottom: calc(var(--m-safe-bottom) + 24px) !important; }
 }
+
+/* Display type, as on the site: light serif, italic for the word that matters */
+.m-app :is(h1, h2):is(.font-extrabold, .font-bold) { font-family: var(--font-display); font-weight: 400; letter-spacing: -0.025em; }

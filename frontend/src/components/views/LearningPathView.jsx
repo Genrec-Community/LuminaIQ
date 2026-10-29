@@ -333,13 +333,9 @@ const LearningPathView = ({
         <div className="h-full flex flex-col" style={{ color: bodyText }}>
             <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8 max-w-4xl mx-auto w-full">
                 {/* Header */}
-                <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center p-4 rounded-2xl shadow-sm border mb-4"
-                        style={{ background: card, borderColor: cardBorder }}>
-                        <Target className="h-8 w-8 text-[#1E5C42]" />
-                    </div>
-                    <h2 className="text-2xl font-bold mb-2" style={{ color: bodyText }}>Learning Path</h2>
-                    <p style={{ color: mutedText }}>Your personalized study sequence</p>
+                <div className="mb-10 pt-2">
+                    <h2 className="display h-l mark-em" style={{ color: bodyText }}>Your learning <em>path</em></h2>
+                    <p className="lede mt-3 max-w-[40ch]">Foundations first, the ideas that unlock the most next, and a review the day before you forget.</p>
                 </div>
 
                 {/* Adaptive plan from the learning engine: next step, why, what you know */}

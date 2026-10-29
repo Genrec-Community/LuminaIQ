@@ -412,3 +412,10 @@ html.motion .menu:not([hidden]) li:nth-child(5) { animation-delay: 0.16s; }
 .field { display: grid; gap: 0.45rem; }
 .field > span { font-size: 0.875rem; font-weight: 600; color: var(--lumina-ink); }
 html.dark .field > span { color: var(--lumina-on-ink); }
+
+/* Workspace tool headings take the display face, like the site's section titles */
+.lumina-workspace h2:is(.text-2xl, .text-3xl) { font-family: var(--font-display); font-weight: 400 !important; font-size: clamp(1.9rem, 1.5rem + 1.2vw, 2.6rem); letter-spacing: -0.028em; line-height: 1.05; }
+.chip { min-height: 2.5rem; padding: 0 1.1rem; border-radius: 999px; background: transparent; font-size: 0.9375rem; font-weight: 600; color: #5E5046; transition: background-color 0.25s, color 0.25s, scale 0.2s; }
+.chip--on { background: var(--lumina-ink); color: var(--lumina-on-ink); }
+.chip:active { scale: 0.96; }
+@media (hover: hover) { .chip:not(.chip--on):hover { background: var(--lumina-lime); color: var(--lumina-ink); } }
