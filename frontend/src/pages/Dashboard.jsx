@@ -6,7 +6,8 @@ import {
     Loader2, X, Trash2, RefreshCw, WifiOff, Globe, Lock, ArrowLeft,
     Tag, ChevronDown, ChevronUp, Check, Download, Settings as SettingsIcon
 } from 'lucide-react';
-import { createProject, uploadDocument, getProjects, deleteProject, getPublicBooks, importBook } from '../api';
+import { createProject, uploadDocument, getProjects, deleteProject, getPublicBooks, importBook, getLearningPlan } from '../api';
+import MemoryCurve from '../components/MemoryCurve';
 
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -183,6 +184,26 @@ const Dashboard = () => {
             setIsLoadingProjects(false);
         }
     };
+
+    // The memory curve under the hero: the student's own for the book they're on
+    const memoryProjectId = (() => {
+        const last = (() => { try { return localStorage.getItem(LAST_PROJECT_KEY); } catch { return null; } })();
+        return (projects.find(p => p.id === last) || projects[0])?.id || null;
+    })();
+    const [memory, setMemory] = useState(null);
+    useEffect(() => {
+        if (!memoryProjectId) { setMemory(null); return undefined; }
+        let alive = true;
+        getLearningPlan(memoryProjectId, { horizon: 3 })
+            .then((res) => { if (alive) setMemory(res); })
+            .catch(() => { if (alive) setMemory(null); });
+        return () => { alive = false; };
+    }, [memoryProjectId]);
+    const openTab = (tab) => {
+        try { sessionStorage.setItem(`lumina_tab_${memoryProjectId}`, tab); } catch { /* ignore */ }
+        navigate(`/project/${memoryProjectId}`);
+    };
+    const fading = memory?.summary?.due_reviews || 0;
 
     // ... handlers ...
 
@@ -397,6 +418,7 @@ const Dashboard = () => {
     const lastProjectId = (() => { try { return localStorage.getItem(LAST_PROJECT_KEY); } catch { return null; } })();
     const continueProject = projects.find(p => p.id === lastProjectId) || projects[0] || null;
 
+
     return (
         <div className="min-h-screen bg-[#FDF6F0] font-sans text-[#163628]">
             <Joyride
@@ -458,6 +480,21 @@ const Dashboard = () => {
                         navigate(`/project/${continueProject.id}`);
                     } : null}
                 />
+
+                {continueProject && (
+                    <div className="mb-10 lumina-settle">
+                        <MemoryCurve
+                            profile={memory?.profile}
+                            height={200}
+                            action={
+                                <button type="button" className="lumina-curve__cta" onClick={() => openTab(fading ? 'path' : 'power')}>
+                                    {fading ? `Bring back ${fading} fading topic${fading === 1 ? '' : 's'}` : 'Lock it in with a 10-minute Power Hour'}
+                                    <ArrowRight className="h-4 w-4" />
+                                </button>
+                            }
+                        />
+                    </div>
+                )}
 
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
                     <div>

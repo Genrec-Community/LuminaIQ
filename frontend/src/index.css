@@ -29,8 +29,8 @@
   --color-dark-paper: #182C21;
   --color-dark-text: #e8e2dc;
 
-  --font-sans: "Atkinson Hyperlegible Next", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Newsreader", Georgia, "Times New Roman", serif;
+  --font-sans: "Atkinson Hyperlegible Next Variable", "Atkinson Hyperlegible Next", "Plus Jakarta Sans Variable", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Newsreader Variable", "Newsreader", Georgia, "Times New Roman", serif;
 }
 
 @layer base {

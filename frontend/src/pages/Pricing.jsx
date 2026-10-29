@@ -121,10 +121,18 @@ const Pricing = () => {
     return (
         <div className="min-h-[100dvh] bg-[#FDF6F0] text-[#163628]">
             <header className="mx-auto max-w-6xl px-4 py-5 flex items-center justify-between">
-                <button onClick={() => navigate(user ? '/dashboard' : '/')}
-                    className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold hover:bg-white">
-                    <ArrowLeft className="h-4 w-4" /> Back
-                </button>
+                <div className="flex items-center gap-2">
+                    <button onClick={() => navigate(user ? '/dashboard' : '/')}
+                        className="flex min-h-[40px] items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold transition-colors hover:bg-white">
+                        <ArrowLeft className="h-4 w-4" /> {user ? 'Dashboard' : 'Lumina IQ'}
+                    </button>
+                    {!user && (
+                        <nav aria-label="Site" className="hidden items-center gap-4 text-sm sm:flex">
+                            <a href="/blog/" className="lumina-link">Blog</a>
+                            <a href="/login" className="lumina-link">Sign in</a>
+                        </nav>
+                    )}
+                </div>
                 {myPlan && (
                     <span className="rounded-full border border-[#E6D5CC] bg-white px-3 py-1 text-sm">
                         You're on <b>{myPlan.plan_name}</b>

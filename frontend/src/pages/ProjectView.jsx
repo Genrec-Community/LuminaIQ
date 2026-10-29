@@ -737,19 +737,17 @@ const ProjectView = () => {
         }
     }, [selectedDocuments, documentTopics, allProjectTopics]);
 
-    // Default Selection: If only 1 document, select it.
+    // Default selection: start with every ready document selected, so study
+    // tools work straight away (once; a later "Deselect all" is respected)
+    const autoSelected = useRef(false);
     useEffect(() => {
-        if (documents.length === 1 && selectedDocuments.length === 0) {
-            // Need to pass array to setSelectedDocuments?
-            // Wait, setSelectedDocuments is passed from context or protected route?
-            // No, it's not defined in ProjectView props usually.
-            // Let's check where selectedDocuments comes from.
-            // It's likely state in ProjectView.
-            // Lines 70-80 usually define it.
-            if (typeof setSelectedDocuments === 'function') {
-                setSelectedDocuments([documents[0].id]);
-            }
+        if (autoSelected.current || selectedDocuments.length) return;
+        const ready = documents.filter(d => d.upload_status === 'completed');
+        if (ready.length) {
+            autoSelected.current = true;
+            setSelectedDocuments(ready.map(d => d.id));
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [documents]);
 
     // Keyboard shortcuts

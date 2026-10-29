@@ -128,21 +128,21 @@ const jsonLd = (obj) => `<script type="application/ld+json">${JSON.stringify(obj
 /* ───────────── page shell ───────────── */
 
 const CSS = `
-:root{--bg:#FDF6F0;--card:#FFFFFF;--ink:#4A3B32;--muted:#7A6A5F;--line:#EADFD5;--accent:#C8A288;--accent-ink:#8A5F44;--green:#5E8C6A}
-@media (prefers-color-scheme:dark){:root{--bg:#1C1714;--card:#25201C;--ink:#F1E7DE;--muted:#B7A79A;--line:#3A322C;--accent:#C8A288;--accent-ink:#E2BFA4;--green:#8DBB98}}
+:root{--bg:#FDF6F0;--card:#FFFFFF;--ink:#163628;--muted:#5E5046;--line:rgb(74 59 50/.15);--accent:#D3EE6A;--accent-ink:#1E5C42;--green:#1E5C42}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1d16;--card:#182c21;--ink:#f4eee2;--muted:#b7c2b4;--line:rgb(244 238 226/.12);--accent:#D3EE6A;--accent-ink:#D3EE6A;--green:#D3EE6A}}
 *{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.7 "Plus Jakarta Sans",system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-a{color:var(--accent-ink)}a:hover{text-decoration-thickness:2px}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.7 "Atkinson Hyperlegible Next",system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+a{color:var(--accent-ink);text-underline-offset:3px}article a:hover{background:linear-gradient(transparent 55%,#D3EE6A 55%);color:#163628;text-decoration:none}
 .wrap{max-width:760px;margin:0 auto;padding:0 20px}
 header.site{border-bottom:1px solid var(--line);background:var(--bg);position:sticky;top:0;z-index:5}
 header.site .wrap{max-width:1040px;display:flex;align-items:center;justify-content:space-between;height:64px}
-.logo{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink);font:700 19px/1 Outfit,sans-serif;letter-spacing:-.01em}
-.logo i{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#A08072,#C8A288);box-shadow:0 6px 14px rgba(160,128,114,.25)}
+.logo{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink);font:400 21px/1 Newsreader,Georgia,serif;letter-spacing:-.02em}
+.logo i{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:10px;background:#163628;box-shadow:0 6px 14px rgba(22,54,40,.25)}
 .logo b{color:var(--accent-ink)}
 nav.top{display:flex;gap:18px;align-items:center;font-size:15px}
 nav.top a{text-decoration:none;color:var(--muted)}nav.top a:hover{color:var(--ink)}
-.btn{display:inline-block;background:var(--ink);color:var(--bg)!important;text-decoration:none;padding:10px 18px;border-radius:999px;font-weight:600;font-size:15px}
-h1,h2,h3,h4{font-family:Outfit,sans-serif;line-height:1.2;letter-spacing:-.015em}
+.btn{display:inline-block;background:var(--ink) linear-gradient(#D3EE6A,#D3EE6A) no-repeat left/0% 100%;transition:background-size .5s cubic-bezier(.16,1,.3,1),color .3s;color:var(--bg)!important;text-decoration:none;padding:10px 18px;border-radius:999px;font-weight:600;font-size:15px}
+h1,h2,h3,h4{font-family:Newsreader,Georgia,serif;font-weight:400;line-height:1.12;letter-spacing:-.02em}
 h1{font-size:clamp(30px,5vw,44px);margin:12px 0 14px}
 h2{font-size:26px;margin:44px 0 10px}h3{font-size:20px;margin:30px 0 6px}
 .crumbs{font-size:14px;color:var(--muted);margin-top:36px}.crumbs a{color:var(--muted)}
@@ -154,7 +154,7 @@ blockquote{margin:24px 0;padding:6px 20px;border-left:3px solid var(--accent);co
 code{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:1px 6px;font-size:.9em}
 .table{overflow-x:auto;margin:8px 0 22px}
 table{border-collapse:collapse;width:100%;font-size:16px;background:var(--card);border-radius:12px;overflow:hidden}
-th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line)}th{font-family:Outfit,sans-serif}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line)}th{font-weight:700}
 .toc{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 22px;margin:0 0 30px;font-size:15px}
 .toc strong{display:block;margin-bottom:6px}.toc ol{margin:0;padding-left:20px}.toc li{margin:2px 0}
 .cta{margin:48px 0;padding:28px;border-radius:20px;background:var(--card);border:1px solid var(--line)}
@@ -170,6 +170,7 @@ th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line)}th{f
 footer.site{margin-top:72px;border-top:1px solid var(--line);padding:28px 0 40px;font-size:14px;color:var(--muted)}
 footer.site .wrap{max-width:1040px;display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-between}
 footer.site a{color:var(--muted)}
+.btn:hover{background-size:100% 100%;color:#163628!important}
 @media (max-width:640px){nav.top .hide-sm{display:none}body{font-size:16px}h2{font-size:23px}}
 `;
 
@@ -203,7 +204,7 @@ ${published ? `<meta property="article:published_time" content="${published}">\n
 <link rel="alternate" type="application/rss+xml" title="${BRAND} blog" href="${SITE}/blog/feed.xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700&family=Plus+Jakarta+Sans:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;700&family=Newsreader:ital,opsz,wght@0,6..72,400;1,6..72,400&display=swap" rel="stylesheet">
 <style>${CSS.trim()}</style>
 ${extraHead}
 </head>
@@ -304,6 +305,7 @@ writeFileSync(join(OUT, 'blog', 'index.html'), shell({
     body: `<main class="wrap blog-wrap">
 <section class="blog-hero"><h1>Study smarter, not longer</h1>
 <p>Honest, practical guides for students who have exams coming and not enough time. How to study, how to learn fast, and how to actually remember it.</p></section>
+<h2>Latest guides</h2>
 <div class="cards">${articles.map(card).join('')}</div>
 ${CTA}
 </main>`,

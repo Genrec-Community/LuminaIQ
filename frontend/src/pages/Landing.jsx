@@ -37,6 +37,7 @@ import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
 import { ThemeToggle } from "../components/ui/ThemeToggle";
 import { STUDENT_PLANS, INSTITUTION_PLAN, inr } from "../utils/pricing";
+import MemoryCurve from "../components/MemoryCurve";
 
 const APP_URL = "https://luminaiq.fun";
 
@@ -171,8 +172,8 @@ const howItWorks = [
 ];
 
 const stats = [
-  { value: "10×", label: "Faster study prep", sub: "vs. manual note-taking" },
-  { value: "90%+", label: "Retention boost", sub: "with spaced repetition" },
+  { value: "8", label: "Study tools", sub: "chat, quizzes, notes, cards and more" },
+  { value: "1", label: "Plan that adapts", sub: "after every answer" },
   { value: "15", label: "Levels to climb", sub: "stay motivated" },
   { value: "<30s", label: "To first quiz", sub: "after upload" },
 ];
@@ -285,17 +286,15 @@ function Header() {
   return (
     <header
       className={`sticky top-0 z-50 transition-all duration-300 ${
-        scrolled ? "glass border-b border-border/40 shadow-sm" : "bg-transparent"
+        scrolled ? "bg-[#FDF6F0]/95 backdrop-blur-md border-b border-[#E6D5CC] shadow-sm dark:bg-[#0f1d16]/95 dark:border-white/10" : "bg-transparent"
       }`}
     >
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <a href="#top" className="flex items-center gap-2.5 group">
-          <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent shadow-lg shadow-primary/20 transition-transform group-hover:scale-105">
-            <Sparkles className="h-5 w-5 text-primary-foreground" />
+          <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-[#163628] text-white shadow-md shadow-[#163628]/20 transition-transform group-hover:scale-105">
+            <BookOpen className="h-5 w-5" />
           </div>
-          <span className="font-display text-lg font-700 tracking-tight">
-            Lumina <span className="text-gradient-liq">IQ</span>
-          </span>
+          <span className="font-display whitespace-nowrap text-xl tracking-tight">Lumina IQ</span>
         </a>
 
         <nav className="hidden items-center gap-1 md:flex">
@@ -303,7 +302,7 @@ function Header() {
             <a
               key={item.href}
               href={item.href}
-              className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent/20 hover:text-foreground"
+              className="lumina-nav rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
             >
               {item.label}
             </a>
@@ -311,7 +310,7 @@ function Header() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <ThemeToggle />
+          <span className="hidden sm:inline-flex"><ThemeToggle /></span>
           <Button
             variant="ghost"
             size="sm"
@@ -425,7 +424,7 @@ function Hero() {
           <div className="flex items-center gap-1.5">
             <div className="flex">
               {[...Array(5)].map((_, i) => (
-                <Star key={i} className="h-4 w-4 fill-chart-4 text-chart-4" />
+                <Star key={i} className="h-4 w-4 fill-[#D3EE6A] text-[#1E5C42]" />
               ))}
             </div>
             <span className="font-medium text-foreground">4.9/5</span>
@@ -645,6 +644,22 @@ function Stats() {
   );
 }
 
+/* The signature: why you forget, and how reviews fix it */
+function CurveBand() {
+  return (
+    <section aria-label="How reviews keep what you learn" className="mx-auto -mt-6 max-w-6xl px-4 pb-16 sm:px-6 lg:px-8">
+      <MemoryCurve
+        height={230}
+        action={
+          <Link to="/login" className="lumina-curve__cta">
+            Start remembering, free <ArrowRight className="h-4 w-4" />
+          </Link>
+        }
+      />
+    </section>
+  );
+}
+
 /* ─────────────────────────  testimonials  ────────────────── */
 
 function Testimonials() {
@@ -683,7 +698,7 @@ function Testimonials() {
               <Quote className="absolute right-4 top-4 h-8 w-8 text-primary/10" />
               <div className="flex gap-1">
                 {[...Array(t.rating)].map((_, j) => (
-                  <Star key={j} className="h-4 w-4 fill-chart-4 text-chart-4" />
+                  <Star key={j} className="h-4 w-4 fill-[#D3EE6A] text-[#1E5C42]" />
                 ))}
               </div>
               <p className="mt-3 text-sm leading-relaxed text-foreground/90">"{t.quote}"</p>
@@ -809,7 +824,7 @@ function FAQ() {
           {faqs.map((faq, i) => (
             <div
               key={i}
-              className="overflow-hidden rounded-xl border border-border/50 bg-card/60"
+              className="lumina-secondary overflow-hidden rounded-xl border border-[#E6D5CC] bg-white/70 dark:border-white/10 dark:bg-white/5"
             >
               <button
                 onClick={() => setOpenIndex(openIndex === i ? null : i)}
@@ -889,12 +904,10 @@ function Footer() {
         <div className="grid gap-8 md:grid-cols-5">
           <div className="md:col-span-2">
             <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent shadow-lg shadow-primary/20">
-                <Sparkles className="h-5 w-5 text-primary-foreground" />
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#163628] text-white">
+                <BookOpen className="h-5 w-5" />
               </div>
-              <span className="font-display text-lg font-700">
-                Lumina <span className="text-gradient-liq">IQ</span>
-              </span>
+              <span className="font-display whitespace-nowrap text-xl">Lumina IQ</span>
             </div>
             <p className="mt-4 max-w-md text-sm text-muted-foreground">
               Exams come faster than textbooks can be read. Lumina IQ turns any
@@ -910,20 +923,20 @@ function Footer() {
           <div>
             <h4 className="font-display text-sm font-600">Product</h4>
             <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-              <li><a href="#features" className="hover:text-foreground transition-colors">Features</a></li>
-              <li><a href="#how" className="hover:text-foreground transition-colors">How it works</a></li>
-              <li><a href="#pricing" className="hover:text-foreground transition-colors">Pricing</a></li>
-              <li><a href="#faq" className="hover:text-foreground transition-colors">FAQ</a></li>
+              <li><a href="#features" className="lumina-link inline-flex min-h-[32px] items-center hover:text-foreground">Features</a></li>
+              <li><a href="#how" className="lumina-link inline-flex min-h-[32px] items-center hover:text-foreground">How it works</a></li>
+              <li><a href="#pricing" className="lumina-link inline-flex min-h-[32px] items-center hover:text-foreground">Pricing</a></li>
+              <li><a href="#faq" className="lumina-link inline-flex min-h-[32px] items-center hover:text-foreground">FAQ</a></li>
             </ul>
           </div>
 
           <div>
             <h4 className="font-display text-sm font-600">Study guides</h4>
             <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-              <li><a href="/blog/how-to-study-for-exams/" className="hover:text-foreground transition-colors">How to study for exams</a></li>
-              <li><a href="/blog/how-to-learn-fast/" className="hover:text-foreground transition-colors">How to learn fast</a></li>
-              <li><a href="/blog/study-the-night-before-exam/" className="hover:text-foreground transition-colors">Exam tomorrow?</a></li>
-              <li><a href="/blog/" className="hover:text-foreground transition-colors">All articles</a></li>
+              <li><a href="/blog/how-to-study-for-exams/" className="lumina-link inline-flex min-h-[32px] items-center hover:text-foreground">How to study for exams</a></li>
+              <li><a href="/blog/how-to-learn-fast/" className="lumina-link inline-flex min-h-[32px] items-center hover:text-foreground">How to learn fast</a></li>
+              <li><a href="/blog/study-the-night-before-exam/" className="lumina-link inline-flex min-h-[32px] items-center hover:text-foreground">Exam tomorrow?</a></li>
+              <li><a href="/blog/" className="lumina-link inline-flex min-h-[32px] items-center hover:text-foreground">All articles</a></li>
             </ul>
           </div>
 
@@ -965,6 +978,7 @@ export default function Home() {
       <Header />
       <main className="flex-1">
         <Hero />
+        <CurveBand />
         <Benefits />
         <Features />
         <HowItWorks />

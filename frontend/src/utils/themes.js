@@ -56,9 +56,9 @@ export const THEMES = {
 };
 
 export const FONT_STYLES = {
-    default: { name: 'Lumina', sample: 'Aa', stack: '"Atkinson Hyperlegible Next", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif' },
-    rounded: { name: 'Rounded', sample: 'Aa', stack: '"Outfit", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif' },
-    clean: { name: 'Clean', sample: 'Aa', stack: '"Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif' },
+    default: { name: 'Lumina', sample: 'Aa', stack: '"Atkinson Hyperlegible Next Variable", "Atkinson Hyperlegible Next", "Plus Jakarta Sans Variable", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif' },
+    rounded: { name: 'Rounded', sample: 'Aa', stack: '"Outfit Variable", "Outfit", "Plus Jakarta Sans Variable", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif' },
+    clean: { name: 'Clean', sample: 'Aa', stack: '"Plus Jakarta Sans Variable", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif' },
     serif: { name: 'Bookish', sample: 'Aa', stack: 'Georgia, "Iowan Old Style", "Times New Roman", serif' },
     mono: { name: 'Coder', sample: 'Aa', stack: 'ui-monospace, "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace' },
 };

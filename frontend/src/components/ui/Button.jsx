@@ -6,7 +6,7 @@ export const Button = React.forwardRef(({ className = '', variant = 'default', s
   const variants = {
     default: "bg-[#163628] text-[#f4eee2] shadow dark:bg-[#D3EE6A] dark:text-[#0f271c]",
     destructive: "bg-red-500 text-white shadow-sm hover:bg-red-600",
-    outline: "border border-[#E6D5CC] bg-transparent shadow-sm hover:bg-[#E6D5CC]/50 hover:text-inherit dark:border-white/10 dark:hover:bg-white/10",
+    outline: "lumina-secondary border border-[#E6D5CC] bg-transparent shadow-sm hover:bg-white hover:text-inherit dark:border-white/10 dark:hover:bg-white/10",
     secondary: "bg-[#FDF6F0] text-[#163628] shadow-sm hover:bg-[#E6D5CC] dark:bg-[#182C21] dark:text-[#e8e2dc] dark:hover:bg-[#20382B]",
     ghost: "hover:bg-[#E6D5CC]/30 hover:text-inherit dark:hover:bg-white/10",
     link: "text-[#1E5C42] underline-offset-4 hover:underline dark:text-[#D3EE6A]",

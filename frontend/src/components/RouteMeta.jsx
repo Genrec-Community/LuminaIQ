@@ -7,7 +7,7 @@ import { useLocation } from 'react-router-dom';
 
 const SITE = 'https://luminaiq.fun';
 const DEFAULT_TITLE = 'Lumina IQ: Study Smarter, Learn Fast and Ace Your Exams';
-const DEFAULT_DESCRIPTION = 'Exams come faster than textbooks can be read. Lumina IQ turns any book or notes into the shortest path to exam-ready, with practice questions, flashcards and a study plan built from your own material.';
+const DEFAULT_DESCRIPTION = 'Lumina IQ turns your textbooks and notes into a study plan, practice questions and flashcards, so you learn the whole book in less time.';
 
 const PUBLIC = {
     '/': { title: DEFAULT_TITLE, description: DEFAULT_DESCRIPTION },

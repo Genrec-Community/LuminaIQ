@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { isAppShell } from './utils/platform';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
@@ -27,12 +27,30 @@ const DeleteAccount = lazy(() => import('./pages/Legal').then((m) => ({ default:
 const Terms = lazy(() => import('./pages/Legal').then((m) => ({ default: m.Terms })));
 // The phone app has its own interface (bottom tabs, feed, onboarding)
 const MobileApp = lazy(() => import('./mobile/MobileApp'));
+const NotFound = lazy(() => import('./pages/NotFound'));
 const APP_SHELL = isAppShell();
 
 const PageLoader = () => (
     <div className="min-h-screen flex items-center justify-center bg-[#FDF6F0]">
         <div className="h-12 w-12 rounded-2xl bg-[#1E5C42] animate-pulse shadow-lg shadow-[#1E5C42]/30" />
     </div>
+);
+
+// Each page fades in (opacity only, so fixed layers keep working)
+const RouteFade = ({ children }) => {
+    const { pathname } = useLocation();
+    return <div key={pathname} className="lumina-route">{children}</div>;
+};
+
+// First keyboard stop: jump past the header to the page's main content
+const SkipLink = () => (
+    <a href="#main" className="lumina-skip" onClick={(e) => {
+        const main = document.querySelector('main');
+        if (!main) return;
+        e.preventDefault();
+        main.setAttribute('tabindex', '-1');
+        main.focus();
+    }}>Skip to content</a>
 );
 
 function App() {
@@ -43,8 +61,10 @@ function App() {
                     <ToastProvider>
                         <Router>
                             {!APP_SHELL && <RouteMeta />}
+                            {!APP_SHELL && <SkipLink />}
                             <Suspense fallback={<PageLoader />}>
                             {APP_SHELL ? <MobileApp /> : (
+                            <RouteFade>
                             <Routes>
                                 <Route path="/" element={<Landing />} />
                                 <Route path="/login" element={<Login />} />
@@ -64,7 +84,9 @@ function App() {
                                     <Route path="/platform" element={<Platform />} />
                                     <Route path="/join/:code" element={<JoinClass />} />
                                 </Route>
+                                <Route path="*" element={<NotFound />} />
                             </Routes>
+                            </RouteFade>
                             )}
                             </Suspense>
                             <LimitModal />

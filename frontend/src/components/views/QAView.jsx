@@ -191,16 +191,7 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
 
     return (
         <div className="h-full overflow-y-auto p-4 md:p-8 max-w-4xl mx-auto custom-scrollbar relative">
-            {/* Back Button */}
-            {onBack && !qaLoading && viewMode === 'list' && (
-                <button
-                    onClick={onBack}
-                    className="flex items-center gap-2 px-4 py-2 mb-4 text-[#5E5046] hover:text-[#163628] hover:bg-[#E6D5CC]/30 rounded-lg font-medium transition-colors"
-                >
-                    <ArrowLeft className="h-4 w-4" />
-                    Back to Chat
-                </button>
-            )}
+            {/* No 'Back to Chat' link: the sidebar is always one tap away */}
 
             {/* Full-screen Loading State */}
             {qaLoading && (

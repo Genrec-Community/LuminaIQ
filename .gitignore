@@ -374,3 +374,4 @@ logs_extracted*/
 .vercel
 play-store-keys/
 azure-deploy-secrets/
+.jury/

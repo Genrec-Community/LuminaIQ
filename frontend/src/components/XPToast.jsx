@@ -24,7 +24,7 @@ const XPToast = () => {
     const { xpEvents, dismissXpEvent } = useGamification();
 
     return (
-        <div className={`fixed left-1/2 -translate-x-1/2 z-[110] flex flex-col items-center gap-2 pointer-events-none ${APP_SHELL ? 'top-[calc(var(--sat)+64px)]' : 'top-4'}`}>
+        <div className={`fixed left-1/2 -translate-x-1/2 z-[110] flex flex-col items-center gap-2 pointer-events-none ${APP_SHELL ? 'bottom-[calc(var(--sab)+92px)]' : 'top-4'}`}>
             <AnimatePresence>
                 {xpEvents.map((event) => (
                     <motion.div

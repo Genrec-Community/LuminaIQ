@@ -623,18 +623,7 @@ const QuizView = ({
 
     return (
         <div className="h-full flex flex-col relative w-full">
-            {/* Back Button - shown when no quiz is active and not loading */}
-            {onBack && !mcqLoading && !evalLoading && !mcqTest && !evalTest && !cameFromPath && (
-                <div className="px-4 pt-4 md:px-8 md:pt-6">
-                    <button
-                        onClick={onBack}
-                        className="flex items-center gap-2 px-4 py-2 text-[#5E5046] hover:text-[#163628] hover:bg-[#E6D5CC]/30 rounded-lg font-medium transition-colors"
-                    >
-                        <ArrowLeft className="h-4 w-4" />
-                        Back to Chat
-                    </button>
-                </div>
-            )}
+            {/* No 'Back to Chat' link: the sidebar is always one tap away */}
 
             {/* Full-screen Loading State for MCQ */}
             {mcqLoading && (
@@ -694,13 +683,15 @@ const QuizView = ({
                                 <h2 className="text-2xl font-bold text-[#163628]">Quizzes</h2>
                                 <p className="text-[#5E5046]">Test your knowledge with AI-generated quizzes</p>
                             </div>
-                            <button
-                                onClick={() => setShowSavedList(false)}
-                                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#1E5C42] to-[#163628] text-white rounded-lg hover:opacity-90 transition-opacity shadow-sm"
-                            >
-                                <Plus className="h-4 w-4" />
-                                New Quiz
-                            </button>
+                            {savedQuizzes.length > 0 && (
+                                <button
+                                    onClick={() => setShowSavedList(false)}
+                                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#1E5C42] to-[#163628] text-white rounded-lg hover:opacity-90 transition-opacity shadow-sm"
+                                >
+                                    <Plus className="h-4 w-4" />
+                                    New Quiz
+                                </button>
+                            )}
                         </div>
 
                         {savedLoading ? (
@@ -712,8 +703,8 @@ const QuizView = ({
                                 <div className="h-20 w-20 bg-[#FDF6F0] rounded-full flex items-center justify-center mx-auto mb-6">
                                     <CheckSquare className="h-10 w-10 text-[#1E5C42]" />
                                 </div>
-                                <h3 className="text-xl font-bold text-[#163628] mb-2">No Quizzes Yet</h3>
-                                <p className="text-[#5E5046] mb-6">Generate your first quiz to test your knowledge</p>
+                                <h3 className="text-xl font-bold text-[#163628] mb-2">Your first quiz takes 30 seconds</h3>
+                                <p className="text-[#5E5046] mb-6">Five questions from your own pages. Getting some wrong is how they stick.</p>
                                 <button
                                     onClick={() => setShowSavedList(false)}
                                     className="px-6 py-3 bg-gradient-to-r from-[#1E5C42] to-[#163628] text-white rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2 mx-auto"

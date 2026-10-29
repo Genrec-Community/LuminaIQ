@@ -7,7 +7,8 @@ import { useSettings } from '../../context/SettingsContext';
 import { useGamification } from '../../context/GamificationContext';
 import { getDailyProgress, onDailyProgress, dailyQuests, LAST_PROJECT_KEY } from '../../utils/dailyProgress';
 import { displayName, aiName, timeGreeting, daysUntil, pick } from '../../utils/persona';
-import { getReviewStats } from '../../api';
+import { getReviewStats, getLearningPlan } from '../../api';
+import MemoryCurve from '../../components/MemoryCurve';
 import { useBooks, coverFor, emojiFor } from '../data';
 import { Screen, Ring } from '../ui';
 import { tap, reminderScheduled } from '../device';
@@ -63,6 +64,16 @@ const Home = () => {
     const last = books.find((b) => b.id === lastId) || books[0];
     const openTool = (id, tool) => { tap(); navigate(tool ? `/project/${id}?tool=${tool}` : `/app/book/${id}`); };
 
+    // Memory curve for the book they're on (illustrative until there are answers)
+    const [memory, setMemory] = useState(null);
+    useEffect(() => {
+        if (!last?.id) return undefined;
+        let alive = true;
+        getLearningPlan(last.id, { horizon: 3 }).then((r) => { if (alive) setMemory(r); }).catch(() => {});
+        return () => { alive = false; };
+    }, [last?.id]);
+    const fading = (memory?.profile || []).find((r) => r.due);
+
     return (
         <Screen className="m-tab-space">
             <header className="m-safe-top px-5 pt-4">
@@ -72,7 +83,7 @@ const Home = () => {
                         {settings.userAvatar || '🦊'}
                     </button>
                     <div className="min-w-0 flex-1">
-                        <p className="text-[13px] font-medium" style={{ color: 'var(--m-muted)' }}>{timeGreeting()}</p>
+                        <p className="truncate text-[13px] font-medium" style={{ color: 'var(--m-muted)' }}>{timeGreeting()}</p>
                         <h1 className="truncate text-[22px] font-extrabold tracking-tight">{name} 👋</h1>
                     </div>
                     <div className="flex items-center gap-1 rounded-full px-3 py-1.5 text-[15px] font-extrabold" style={{ background: 'var(--m-soft)' }}>
@@ -134,6 +145,17 @@ const Home = () => {
                 </div>
                 {questDone === quests.length && (
                     <p className="-mt-2 text-center text-[13px] font-semibold" style={{ color: 'var(--m-accent-text)' }}>All done today. Legend. 🏆</p>
+                )}
+                {last && (
+                    <MemoryCurve
+                        profile={memory?.profile}
+                        compact
+                        action={
+                            <button type="button" className="lumina-curve__cta m-pressable" onClick={() => openTool(last.id, fading ? 'path' : 'power')}>
+                                <span className="max-w-[15rem] truncate">{fading ? `Review “${fading.topic}” · 3 min` : 'Lock it in · 10 min'}</span> <ChevronRight className="h-4 w-4 shrink-0" />
+                            </button>
+                        }
+                    />
                 )}
 
                 {examIn != null && examIn >= 0 && (

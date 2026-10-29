@@ -126,3 +126,131 @@ html.dark .lumina-nav-active::before { background: var(--lumina-deep); }
 html.dark .bg-gradient-to-r.from-\[\#1E5C42\],
 html.dark .bg-gradient-to-br.from-\[\#1E5C42\] { --tw-gradient-from: var(--dm-accent) !important; --tw-gradient-to: var(--dm-accent-hover) !important; }
 html.dark :is(.bg-gradient-to-r, .bg-gradient-to-br).from-\[\#1E5C42\] :is(.text-white, svg) { color: var(--lumina-deep) !important; }
+
+/* ── Memory curve: the signature, shared with the landing page ── */
+.lumina-curve {
+  --c-on: #f4eee2;
+  --c-on-muted: rgb(244 238 226 / 0.66);
+  background: var(--lumina-ink);
+  color: var(--c-on);
+  border-radius: 1.5rem;
+  padding: clamp(1.1rem, 0.8rem + 1.2vw, 1.75rem);
+  box-shadow: 0 24px 48px -28px rgb(15 39 28 / 0.55);
+}
+html.dark .lumina-curve { background: #132a1f; box-shadow: inset 0 0 0 1px rgb(211 238 106 / 0.12); }
+.lumina-curve__head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 0.75rem 2rem; }
+.lumina-curve__title { font-family: var(--font-display); font-weight: 400 !important; font-size: clamp(1.45rem, 1.1rem + 1vw, 2rem); line-height: 1.05; letter-spacing: -0.025em; color: var(--c-on); max-width: 24ch; }
+.lumina-curve__title em { background: none !important; color: var(--lumina-lime); font-style: italic; padding: 0; }
+.lumina-curve__sub { margin-top: 0.4rem; font-size: 0.85rem; color: var(--c-on-muted); max-width: 40ch; }
+.lumina-curve__sub b { color: var(--c-on); }
+.lumina-curve__readout { display: flex; gap: clamp(1rem, 2.5vw, 2rem); margin: 0; }
+.lumina-curve__readout dt { font-size: 0.75rem; color: var(--c-on-muted); white-space: nowrap; }
+.lumina-curve__readout dd { margin: 0; font-family: var(--font-display); font-size: clamp(1.6rem, 1.2rem + 1.2vw, 2.4rem); line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; min-width: 2.4ch; }
+.lumina-curve__readout dd small { font-size: 0.5em; color: var(--c-on-muted); }
+.lumina-curve__once dd { color: var(--c-on-muted); }
+.lumina-curve__rev dd { color: var(--lumina-lime); }
+.lumina-curve__rev dt::before { content: ''; display: inline-block; width: 0.75em; height: 0.25em; border-radius: 2px; background: var(--lumina-lime); margin-right: 0.4em; vertical-align: middle; }
+.lumina-curve__once dt::before { content: ''; display: inline-block; width: 0.75em; border-top: 2px solid var(--c-on-muted); margin-right: 0.4em; vertical-align: middle; }
+.lumina-curve__plot { position: relative; margin-top: 1rem; padding-bottom: 2rem; border-radius: 0.75rem; cursor: ew-resize; touch-action: pan-y; user-select: none; }
+.lumina-curve__plot:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--lumina-lime); }
+.lumina-curve__plot svg { display: block; width: 100%; height: auto; aspect-ratio: 800 / 280; overflow: visible; }
+.lumina-curve__grid { stroke: rgb(244 238 226 / 0.1); stroke-width: 1; }
+.lumina-curve__review { stroke: rgb(211 238 106 / 0.3); stroke-width: 1; stroke-dasharray: 3 5; }
+.lumina-curve__line { fill: none; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 0; }
+.lumina-curve__line--once { stroke: rgb(244 238 226 / 0.55); stroke-width: 2; animation: lumina-draw 1.4s var(--lumina-ease) 0.2s both; }
+.lumina-curve__line--rev { stroke: var(--lumina-lime); stroke-width: 4; animation: lumina-draw 2s var(--lumina-ease) 0.45s both; }
+.lumina-curve__marker { stroke: rgb(244 238 226 / 0.4); stroke-width: 1; }
+.lumina-curve__dot--once { fill: var(--lumina-ink); stroke: var(--c-on); stroke-width: 2; }
+.lumina-curve__dot--rev { fill: var(--lumina-lime); stroke: var(--lumina-ink); stroke-width: 3; }
+.lumina-curve__axis { list-style: none; margin: 0; padding: 0; position: absolute; inset: auto 0 0 0; height: 1.6rem; font-size: 0.72rem; color: var(--c-on-muted); }
+.lumina-curve__axis li { position: absolute; bottom: 0; translate: -50% 0; white-space: nowrap; }
+.lumina-curve__axis li span:last-child { color: var(--c-on); }
+.lumina-curve__foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem 1.5rem; margin-top: 0.75rem; }
+.lumina-curve__note { font-size: 0.75rem; color: var(--c-on-muted); max-width: 56ch; margin: 0; }
+.lumina-curve--compact .lumina-curve__note { display: none; }
+.lumina-curve__cta {
+  display: inline-flex; align-items: center; gap: 0.5rem; border-radius: 999px; padding: 0.7rem 1.15rem;
+  font-weight: 700; font-size: 0.9rem; color: var(--lumina-ink); background: var(--lumina-lime);
+  transition: transform 0.3s var(--lumina-ease), box-shadow 0.3s var(--lumina-ease);
+}
+.lumina-curve__cta:hover { transform: translateY(-1px); box-shadow: 0 10px 24px -12px rgb(211 238 106 / 0.8); }
+.lumina-curve__cta svg { transition: transform 0.3s var(--lumina-ease); }
+.lumina-curve__cta:hover svg { transform: translateX(4px); }
+@media (max-width: 640px) {
+  .lumina-curve__readout { width: 100%; justify-content: space-between; }
+  .lumina-curve__rv { display: none; }
+}
+@keyframes lumina-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) { .lumina-curve__line { animation: none; } }
+
+/* ── Links: an underline at rest that rises into a lime band ── */
+.lumina-link {
+  color: inherit;
+  text-decoration: none;
+  background: linear-gradient(var(--lumina-lime), var(--lumina-lime)) no-repeat left 100% / 100% 2px;
+  transition: background-size 0.4s var(--lumina-ease);
+}
+.lumina-link:hover { background-size: 100% 0.55em; }
+html.dark .lumina-link:hover { color: var(--lumina-deep); background-size: 100% 100%; }
+
+/* Nav items: a lime band draws in under the label */
+.lumina-nav {
+  background: linear-gradient(var(--lumina-lime), var(--lumina-lime)) no-repeat left calc(100% - 4px) / 0% 3px;
+  transition: background-size 0.4s var(--lumina-ease), color 0.2s;
+}
+.lumina-nav:hover, .lumina-nav[aria-current="page"] { background-size: calc(100% - 1.5rem) 3px; background-position-x: 0.75rem; }
+
+/* Secondary buttons: the border inks in and the arrow nudges */
+.lumina-secondary { transition: border-color 0.3s var(--lumina-ease), transform 0.3s var(--lumina-ease), box-shadow 0.3s var(--lumina-ease); }
+.lumina-secondary:hover { border-color: var(--lumina-ink) !important; transform: translateY(-2px); box-shadow: 0 10px 22px -16px rgb(22 54 40 / 0.6); }
+.lumina-secondary svg:last-child { transition: transform 0.3s var(--lumina-ease); }
+.lumina-secondary:hover svg:last-child { transform: translateX(3px); }
+
+/* Skip link: first stop for keyboard users */
+.lumina-skip { position: fixed; left: 12px; top: -60px; z-index: 1000; padding: 10px 16px; border-radius: 999px; background: var(--lumina-ink); color: #f4eee2; font-weight: 700; transition: top 0.2s; }
+.lumina-skip:focus { top: 12px; }
+
+/* Route change: a quick fade, opacity only (keeps fixed layers intact) */
+.lumina-route { animation: lumina-fade 0.35s var(--lumina-ease) both; }
+@keyframes lumina-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .lumina-route { animation: none; } }
+
+/* ── Dark mode (Forest Night): the forest accent would vanish on forest,
+   so accent text, borders and tints follow the lime accent instead ── */
+html.dark .text-\[\#1E5C42\],
+html.dark .hover\:text-\[\#1E5C42\]:hover,
+html.dark .group:hover .group-hover\:text-\[\#1E5C42\],
+html.dark .group:focus-within .group-focus-within\:text-\[\#1E5C42\],
+html.dark .prose-a\:text-\[\#1E5C42\] a,
+html.dark .prose-code\:text-\[\#1E5C42\] code { color: var(--dm-accent) !important; }
+html.dark .text-\[\#1E5C42\]\/60 { color: color-mix(in srgb, var(--dm-accent) 60%, transparent) !important; }
+html.dark .border-\[\#1E5C42\],
+html.dark .hover\:border-\[\#1E5C42\]:hover,
+html.dark .focus\:border-\[\#1E5C42\]:focus,
+html.dark .group:hover .group-hover\:border-\[\#1E5C42\],
+html.dark .prose-blockquote\:border-\[\#1E5C42\] blockquote { border-color: var(--dm-accent) !important; }
+html.dark .border-\[\#1E5C42\]\/60,
+html.dark .border-\[\#1E5C42\]\/40,
+html.dark .hover\:border-\[\#1E5C42\]\/60:hover,
+html.dark .hover\:border-\[\#1E5C42\]\/50:hover,
+html.dark .hover\:border-\[\#1E5C42\]\/40:hover { border-color: color-mix(in srgb, var(--dm-accent) 50%, transparent) !important; }
+html.dark .bg-\[\#1E5C42\]\/5,
+html.dark .bg-\[\#1E5C42\]\/10,
+html.dark .group:hover .group-hover\:bg-\[\#1E5C42\]\/10 { background-color: rgb(211 238 106 / 0.08) !important; }
+html.dark .bg-\[\#1E5C42\]\/15,
+html.dark .bg-\[\#1E5C42\]\/20,
+html.dark .hover\:bg-\[\#1E5C42\]\/20:hover { background-color: rgb(211 238 106 / 0.14) !important; }
+html.dark .bg-\[\#1E5C42\]\/70,
+html.dark .bg-\[\#1E5C42\]\/90,
+html.dark .hover\:bg-\[\#1E5C42\]:hover,
+html.dark .group:hover .group-hover\:bg-\[\#1E5C42\] { background-color: var(--dm-accent) !important; color: var(--lumina-deep) !important; }
+html.dark .focus\:ring-\[\#1E5C42\]:focus,
+html.dark .ring-\[\#1E5C42\] { --tw-ring-color: var(--dm-accent) !important; }
+html.dark .accent-\[\#1E5C42\] { accent-color: var(--dm-accent); }
+html.dark .bg-\[\#1E5C42\] .fill-white { fill: var(--lumina-deep) !important; }
+/* Empty progress tracks stay quiet on forest */
+html.dark .bg-\[\#E6D5CC\],
+html.dark .bg-\[\#E6D5CC\]\/60,
+html.dark .bg-\[\#E6D5CC\]\/50,
+html.dark .bg-\[\#E6D5CC\]\/40,
+html.dark .bg-\[\#E6D5CC\]\/30 { background-color: rgb(244 238 226 / 0.1) !important; }
