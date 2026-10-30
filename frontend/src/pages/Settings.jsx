@@ -34,6 +34,7 @@ import {
 import { useSettings } from '../context/SettingsContext';
 import PlanUsage from '../components/PlanUsage';
 import ChangePasswordForm from '../components/ChangePasswordForm';
+import DeleteAccountForm from '../components/DeleteAccountForm';
 import { useGamification } from '../context/GamificationContext';
 import { useAuth } from '../context/AuthContext';
 import { AI_CHARACTERS, USER_AVATARS, AI_AVATARS, AGE_GROUPS, getCharacter, displayName } from '../utils/persona';
@@ -135,7 +136,7 @@ const Settings = () => {
         { id: 'appearance', label: 'Display', icon: Sun },
         { id: 'notifications', label: 'Alerts', icon: Bell },
         { id: 'plan', label: 'Plan', icon: Crown },
-        { id: 'account', label: 'Password', icon: KeyRound },
+        { id: 'account', label: 'Account', icon: KeyRound },
     ];
 
     // --- Reusable Components ---
@@ -914,6 +915,10 @@ const Settings = () => {
                 <p className="mt-3 text-xs" style={{ color: muted }}>
                     Signed in with Google or an email code? You don't have a password here. Forgot your password? Use "Forgot password?" on the sign-in page. School students can ask their school to reset theirs.
                 </p>
+            </div>
+            <SectionHeader icon={KeyRound} title="Delete account" subtitle="Remove your account and all its data" />
+            <div className="max-w-md">
+                <DeleteAccountForm />
             </div>
         </div>
     );
