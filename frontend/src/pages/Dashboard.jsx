@@ -13,7 +13,7 @@ import Logo from '../components/brand/Logo';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getRotatingLoadingMessage } from '../utils/LoadingMessages';
-import { DashboardSkeleton } from '../components/Skeleton';
+import { BookCardSkeleton, LoadingNote } from '../components/Skeleton';
 import { getCachedProjects, setCachedProjects, clearProjectsCache } from '../utils/projectCache';
 import { Joyride, STATUS } from 'react-joyride';
 import { TOUR_OPTIONS } from '../utils/tourConfig';
@@ -208,20 +208,8 @@ const Dashboard = () => {
 
     // ... handlers ...
 
-    // Show skeleton only when there's no cached data to display
-    if (isLoadingProjects && projects.length === 0 && !fetchError) {
-        return (
-            <div className="relative">
-                <DashboardSkeleton />
-                {isSlowLoad && (
-                    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-[#163628] text-white px-5 py-3 rounded-2xl shadow-xl text-sm">
-                        <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[#D3EE6A]" />
-                        <span>Getting your library ready. The first visit after a quiet spell can take up to a minute.</span>
-                    </div>
-                )}
-            </div>
-        );
-    }
+    // First load with nothing cached: the page shows at once, the shelf fills in when it arrives
+    const booksLoading = isLoadingProjects && projects.length === 0 && !fetchError;
 
     // Error state — no cache available
     if (fetchError) {
@@ -438,7 +426,7 @@ const Dashboard = () => {
                     </div>
 
                     <div className="flex items-center gap-2 sm:gap-4">
-                        {myPlan && !(isNativeApp() && myPlan.plan === 'free') && (
+                        {myPlan?.plan && !(isNativeApp() && myPlan.plan === 'free') && (
                             <button
                                 onClick={() => navigate(myPlan.plan === 'free' ? '/plans' : '/settings?section=plan')}
                                 className={`rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${myPlan.plan === 'free'
@@ -472,6 +460,7 @@ const Dashboard = () => {
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10">
                 <TodayHero
+                    loading={booksLoading}
                     onContinue={continueProject ? () => navigate(`/project/${continueProject.id}`) : openNewProjectModal}
                     continueLabel={continueProject ? `Continue: ${continueProject.name}` : 'Add your first book'}
                     onCram={continueProject ? () => {
@@ -540,7 +529,9 @@ const Dashboard = () => {
                     </div>
                 </div>
 
+                {booksLoading && <LoadingNote slow={isSlowLoad} className="-mt-3 mb-6">Bringing out your books</LoadingNote>}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {booksLoading && [0, 1, 2].map(i => <BookCardSkeleton key={i} />)}
                     {filteredProjects.map((project, i) => (
                         <div
                             key={project.id}
@@ -583,7 +574,7 @@ const Dashboard = () => {
                     ))}
 
                     {/* New Project Card Placeholder */}
-                    <button
+                    {!booksLoading && <button
                         id="tour-new-project-card"
                         onClick={openNewProjectModal}
                         data-reveal="settle"
@@ -594,7 +585,7 @@ const Dashboard = () => {
                             <Plus className="h-6 w-6 text-[#1E5C42] group-hover:text-white transition-colors" />
                         </div>
                         <span className="font-medium text-[#5E5046] group-hover:text-[#163628]">Add a book</span>
-                    </button>
+                    </button>}
                 </div>
             </main>
 
