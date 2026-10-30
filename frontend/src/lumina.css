@@ -432,3 +432,14 @@ html.dark .menu-button { background: rgb(244 238 226 / 0.06); }
 .lumina-workspace :is(h3):is(.text-xl, .text-2xl).font-bold { font-family: var(--font-display); font-weight: 400 !important; letter-spacing: -0.02em; }
 /* The hand-drawn circle needs a little air before the next word */
 .display .circled { margin-right: 0.12em; }
+
+/* Loading placeholders: a faint forest tint with a slow cream sweep, never grey boxes */
+.lumina-shimmer {
+  background: linear-gradient(100deg, rgb(94 80 70 / .075) 30%, rgb(255 251 247 / .95) 50%, rgb(94 80 70 / .075) 70%) 0 0 / 300% 100%;
+  animation: lumina-shimmer 1.8s ease-in-out infinite;
+}
+.dark .lumina-shimmer, [data-theme="dark"] .lumina-shimmer {
+  background-image: linear-gradient(100deg, rgb(233 239 214 / .06) 30%, rgb(233 239 214 / .14) 50%, rgb(233 239 214 / .06) 70%);
+}
+@keyframes lumina-shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .lumina-shimmer { animation: none; } }
