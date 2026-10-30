@@ -6,7 +6,7 @@ import MemoryCurve from '../components/MemoryCurve';
 import { AFTER_LOGIN_KEY } from '../utils/afterLogin';
 import { Loader2, ArrowRight, Mail, Lock, User, School, ChevronDown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { apiErrorText, SCHOOL_PAUSED_KEY } from '../api';
+import { apiErrorText, SCHOOL_PAUSED_KEY, warmUp } from '../api';
 
 const Login = () => {
     const navigate = useNavigate();
@@ -34,6 +34,9 @@ const Login = () => {
     const [fullName, setFullName] = useState('');
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState(null); // { type: 'success' | 'error', text: '' }
+
+    // Wake the backend while they fill in the form
+    React.useEffect(() => { warmUp(); }, []);
 
     // A school-created student who was signed out because their school is paused
     React.useEffect(() => {

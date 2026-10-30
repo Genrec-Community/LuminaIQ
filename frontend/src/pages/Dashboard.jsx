@@ -215,8 +215,8 @@ const Dashboard = () => {
                 <DashboardSkeleton />
                 {isSlowLoad && (
                     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-[#163628] text-white px-5 py-3 rounded-2xl shadow-xl text-sm">
-                        <WifiOff className="h-4 w-4 shrink-0 text-[#1E5C42]" />
-                        <span>Taking longer than expected… backend may be waking up</span>
+                        <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[#D3EE6A]" />
+                        <span>Getting your library ready. The first visit after a quiet spell can take up to a minute.</span>
                     </div>
                 )}
             </div>
