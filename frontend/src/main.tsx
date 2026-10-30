@@ -10,6 +10,7 @@ import './index.css'
 import './themes.css'
 import './lumina.css'
 import App from './App.jsx'
+import { warmUp } from './api'
 import Analytics from "@vercel/analytics"
 import { injectSpeedInsights } from "@vercel/speed-insights"
 
@@ -35,3 +36,6 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>,
 )
+
+// Start waking the backend now, while the app itself loads
+warmUp()
