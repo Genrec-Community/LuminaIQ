@@ -4,6 +4,13 @@
   "buildCommand": "npm run build --prefix frontend",
   "outputDirectory": "frontend/dist",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/:route(login|signup|signin|welcome|dashboard|reset-password|plans|settings|bookstore|institution|platform|privacy|terms|delete-account|project|join|app)/:rest*",
+      "destination": "/app.html"
+    },
+    {
+      "source": "/:route(login|signup|signin|welcome|dashboard|reset-password|plans|settings|bookstore|institution|platform|privacy|terms|delete-account|project|join|app)",
+      "destination": "/app.html"
+    }
   ]
 }
