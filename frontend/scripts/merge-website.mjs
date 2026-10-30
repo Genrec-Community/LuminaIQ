@@ -21,7 +21,10 @@ const branch = process.env.VERCEL_GIT_COMMIT_REF || process.env.GITHUB_REF_NAME 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
     || (branch === 'jaisamyukth-changes' ? 'https://test.luminaiq.fun' : 'https://luminaiq.fun');
 
-const run = (cmd) => execSync(cmd, { cwd: site, stdio: 'inherit', env: { ...process.env, NEXT_PUBLIC_SITE_URL: siteUrl, NEXT_TELEMETRY_DISABLED: '1' } });
+// The app's backend, so the website can wake it up before the visitor clicks through
+const apiUrl = process.env.VITE_MAIN_API_URL || 'https://luminaiq-backend.onrender.com/api/v1';
+
+const run = (cmd) => execSync(cmd, { cwd: site, stdio: 'inherit', env: { ...process.env, NEXT_PUBLIC_SITE_URL: siteUrl, NEXT_PUBLIC_API_URL: apiUrl, NEXT_TELEMETRY_DISABLED: '1' } });
 if (!existsSync(join(site, 'node_modules'))) run('npm ci --no-audit --no-fund');
 run('npx next build');
 

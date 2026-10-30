@@ -13,6 +13,7 @@
  */
 
 import { recordStudyActivity, getStudyActivity } from '../api';
+import { markActive } from './activeTime';
 
 // ============================
 // Gamification XP Bridge
@@ -68,6 +69,7 @@ const getDayName = (dateStr) => {
  */
 export const recordActivity = (projectId, activityType, meta = {}) => {
     if (!projectId) return;
+    markActive();
 
     // Fire-and-forget — callers never await this
     recordStudyActivity(projectId, activityType, meta).catch(err =>

@@ -1,29 +1,27 @@
 import { useEffect } from 'react';
 import { bumpDailyProgress } from '../utils/dailyProgress';
+import { onActiveTime } from '../utils/activeTime';
 
-const IDLE_MS = 90 * 1000;
+const SAVE_EVERY_MS = 15 * 1000;
 
 /**
- * Counts focused study minutes: a minute counts only while the tab is visible
- * and the learner interacted within the last 90 seconds.
+ * Counts active study time for the daily goal: only while the app is in
+ * front, focused, and the learner was active within the idle window
+ * (see utils/activeTime). Saved in seconds, a few times a minute.
  */
 export default function useFocusTimer(userId) {
     useEffect(() => {
         if (!userId) return;
-        let lastInteraction = Date.now();
-        const mark = () => { lastInteraction = Date.now(); };
-        const events = ['pointerdown', 'keydown', 'wheel', 'touchstart'];
-        events.forEach((e) => window.addEventListener(e, mark, { passive: true }));
-
-        const interval = setInterval(() => {
-            if (document.visibilityState === 'visible' && Date.now() - lastInteraction < IDLE_MS) {
-                bumpDailyProgress(userId, { minutes: 1 });
-            }
-        }, 60 * 1000);
-
-        return () => {
-            clearInterval(interval);
-            events.forEach((e) => window.removeEventListener(e, mark));
+        let pending = 0;
+        const flush = () => {
+            const seconds = Math.floor(pending / 1000);
+            if (seconds <= 0) return;
+            pending -= seconds * 1000;
+            bumpDailyProgress(userId, { seconds });
         };
+        return onActiveTime({
+            add: (ms) => { pending += ms; if (pending >= SAVE_EVERY_MS) flush(); },
+            flush,
+        });
     }, [userId]);
 }

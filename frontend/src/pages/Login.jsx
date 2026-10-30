@@ -6,7 +6,7 @@ import MemoryCurve from '../components/MemoryCurve';
 import { AFTER_LOGIN_KEY } from '../utils/afterLogin';
 import { Loader2, ArrowRight, Mail, Lock, User, School, ChevronDown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { apiErrorText, SCHOOL_PAUSED_KEY } from '../api';
+import { apiErrorText, SCHOOL_PAUSED_KEY, warmUp } from '../api';
 
 const Login = () => {
     const navigate = useNavigate();
@@ -17,7 +17,12 @@ const Login = () => {
     React.useEffect(() => {
         if (next) sessionStorage.setItem(AFTER_LOGIN_KEY, next);
     }, [next]);
-    const { login, signup, loginWithGoogle, requestOtp, verifyOtpCode, requestPasswordReset } = useAuth();
+    const { user, login, signup, loginWithGoogle, requestOtp, verifyOtpCode, requestPasswordReset } = useAuth();
+    // Already signed in (e.g. Start free from the website): nothing to fill in here
+    const signedIn = Boolean(user);
+    React.useEffect(() => {
+        if (signedIn) navigate(next || '/dashboard', { replace: true });
+    }, [signedIn]); // eslint-disable-line react-hooks/exhaustive-deps
     const [isLogin, setIsLogin] = useState(() => searchParams.get('signup') !== '1');
     const [isOtpMode, setIsOtpMode] = useState(false);
     const [isForgot, setIsForgot] = useState(false); // "Forgot password?" form
@@ -29,6 +34,9 @@ const Login = () => {
     const [fullName, setFullName] = useState('');
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState(null); // { type: 'success' | 'error', text: '' }
+
+    // Wake the backend while they fill in the form
+    React.useEffect(() => { warmUp(); }, []);
 
     // A school-created student who was signed out because their school is paused
     React.useEffect(() => {
@@ -97,8 +105,14 @@ const Login = () => {
 
                 await signup(email, password, fullName);
 
-                // Signup successful - Redirect to login with confirmation message
-                // We do NOT auto-login because email confirmation might be required
+                // Straight in when the account needs no email confirmation: the dashboard
+                // then opens the first-run onboarding. Otherwise ask them to confirm first.
+                const signedIn = await login(email, password).catch(() => false);
+                if (signedIn) {
+                    sessionStorage.removeItem(AFTER_LOGIN_KEY);
+                    navigate(next || '/dashboard', { replace: true });
+                    return;
+                }
                 setIsLogin(true);
                 setPassword('');
                 setMessage({

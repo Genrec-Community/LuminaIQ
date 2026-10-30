@@ -6,6 +6,7 @@ import {
 import { generateVisualLab } from '../../api';
 import { useSettings } from '../../context/SettingsContext';
 import { aiName } from '../../utils/persona';
+import { markActive } from '../../utils/activeTime';
 
 const EXAMPLES = [
     'Simple pendulum',
@@ -27,12 +28,15 @@ const BUILD_STEPS = [
     'Testing it runs…',
 ];
 
-// Runs inside the sandboxed iframe: blocks all network access and reports
-// runtime errors to the parent so a broken simulation can repair itself.
+// Runs inside the sandboxed iframe: blocks all network access, reports
+// runtime errors to the parent so a broken simulation can repair itself, and
+// tells the parent the learner is interacting (at most every few seconds) so
+// study time keeps counting while they play with it.
 const GUARD = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src data: blob:">
 <script>(function(){var sent=0;function report(m){if(sent++<3){try{parent.postMessage({type:'lumina-lab-error',message:String(m).slice(0,1500)},'*')}catch(e){}}}
 window.addEventListener('error',function(e){report((e.message||'Error')+(e.lineno?' (line '+e.lineno+')':''))});
 window.addEventListener('unhandledrejection',function(e){report('Unhandled promise rejection: '+(e.reason&&e.reason.message||e.reason))});
+var last=0;['pointerdown','pointermove','keydown','wheel','touchstart','input'].forEach(function(n){window.addEventListener(n,function(){var t=Date.now();if(t-last>5000){last=t;try{parent.postMessage({type:'lumina-lab-active'},'*')}catch(e){}}},{passive:true,capture:true})});
 window.alert=window.confirm=window.prompt=function(){};
 function mem(){var d={};return{getItem:function(k){return k in d?d[k]:null},setItem:function(k,v){d[k]=String(v)},removeItem:function(k){delete d[k]},clear:function(){d={}},key:function(i){return Object.keys(d)[i]||null},get length(){return Object.keys(d).length}}}
 ['localStorage','sessionStorage'].forEach(function(n){try{window[n]}catch(e){try{Object.defineProperty(window,n,{value:mem(),configurable:true})}catch(_){}}});})();</script>`;
@@ -138,6 +142,7 @@ const VisualLabView = ({ projectId, availableTopics = [], selectedDocuments = []
     useEffect(() => {
         const onMessage = async (ev) => {
             if (ev.source !== iframeRef.current?.contentWindow) return;
+            if (ev.data?.type === 'lumina-lab-active') { markActive(); return; }
             if (ev.data?.type !== 'lumina-lab-error') return;
             const message = ev.data.message || 'Unknown error';
             if (repairedRef.current) { setRuntimeError(message); return; }

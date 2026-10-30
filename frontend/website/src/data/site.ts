@@ -1,8 +1,8 @@
 // All visible content for the Lumina IQ site lives here.
 //
 // Assumptions (mirrored in the hand-off; replace before launch):
-// - appUrl / loginUrl: taken from the app repo (Genrec-Community/LuminaIQ): its own landing
-//   page sends every CTA to /dashboard, which asks logged-out visitors to sign in.
+// - appUrl / loginUrl: the app's own routes (Genrec-Community/LuminaIQ): Start free opens its
+//   sign-up form, Log in its sign-in form.
 // - email: the support address from the Play Store listing.
 // - Prices: the app's plans (backend/services/plans.py), yearly saves about 30%.
 // - Stats: the figures the current luminaiq.fun site reports, shown as reported.
@@ -24,12 +24,16 @@ export const site = {
   tagline: 'The AI study companion that remembers when you will forget',
   description:
     'Lumina IQ turns your PDFs, textbooks and lecture notes into cited answers, quizzes, notes, flashcards and a spaced repetition schedule. Start free.',
-  // Same-origin by default: the site is served in front of the app, so test stays on test
-  appUrl: process.env.NEXT_PUBLIC_APP_URL || '/dashboard',
+  // Same-origin by default: the site is served in front of the app, so test stays on test.
+  // Start free opens the sign-up form (signed-in visitors go straight on to their dashboard).
+  appUrl: process.env.NEXT_PUBLIC_APP_URL || '/login?signup=1',
   loginUrl: process.env.NEXT_PUBLIC_LOGIN_URL || '/login',
   email: 'support@luminaiq.fun',
   maker: { name: 'GenrecAI', url: 'https://www.genrecai.com' },
   youtubeId: 'uLXTLmunK0g',
+  // Every page this site owns. Any other same-origin path (/login, /dashboard, /plans…) belongs
+  // to the app, so it needs a full page load rather than a client-side route change.
+  pages: ['/', '/features/', '/how-it-works/', '/pricing/', '/about/'],
   nav: [
     { href: '/features/', label: 'Features' },
     { href: '/how-it-works/', label: 'How it works' },

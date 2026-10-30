@@ -4,7 +4,21 @@ import { emitLimit, isLimitDetail } from './utils/plan';
 
 // Fallback to localhost so a missing VITE_MAIN_API_URL env var doesn't silently
 // send every request to '/undefined/...' on deployed builds.
-export const API_URL = import.meta.env.VITE_MAIN_API_URL || 'https://luminaiq-backend.onrender.com/api/v1';
+// test.luminaiq.fun always talks to the test backend (Azure "luminaiq-api-test", deployed from
+// jaisamyukth-changes), whatever the hosting project's env says.
+const TEST_API_URL = 'https://luminaiq-api-test.graygrass-e72a94bd.centralindia.azurecontainerapps.io/api/v1';
+const onTestSite = typeof window !== 'undefined' && window.location.hostname === 'test.luminaiq.fun';
+export const API_URL = onTestSite
+    ? TEST_API_URL
+    : import.meta.env.VITE_MAIN_API_URL || 'https://luminaiq-backend.onrender.com/api/v1';
+
+// Wake a backend that scales to zero while the visitor is still reading or typing, so the
+// first real request doesn't wait for a cold start. Fire and forget.
+export const warmUp = () => {
+    try {
+        fetch(API_URL.replace(/\/api\/v1\/?$/, '') + '/health', { mode: 'no-cors', cache: 'no-store' }).catch(() => {});
+    } catch { /* ignore */ }
+};
 
 export const api = axios.create({
     baseURL: API_URL,

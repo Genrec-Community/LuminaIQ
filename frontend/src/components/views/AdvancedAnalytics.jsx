@@ -96,7 +96,7 @@ const AdvancedAnalytics = ({ projectId, documents = [], bookIsolation = true }) 
             totalAttempts,
             accuracy,
             studySessions: analytics.studyTime?.sessions || 0,
-            focusTime: analytics.studyTime?.focusTime || 0,
+            focusTime: (analytics.studyTime?.focusTime || 0) * 60, // API stores minutes, formatTime takes seconds
             streak: analytics.streak?.current || 0,
             longestStreak: analytics.streak?.longest || 0,
         };

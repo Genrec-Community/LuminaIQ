@@ -3,6 +3,7 @@ import { CalendarClock, Play, Check, Moon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { useGamification } from '../context/GamificationContext';
+import { Shimmer } from './Skeleton';
 import { getDailyProgress, onDailyProgress, dailyQuests } from '../utils/dailyProgress';
 import { getCharacter, displayName, aiName, timeGreeting, daysUntil, pick } from '../utils/persona';
 
@@ -20,7 +21,7 @@ const TIPS = [
  * Dashboard hero: personal greeting from the AI companion, streak, daily goal,
  * level progress, exam countdown and daily quests.
  */
-const TodayHero = ({ onContinue, continueLabel, onCram }) => {
+const TodayHero = ({ onContinue, continueLabel, onCram, loading = false }) => {
     const { user } = useAuth();
     const { settings } = useSettings();
     const { data: g } = useGamification();
@@ -71,14 +72,15 @@ const TodayHero = ({ onContinue, continueLabel, onCram }) => {
                     </p>
                 </div>
                 <div data-reveal="up" data-delay="0.25" className="mt-8 flex flex-wrap items-center gap-3">
-                    {onContinue && (
+                    {loading && <Shimmer className="h-12 w-60 rounded-full" />}
+                    {!loading && onContinue && (
                         <button onClick={onContinue} data-magnetic="0.25" className="btn btn--dark">
                             <Play className="h-4 w-4 fill-current" />
                             <span className="max-w-[16rem] truncate">{continueLabel}</span>
                             <svg className="arrow" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9M8.5 4.5 12 8l-3.5 3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
                         </button>
                     )}
-                    {onCram && (
+                    {!loading && onCram && (
                         <button onClick={onCram} className="btn btn--light">
                             <Moon className="h-4 w-4" />
                             {examDays !== null && examDays >= 0 && examDays <= 1 ? 'Cram for it now' : 'Exam tonight?'}
