@@ -336,6 +336,9 @@ class UserDataService:
                 query = query.eq("document_id", document_id)
             else:
                 query = query.is_("document_id", "null")
+            # Match get_pomodoro: without this, one book's total overwrote another's
+            if project_id:
+                query = query.eq("project_id", project_id)
 
             existing = (await async_db(lambda: query.execute()))
 

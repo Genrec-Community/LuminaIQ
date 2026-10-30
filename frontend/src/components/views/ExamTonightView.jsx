@@ -442,7 +442,7 @@ const ExamTonightView = ({ projectId, selectedDocuments = [], onTopicMastered, o
         if (topicDone && entry?.type === 'topic') {
             setDone((d) => new Set(d).add(entry.topic));
             if (entry.tier === 'learn') onTopicMastered?.(entry.topic);
-            bumpDailyProgress(user?.id, { cards: 1, minutes: Math.round(entry.minutes) });
+            bumpDailyProgress(user?.id, { cards: 1 });
             earnXP('sprint', { topic: entry.topic });
         }
         setChecking(false); setCheer('');
