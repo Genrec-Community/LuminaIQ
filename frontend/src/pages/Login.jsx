@@ -17,7 +17,12 @@ const Login = () => {
     React.useEffect(() => {
         if (next) sessionStorage.setItem(AFTER_LOGIN_KEY, next);
     }, [next]);
-    const { login, signup, loginWithGoogle, requestOtp, verifyOtpCode, requestPasswordReset } = useAuth();
+    const { user, login, signup, loginWithGoogle, requestOtp, verifyOtpCode, requestPasswordReset } = useAuth();
+    // Already signed in (e.g. Start free from the website): nothing to fill in here
+    const signedIn = Boolean(user);
+    React.useEffect(() => {
+        if (signedIn) navigate(next || '/dashboard', { replace: true });
+    }, [signedIn]); // eslint-disable-line react-hooks/exhaustive-deps
     const [isLogin, setIsLogin] = useState(() => searchParams.get('signup') !== '1');
     const [isOtpMode, setIsOtpMode] = useState(false);
     const [isForgot, setIsForgot] = useState(false); // "Forgot password?" form
@@ -97,8 +102,14 @@ const Login = () => {
 
                 await signup(email, password, fullName);
 
-                // Signup successful - Redirect to login with confirmation message
-                // We do NOT auto-login because email confirmation might be required
+                // Straight in when the account needs no email confirmation: the dashboard
+                // then opens the first-run onboarding. Otherwise ask them to confirm first.
+                const signedIn = await login(email, password).catch(() => false);
+                if (signedIn) {
+                    sessionStorage.removeItem(AFTER_LOGIN_KEY);
+                    navigate(next || '/dashboard', { replace: true });
+                    return;
+                }
                 setIsLogin(true);
                 setPassword('');
                 setMessage({
