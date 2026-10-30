@@ -7,6 +7,7 @@ import {
 import { recordActivity } from '../utils/studyActivity';
 import { useSettings } from '../context/SettingsContext';
 import { getPomodoro, savePomodoro } from '../api';
+import { isActive } from '../utils/activeTime';
 
 const PomodoroTimer = ({ 
     projectId = null,
@@ -34,13 +35,19 @@ const PomodoroTimer = ({
     const audioRef = useRef(null);
     const intervalRef = useRef(null);
 
+    // Saving waits until today's numbers have loaded, so a fresh 0 never
+    // overwrites them
+    const loadedRef = useRef(false);
+
     // Load session history from API
     useEffect(() => {
+        loadedRef.current = false;
         const load = async () => {
             try {
                 const data = await getPomodoro(projectId, documentId);
                 setSessionsCompleted(data.sessions || 0);
                 setTotalFocusTime((data.focusTime || 0) * 60); // API stores minutes, timer uses seconds
+                loadedRef.current = true;
             } catch (err) {
                 console.warn('Failed to load pomodoro data:', err);
             }
@@ -48,15 +55,15 @@ const PomodoroTimer = ({
         load();
     }, [documentId, projectId]);
 
+    // Saved once per whole minute of focus, not every second
+    const focusMinutes = Math.floor(totalFocusTime / 60);
+
     // Save session history to API
     const saveSession = useCallback(() => {
-        savePomodoro(
-            sessionsCompleted,
-            Math.round(totalFocusTime / 60), // convert seconds to minutes
-            projectId,
-            documentId
-        ).catch(err => console.warn('Failed to save pomodoro:', err));
-    }, [documentId, projectId, sessionsCompleted, totalFocusTime]);
+        if (!loadedRef.current) return;
+        savePomodoro(sessionsCompleted, focusMinutes, projectId, documentId)
+            .catch(err => console.warn('Failed to save pomodoro:', err));
+    }, [documentId, projectId, sessionsCompleted, focusMinutes]);
 
     // Timer logic
     useEffect(() => {
@@ -70,8 +77,9 @@ const PomodoroTimer = ({
                     return prev - 1;
                 });
                 
-                // Track focus time
-                if (mode === 'work') {
+                // Focus time is only the time the learner is actually here:
+                // the countdown keeps going, but an away or idle second adds nothing
+                if (mode === 'work' && isActive()) {
                     setTotalFocusTime(prev => prev + 1);
                 }
             }, 1000);
@@ -87,7 +95,7 @@ const PomodoroTimer = ({
     // Save on changes
     useEffect(() => {
         saveSession();
-    }, [sessionsCompleted, totalFocusTime, saveSession]);
+    }, [saveSession]);
 
     const handleTimerComplete = () => {
         setIsRunning(false);
