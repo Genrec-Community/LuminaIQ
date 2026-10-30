@@ -83,6 +83,14 @@ export async function leave() {
   await playLeave();
 }
 
+/** Lift the curtain off a page that was left but never unloaded: the browser restored it from
+ *  the back/forward cache, or a full page load away from it was cancelled. */
+export async function resume() {
+  if (!booted) return;
+  await playEnter();
+  startScroll();
+}
+
 /** Tear down the current page: reverts every tween, ScrollTrigger and split; removes GL planes. */
 export function cleanup() {
   if (!ready) return;
