@@ -1,8 +1,16 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api, login as apiLogin, signup as apiSignup, exchangeToken as apiExchangeToken } from '../api';
 import { supabase } from '../supabaseClient';
+import { isNativeApp } from '../utils/platform';
+import { nativeGoogleSignIn, initNative } from '../utils/native';
 
 const AuthContext = createContext(null);
+
+// Resolve with `fallback` if a promise takes longer than `ms` (start-up must never hang)
+const withTimeout = (promise, ms, fallback) => Promise.race([
+    promise,
+    new Promise((resolve) => setTimeout(() => resolve(fallback), ms)),
+]);
 
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
@@ -44,8 +52,12 @@ export const AuthProvider = ({ children }) => {
                 }
             }
 
-            // Wait for Supabase session to initialize (handles OAuth callback)
-            const { data: { session } } = await supabase.auth.getSession();
+            // Wait for Supabase session to initialize (handles OAuth callback).
+            // Capped: in some Android WebViews the session refresh can hang, which
+            // left the app on a blank screen.
+            const { data: { session } } = await withTimeout(
+                supabase.auth.getSession(), 8000, { data: { session: null } }
+            );
             
             if (session && !tokenExchanged.current) {
                 console.log("Supabase session found, exchanging token...");
@@ -72,10 +84,17 @@ export const AuthProvider = ({ children }) => {
             setLoading(false);
         };
 
-        initAuth();
+        initAuth().catch((e) => console.error('Auth start-up failed:', e)).finally(() => setLoading(false));
+        initNative(supabase); // Android app: sign-in deep link + back button
 
         // Listen for Supabase auth changes (including OAuth callbacks)
-        const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+        const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+            // Run outside the callback: awaiting Supabase (signOut, getSession in the
+            // 401 handler) inside it deadlocks the auth lock, so sign-in spun forever
+            setTimeout(() => handleAuthEvent(event, session), 0);
+        });
+
+        const handleAuthEvent = async (event, session) => {
             console.log("Auth event:", event, session ? "with session" : "no session");
             
             if (event === 'SIGNED_IN' && session && !tokenExchanged.current) {
@@ -110,6 +129,11 @@ export const AuthProvider = ({ children }) => {
                     } catch (e) {
                         console.error("Token Exchange Failed:", e);
                         tokenExchanged.current = false; // Reset on failure to allow retry
+                        // Say why on the sign-in screen instead of failing silently
+                        const detail = e?.response?.data?.detail;
+                        window.dispatchEvent(new CustomEvent('lumina-auth-error', {
+                            detail: typeof detail === 'string' ? detail : detail?.message ? detail.message : (e?.response ? 'Sign-in failed on our side. Please try again.' : "Couldn't reach Lumina IQ. Check your connection and try again."),
+                        }));
                         await supabase.auth.signOut(); // Clear invalid supabase session
                     }
                 }
@@ -119,7 +143,7 @@ export const AuthProvider = ({ children }) => {
                 localStorage.removeItem('user');
                 setUser(null);
             }
-        });
+        };
 
         return () => {
             authListener.subscription.unsubscribe();
@@ -155,6 +179,10 @@ export const AuthProvider = ({ children }) => {
 
     const loginWithGoogle = async () => {
         try {
+            if (isNativeApp()) {
+                await nativeGoogleSignIn(supabase);
+                return;
+            }
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
@@ -192,6 +220,33 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    // Email a link to choose a new password. The link opens /reset-password.
+    // The Android app sends people to the website, which can finish the reset.
+    const requestPasswordReset = async (email) => {
+        const origin = isNativeApp() ? 'https://luminaiq.fun' : window.location.origin;
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: `${origin}/reset-password`,
+        });
+        if (error) throw error;
+        return true;
+    };
+
+    // Set a new password for the account opened from a reset link
+    const setNewPassword = async (password) => {
+        const { data, error } = await supabase.auth.updateUser({ password });
+        if (error) throw error;
+        return data?.user;
+    };
+
+    // Merge fields into the signed-in user (e.g. after a password change)
+    const updateUser = (patch) => {
+        setUser((u) => {
+            const next = { ...(u || {}), ...patch };
+            try { localStorage.setItem('user', JSON.stringify(next)); } catch { /* ignore */ }
+            return next;
+        });
+    };
+
     const logout = async () => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
@@ -201,9 +256,14 @@ export const AuthProvider = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, login, signup, loginWithGoogle, requestOtp, verifyOtpCode, logout, loading }}>
+        <AuthContext.Provider value={{ user, login, signup, loginWithGoogle, requestOtp, verifyOtpCode, requestPasswordReset, setNewPassword, logout, loading, updateUser }}>
 
-            {!loading && children}
+            {loading ? (
+                // Not a blank screen while the saved sign-in is checked
+                <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FDF6F0' }}>
+                    <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-[#E6D5CC] border-t-[#1E5C42]" />
+                </div>
+            ) : children}
         </AuthContext.Provider >
     );
 };

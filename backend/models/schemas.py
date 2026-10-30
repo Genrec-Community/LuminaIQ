@@ -12,7 +12,8 @@ class UserSignup(BaseModel):
 
 
 class UserLogin(BaseModel):
-    email: EmailStr
+    # An email, or a school sign-in ID (with or without @luminaiq.fun)
+    email: str = Field(..., min_length=1, max_length=254)
     password: str
 
 
@@ -69,6 +70,7 @@ class DocumentStatus(BaseModel):
 class ChatMessage(BaseModel):
     role: str
     content: str
+    created_at: Optional[str] = None
 
 
 class ChatRequest(BaseModel):
@@ -77,6 +79,8 @@ class ChatRequest(BaseModel):
     selected_documents: Optional[List[str]] = None
     session_history: List[ChatMessage] = []
     system_prompt: Optional[str] = None
+    # Topper "Deep" answer from the stronger model (counts against the Deep allowance)
+    deep: bool = False
 
 
 class SourceInfo(BaseModel):

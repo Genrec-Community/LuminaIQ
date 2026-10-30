@@ -1,3 +1,4 @@
+from db.client import async_db
 from typing import List, Dict, Any, Optional
 import asyncio
 from services.embedding_service import embedding_service
@@ -52,16 +53,30 @@ async def retry_with_backoff(func, max_retries=3, base_delay=1.0, max_delay=10.0
 
 
 class RAGService:
+    # Strong refs to background tasks so they aren't garbage-collected mid-run
+    _background_tasks: set = set()
+
     def __init__(self):
         self.client: Client = create_client(
             settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY
         )
 
-        # Initialize LLM via centralized llm_service
-        self.llm = llm_service._get_client(temperature=0.1)
+        # Chat clients per model: the model depends on the user's plan
+        # (LLM_TIER_MODELS) and on Deep mode, see llm_service.resolve_model
+        self._clients = {}
+
+    def _llm(self, deep: bool = False):
+        """The chat model for this request's plan, or the Deep model for Deep answers."""
+        from services.llm_service import resolve_model
+        model = resolve_model(deep=deep)
+        key = (model, deep)
+        if key not in self._clients:
+            self._clients[key] = llm_service._get_client(temperature=0.1, deep=deep, model=model)
+        return self._clients[key]
 
     def _get_retrieval_chain(
-        self, collection_name: str, selected_documents: Optional[List[str]] = None, system_prompt: Optional[str] = None, user_context: Optional[str] = None
+        self, collection_name: str, selected_documents: Optional[List[str]] = None, system_prompt: Optional[str] = None, user_context: Optional[str] = None,
+        deep: bool = False,
     ):
         """Create a RAG chain for a specific collection"""
 
@@ -93,6 +108,7 @@ CRITICAL RULE:
 - If the student asks ANY question about themselves — "who am I", "what is my name", "what am I studying for", "tell me about myself" — answer ONLY using the STUDENT PROFILE above.
 - Do NOT use document content to describe the student. The student is the READER, not the subject.
 - If the student asks "who am I" and the profile has their name, greet them by name and describe what you know from their profile.
+- If a YOUR PERSONA section is present above, adopt that name and personality for every reply (the rules below still apply).
 
 ===================================================
 
@@ -210,10 +226,84 @@ Your job is to make the user understand.
         )
 
         # 3. Chains
-        question_answer_chain = create_stuff_documents_chain(self.llm, prompt)
+        question_answer_chain = create_stuff_documents_chain(self._llm(deep), prompt)
         rag_chain = create_retrieval_chain(retriever, question_answer_chain)
 
         return rag_chain
+
+    @staticmethod
+    def _friendly_error(e: Exception) -> str:
+        """Plain-language message for chat errors (raw details go to the logs)."""
+        text = str(e)
+        lower = text.lower()
+        if "not found: collection" in lower or "doesn't exist" in lower:
+            return "Your documents' search index is being rebuilt. Please try again in a few minutes."
+        if "402" in text or "credit limit" in lower or "insufficient_quota" in lower:
+            return "The AI service has run out of credit, so I can't answer right now. Please let the site admin know."
+        if "401" in text or "invalid api key" in lower or "invalid_api_key" in lower:
+            return "The AI service rejected its API key, so I can't answer right now. Please let the site admin know."
+        if "connection error" in lower or "apiconnectionerror" in lower or "timed out" in lower:
+            return "I couldn't reach the AI service. Please try again in a moment."
+        return "Something went wrong while answering. Please try again."
+
+    def _trigger_reindex(self, project_id: str):
+        """Rebuild missing vectors for this project's documents in the background."""
+        from services.document_service import document_service
+
+        async def _run():
+            try:
+                await document_service.ensure_project_indexed(project_id)
+            except Exception as e:
+                logger.error(f"Index check failed for project {project_id}: {e}")
+
+        task = asyncio.create_task(_run())
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+
+    async def _answer_from_stored_text(
+        self,
+        project_id: str,
+        question: str,
+        selected_documents: Optional[List[str]],
+        chat_history: List[Dict[str, str]],
+        user_context: Optional[str],
+        deep: bool = False,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Answer without the vector index (missing, rebuilding, or the embedding
+        provider is down) using passages found in the documents' stored text.
+        Returns None when no text is available.
+        """
+        from services.graph_analytics_service import graph_analytics
+
+        passages, sources = await graph_analytics.keyword_context_from_stored_text(
+            project_id,
+            question,
+            max_passages=6,
+            document_ids=selected_documents or None,
+            per_passage_sources=True,
+            overview_if_empty=True,
+        )
+        if not passages:
+            return None
+
+        context = "\n\n".join(f"[Source {i + 1}]\n{p}" for i, p in enumerate(passages))
+        system = (
+            (f"=== STUDENT PROFILE ===\n{user_context}\n\n" if user_context else "")
+            + "You are a helpful study companion. Answer the student's question using the "
+            "excerpts from their documents below. Cite facts inline as [1](1), [2](2) matching "
+            "the source numbers. Use clear Markdown. If the excerpts don't cover the question, "
+            "say so briefly and give the best answer you can from them.\n\n"
+            f"EXCERPTS:\n{context[:9000]}"
+        )
+        messages = [{"role": "system", "content": system}]
+        for m in chat_history[-6:]:
+            if m.get("role") in ("user", "assistant") and m.get("content"):
+                messages.append({"role": m["role"], "content": m["content"]})
+        messages.append({"role": "user", "content": question})
+
+        answer = await llm_service.chat_completion(messages, temperature=0.3, max_tokens=1500, deep=deep)
+        return {"answer": answer, "sources": sources}
 
     async def get_answer(
         self,
@@ -223,11 +313,12 @@ Your job is to make the user understand.
         chat_history: List[Dict[str, str]] = [],
         system_prompt: Optional[str] = None,
         user_context: Optional[str] = None,
+        deep: bool = False,
     ) -> Dict[str, Any]:
         """Generate answer using RAG pipeline (LangChain) with retry logic"""
         try:
             collection_name = f"project_{project_id}"
-            chain = self._get_retrieval_chain(collection_name, selected_documents, system_prompt, user_context)
+            chain = self._get_retrieval_chain(collection_name, selected_documents, system_prompt, user_context, deep=deep)
 
             # Convert history to LangChain format
             history_messages = []
@@ -247,16 +338,21 @@ Your job is to make the user understand.
                 invoke_chain, max_retries=3, base_delay=1.5
             )
 
+            # Nothing retrieved (index empty / rebuilding): use stored text instead
+            if "context" in response and not response["context"]:
+                self._trigger_reindex(project_id)
+                fallback = await self._answer_from_stored_text(
+                    project_id, question, selected_documents, chat_history, user_context,
+                    deep=deep,
+                )
+                if fallback:
+                    return fallback
+
             # Process sources from 'context' in response
             sources = []
             if "context" in response:
-                # DIAGNOSTIC: Log retrieved chunks
-                print("\n====== RETRIEVED CHUNKS ======")
-                for i, doc in enumerate(response["context"]):
-                    print(f"\n--- Chunk {i+1} ---")
-                    print(doc.page_content[:300])
-                print("\n===========================\n")
-                
+                logger.debug(f"Retrieved {len(response['context'])} chunks")
+
                 for i, doc in enumerate(response["context"]):
                     # Resolve filename from doc.metadata if available
                     doc_name = doc.metadata.get("document_name", "Unknown")
@@ -266,10 +362,10 @@ Your job is to make the user understand.
                     if doc_name == "Unknown" and doc_id:
                         try:
                             res = (
-                                self.client.table("documents")
+                                (await async_db(lambda: self.client.table("documents")
                                 .select("filename")
                                 .eq("id", doc_id)
-                                .execute()
+                                .execute()))
                             )
                             if res.data:
                                 doc_name = res.data[0]["filename"]
@@ -290,13 +386,20 @@ Your job is to make the user understand.
         except Exception as e:
             logger.error(f"Error in RAG pipeline: {str(e)}")
             
-            friendly_message = str(e)
             if "Not found: Collection" in str(e) or "doesn't exist" in str(e):
-                friendly_message = "Document chunks are still processing or failed to upload. Please try re-uploading the document if this persists."
-            elif "Connection error" in str(e) or "APIConnectionError" in str(e):
-                friendly_message = "Failed to connect to the AI service. Please check your backend configuration or try again later."
-                
-            raise Exception(friendly_message)
+                self._trigger_reindex(project_id)
+            # Search/embeddings/index failed: answer from the stored text instead
+            try:
+                fallback = await self._answer_from_stored_text(
+                    project_id, question, selected_documents, chat_history, user_context,
+                    deep=deep,
+                )
+                if fallback:
+                    return fallback
+            except Exception as fb_err:
+                logger.error(f"Stored-text fallback failed: {fb_err}")
+
+            raise Exception(self._friendly_error(e))
 
     async def get_answer_stream(
         self,
@@ -306,6 +409,7 @@ Your job is to make the user understand.
         chat_history: List[Dict[str, str]] = [],
         system_prompt: Optional[str] = None,
         user_context: Optional[str] = None,
+        deep: bool = False,
     ):
         """Generate answer using RAG pipeline with streaming (LangChain) - Optimized with retry"""
         max_retries = 3
@@ -318,10 +422,10 @@ Your job is to make the user understand.
         if selected_documents:
             try:
                 res = (
-                    self.client.table("documents")
+                    (await async_db(lambda: self.client.table("documents")
                     .select("id, filename")
                     .in_("id", selected_documents)
-                    .execute()
+                    .execute()))
                 )
                 for doc in res.data:
                     doc_name_cache[doc["id"]] = doc["filename"]
@@ -336,14 +440,22 @@ Your job is to make the user understand.
                 history_messages.append(AIMessage(content=msg["content"]))
 
         for attempt in range(max_retries):
+            has_yielded = False
             try:
-                chain = self._get_retrieval_chain(collection_name, selected_documents, system_prompt, user_context)
+                chain = self._get_retrieval_chain(collection_name, selected_documents, system_prompt, user_context, deep=deep)
                 sources_data = []
-                has_yielded = False
 
+                empty_context = False
                 async for chunk in chain.astream(
                     {"input": question, "chat_history": history_messages}
                 ):
+                    # Retrieval comes before generation: if it found nothing
+                    # (index empty or still rebuilding), stop before the LLM call
+                    # and answer from the documents' stored text instead.
+                    if "context" in chunk and not chunk["context"] and not has_yielded:
+                        empty_context = True
+                        break
+
                     # Check for answer chunks
                     if "answer" in chunk:
                         has_yielded = True
@@ -361,10 +473,10 @@ Your job is to make the user understand.
                             elif doc_name == "Unknown" and doc_id:
                                 try:
                                     res = (
-                                        self.client.table("documents")
+                                        (await async_db(lambda: self.client.table("documents")
                                         .select("filename")
                                         .eq("id", doc_id)
-                                        .execute()
+                                        .execute()))
                                     )
                                     if res.data:
                                         doc_name = res.data[0]["filename"]
@@ -380,6 +492,25 @@ Your job is to make the user understand.
                                     "page": doc.metadata.get("page"),
                                 }
                             )
+
+                if empty_context:
+                    self._trigger_reindex(project_id)
+                    fallback = await self._answer_from_stored_text(
+                        project_id, question, selected_documents, chat_history, user_context,
+                        deep=deep,
+                    )
+                    import json
+
+                    if fallback:
+                        yield fallback["answer"]
+                        yield f"\n\n__SOURCES__:{json.dumps(fallback['sources'])}"
+                    else:
+                        yield "I couldn't find any readable text in the selected documents yet. Try again once they finish processing."
+                        yield "\n\n__SOURCES__:[]"
+                    return
+
+                if not sources_data:
+                    self._trigger_reindex(project_id)
 
                 # Send sources at the end
                 import json
@@ -435,14 +566,27 @@ Your job is to make the user understand.
                         return
 
                 logger.error(f"Error in RAG stream: {str(e)}")
-                
-                friendly_message = str(e)
+
                 if "Not found: Collection" in str(e) or "doesn't exist" in str(e):
-                    friendly_message = "Document chunks are still processing or failed to upload. Please try re-uploading the document if this persists."
-                elif "Connection error" in str(e) or "APIConnectionError" in str(e):
-                    friendly_message = "Failed to connect to the AI service. Please check your backend configuration or try again later."
-                
-                yield f"Error: {friendly_message}"
+                    self._trigger_reindex(project_id)
+                # Failed before any answer text (search, embeddings or index):
+                # answer from the documents' stored text instead.
+                if not has_yielded:
+                    try:
+                        fallback = await self._answer_from_stored_text(
+                            project_id, question, selected_documents, chat_history, user_context,
+                            deep=deep,
+                        )
+                        if fallback:
+                            import json
+
+                            yield fallback["answer"]
+                            yield f"\n\n__SOURCES__:{json.dumps(fallback['sources'])}"
+                            return
+                    except Exception as fb_err:
+                        logger.error(f"Stored-text fallback failed: {fb_err}")
+
+                yield f"Error: {self._friendly_error(e)}"
                 return
 
     async def generate_summary(
@@ -454,10 +598,10 @@ Your job is to make the user understand.
             if not selected_documents:
                 try:
                     cached_res = (
-                        self.client.table("project_summaries")
+                        (await async_db(lambda: self.client.table("project_summaries")
                         .select("summary")
                         .eq("project_id", project_id)
-                        .execute()
+                        .execute()))
                     )
                     if cached_res.data:
                         logger.info(
@@ -473,13 +617,13 @@ Your job is to make the user understand.
             # 2. Generate if not found
             query = (
                 self.client.table("documents")
-                .select("id, filename")
+                .select("id, project_id, filename, text_storage_path")
                 .eq("project_id", project_id)
                 .eq("upload_status", "completed")
             )
             if selected_documents:
                 query = query.in_("id", selected_documents)
-            response = query.execute()
+            response = (await async_db(lambda: query.execute()))
             documents = response.data
             if not documents:
                 return {"answer": "No documents available.", "sources": []}
@@ -492,6 +636,12 @@ Your job is to make the user understand.
                 chunks = await qdrant_service.get_initial_chunks(
                     collection_name, doc["id"], 3
                 )
+                if not chunks:
+                    # Not indexed (yet): use the opening of the stored text
+                    from services.document_service import document_service
+                    text = await document_service.load_stored_text(doc)
+                    if text:
+                        chunks = [text[i:i + 1500] for i in range(0, min(len(text), 4500), 1500)]
                 if chunks:
                     doc_text = "\n".join(chunks)
                     all_intro_text += (
@@ -521,7 +671,7 @@ IMPORTANT: Format the output using standard Markdown. Do NOT use any HTML tags l
 
             # Use retry logic for LLM call
             async def invoke_llm():
-                return await self.llm.ainvoke(messages)
+                return await self._llm().ainvoke(messages)
 
             response = await retry_with_backoff(
                 invoke_llm, max_retries=3, base_delay=1.5
@@ -532,10 +682,10 @@ IMPORTANT: Format the output using standard Markdown. Do NOT use any HTML tags l
             # 3. Store in DB only for full project summaries
             if not selected_documents:
                 try:
-                    self.client.table("project_summaries").upsert(
+                    (await async_db(lambda: self.client.table("project_summaries").upsert(
                         {"project_id": project_id, "summary": summary_text},
                         on_conflict="project_id",
-                    ).execute()
+                    ).execute()))
                 except Exception as store_err:
                     logger.error(f"Failed to store summary: {store_err}")
 

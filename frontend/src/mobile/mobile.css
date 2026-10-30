@@ -1,0 +1,165 @@
+/* Phone app interface. Colours follow the chosen theme (themes.css variables). */
+
+.m-app {
+    --m-bg: var(--th-bg, #FDF6F0);
+    --m-surface: var(--th-surface, #ffffff);
+    --m-soft: var(--th-alt, #F6EBE2);
+    --m-border: var(--th-border, #EEDFD5);
+    --m-text: var(--th-text, #163628);
+    --m-muted: var(--th-muted, #5E5046);
+    --m-accent: var(--th-accent, #1E5C42);
+    --m-accent-deep: color-mix(in srgb, var(--m-accent) 78%, #0a1a12);
+    --m-mark: #D3EE6A;
+    /* Accent for text on light backgrounds: darker, so it stays readable (WCAG AA) */
+    --m-accent-text: color-mix(in srgb, var(--m-accent) 80%, #0a1a12);
+    --m-on-accent: #ffffff;
+    --m-shadow: 0 10px 30px -12px rgba(22, 54, 40, 0.22);
+    --m-tabbar-h: 64px;
+    --m-safe-top: var(--sat);
+    --m-safe-bottom: var(--sab);
+    /* Content column: full width on phones, a centred reading column on
+       unfolded foldables, tablets and landscape (no stretched cards/buttons) */
+    --m-col: 100%;
+
+    background: var(--m-bg);
+    color: var(--m-text);
+    min-height: 100dvh;
+    font-family: var(--app-font, "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif);
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    user-select: none;
+    overscroll-behavior: none;
+}
+
+html.dark .m-app {
+    --m-bg: var(--dm-bg, #0f1d16);
+    --m-surface: var(--dm-surface, #182c21);
+    --m-soft: var(--dm-surface-elevated, #26342D);
+    --m-border: color-mix(in srgb, var(--dm-text-muted, #8f8273) 28%, transparent);
+    --m-text: var(--dm-text-primary, #f0ece6);
+    --m-muted: var(--dm-text-secondary, #b9ab9b);
+    --m-accent: var(--dm-accent, #D3EE6A);
+    --m-on-accent: #0f271c;
+    --m-accent-text: var(--m-accent);
+    --m-shadow: 0 12px 32px -14px rgba(0, 0, 0, 0.7);
+}
+
+/* Typing and reading stay selectable */
+.m-app input, .m-app textarea, .m-app [contenteditable], .m-app .m-selectable { user-select: text; }
+
+.m-app button { touch-action: manipulation; }
+
+.m-pressable { transition: transform 140ms cubic-bezier(.2,.8,.2,1), opacity 140ms; }
+.m-pressable:active { transform: scale(0.96); opacity: 0.9; }
+
+.m-card {
+    background: var(--m-surface);
+    border: 1px solid var(--m-border);
+    border-radius: 22px;
+    box-shadow: var(--m-shadow);
+}
+
+.m-app .m-white { background-color: #ffffff !important; }
+.m-app .m-white.text-\[\#142A1F\], .m-app .m-white.text-\[\#0F1D16\], .m-app .m-white.text-\[\#1f1f1f\] { color: #142A1F !important; }
+
+.m-group > * + * { border-top: 1px solid var(--m-border); }
+
+.m-safe-top { padding-top: var(--m-safe-top); }
+.m-safe-bottom { padding-bottom: var(--m-safe-bottom); }
+.m-tab-space { padding-bottom: calc(var(--m-tabbar-h) + var(--m-safe-bottom) + 24px); }
+
+.m-scroll {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+    scrollbar-width: none;
+}
+.m-scroll::-webkit-scrollbar { display: none; }
+
+.m-hscroll {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+}
+.m-hscroll::-webkit-scrollbar { display: none; }
+.m-hscroll > * { scroll-snap-align: start; }
+
+/* Full-screen vertical feed, one card per screen */
+.m-feed {
+    height: 100dvh;
+    overflow-y: scroll;
+    scroll-snap-type: y mandatory;
+    overscroll-behavior-y: contain;
+    scrollbar-width: none;
+    /* New cards are added below; don't let the browser keep the loader pinned in view */
+    overflow-anchor: none;
+}
+.m-feed::-webkit-scrollbar { display: none; }
+.m-card-scroll { scrollbar-width: none; overscroll-behavior-y: auto; }
+.m-card-scroll::-webkit-scrollbar { display: none; }
+.m-feed > section { height: 100dvh; scroll-snap-align: start; scroll-snap-stop: always; }
+
+/* Flip cards */
+.m-flip { perspective: 1400px; }
+.m-flip-inner { position: relative; width: 100%; height: 100%; transition: transform 520ms cubic-bezier(.2,.8,.2,1); transform-style: preserve-3d; }
+.m-flip.is-flipped .m-flip-inner { transform: rotateY(180deg); }
+.m-flip-face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.m-flip-back { transform: rotateY(180deg); }
+
+/* Floating heart on double tap */
+@keyframes m-heart {
+    0% { transform: translate(-50%, -50%) scale(0.2); opacity: 0; }
+    25% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+    45% { transform: translate(-50%, -50%) scale(0.95); }
+    100% { transform: translate(-50%, -120%) scale(1.05); opacity: 0; }
+}
+.m-heart { position: absolute; pointer-events: none; animation: m-heart 900ms ease-out forwards; }
+
+@keyframes m-flame {
+    0%, 100% { transform: scale(1) rotate(-2deg); }
+    50% { transform: scale(1.08) rotate(2deg); }
+}
+.m-flame { display: inline-block; animation: m-flame 1.6s ease-in-out infinite; transform-origin: 50% 90%; }
+
+@keyframes m-shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+.m-skeleton {
+    background: linear-gradient(90deg, var(--m-soft) 0%, color-mix(in srgb, var(--m-soft) 40%, var(--m-surface)) 50%, var(--m-soft) 100%);
+    background-size: 200% 100%;
+    animation: m-shimmer 1.4s linear infinite;
+    border-radius: 14px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .m-flame, .m-skeleton, .m-heart { animation: none; }
+    .m-flip-inner { transition: none; }
+}
+
+/* ── Large screens: foldables (unfolded), tablets, landscape ───────────── */
+@media (min-width: 600px) {
+    .m-app { --m-col: 600px; }
+}
+@media (min-width: 1024px) {
+    .m-app { --m-col: 680px; }
+}
+.m-col { width: 100%; max-width: var(--m-col); margin-inline: auto; }
+/* Full-screen shells (welcome, sign-in, setup): every child but the
+   decorative backdrop sits in the column */
+.m-shell > *:not(.absolute) { width: 100%; max-width: var(--m-col); margin-inline: auto; }
+/* Feed cards stay a readable width; the action rail keeps to the edge */
+@media (min-width: 600px) {
+    .m-feed-col { left: max(0px, calc(50% - var(--m-col) / 2)) !important; right: max(0px, calc(50% - var(--m-col) / 2)) !important; }
+    .m-feed-col.pr-16 { padding-right: 1.25rem; }
+    .m-sheet { left: 50% !important; right: auto !important; width: 100%; max-width: var(--m-col); translate: -50% 0; border-radius: 28px 28px 0 0; }
+}
+/* Short landscape screens: tighter feed offsets so the card keeps room */
+@media (max-height: 500px) and (orientation: landscape) {
+    .m-feed-col { top: calc(var(--m-safe-top) + 56px) !important; bottom: calc(var(--m-safe-bottom) + 24px) !important; }
+}
+
+/* Display type, as on the site: light serif, italic for the word that matters */
+.m-app :is(h1, h2):is(.font-extrabold, .font-bold) { font-family: var(--font-display); font-weight: 400; letter-spacing: -0.025em; }

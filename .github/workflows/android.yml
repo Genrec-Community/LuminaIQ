@@ -1,0 +1,131 @@
+# Builds the Lumina IQ Android app (Capacitor wrapper of frontend/).
+#
+# Every push to main that touches frontend/ produces, as a
+# downloadable artifact of the run:
+#   - LuminaIQ-debug.apk     installable on any phone for testing
+#   - LuminaIQ-release.apk   signed (only when the signing secrets are set)
+#   - LuminaIQ-release.aab   signed bundle to upload to Google Play
+#
+# Optional repository settings (Settings → Secrets and variables → Actions):
+#   Variables: ANDROID_API_URL (backend, default: the Azure API),
+#              VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY (defaults below are the
+#              project's public values, the same ones the website ships)
+#   Secrets:   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,
+#              ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD  (see ANDROID.md)
+name: Android app
+
+on:
+  push:
+    branches: [main]
+    paths: ["frontend/**", ".github/workflows/android.yml"]
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: "Version shown in the Play Store (e.g. 1.0.0)"
+        required: false
+        default: "1.0.0"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      VITE_MAIN_API_URL: ${{ vars.ANDROID_API_URL || 'https://luminaiq-api.graygrass-e72a94bd.centralindia.azurecontainerapps.io/api/v1' }}
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://bcosfvilvwyxtrctsmez.supabase.co' }}
+      VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJjb3Nmdmlsdnd5eHRyY3RzbWV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY3ODIyMTMsImV4cCI6MjA4MjM1ODIxM30.bj9wwAT41fkvGX6CLrmyQT16-Fph4_mgqSXZintsNX0' }}
+      # Native Google sign-in (Web OAuth client ID; not a secret). Empty = browser sign-in
+      VITE_GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
+      # Play needs a higher versionCode for every upload
+      ANDROID_VERSION_CODE: ${{ github.run_number }}
+      ANDROID_VERSION_NAME: ${{ inputs.version_name || '1.0.0' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install
+        run: npm ci
+
+      - name: Build web app
+        run: npm run build
+        env:
+          # The phone app is the app only: keep dist/index.html, skip the marketing site
+          SKIP_WEBSITE: "1"
+
+      - name: Copy web app into Android project
+        run: npx cap sync android
+
+      - name: Prepare signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+            echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
+            echo "SIGNED=1" >> "$GITHUB_ENV"
+          else
+            echo "No signing secrets: building the debug APK only."
+          fi
+
+      - name: Build debug APK
+        working-directory: frontend/android
+        run: ./gradlew --no-daemon assembleDebug
+
+      - name: Build signed release APK + AAB
+        if: env.SIGNED == '1'
+        working-directory: frontend/android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon assembleRelease bundleRelease
+
+      - name: Collect outputs
+        run: |
+          mkdir -p ../out
+          cp android/app/build/outputs/apk/debug/app-debug.apk ../out/LuminaIQ-debug.apk
+          if [ "$SIGNED" = "1" ]; then
+            cp android/app/build/outputs/apk/release/app-release.apk ../out/LuminaIQ-release.apk
+            cp android/app/build/outputs/bundle/release/app-release.aab ../out/LuminaIQ-release.aab
+          fi
+          ls -la ../out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LuminaIQ-android-${{ github.run_number }}
+          path: out/
+          retention-days: 30
+
+      # Straight to Google Play (internal testing track) once the Play API key is
+      # set. Google needs the very first .aab uploaded by hand in Play Console;
+      # every build after that goes up automatically. See ANDROID.md.
+      - name: Check Play upload key
+        id: play
+        env:
+          PLAY_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: echo "enabled=$([ -n "$PLAY_JSON" ] && [ "$SIGNED" = "1" ] && echo 1 || echo 0)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload to Google Play (internal testing)
+        if: steps.play.outputs.enabled == '1'
+        uses: r0adkll/upload-google-play@v1.1.3
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: fun.luminaiq.app
+          releaseFiles: out/LuminaIQ-release.aab
+          track: ${{ vars.PLAY_TRACK || 'internal' }}
+          status: ${{ vars.PLAY_STATUS || 'completed' }}

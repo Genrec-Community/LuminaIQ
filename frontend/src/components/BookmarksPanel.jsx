@@ -223,12 +223,12 @@ const BookmarksPanel = ({
                                     value={editNote}
                                     onChange={(e) => setEditNote(e.target.value)}
                                     placeholder="Add a note..."
-                                    className="flex-1 px-2 py-1 text-sm bg-white rounded border border-[#E6D5CC] focus:ring-1 focus:ring-[#C8A288]"
+                                    className="flex-1 px-2 py-1 text-sm bg-white rounded border border-[#E6D5CC] focus:ring-1 focus:ring-[#1E5C42]"
                                     autoFocus
                                 />
                                 <button
                                     onClick={() => updateNote(bookmark.id)}
-                                    className="p-1 bg-[#C8A288] text-white rounded"
+                                    className="p-1 bg-[#1E5C42] text-white rounded"
                                 >
                                     <Check className="h-4 w-4" />
                                 </button>
@@ -273,12 +273,12 @@ const BookmarksPanel = ({
                         <Star className={`h-5 w-5 transition-colors ${
                             bookmark.starred
                                 ? 'text-amber-500 fill-amber-500'
-                                : 'text-[#8a6a5c] hover:text-amber-500'
+                                : 'text-[#5E5046] hover:text-amber-500'
                         }`} />
                     </button>
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
-                            <h4 className="font-medium text-[#4A3B32] truncate">
+                            <h4 className="font-medium text-[#163628] truncate">
                                 {bookmark.title}
                             </h4>
                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -289,7 +289,7 @@ const BookmarksPanel = ({
                                     }}
                                     className="p-1 hover:bg-white rounded"
                                 >
-                                    <Edit2 className="h-3.5 w-3.5 text-[#8a6a5c]" />
+                                    <Edit2 className="h-3.5 w-3.5 text-[#5E5046]" />
                                 </button>
                                 <button
                                     onClick={() => deleteBookmark(bookmark.id)}
@@ -307,23 +307,23 @@ const BookmarksPanel = ({
                                     value={editNote}
                                     onChange={(e) => setEditNote(e.target.value)}
                                     placeholder="Add a note..."
-                                    className="flex-1 px-2 py-1 text-sm bg-white rounded border border-[#E6D5CC] focus:ring-1 focus:ring-[#C8A288]"
+                                    className="flex-1 px-2 py-1 text-sm bg-white rounded border border-[#E6D5CC] focus:ring-1 focus:ring-[#1E5C42]"
                                     autoFocus
                                 />
                                 <button
                                     onClick={() => updateNote(bookmark.id)}
-                                    className="p-1 bg-[#C8A288] text-white rounded"
+                                    className="p-1 bg-[#1E5C42] text-white rounded"
                                 >
                                     <Check className="h-4 w-4" />
                                 </button>
                             </div>
                         ) : bookmark.note ? (
-                            <p className="text-sm text-[#8a6a5c] mt-1 line-clamp-2">
+                            <p className="text-sm text-[#5E5046] mt-1 line-clamp-2">
                                 {bookmark.note}
                             </p>
                         ) : null}
 
-                        <div className="flex items-center gap-2 mt-2 text-xs text-[#8a6a5c]">
+                        <div className="flex items-center gap-2 mt-2 text-xs text-[#5E5046]">
                             {(bookmark.document_id || bookmark.documentName) && (
                                 <span className="flex items-center gap-1 bg-white px-2 py-0.5 rounded-full">
                                     <FileText className="h-3 w-3" />
@@ -398,22 +398,22 @@ const BookmarksPanel = ({
                         onClick={() => setActiveTab(tab.key)}
                         className={`flex-1 py-2.5 text-xs font-bold uppercase tracking-wide transition-all relative ${
                             activeTab === tab.key
-                                ? 'text-[#C8A288]'
-                                : 'text-[#8a6a5c] hover:text-[#4A3B32]'
+                                ? 'text-[#1E5C42]'
+                                : 'text-[#5E5046] hover:text-[#163628]'
                         }`}
                     >
                         {tab.label}
                         {tab.count > 0 && (
                             <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] ${
                                 activeTab === tab.key
-                                    ? 'bg-[#C8A288] text-white'
-                                    : 'bg-[#E6D5CC] text-[#8a6a5c]'
+                                    ? 'bg-[#1E5C42] text-white'
+                                    : 'bg-[#E6D5CC] text-[#5E5046]'
                             }`}>
                                 {tab.count}
                             </span>
                         )}
                         {activeTab === tab.key && (
-                            <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-[#C8A288] rounded-full" />
+                            <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-[#1E5C42] rounded-full" />
                         )}
                     </button>
                 ))}
@@ -432,19 +432,19 @@ const BookmarksPanel = ({
                             value={newBookmark.title}
                             onChange={(e) => setNewBookmark({ ...newBookmark, title: e.target.value })}
                             placeholder="Topic or concept name"
-                            className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-500 text-[#4A3B32]"
+                            className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-500 text-[#163628]"
                         />
                         <textarea
                             value={newBookmark.note}
                             onChange={(e) => setNewBookmark({ ...newBookmark, note: e.target.value })}
                             placeholder="Add a note (optional)"
                             rows={2}
-                            className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-500 text-[#4A3B32] resize-none"
+                            className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-500 text-[#163628] resize-none"
                         />
                         <select
                             value={newBookmark.documentId}
                             onChange={(e) => setNewBookmark({ ...newBookmark, documentId: e.target.value })}
-                            className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-500 text-[#4A3B32]"
+                            className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-500 text-[#163628]"
                         >
                             <option value="">No specific document</option>
                             {documents.map(doc => (
@@ -461,7 +461,7 @@ const BookmarksPanel = ({
                             </button>
                             <button
                                 onClick={() => setShowAddForm(false)}
-                                className="px-4 py-2 bg-white border border-amber-200 rounded-lg text-[#4A3B32] hover:bg-amber-50 transition-colors"
+                                className="px-4 py-2 bg-white border border-amber-200 rounded-lg text-[#163628] hover:bg-amber-50 transition-colors"
                             >
                                 Cancel
                             </button>
@@ -483,7 +483,7 @@ const BookmarksPanel = ({
                             onChange={(e) => setNewHighlight({ ...newHighlight, highlightText: e.target.value })}
                             placeholder="Paste or type the quote / passage here..."
                             rows={3}
-                            className="w-full px-3 py-2 bg-white border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-500 text-[#4A3B32] resize-none italic"
+                            className="w-full px-3 py-2 bg-white border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-500 text-[#163628] resize-none italic"
                             autoFocus
                         />
                         <input
@@ -491,14 +491,14 @@ const BookmarksPanel = ({
                             value={newHighlight.title}
                             onChange={(e) => setNewHighlight({ ...newHighlight, title: e.target.value })}
                             placeholder="Label (optional, e.g. 'Key Definition')"
-                            className="w-full px-3 py-2 bg-white border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-500 text-[#4A3B32]"
+                            className="w-full px-3 py-2 bg-white border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-500 text-[#163628]"
                         />
                         <input
                             type="text"
                             value={newHighlight.note}
                             onChange={(e) => setNewHighlight({ ...newHighlight, note: e.target.value })}
                             placeholder="Your thoughts / note (optional)"
-                            className="w-full px-3 py-2 bg-white border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-500 text-[#4A3B32]"
+                            className="w-full px-3 py-2 bg-white border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-500 text-[#163628]"
                         />
 
                         {/* Color Picker */}
@@ -513,7 +513,7 @@ const BookmarksPanel = ({
                                         onClick={() => setNewHighlight({ ...newHighlight, color: c.value })}
                                         className={`h-7 w-7 rounded-full ${c.accent} border-2 transition-all ${
                                             newHighlight.color === c.value
-                                                ? 'border-[#4A3B32] scale-110 shadow-md'
+                                                ? 'border-[#163628] scale-110 shadow-md'
                                                 : 'border-transparent hover:scale-105'
                                         }`}
                                         title={c.name}
@@ -525,7 +525,7 @@ const BookmarksPanel = ({
                         <select
                             value={newHighlight.documentId}
                             onChange={(e) => setNewHighlight({ ...newHighlight, documentId: e.target.value })}
-                            className="w-full px-3 py-2 bg-white border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-500 text-[#4A3B32]"
+                            className="w-full px-3 py-2 bg-white border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-500 text-[#163628]"
                         >
                             <option value="">No specific document</option>
                             {documents.map(doc => (
@@ -542,7 +542,7 @@ const BookmarksPanel = ({
                             </button>
                             <button
                                 onClick={() => setShowAddForm(false)}
-                                className="px-4 py-2 bg-white border border-purple-200 rounded-lg text-[#4A3B32] hover:bg-purple-50 transition-colors"
+                                className="px-4 py-2 bg-white border border-purple-200 rounded-lg text-[#163628] hover:bg-purple-50 transition-colors"
                             >
                                 Cancel
                             </button>
@@ -554,20 +554,20 @@ const BookmarksPanel = ({
             {/* Search and Filter */}
             <div className="p-3 border-b border-[#E6D5CC] space-y-2">
                 <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8a6a5c]" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#5E5046]" />
                     <input
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder={activeTab === 'highlights' ? 'Search highlights...' : 'Search bookmarks...'}
-                        className="w-full pl-9 pr-4 py-2 bg-[#FDF6F0] border-none rounded-lg focus:ring-2 focus:ring-[#C8A288] text-[#4A3B32] text-sm"
+                        className="w-full pl-9 pr-4 py-2 bg-[#FDF6F0] border-none rounded-lg focus:ring-2 focus:ring-[#1E5C42] text-[#163628] text-sm"
                     />
                 </div>
                 {documents.length > 1 && (
                     <select
                         value={filterDoc}
                         onChange={(e) => setFilterDoc(e.target.value)}
-                        className="w-full px-3 py-2 bg-[#FDF6F0] border-none rounded-lg focus:ring-2 focus:ring-[#C8A288] text-[#4A3B32] text-sm"
+                        className="w-full px-3 py-2 bg-[#FDF6F0] border-none rounded-lg focus:ring-2 focus:ring-[#1E5C42] text-[#163628] text-sm"
                     >
                         <option value="all">All Documents</option>
                         {documents.map(doc => (
@@ -591,13 +591,13 @@ const BookmarksPanel = ({
                     <div className="flex flex-col items-center justify-center py-12 text-center">
                         <div className="h-16 w-16 bg-[#E6D5CC]/50 rounded-full flex items-center justify-center mb-4">
                             {activeTab === 'highlights' ? (
-                                <Highlighter className="h-8 w-8 text-[#8a6a5c]" />
+                                <Highlighter className="h-8 w-8 text-[#5E5046]" />
                             ) : (
-                                <Bookmark className="h-8 w-8 text-[#8a6a5c]" />
+                                <Bookmark className="h-8 w-8 text-[#5E5046]" />
                             )}
                         </div>
-                        <p className="font-medium text-[#4A3B32]">{emptyMessages[activeTab].title}</p>
-                        <p className="text-sm text-[#8a6a5c] mt-1">
+                        <p className="font-medium text-[#163628]">{emptyMessages[activeTab].title}</p>
+                        <p className="text-sm text-[#5E5046] mt-1">
                             {emptyMessages[activeTab].desc}
                         </p>
                         <button
@@ -605,7 +605,7 @@ const BookmarksPanel = ({
                                 setShowAddForm(true);
                                 setAddMode(activeTab === 'highlights' ? 'highlight' : 'bookmark');
                             }}
-                            className="mt-4 px-4 py-2 bg-[#C8A288] text-white rounded-lg font-medium hover:bg-[#B08B72] transition-colors flex items-center gap-2"
+                            className="mt-4 px-4 py-2 bg-[#1E5C42] text-white rounded-lg font-medium hover:bg-[#163628] transition-colors flex items-center gap-2"
                         >
                             {activeTab === 'highlights' ? (
                                 <><Highlighter className="h-4 w-4" /> Add Highlight</>

@@ -1,5 +1,5 @@
 -- =====================================================
--- LuminaIQ: Complete Supabase Schema
+-- Lumina IQ: Complete Supabase Schema
 -- All tables NOT covered by supabase_schema_flashcards_mindmaps.sql
 -- Safe to run on existing DB (uses IF NOT EXISTS everywhere)
 -- =====================================================

@@ -81,6 +81,28 @@ def _get_lazy_client() -> Client:
 # so they DON'T block the event loop
 # ============================================================================
 
+# Supabase closes idle keep-alive connections; the next request on one fails at
+# once with "Server disconnected" before reaching the server. Those are retried.
+_TRANSIENT = ("server disconnected", "remoteprotocolerror", "connectionterminated",
+              "connection reset", "readerror", "broken pipe", "connection aborted")
+
+
+def _is_transient(e: Exception) -> bool:
+    text = f"{type(e).__name__} {e}".lower()
+    return any(t in text for t in _TRANSIENT)
+
+
+async def _run_with_retry(fn):
+    loop = asyncio.get_running_loop()
+    for attempt in range(3):
+        try:
+            return await loop.run_in_executor(_db_executor, fn)
+        except Exception as e:
+            if attempt == 2 or not _is_transient(e):
+                raise
+            await asyncio.sleep(0.2 * (attempt + 1))
+
+
 async def async_db_execute(func, *args, **kwargs):
     """
     Run a synchronous Supabase operation in a dedicated thread pool.
@@ -97,8 +119,7 @@ async def async_db_execute(func, *args, **kwargs):
             lambda: client.table("docs").select("*").execute()
         )
     """
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(_db_executor, func, *args)
+    return await _run_with_retry(lambda: func(*args))
 
 
 async def async_db(callable_fn):
@@ -110,5 +131,4 @@ async def async_db(callable_fn):
             lambda: client.table("docs").select("*").eq("id", doc_id).execute()
         )
     """
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(_db_executor, callable_fn)
+    return await _run_with_retry(callable_fn)

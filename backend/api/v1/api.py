@@ -16,6 +16,11 @@ from api.v1.endpoints import (
     mindmaps,
     progress,
     jobs,
+    study_modes,
+    lessons,
+    billing,
+    institutions,
+    platform,
 )
 
 api_router = APIRouter()
@@ -29,6 +34,14 @@ api_router.include_router(evaluation.router, prefix="/evaluation", tags=["evalua
 api_router.include_router(notes.router, prefix="/notes", tags=["notes"])
 api_router.include_router(webhook.router, prefix="/webhook", tags=["webhook"])
 api_router.include_router(learning.router, prefix="/learning", tags=["learning"])
+# Plans, usage and payments
+api_router.include_router(billing.router, prefix="/billing", tags=["billing"])
+api_router.include_router(institutions.router, prefix="/institutions", tags=["institutions"])
+# Lumina IQ staff: approve / pause / extend schools
+api_router.include_router(platform.router, prefix="/platform", tags=["platform"])
+# Exam Tonight (crash mode) + Visual Lab
+api_router.include_router(study_modes.router, prefix="/learning", tags=["study-modes"])
+api_router.include_router(lessons.router, prefix="/learning", tags=["lessons"])
 api_router.include_router(knowledge_graph.router, prefix="/knowledge-graph", tags=["knowledge-graph"])
 api_router.include_router(user_data.router, prefix="/user-data", tags=["user-data"])
 api_router.include_router(flashcards.router, prefix="/flashcards", tags=["flashcards"])

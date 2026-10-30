@@ -31,7 +31,7 @@ class FileParser:
     # ──────────────────────────────────────────────────────────────────────────
 
     @staticmethod
-    def extract_text(file_path: str) -> Optional[str]:
+    def extract_text(file_path: str, on_progress=None) -> Optional[str]:
         """
         Extract text from any supported file format.
 
@@ -39,6 +39,8 @@ class FileParser:
         Azure OCR (async) is invoked via asyncio.run() inside the executor thread.
 
         Supported: pdf, docx, txt, html, md, jpg, jpeg, png, bmp, tiff, tif, gif, webp
+
+        on_progress(done, total) is called per page while a scanned PDF is OCR'd.
         """
         logger.info(f"[FileParser] Extracting from: {file_path}")
 
@@ -47,7 +49,7 @@ class FileParser:
             ext = ext.lower()
 
             if ext == ".pdf":
-                return FileParser._extract_pdf(file_path)
+                return FileParser._extract_pdf(file_path, on_progress)
             elif ext in [".docx", ".doc"]:
                 return FileParser._extract_docx(file_path)
             elif ext == ".txt":
@@ -75,7 +77,7 @@ class FileParser:
     # ──────────────────────────────────────────────────────────────────────────
 
     @staticmethod
-    def _extract_pdf(file_path: str) -> Optional[str]:
+    def _extract_pdf(file_path: str, on_progress=None) -> Optional[str]:
         """
         2-stage PDF extraction:
 
@@ -109,8 +111,14 @@ class FileParser:
         if azure_text and len(azure_text.strip()) >= FileParser.MIN_TEXT_CHARS:
             return azure_text
 
+        # ── Stage 3: Google Vision for the pages this month's free allowance
+        #    covers, local Tesseract for the rest ──────────────────────────────
+        ocr_text = FileParser._ocr_scanned_pdf(file_path, on_progress)
+        if ocr_text and len(ocr_text.strip()) >= FileParser.MIN_TEXT_CHARS:
+            return ocr_text
+
         # ── All stages exhausted ──────────────────────────────────────────────
-        best_text = azure_text or text
+        best_text = ocr_text or azure_text or text
         final_count = len(best_text.strip()) if best_text else 0
         raise ValueError(
             f"PDF extraction failed: all methods yielded only {final_count} chars. "
@@ -149,6 +157,154 @@ class FileParser:
             f"Image OCR produced insufficient text ({char_count} chars). "
             "The image may contain no readable text, or text is too small/blurry."
         )
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Local OCR (Tesseract) for scanned PDFs
+    # ──────────────────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _vision_pages_allowed(pages: int) -> int:
+        """
+        Reserve up to `pages` of this month's Google Vision allowance
+        (GOOGLE_VISION_MONTHLY_PAGES). 0 when Vision isn't set up, the allowance
+        is used up, or the counter can't be reached (never risk a bill).
+        """
+        from datetime import datetime, timezone
+
+        from config.settings import settings
+        from utils.google_vision_ocr import get_google_vision
+
+        if pages <= 0 or settings.GOOGLE_VISION_MONTHLY_PAGES <= 0 or not get_google_vision():
+            return 0
+        try:
+            from db.client import get_supabase_client
+
+            month = datetime.now(timezone.utc).strftime("%Y-%m")
+            res = get_supabase_client().rpc("reserve_ocr_pages", {
+                "p_provider": "google_vision", "p_month": month,
+                "p_pages": pages, "p_cap": settings.GOOGLE_VISION_MONTHLY_PAGES,
+            }).execute()
+            granted = int(res.data or 0)
+            logger.info(f"[FileParser] Google Vision allowance: {granted} of {pages} pages granted ({month})")
+            return granted
+        except Exception as e:
+            logger.error(f"[FileParser] Could not check the Google Vision allowance, using Tesseract: {e}")
+            return 0
+
+    @staticmethod
+    def _ocr_scanned_pdf(file_path: str, on_progress=None) -> Optional[str]:
+        """
+        Google Vision first (fastest, within the monthly allowance); the pages it
+        doesn't cover go to the Indra OCR service (free, no limit), then Tesseract.
+        Each engine continues from the page the previous one stopped at.
+        """
+        import fitz
+        from config.settings import settings
+
+        with fitz.open(file_path) as doc:
+            total = min(len(doc), settings.OCR_MAX_PAGES)
+            if len(doc) > total:
+                logger.warning(f"[FileParser] OCR limited to the first {total} of {len(doc)} pages")
+
+        def report(done: int):
+            if on_progress:
+                try:
+                    on_progress(done, total)
+                except Exception:
+                    pass
+
+        parts, pos = [], 0
+
+        # 1. Google Vision first (fastest: ~1-2 min a book), within this month's allowance
+        granted = FileParser._vision_pages_allowed(total)
+        if granted:
+            try:
+                from utils.google_vision_ocr import get_google_vision
+
+                parts.append(get_google_vision().extract_pdf(
+                    file_path, dpi=settings.OCR_DPI, start=0, end=granted,
+                    on_progress=lambda d, _t: report(d),
+                ) or "")
+                pos = granted
+            except Exception as e:
+                logger.error(f"[FileParser] Google Vision OCR failed, trying Indra: {e}")
+
+        # 2. Indra OCR service for what is left (free, no page limit, slower on a free server)
+        if pos < total:
+            start = pos
+            try:
+                from utils.indra_ocr_client import get_indra_ocr
+
+                indra = get_indra_ocr()
+                if indra:
+                    indra_text, done = indra.extract_pdf(
+                        file_path, dpi=settings.OCR_DPI, start=start, end=total,
+                        on_progress=lambda d, _t: report(start + d),
+                    )
+                    parts.append(indra_text)
+                    pos = start + done
+            except Exception as e:
+                logger.error(f"[FileParser] Indra OCR failed: {e}")
+
+        # 3. Tesseract for the rest
+        if pos < total:
+            start = pos
+            parts.append(FileParser._try_tesseract_ocr(
+                file_path, lambda d, _t: report(start + d), start=start, end=total,
+            ) or "")
+        return "\n\n".join(t.strip() for t in parts if t and t.strip()) or None
+
+    @staticmethod
+    def _try_tesseract_ocr(file_path: str, on_progress=None, start: int = 0, end: Optional[int] = None) -> Optional[str]:
+        """
+        OCR a scanned PDF page by page with Tesseract (installed in the Docker
+        image). Pages are rendered one at a time in greyscale so memory stays
+        small on a 512 MB instance. Returns None when Tesseract is unavailable.
+        """
+        from config.settings import settings
+
+        if not settings.OCR_LOCAL_ENABLED:
+            return None
+        try:
+            import fitz
+            import pytesseract
+            from PIL import Image
+
+            from utils.google_vision_ocr import render_page
+
+            pytesseract.get_tesseract_version()
+        except Exception as e:
+            logger.warning(f"[FileParser] Tesseract OCR unavailable: {e}")
+            return None
+
+        os.environ.setdefault("OMP_THREAD_LIMIT", "1")  # one core is all a small instance has
+        parts = []
+        try:
+            with fitz.open(file_path) as doc:
+                end = min(len(doc), settings.OCR_MAX_PAGES if end is None else end)
+                total = max(0, end - start)
+                logger.info(f"[FileParser] Tesseract OCR → pages {start + 1}-{end} ({total}) at {settings.OCR_DPI} dpi")
+                for i in range(total):
+                    pix = render_page(doc[start + i], settings.OCR_DPI, 3000)
+                    img = Image.frombytes("L", (pix.width, pix.height), pix.samples)
+                    del pix
+                    # psm 3: automatic layout, handles two-page spreads and columns
+                    page_text = pytesseract.image_to_string(img, lang="eng", config="--oem 1 --psm 3")
+                    img.close()
+                    if page_text.strip():
+                        parts.append(page_text.strip())
+                    if on_progress:
+                        try:
+                            on_progress(i + 1, total)
+                        except Exception:
+                            pass
+        except Exception as e:
+            logger.error(f"[FileParser] Tesseract OCR failed: {e}")
+            if not parts:
+                return None
+        text = "\n\n".join(parts)
+        logger.info(f"[FileParser] Tesseract OCR → {len(text)} chars from {len(parts)} pages")
+        return text
 
     # ──────────────────────────────────────────────────────────────────────────
     # Azure Document Intelligence OCR

@@ -75,14 +75,14 @@ export const ToolLoadingCard = ({ toolType, toolParams }) => {
                     </div>
                     <div className="flex-1 mt-0.5">
                         <div className="flex items-center gap-2">
-                            <span className="font-bold text-[#4A3B32] text-sm">Generating {config.label}</span>
+                            <span className="font-bold text-[#163628] text-sm">Generating {config.label}</span>
                             <div className="flex gap-1">
-                                <div className="h-1.5 w-1.5 bg-[#C8A288] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                                <div className="h-1.5 w-1.5 bg-[#C8A288] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                                <div className="h-1.5 w-1.5 bg-[#C8A288] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                <div className="h-1.5 w-1.5 bg-[#1E5C42] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                <div className="h-1.5 w-1.5 bg-[#1E5C42] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                                <div className="h-1.5 w-1.5 bg-[#1E5C42] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                             </div>
                         </div>
-                        <div className="mt-2 text-[11px] leading-relaxed text-[#8a6a5c]/80 italic font-medium whitespace-pre-line pr-4">
+                        <div className="mt-2 text-[11px] leading-relaxed text-[#5E5046]/80 italic font-medium whitespace-pre-line pr-4">
                             {loadingMsg}
                         </div>
                     </div>
@@ -165,10 +165,10 @@ export const ToolResultCard = ({ toolType, toolParams, toolData, onOpen }) => {
                     </div>
                     <div>
                         <div className="flex items-center gap-2">
-                            <span className="font-bold text-[#4A3B32] text-sm">{config.label} Ready</span>
+                            <span className="font-bold text-[#163628] text-sm">{config.label} Ready</span>
                             <Sparkles className="h-3.5 w-3.5 text-amber-500" />
                         </div>
-                        <p className="text-xs text-[#8a6a5c]">
+                        <p className="text-xs text-[#5E5046]">
                             {toolParams?.topic || 'General'} {summary.secondary && `\u00b7 ${summary.secondary}`}
                         </p>
                     </div>
@@ -181,13 +181,13 @@ export const ToolResultCard = ({ toolType, toolParams, toolData, onOpen }) => {
             {/* Preview */}
             {preview && (
                 <div className="px-5 py-3 bg-white border-t border-b border-[#E6D5CC]/30">
-                    <p className="text-xs text-[#8a6a5c] line-clamp-2 leading-relaxed italic">
+                    <p className="text-xs text-[#5E5046] line-clamp-2 leading-relaxed italic">
                         {toolType === 'qa' || toolType === 'quiz' ? (
-                            <><span className="font-semibold not-italic text-[#4A3B32]">Q1:</span> {preview}</>
+                            <><span className="font-semibold not-italic text-[#163628]">Q1:</span> {preview}</>
                         ) : toolType === 'flashcards' ? (
-                            <><span className="font-semibold not-italic text-[#4A3B32]">Card 1:</span> {preview}</>
+                            <><span className="font-semibold not-italic text-[#163628]">Card 1:</span> {preview}</>
                         ) : toolType === 'mindmap' ? (
-                            <><span className="font-semibold not-italic text-[#4A3B32]">Branches:</span> {preview}</>
+                            <><span className="font-semibold not-italic text-[#163628]">Branches:</span> {preview}</>
                         ) : (
                             preview
                         )}
@@ -197,7 +197,7 @@ export const ToolResultCard = ({ toolType, toolParams, toolData, onOpen }) => {
 
             {/* Open Button */}
             <div className="px-5 py-3 bg-white flex items-center justify-between">
-                <span className="text-xs text-[#8a6a5c]">
+                <span className="text-xs text-[#5E5046]">
                     Generated from your documents
                 </span>
                 <button

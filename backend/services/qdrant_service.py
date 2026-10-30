@@ -18,6 +18,40 @@ from services.embedding_service import embedding_service
 import asyncio
 
 
+def physical_collection(name):
+    """
+    Book collections are named project_<id>; QDRANT_COLLECTION_SUFFIX (e.g. "_cf")
+    gives an environment its own set, so switching the embedding model starts from
+    empty collections (rebuilt automatically from the stored text) instead of
+    mixing vectors from two models.
+    """
+    sfx = settings.QDRANT_COLLECTION_SUFFIX
+    if sfx and isinstance(name, str) and name.startswith("project_") and not name.endswith(sfx):
+        return name + sfx
+    return name
+
+
+class _SuffixedClient:
+    """Wraps a Qdrant client so every call uses the physical collection name."""
+
+    def __init__(self, client):
+        self._client = client
+
+    def __getattr__(self, attr):
+        fn = getattr(self._client, attr)
+        if not callable(fn):
+            return fn
+
+        def call(*args, **kwargs):
+            if "collection_name" in kwargs:
+                kwargs["collection_name"] = physical_collection(kwargs["collection_name"])
+            elif args and isinstance(args[0], str):
+                args = (physical_collection(args[0]),) + args[1:]
+            return fn(*args, **kwargs)
+
+        return call
+
+
 class QdrantService:
     """
     Qdrant vector database service with ASYNC client for non-blocking operations.
@@ -56,7 +90,7 @@ class QdrantService:
             "timeout": self.ASYNC_TIMEOUT,
         }
 
-        self._async_client_instance = AsyncQdrantClient(**kwargs)
+        self._async_client_instance = _SuffixedClient(AsyncQdrantClient(**kwargs))
         logger.info(
             f"[QdrantService] Initialized with AsyncQdrantClient | "
             f"async_timeout={self.ASYNC_TIMEOUT}s"
@@ -72,26 +106,32 @@ class QdrantService:
             url=settings.QDRANT_URL,
             api_key=settings.QDRANT_API_KEY,
             timeout=self.SYNC_TIMEOUT,
-        )
+        )  # raw client: LangChain needs a real QdrantClient (names mapped in get_vector_store)
         logger.info(f"[QdrantService] Initialized Sync QdrantClient | sync_timeout={self.SYNC_TIMEOUT}s")
         return self._sync_client_instance
 
     async def create_collection(self, collection_name: str, vector_size: int = settings.EMBEDDING_DIMENSION):
         """Create a new collection and ensure indexes exist (fully async)"""
         try:
-            collections = await self.async_client.get_collections()
-            exists = any(col.name == collection_name for col in collections.collections)
+            # Goes through the suffix wrapper, so it checks the physical name
+            exists = await self.async_client.collection_exists(collection_name=collection_name)
 
             if not exists:
-                await self.async_client.create_collection(
-                    collection_name=collection_name,
-                    vectors_config=VectorParams(
-                        size=vector_size, distance=Distance.COSINE
-                    ),
-                )
-                logger.info(f"Created collection: {collection_name}")
+                try:
+                    await self.async_client.create_collection(
+                        collection_name=collection_name,
+                        vectors_config=VectorParams(
+                            size=vector_size, distance=Distance.COSINE
+                        ),
+                    )
+                    logger.info(f"Created collection: {collection_name}")
+                except Exception as e:
+                    # Two books uploaded together into a new project race to create it
+                    if "already exists" not in str(e):
+                        raise
+                    await self._check_vector_size(collection_name, vector_size)
             else:
-                logger.info(f"Collection already exists: {collection_name}")
+                await self._check_vector_size(collection_name, vector_size)
 
             # Always ensure indexes exist
             await self._ensure_indexes(collection_name)
@@ -99,6 +139,37 @@ class QdrantService:
         except Exception as e:
             logger.error(f"Error creating collection: {str(e)}")
             raise
+
+    async def _check_vector_size(self, collection_name: str, vector_size: int):
+        """
+        Guard against a collection created for a different embedding model
+        (e.g. 1024-dim vs 1536-dim). An EMPTY mismatched collection is
+        recreated with the right size; one holding data is never deleted —
+        we log a clear error instead.
+        """
+        info = await self.async_client.get_collection(collection_name)
+        vectors = info.config.params.vectors
+        existing = getattr(vectors, "size", None)
+        if existing is None or existing == vector_size:
+            logger.info(f"Collection already exists: {collection_name}")
+            return
+        points = info.points_count or 0
+        if points == 0:
+            logger.warning(
+                f"Collection {collection_name} has vector size {existing} but the "
+                f"embedding model produces {vector_size}; it is empty, recreating it"
+            )
+            await self.async_client.delete_collection(collection_name)
+            await self.async_client.create_collection(
+                collection_name=collection_name,
+                vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
+            )
+        else:
+            logger.error(
+                f"Collection {collection_name} holds {points} vectors of size {existing}, "
+                f"but EMBEDDING_DIMENSION is {vector_size}. Check EMBEDDING_MODEL / "
+                f"EMBEDDING_DIMENSION match the model that built this collection."
+            )
 
     async def _ensure_indexes(self, collection_name: str):
         """Create payload indexes if they don't exist (async)"""
@@ -194,7 +265,7 @@ class QdrantService:
         """Get LangChain VectorStore instance (uses sync client for LangChain compat)"""
         return QdrantVectorStore(
             client=self._sync_client,
-            collection_name=collection_name,
+            collection_name=physical_collection(collection_name),
             embedding=embedding_service.embeddings,
             content_payload_key="text",
             metadata_payload_key="metadata",
@@ -266,6 +337,43 @@ class QdrantService:
             logger.error(f"Error searching: {str(e)}")
             raise
 
+    async def copy_document_vectors(
+        self, src_collection: str, src_document_id: str,
+        dst_collection: str, dst_document_id: str, dst_document_name: str,
+    ) -> int:
+        """
+        Copy a document's chunks + vectors into another project's collection under
+        a new document id (class books: no re-embedding per student). Returns the
+        number of chunks copied (0 if the source isn't indexed).
+        """
+        from qdrant_client.models import Filter, FieldCondition, MatchValue
+
+        flt = Filter(must=[FieldCondition(key="document_id", match=MatchValue(value=src_document_id))])
+        await self.create_collection(dst_collection)
+        copied, offset = 0, None
+        while True:
+            try:
+                points, offset = await self.async_client.scroll(
+                    collection_name=src_collection, scroll_filter=flt, limit=256,
+                    offset=offset, with_payload=True, with_vectors=True,
+                )
+            except Exception as e:
+                logger.warning(f"Vector copy: cannot read {src_collection}: {e}")
+                return copied
+            if not points:
+                break
+            await self.upsert_chunks(
+                collection_name=dst_collection,
+                chunks=[p.payload.get("text", "") for p in points],
+                embeddings=[p.vector for p in points],
+                metadata=[{"document_id": dst_document_id, "document_name": dst_document_name,
+                           "chunk_id": p.payload.get("chunk_id")} for p in points],
+            )
+            copied += len(points)
+            if offset is None:
+                break
+        return copied
+
     async def get_initial_chunks(
         self, collection_name: str, document_id: str, limit: int = 10
     ) -> List[str]:
@@ -311,6 +419,26 @@ class QdrantService:
                 return []
             logger.error(f"Error getting initial chunks: {str(e)}")
             return []
+
+    async def count_document_vectors(self, collection_name: str, document_id: str) -> int:
+        """Count vectors stored for a document. Returns 0 if the collection is missing."""
+        try:
+            result = await self.async_client.count(
+                collection_name=collection_name,
+                count_filter=Filter(
+                    must=[
+                        FieldCondition(
+                            key="document_id", match=MatchValue(value=document_id)
+                        )
+                    ]
+                ),
+                exact=True,
+            )
+            return result.count
+        except Exception as e:
+            if "Not found: Collection" in str(e) or "doesn't exist" in str(e):
+                return 0
+            raise
 
     async def delete_vectors(self, collection_name: str, document_id: str):
         """Delete vectors for a specific document (fully async)"""

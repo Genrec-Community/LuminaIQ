@@ -10,6 +10,10 @@ from utils.logger import logger
 from uuid import uuid4
 
 
+# Strong refs to fire-and-forget tasks so they aren't garbage-collected
+_background_tasks: set = set()
+
+
 class MCQService:
     def __init__(self):
         self.client = get_supabase_client()
@@ -17,101 +21,11 @@ class MCQService:
     async def generate_document_topics(
         self, project_id: str, document_id: str
     ) -> List[str]:
-        """Generate comprehensive topics for a single document"""
+        """Extract a chapter-grouped topic outline covering the whole document."""
+        from services.topic_outline_service import topic_outline_service
+
         try:
-            collection_name = f"project_{project_id}"
-            chunks = await qdrant_service.get_initial_chunks(
-                collection_name=collection_name,
-                document_id=document_id,
-                limit=30,  # Increased to capture more content for topic extraction
-            )
-
-            if not chunks:
-                logger.warning(f"No chunks found for document {document_id}")
-                return []
-
-            text = "\n".join(chunks)
-
-            # DIAGNOSTIC: Log text sample before sending to LLM
-            print("\n====== EXTRACTED TEXT SAMPLE ======\n")
-            print(text[:1000] if text else "EMPTY TEXT")
-            print("\n====================================\n")
-            print(f"TEXT LENGTH: {len(text)} chars")
-            print(f"CHUNK COUNT: {len(chunks)} chunks\n")
-
-            system_prompt = """You are an expert curriculum analyst. Analyze this educational content and extract ALL learning topics.
-
-INSTRUCTIONS:
-1. Extract EVERY distinct topic, concept, chapter, or learning objective
-2. Include main topics AND subtopics (e.g., "Machine Learning" AND "Neural Networks")
-3. Use clear, educational topic names (not chapter numbers like "Chapter 1")
-4. Ignore non-content pages: Table of Contents, Index, Copyright, Acknowledgements
-5. Topics should be specific enough to create quiz questions about
-6. Target 15-30 topics for comprehensive coverage
-
-EXAMPLES of good topics:
-- "Introduction to Python Programming"
-- "Object-Oriented Programming Concepts"
-- "Exception Handling in Python"
-- "Working with Files and I/O"
-
-Return ONLY a valid JSON array of topic strings:
-["Topic 1", "Topic 2", "Topic 3"]"""
-
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"CONTENT:\n{text[:14000]}"}
-            ]
-            response = await llm_service.chat_completion(messages, max_tokens=4000)
-            
-            # DIAGNOSTIC: Log raw LLM output
-            print("\n====== RAW LLM OUTPUT ======\n")
-            print(response)
-            print("\n===========================\n")
-            if not response:
-                logger.error("LLM returned empty response for topic generation")
-                return []
-
-            topics = []
-            start = response.find("[")
-            end = response.rfind("]") + 1
-            if start != -1 and end > start:
-                try:
-                    loaded = json.loads(response[start:end])
-                    if isinstance(loaded, list):
-                        # Clean and deduplicate topics
-                        seen = set()
-                        for t in loaded:
-                            if isinstance(t, str):
-                                clean_topic = t.strip()
-                                if clean_topic and clean_topic.lower() not in seen:
-                                    topics.append(clean_topic)
-                                    seen.add(clean_topic.lower())
-                except json.JSONDecodeError as e:
-                    logger.error(f"Failed to parse topics JSON: {e}")
-                    # FALLBACK: Try to extract topics from raw response text
-                    print("FALLBACK: Trying to extract topics from raw text...")
-                    import re
-                    # Look for quoted strings in the response
-                    matches = re.findall(r'"([^"]+)"', response)
-                    for m in matches:
-                        clean = m.strip()
-                        if clean and len(clean) > 3 and clean.lower() not in seen:
-                            topics.append(clean)
-                            seen.add(clean.lower())
-                    if topics:
-                        print(f"FALLBACK: Extracted {len(topics)} topics from raw text")
-
-            # Save to document
-            if topics:
-                await async_db(lambda: self.client.table("documents").update({"topics": topics}).eq(
-                    "id", document_id
-                ).execute())
-                logger.info(f"Generated {len(topics)} topics for doc {document_id}")
-            else:
-                logger.warning(f"No topics generated for doc {document_id}")
-
-            return topics
+            return await topic_outline_service.generate_outline(project_id, document_id)
         except Exception as e:
             logger.error(f"Error generating doc topics: {e}")
             import traceback
@@ -120,77 +34,78 @@ Return ONLY a valid JSON array of topic strings:
             return []
 
     async def get_topics(self, project_id: str) -> Dict[str, Any]:
-        """Get aggregated topics AND per-document topics. Also triggers knowledge graph building."""
+        """
+        Topics for the project in learning order (the same order as the
+        Learning Path), plus per-document lists, chapter outlines and
+        per-topic metadata (level, chapter, prerequisites).
+        """
+        from services.knowledge_graph_service import knowledge_graph
+        from services.topic_outline_service import topic_outline_service
+
         try:
-            # Get all docs with their topics
-            response = await async_db(
-                lambda: self.client.table("documents")
-                .select("id, topics")
-                .eq("project_id", project_id)
-                .eq("upload_status", "completed")
-                .execute()
-            )
-            documents = response.data or []
+            documents = await knowledge_graph.load_project_documents(project_id)
 
-            all_topics = set()
-            by_doc = {}
-            docs_needing_generation = []
-
-            for doc in documents:
-                doc_topics = doc.get("topics") or []
-                by_doc[doc["id"]] = doc_topics
-
-                if doc_topics:
-                    for t in doc_topics:
-                        all_topics.add(t)
-                else:
-                    docs_needing_generation.append(doc["id"])
-
-            # Lazy generation for docs missing topics
-            if docs_needing_generation:
-                logger.info(
-                    f"Generating topics for {len(docs_needing_generation)} documents..."
+            # Lazy generation for documents that have no topics yet
+            missing = [d for d in documents if not d.get("topics")]
+            if missing:
+                logger.info(f"Generating topics for {len(missing)} documents...")
+                results = await asyncio.gather(
+                    *(self.generate_document_topics(project_id, d["id"]) for d in missing)
                 )
-                tasks = [
-                    self.generate_document_topics(project_id, doc_id)
-                    for doc_id in docs_needing_generation
-                ]
-                # Run concurrently
-                results = await asyncio.gather(*tasks)
+                for d, topics in zip(missing, results):
+                    d["topics"] = topics
 
-                # Update our local maps with results
-                for i, doc_id in enumerate(docs_needing_generation):
-                    t_list = results[i]
-                    by_doc[doc_id] = t_list
-                    for t in t_list:
-                        all_topics.add(t)
+            # Older documents: group existing topics into chapters (background, once)
+            for d in documents:
+                if d.get("topics") and "topic_outline" in d and not d.get("topic_outline"):
+                    task = asyncio.create_task(topic_outline_service.organize_existing(d))
+                    _background_tasks.add(task)
+                    task.add_done_callback(_background_tasks.discard)
 
-            # Auto-build knowledge graph if we have enough topics (background task)
-            sorted_topics = sorted(list(all_topics))
-            if len(sorted_topics) >= 3:
+            path = await knowledge_graph.generate_learning_path(project_id, documents=documents)
+            ordered = [p["topic"] for p in path]
+
+            by_doc = {}
+            for d in documents:
+                doc_topics = set(d.get("topics") or [])
+                by_doc[d["id"]] = [t for t in ordered if t in doc_topics]
+
+            meta = {
+                p["topic"]: {
+                    "order": p["order"],
+                    "level": p["level"],
+                    "chapter": p.get("chapter"),
+                    "foundation": p["foundation"],
+                    "prerequisites": p["prerequisites"][:3],
+                    "unlocks": len(p["unlocks"]),
+                }
+                for p in path
+            }
+
+            # Build the knowledge graph once if it doesn't exist yet (background)
+            if len(ordered) >= 3:
                 try:
-                    from services.knowledge_graph_service import knowledge_graph
-
-                    # Check if graph already exists
                     stats = await knowledge_graph.get_graph_stats(project_id)
                     if stats.get("total_edges", 0) == 0:
-                        # Build graph in background (don't await, fire and forget)
-                        asyncio.create_task(
-                            knowledge_graph.build_graph_from_topics(
-                                project_id, sorted_topics
-                            )
+                        task = asyncio.create_task(
+                            knowledge_graph.build_graph_from_topics(project_id, ordered)
                         )
-                        logger.info(
-                            f"Triggered knowledge graph build for project {project_id}"
-                        )
+                        _background_tasks.add(task)
+                        task.add_done_callback(_background_tasks.discard)
+                        logger.info(f"Triggered knowledge graph build for project {project_id}")
                 except Exception as kg_err:
                     logger.warning(f"Knowledge graph build skipped: {kg_err}")
 
-            return {"all": sorted_topics, "by_doc": by_doc}
+            return {
+                "all": ordered,
+                "by_doc": by_doc,
+                "outline": {d["id"]: d.get("topic_outline") or [] for d in documents},
+                "meta": meta,
+            }
 
         except Exception as e:
             logger.error(f"Error extracting topics: {str(e)}")
-            return {"all": [], "by_doc": {}}
+            return {"all": [], "by_doc": {}, "outline": {}, "meta": {}}
 
     async def generate_mcq(
         self,
@@ -281,7 +196,7 @@ Respond ONLY with the valid JSON array. Do not add any markdown formatting (like
 
             messages = [{"role": "user", "content": prompt}]
             response = await llm_service.chat_completion(
-                messages, temperature=0.7, max_tokens=6000
+                messages, temperature=0.7, max_tokens=6000, light=True
             )
 
             # 3. Parse response
@@ -318,9 +233,6 @@ Respond ONLY with the valid JSON array. Do not add any markdown formatting (like
     ) -> str:
         """Retrieve relevant content — parallel multi-query retrieval (no LLM expansion)."""
         try:
-            collection_name = f"project_{project_id}"
-            filter_conds = {"document_ids": selected_documents} if selected_documents else None
-
             # Build query variants without LLM (saves 2-3s per call)
             if topic:
                 queries = [
@@ -334,25 +246,9 @@ Respond ONLY with the valid JSON array. Do not add any markdown formatting (like
 
             limit_per_query = max(3, num_chunks // len(queries))
 
-            # Run ALL embedding + qdrant searches in parallel
-            async def _search_one(q: str):
-                emb = await embedding_service.generate_embedding(q)
-                return await qdrant_service.search(
-                    collection_name=collection_name,
-                    query_vector=emb,
-                    limit=limit_per_query,
-                    filter_conditions=filter_conds,
-                )
-
-            results_list = await asyncio.gather(*[_search_one(q) for q in queries])
-
-            all_hits = []
-            seen_texts = set()
-            for results in results_list:
-                for hit in results:
-                    if hit["text"] not in seen_texts:
-                        all_hits.append(hit)
-                        seen_texts.add(hit["text"])
+            # Vector search, or the stored text when the index is unavailable
+            from services.retrieval import search_passages
+            all_hits = await search_passages(project_id, queries, limit_per_query, selected_documents)
 
             final_chunks = [hit["text"] for hit in all_hits][:num_chunks]
             return "\n\n".join(final_chunks)

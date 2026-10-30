@@ -2,7 +2,7 @@ from typing import Dict, Any, List
 from services.embedding_service import embedding_service
 from services.qdrant_service import qdrant_service
 from services.llm_service import llm_service
-from db.client import get_supabase_client
+from db.client import get_supabase_client, async_db
 from utils.logger import logger
 from uuid import uuid4
 import asyncio
@@ -127,14 +127,14 @@ Respond ONLY with the valid JSON array."""
 
             # 5. Store in database
             test_id = str(uuid4())
-            self.client.table("subjective_tests").insert(
+            (await async_db(lambda: self.client.table("subjective_tests").insert(
                 {
                     "id": test_id,
                     "project_id": project_id,
                     "topic": topic if topic else "General Quiz",
                     "questions": json.dumps(questions_data),
                 }
-            ).execute()
+            ).execute()))
 
             logger.info(f"Created subjective test (Q&A) with ID: {test_id}")
 
@@ -163,10 +163,10 @@ Respond ONLY with the valid JSON array."""
         try:
             # 1. Get test from database
             response = (
-                self.client.table("subjective_tests")
+                (await async_db(lambda: self.client.table("subjective_tests")
                 .select("*")
                 .eq("id", test_id)
-                .execute()
+                .execute()))
             )
 
             if not response.data:
@@ -233,9 +233,9 @@ Respond ONLY with the valid JSON array."""
                 "evaluations": [e.model_dump() for e in evaluations],
             }
 
-            self.client.table("subjective_tests").update(
+            (await async_db(lambda: self.client.table("subjective_tests").update(
                 {"results": json.dumps(results_data)}
-            ).eq("id", test_id).execute()
+            ).eq("id", test_id).execute()))
 
             return {"test_id": test_id, **results_data}
 
@@ -324,7 +324,7 @@ Be constructive and specific in your feedback. Respond ONLY with the JSON object
 
             # 4. Store in database
             evaluation_id = str(uuid4())
-            self.client.table("answer_evaluations").insert(
+            (await async_db(lambda: self.client.table("answer_evaluations").insert(
                 {
                     "id": evaluation_id,
                     "project_id": project_id,
@@ -334,7 +334,7 @@ Be constructive and specific in your feedback. Respond ONLY with the JSON object
                     "ai_feedback": json.dumps(evaluation),
                     "score": evaluation.get("score", 0),
                 }
-            ).execute()
+            ).execute()))
 
             logger.info(f"Created evaluation with ID: {evaluation_id}")
 
@@ -358,9 +358,6 @@ Be constructive and specific in your feedback. Respond ONLY with the JSON object
     ) -> str:
         """Retrieve relevant context — parallel multi-query, no LLM expansion."""
         try:
-            collection_name = f"project_{project_id}"
-            filter_conds = {"document_ids": selected_documents} if selected_documents else None
-
             # Rule-based query variants (saves one full LLM round-trip)
             queries = [
                 query_text,
@@ -369,24 +366,9 @@ Be constructive and specific in your feedback. Respond ONLY with the JSON object
             ]
             limit_per_query = max(2, num_chunks // len(queries))
 
-            async def _search_one(q: str):
-                emb = await embedding_service.generate_embedding(q)
-                return await qdrant_service.search(
-                    collection_name=collection_name,
-                    query_vector=emb,
-                    limit=limit_per_query,
-                    filter_conditions=filter_conds,
-                )
-
-            results_list = await asyncio.gather(*[_search_one(q) for q in queries])
-
-            all_hits = []
-            seen_texts = set()
-            for results in results_list:
-                for hit in results:
-                    if hit["text"] not in seen_texts:
-                        all_hits.append(hit)
-                        seen_texts.add(hit["text"])
+            # Vector search, or the stored text when the index is unavailable
+            from services.retrieval import search_passages
+            all_hits = await search_passages(project_id, queries, limit_per_query, selected_documents)
 
             if not all_hits:
                 return ""
@@ -487,11 +469,11 @@ Be constructive and specific in your feedback. Respond ONLY with the JSON object
         """Get all saved subjective tests for a project"""
         try:
             response = (
-                self.client.table("subjective_tests")
+                (await async_db(lambda: self.client.table("subjective_tests")
                 .select("id, project_id, topic, created_at, results")
                 .eq("project_id", project_id)
                 .order("created_at", desc=True)
-                .execute()
+                .execute()))
             )
             tests = response.data or []
             # Parse results JSON and add summary info
@@ -518,10 +500,10 @@ Be constructive and specific in your feedback. Respond ONLY with the JSON object
         """Get a specific saved subjective test with full questions and results"""
         try:
             response = (
-                self.client.table("subjective_tests")
+                (await async_db(lambda: self.client.table("subjective_tests")
                 .select("*")
                 .eq("id", test_id)
-                .execute()
+                .execute()))
             )
             if not response.data:
                 raise Exception("Test not found")
@@ -541,10 +523,10 @@ Be constructive and specific in your feedback. Respond ONLY with the JSON object
         """Delete a saved subjective test"""
         try:
             response = (
-                self.client.table("subjective_tests")
+                (await async_db(lambda: self.client.table("subjective_tests")
                 .delete()
                 .eq("id", test_id)
-                .execute()
+                .execute()))
             )
             if not response.data:
                 raise Exception("Test not found")
@@ -557,10 +539,10 @@ Be constructive and specific in your feedback. Respond ONLY with the JSON object
         """Retrieve evaluation by ID"""
         try:
             response = (
-                self.client.table("answer_evaluations")
+                (await async_db(lambda: self.client.table("answer_evaluations")
                 .select("*")
                 .eq("id", evaluation_id)
-                .execute()
+                .execute()))
             )
 
             if not response.data:

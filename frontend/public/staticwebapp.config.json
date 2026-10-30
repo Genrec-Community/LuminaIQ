@@ -1,0 +1,106 @@
+{
+  "globalHeaders": {
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "strict-origin-when-cross-origin"
+  },
+  "routes": [
+    {
+      "route": "/assets/*",
+      "headers": {
+        "Cache-Control": "public, max-age=31536000, immutable"
+      }
+    },
+    {
+      "route": "/index.html",
+      "headers": {
+        "Cache-Control": "no-cache"
+      }
+    },
+    {
+      "route": "/_next/static/*",
+      "headers": {
+        "Cache-Control": "public, max-age=31536000, immutable"
+      }
+    },
+    {
+      "route": "/app.html",
+      "headers": {
+        "Cache-Control": "no-cache"
+      }
+    },
+    {
+      "route": "/login*",
+      "rewrite": "/app.html"
+    },
+    {
+      "route": "/signup*",
+      "rewrite": "/app.html"
+    },
+    {
+      "route": "/signin*",
+      "rewrite": "/app.html"
+    },
+    {
+      "route": "/welcome*",
+      "rewrite": "/app.html"
+    },
+    {
+      "route": "/dashboard*",
+      "rewrite": "/app.html"
+    },
+    {
+      "route": "/reset-password*",
+      "rewrite": "/app.html"
+    },
+    {
+      "route": "/plans*",
+      "rewrite": "/app.html"
+    },
+    {
+      "route": "/settings*",
+      "rewrite": "/app.html"
+    },
+    {
+      "route": "/bookstore*",
+      "rewrite": "/app.html"
+    },
+    {
+      "route": "/institution*",
+      "rewrite": "/app.html"
+    },
+    {
+      "route": "/platform*",
+      "rewrite": "/app.html"
+    },
+    {
+      "route": "/privacy*",
+      "rewrite": "/app.html"
+    },
+    {
+      "route": "/terms*",
+      "rewrite": "/app.html"
+    },
+    {
+      "route": "/delete-account*",
+      "rewrite": "/app.html"
+    },
+    {
+      "route": "/project*",
+      "rewrite": "/app.html"
+    },
+    {
+      "route": "/join*",
+      "rewrite": "/app.html"
+    },
+    {
+      "route": "/app*",
+      "rewrite": "/app.html"
+    }
+  ],
+  "responseOverrides": {
+    "404": {
+      "rewrite": "/404.html",
+      "statusCode": 404
+    }
+  }
+}

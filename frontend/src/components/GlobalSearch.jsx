@@ -146,27 +146,27 @@ const GlobalSearch = ({
                 {/* Search Input */}
                 <div className="p-4 border-b border-[#E6D5CC]">
                     <div className="relative flex items-center gap-3">
-                        <Search className="h-6 w-6 text-[#8a6a5c]" />
+                        <Search className="h-6 w-6 text-[#5E5046]" />
                         <input
                             ref={inputRef}
                             type="text"
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
                             placeholder="Search documents, topics, or ask a question..."
-                            className="flex-1 text-lg text-[#4A3B32] placeholder-[#8a6a5c] outline-none bg-transparent"
+                            className="flex-1 text-lg text-[#163628] placeholder-[#5E5046] outline-none bg-transparent"
                         />
-                        {loading && <Loader2 className="h-5 w-5 animate-spin text-[#C8A288]" />}
+                        {loading && <Loader2 className="h-5 w-5 animate-spin text-[#1E5C42]" />}
                         {query && (
                             <button
                                 onClick={() => setQuery('')}
                                 className="p-1 hover:bg-[#FDF6F0] rounded-lg transition-colors"
                             >
-                                <X className="h-5 w-5 text-[#8a6a5c]" />
+                                <X className="h-5 w-5 text-[#5E5046]" />
                             </button>
                         )}
                         <button
                             onClick={onClose}
-                            className="p-2 hover:bg-[#FDF6F0] rounded-lg transition-colors text-[#8a6a5c]"
+                            className="p-2 hover:bg-[#FDF6F0] rounded-lg transition-colors text-[#5E5046]"
                         >
                             <span className="text-xs font-medium">ESC</span>
                         </button>
@@ -187,8 +187,8 @@ const GlobalSearch = ({
                                 onClick={() => setActiveTab(tab.id)}
                                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                                     activeTab === tab.id
-                                        ? 'bg-[#C8A288] text-white'
-                                        : 'text-[#8a6a5c] hover:bg-white'
+                                        ? 'bg-[#1E5C42] text-white'
+                                        : 'text-[#5E5046] hover:bg-white'
                                 }`}
                             >
                                 {tab.label}
@@ -202,10 +202,10 @@ const GlobalSearch = ({
                     {!query && recentSearches.length > 0 && (
                         <div className="p-4">
                             <div className="flex items-center justify-between mb-2">
-                                <p className="text-sm font-medium text-[#8a6a5c]">Recent Searches</p>
+                                <p className="text-sm font-medium text-[#5E5046]">Recent Searches</p>
                                 <button
                                     onClick={clearRecentSearches}
-                                    className="text-xs text-[#C8A288] hover:text-[#B08B72]"
+                                    className="text-xs text-[#1E5C42] hover:text-[#163628]"
                                 >
                                     Clear
                                 </button>
@@ -217,8 +217,8 @@ const GlobalSearch = ({
                                         onClick={() => setQuery(search)}
                                         className="w-full flex items-center gap-3 p-2 hover:bg-[#FDF6F0] rounded-lg text-left transition-colors"
                                     >
-                                        <Clock className="h-4 w-4 text-[#8a6a5c]" />
-                                        <span className="text-[#4A3B32]">{search}</span>
+                                        <Clock className="h-4 w-4 text-[#5E5046]" />
+                                        <span className="text-[#163628]">{search}</span>
                                     </button>
                                 ))}
                             </div>
@@ -227,16 +227,16 @@ const GlobalSearch = ({
 
                     {query && totalResults === 0 && !loading && (
                         <div className="p-8 text-center">
-                            <Search className="h-12 w-12 mx-auto text-[#8a6a5c] opacity-50 mb-3" />
-                            <p className="text-[#4A3B32] font-medium">No results found</p>
-                            <p className="text-sm text-[#8a6a5c]">Try different keywords or check spelling</p>
+                            <Search className="h-12 w-12 mx-auto text-[#5E5046] opacity-50 mb-3" />
+                            <p className="text-[#163628] font-medium">No results found</p>
+                            <p className="text-sm text-[#5E5046]">Try different keywords or check spelling</p>
                         </div>
                     )}
 
                     {/* Document Results */}
                     {(activeTab === 'all' || activeTab === 'documents') && results.documents.length > 0 && (
                         <div className="p-4 border-b border-[#E6D5CC]">
-                            <p className="text-xs font-bold text-[#8a6a5c] uppercase tracking-wide mb-2">
+                            <p className="text-xs font-bold text-[#5E5046] uppercase tracking-wide mb-2">
                                 Documents
                             </p>
                             <div className="space-y-1">
@@ -250,12 +250,12 @@ const GlobalSearch = ({
                                             <FileText className="h-5 w-5 text-blue-600" />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <p className="font-medium text-[#4A3B32] truncate">{doc.filename}</p>
-                                            <p className="text-sm text-[#8a6a5c]">
+                                            <p className="font-medium text-[#163628] truncate">{doc.filename}</p>
+                                            <p className="text-sm text-[#5E5046]">
                                                 {(doc.file_size / 1024 / 1024).toFixed(2)} MB
                                             </p>
                                         </div>
-                                        <ChevronRight className="h-5 w-5 text-[#8a6a5c] opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        <ChevronRight className="h-5 w-5 text-[#5E5046] opacity-0 group-hover:opacity-100 transition-opacity" />
                                     </button>
                                 ))}
                             </div>
@@ -265,7 +265,7 @@ const GlobalSearch = ({
                     {/* Topic Results */}
                     {(activeTab === 'all' || activeTab === 'topics') && results.topics.length > 0 && (
                         <div className="p-4 border-b border-[#E6D5CC]">
-                            <p className="text-xs font-bold text-[#8a6a5c] uppercase tracking-wide mb-2">
+                            <p className="text-xs font-bold text-[#5E5046] uppercase tracking-wide mb-2">
                                 Topics
                             </p>
                             <div className="flex flex-wrap gap-2">
@@ -275,8 +275,8 @@ const GlobalSearch = ({
                                         onClick={() => handleSelect('topic', topic)}
                                         className="flex items-center gap-2 px-3 py-2 bg-[#FDF6F0] hover:bg-[#E6D5CC] rounded-lg transition-colors"
                                     >
-                                        <Tag className="h-4 w-4 text-[#C8A288]" />
-                                        <span className="text-[#4A3B32]">{topic}</span>
+                                        <Tag className="h-4 w-4 text-[#1E5C42]" />
+                                        <span className="text-[#163628]">{topic}</span>
                                     </button>
                                 ))}
                             </div>
@@ -286,7 +286,7 @@ const GlobalSearch = ({
                     {/* Semantic/Content Results */}
                     {(activeTab === 'all' || activeTab === 'content') && results.semantic.length > 0 && (
                         <div className="p-4">
-                            <p className="text-xs font-bold text-[#8a6a5c] uppercase tracking-wide mb-2 flex items-center gap-1">
+                            <p className="text-xs font-bold text-[#5E5046] uppercase tracking-wide mb-2 flex items-center gap-1">
                                 <Sparkles className="h-3 w-3" />
                                 Content Matches
                             </p>
@@ -297,10 +297,10 @@ const GlobalSearch = ({
                                         onClick={() => handleSelect('content', result)}
                                         className="w-full p-3 bg-[#FDF6F0] hover:bg-[#E6D5CC] rounded-xl text-left transition-colors"
                                     >
-                                        <p className="text-sm text-[#4A3B32] line-clamp-2">
+                                        <p className="text-sm text-[#163628] line-clamp-2">
                                             {result.text || result.chunk_text}
                                         </p>
-                                        <p className="text-xs text-[#8a6a5c] mt-1 flex items-center gap-1">
+                                        <p className="text-xs text-[#5E5046] mt-1 flex items-center gap-1">
                                             <FileText className="h-3 w-3" />
                                             {result.document_name || 'Document'}
                                         </p>
@@ -312,7 +312,7 @@ const GlobalSearch = ({
                 </div>
 
                 {/* Footer */}
-                <div className="p-3 border-t border-[#E6D5CC] bg-[#FDF6F0] flex items-center justify-between text-xs text-[#8a6a5c]">
+                <div className="p-3 border-t border-[#E6D5CC] bg-[#FDF6F0] flex items-center justify-between text-xs text-[#5E5046]">
                     <div className="flex items-center gap-4">
                         <span className="flex items-center gap-1">
                             <kbd className="px-1.5 py-0.5 bg-white rounded border border-[#E6D5CC] font-mono">↑</kbd>

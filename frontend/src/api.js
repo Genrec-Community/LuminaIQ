@@ -1,4 +1,6 @@
 import axios from 'axios';
+import { uploadToStorage, forgetPendingUpload } from './utils/resumableUpload';
+import { emitLimit, isLimitDetail } from './utils/plan';
 
 // Fallback to localhost so a missing VITE_MAIN_API_URL env var doesn't silently
 // send every request to '/undefined/...' on deployed builds.
@@ -25,6 +27,18 @@ api.interceptors.request.use(async (config) => {
 });
 
 // Flag to prevent multiple simultaneous refresh attempts
+// Why a school-created student was signed out (shown on the sign-in page)
+export const SCHOOL_PAUSED_KEY = 'lumina_school_paused';
+
+/** Error text from an API error (detail can be a string or { message }). */
+export const apiErrorText = (e, fallback = 'Something went wrong.') => {
+    const d = e?.response?.data?.detail;
+    if (typeof d === 'string') return d;
+    if (d?.message) return d.message;
+    if (Array.isArray(d) && d[0]?.msg) return d[0].msg;
+    return e?.message || fallback;
+};
+
 let isRefreshing = false;
 let refreshQueue = []; // pending requests waiting on the refresh
 
@@ -43,8 +57,13 @@ api.interceptors.response.use(
         const config = error.config;
         const status = error.response?.status;
 
+        // Sign-in calls answer 401 for a wrong password or an unconfirmed email.
+        // That is the answer to show, not an expired session to refresh: refreshing
+        // here replaced it with "No active session", shown as "Unable to reach the server".
+        const isAuthCall = (config?.url || '').includes('auth/');
+
         // ── 401 Unauthorized: try to refresh the app JWT via Supabase ──
-        if (status === 401 && config && !config._retried) {
+        if (status === 401 && config && !config._retried && !isAuthCall) {
             config._retried = true; // mark so we don't loop
 
             if (isRefreshing) {
@@ -88,7 +107,7 @@ api.interceptors.response.use(
                 localStorage.removeItem('user');
                 delete api.defaults.headers.common['Authorization'];
                 // Redirect to login without a hard reload loop
-                const isAlreadyOnAuth = ['/login', '/signup', '/'].includes(window.location.pathname);
+                const isAlreadyOnAuth = ['/login', '/signup', '/', '/pricing', '/plans', '/institution'].includes(window.location.pathname);
                 if (!isAlreadyOnAuth) {
                     window.location.href = '/login';
                 }
@@ -96,6 +115,28 @@ api.interceptors.response.use(
             } finally {
                 isRefreshing = false;
             }
+        }
+
+        // ── 403 school_inactive on a school-created student account: the school is
+        //    paused, unpaid or switched this account off. Sign out and explain. ──
+        if (status === 403 && error.response?.data?.detail?.code === 'school_inactive') {
+            let managed = false;
+            try { managed = !!JSON.parse(localStorage.getItem('user') || '{}').managed; } catch { /* ignore */ }
+            if (managed) {
+                try { sessionStorage.setItem(SCHOOL_PAUSED_KEY, error.response.data.detail.message || ''); } catch { /* ignore */ }
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                delete api.defaults.headers.common['Authorization'];
+                if (!['/login', '/signin'].includes(window.location.pathname)) window.location.href = '/login';
+            }
+            return Promise.reject(error);
+        }
+
+        // ── 402: a plan limit was reached — show the upgrade prompt ──
+        if (status === 402 && isLimitDetail(error.response?.data?.detail)) {
+            // silentLimit: the caller shows its own message (e.g. the app's feed)
+            if (!config?.silentLimit) emitLimit(error.response.data.detail);
+            return Promise.reject(error);
         }
 
         // ── Skip retry for auth endpoints to surface errors immediately ──
@@ -123,8 +164,20 @@ api.interceptors.response.use(
 );
 
 export const login = async (email, password) => {
-    const response = await api.post('/auth/login', { email, password });
-    return response.data;
+    try {
+        const response = await api.post('/auth/login', { email, password });
+        return response.data;
+    } catch (error) {
+        // Turn Supabase's terse answers into something a person can act on
+        const data = error.response?.data;
+        const detail = typeof data?.detail === 'string' ? data.detail : '';
+        if (/email not confirmed/i.test(detail)) {
+            data.detail = 'Please confirm your email first. Check your inbox (and spam) for the confirmation link, or sign in with an email code.';
+        } else if (/invalid login credentials/i.test(detail)) {
+            data.detail = 'Incorrect email or password.';
+        }
+        throw error;
+    }
 };
 
 export const signup = async (email, password, fullName) => {
@@ -133,7 +186,8 @@ export const signup = async (email, password, fullName) => {
 };
 
 export const exchangeToken = async (accessToken) => {
-    const response = await api.post('auth/exchange', { access_token: accessToken });
+    // Short timeout: a sign-in should never spin for minutes
+    const response = await api.post('auth/exchange', { access_token: accessToken }, { timeout: 20000 });
     return response.data;
 };
 
@@ -152,6 +206,29 @@ export const getProjects = async () => {
 };
 
 export const uploadDocument = async (projectId, file, onProgress, bookOptions = {}) => {
+    // Preferred: resumable upload straight to storage, then the backend fetches it
+    try {
+        const { path, key } = await uploadToStorage(file, projectId, onProgress);
+        const res = await api.post('/documents/upload-from-storage', {
+            project_id: projectId,
+            storage_path: path,
+            filename: file.name,
+            is_public: !!bookOptions.isPublic,
+            book_title: bookOptions.bookTitle,
+            book_author: bookOptions.bookAuthor,
+            book_description: bookOptions.bookDescription,
+            book_tags: bookOptions.bookTags,
+        }, { timeout: 5 * 60 * 1000 });
+        forgetPendingUpload(key);
+        return res.data;
+    } catch (err) {
+        if (!err?.fallback) throw err;
+        // No storage session or the storage server refused: use the direct upload below
+    }
+    return uploadDocumentDirect(projectId, file, onProgress, bookOptions);
+};
+
+const uploadDocumentDirect = async (projectId, file, onProgress, bookOptions = {}) => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('project_id', projectId);
@@ -177,7 +254,7 @@ export const uploadDocument = async (projectId, file, onProgress, bookOptions = 
                 onProgress(percentCompleted);
             }
         },
-        timeout: 120000, // 2 min for large files
+        timeout: 15 * 60 * 1000, // large books on slow connections
     });
     return response.data;
 };
@@ -247,9 +324,22 @@ export const chatMessage = async (projectId, message, history = []) => {
     return response.data;
 };
 
-export const chatMessageStream = async (projectId, message, history = [], selectedDocuments = [], onChunk, onComplete) => {
+export const chatMessageStream = async (projectId, message, history = [], selectedDocuments = [], onChunkRaw, onComplete, options = {}) => {
     const maxRetries = 3;
     let lastError = null;
+    // Render at most once per frame: tokens can arrive faster than React can
+    // re-render the conversation, which made long answers feel sluggish.
+    let pending = null;
+    let frame = 0;
+    const flush = () => {
+        frame = 0;
+        if (pending !== null) { const t = pending; pending = null; onChunkRaw(t); }
+    };
+    const onChunk = (text) => {
+        pending = text;
+        if (!frame) frame = (typeof requestAnimationFrame === 'function' ? requestAnimationFrame : (f) => setTimeout(f, 16))(flush);
+    };
+    let receivedAny = false; // never re-send a question once an answer has started
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
@@ -264,7 +354,8 @@ export const chatMessageStream = async (projectId, message, history = [], select
                     project_id: projectId,
                     message,
                     session_history: history,
-                    selected_documents: selectedDocuments
+                    selected_documents: selectedDocuments,
+                    deep: !!options.deep,
                 })
             });
 
@@ -279,7 +370,14 @@ export const chatMessageStream = async (projectId, message, history = [], select
             // Check for other HTTP errors
             if (!response.ok) {
                 const errorText = await response.text();
-                throw new Error(errorText || `HTTP error ${response.status}`);
+                let detail = errorText;
+                try { detail = JSON.parse(errorText).detail || errorText; } catch { /* plain text */ }
+                if (response.status === 402 && isLimitDetail(detail)) {
+                    emitLimit(detail);
+                    onComplete({ answer: detail.message, sources: [], limited: true });
+                    return;
+                }
+                throw new Error((typeof detail === 'string' ? detail : detail?.message) || `HTTP error ${response.status}`);
             }
 
             // Check for null body
@@ -297,6 +395,7 @@ export const chatMessageStream = async (projectId, message, history = [], select
                 if (done) break;
 
                 const chunk = decoder.decode(value, { stream: true });
+                if (chunk) receivedAny = true;
                 fullText += chunk;
 
                 // Check for sources delimiter in accumulated text
@@ -309,7 +408,6 @@ export const chatMessageStream = async (projectId, message, history = [], select
                         // Clean and parse sources
                         const cleanSourcesJson = sourcesJson.trim();
                         sources = JSON.parse(cleanSourcesJson);
-                        console.log('Sources parsed successfully:', sources);
 
                         // Update with clean text
                         onChunk(textPart);
@@ -325,7 +423,7 @@ export const chatMessageStream = async (projectId, message, history = [], select
             }
 
             // Stream complete - use parsed sources
-            console.log('Stream finished. Sources:', sources);
+            pending = null;
             onComplete({ answer: fullText, sources: sources });
             return; // Success, exit retry loop
 
@@ -335,7 +433,7 @@ export const chatMessageStream = async (projectId, message, history = [], select
             const isRetryable = errorStr.includes('503') || errorStr.includes('service unavailable') ||
                 errorStr.includes('network') || errorStr.includes('fetch');
 
-            if (isRetryable && attempt < maxRetries - 1) {
+            if (isRetryable && !receivedAny && attempt < maxRetries - 1) {
                 const delay = Math.min(1500 * Math.pow(2, attempt), 10000);
                 console.log(`Retryable error: ${error.message}. Retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})...`);
                 await new Promise(resolve => setTimeout(resolve, delay));
@@ -343,6 +441,7 @@ export const chatMessageStream = async (projectId, message, history = [], select
             }
 
             console.error("Streaming error:", error);
+            pending = null;
             onComplete({ answer: `Error: ${error.message}. Please try again.`, sources: [] });
             return;
         }
@@ -405,6 +504,12 @@ export const submitSubjectiveTest = async (testId, answers) => {
         test_id: testId,
         answers: answers
     });
+    return response.data;
+};
+
+// Process a failed document again (from its stored file), no re-upload needed
+export const retryDocument = async (projectId, documentId) => {
+    const response = await api.post(`/documents/${projectId}/${documentId}/retry`);
     return response.data;
 };
 
@@ -480,6 +585,65 @@ export const deleteSavedNote = async (noteId) => {
 // ============== Learning API (Adaptive Learning System) ==============
 
 // Performance Tracking
+// ── Learning engine ───────────────────────────────────────────────
+// Evidence is batched (a burst of answers becomes one request) and never
+// blocks or breaks the screen that produced it.
+const learningQueue = new Map(); // projectId -> events
+let learningTimer = null;
+const flushLearning = () => {
+    learningTimer = null;
+    for (const [projectId, events] of learningQueue) {
+        learningQueue.delete(projectId);
+        for (let i = 0; i < events.length; i += 100) {
+            api.post('/learning/events', { project_id: projectId, events: events.slice(i, i + 100) }, { _retryCount: 3 })
+                .catch(() => { /* evidence is best effort */ });
+        }
+    }
+};
+/** Record that the learner got a topic right or wrong ({ topic, correct, kind, difficulty, hinted, source }). */
+export const recordLearning = (projectId, event) => {
+    if (!projectId || !event?.topic) return;
+    const list = learningQueue.get(projectId) || [];
+    list.push({ kind: 'mcq', difficulty: 'medium', hinted: false, ...event, correct: !!event.correct });
+    learningQueue.set(projectId, list);
+    if (list.length >= 20) flushLearning();
+    else if (!learningTimer) learningTimer = setTimeout(flushLearning, 1500);
+};
+if (typeof window !== 'undefined') window.addEventListener('pagehide', flushLearning);
+
+/** The adaptive plan: next topics with reasons, mastery profile, blocked topics, due reviews. */
+export const getLearningPlan = async (projectId, { goal, horizon, minutes, documents } = {}) => {
+    const params = {};
+    if (goal?.length) params.goal = goal.join('||');
+    if (horizon) params.horizon = horizon;
+    if (minutes) params.minutes = minutes;
+    if (documents?.length) params.documents = documents.join(',');
+    const response = await api.get(`/learning/engine/${projectId}`, { params, timeout: 60000 });
+    return response.data;
+};
+
+/** A structured six-step lesson for a topic (cached per project). */
+export const getLesson = async (projectId, topic, selectedDocuments = [], refresh = false) => {
+    const response = await api.post('/learning/lesson', {
+        project_id: projectId, topic, selected_documents: selectedDocuments, refresh,
+    }, { timeout: 120000 });
+    return response.data;
+};
+
+/** Grade an explanation written from memory; recorded as recall evidence. */
+export const gradeRecall = async (projectId, topic, prompt, answer, keyPoints = []) => {
+    const response = await api.post('/learning/lesson/grade', {
+        project_id: projectId, topic, prompt, answer, key_points: keyPoints,
+    }, { timeout: 60000 });
+    return response.data;
+};
+
+/** Outcome metrics: mastery gain, gain per hour, delayed retention, transfer, remediation, coverage. */
+export const getLearningMetrics = async (projectId) => {
+    const response = await api.get(`/learning/engine/${projectId}/metrics`, { timeout: 60000 });
+    return response.data;
+};
+
 export const recordPerformance = async (projectId, topic, correct, wrong) => {
     const response = await api.post('/learning/performance/record', {
         project_id: projectId,
@@ -1056,3 +1220,118 @@ export const waitForJob = async (jobId, options = {}) => {
         await new Promise(resolve => setTimeout(resolve, interval));
     }
 };
+
+// ============== Exam Tonight (crash mode) + Visual Lab ==============
+
+export const getCramPlan = async (projectId, minutes, selectedDocuments = []) => {
+    const response = await api.post('/learning/cram/plan', {
+        project_id: projectId,
+        minutes,
+        selected_documents: selectedDocuments,
+    });
+    return response.data;
+};
+
+export const getCramCard = async (projectId, topic, selectedDocuments = [], refresh = false) => {
+    const response = await api.post('/learning/cram/card', {
+        project_id: projectId,
+        topic,
+        selected_documents: selectedDocuments,
+        refresh,
+    });
+    return response.data;
+};
+
+export const generateVisualLab = async (projectId, topic, { selectedDocuments = [], refresh = false, repair = null, signal } = {}) => {
+    // No silent retries: a lost 3-minute build would otherwise spin for up to 15 minutes.
+    // The screen offers Try again instead.
+    const response = await api.post('/learning/visualize', {
+        project_id: projectId,
+        topic,
+        selected_documents: selectedDocuments,
+        refresh,
+        repair,
+    }, { timeout: 180000, signal, _retryCount: 3 });
+    return response.data;
+};
+
+// ============== Plans & billing ==============
+
+export const getPlans = async () => (await api.get('/billing/plans')).data;
+
+export const getMyPlan = async () => (await api.get('/billing/me')).data;
+
+export const startCheckout = async (plan, cycle) => (await api.post('/billing/checkout', { plan, cycle })).data;
+
+export const startPassCheckout = async () => (await api.post('/billing/pass/checkout')).data;
+
+export const verifyPayment = async (payload) => (await api.post('/billing/verify', payload)).data;
+
+export const cancelSubscription = async () => (await api.post('/billing/cancel')).data;
+
+export const getInvoices = async () => (await api.get('/billing/invoices')).data;
+
+// ============== Institutions ==============
+
+export const getMyInstitution = async () => (await api.get('/institutions/me')).data;
+
+export const createInstitution = async (data) => (await api.post('/institutions', data)).data;
+
+export const joinWithCode = async (code) => (await api.post('/institutions/join', { code })).data;
+
+export const createClass = async (name) => (await api.post('/institutions/classes', { name })).data;
+
+export const getClassDashboard = async (classId) => (await api.get(`/institutions/classes/${classId}`)).data;
+
+export const publishBookToClass = async (classId, documentId) =>
+    (await api.post(`/institutions/classes/${classId}/books`, { document_id: documentId })).data;
+
+export const getPublishableBooks = async () => (await api.get('/institutions/publishable')).data;
+
+export const removeInstitutionMember = async (userId) => (await api.delete(`/institutions/members/${userId}`)).data;
+
+export const startSeatsCheckout = async (seats, months = 12) =>
+    (await api.post('/institutions/seats/checkout', { seats, months })).data;
+
+// School-created student sign-ins (studentname-NN@luminaiq.fun)
+export const listStudents = async ({ q = '', classId = '', page = 1, pageSize = 50 } = {}) =>
+    (await api.get('/institutions/students', { params: { q, class_id: classId || undefined, page, page_size: pageSize } })).data;
+
+export const createStudents = async (students) => (await api.post('/institutions/students', { students })).data;
+
+export const resetStudentPassword = async (userId, password) =>
+    (await api.post(`/institutions/students/${userId}/password`, { password: password || null })).data;
+
+export const setStudentDisabled = async (userId, disabled) =>
+    (await api.post(`/institutions/students/${userId}/disabled`, { disabled })).data;
+
+export const addStudentToClass = async (userId, classId) =>
+    (await api.post(`/institutions/students/${userId}/classes`, { class_id: classId })).data;
+
+// Own account: change password, school account details
+export const changePassword = async (currentPassword, newPassword) =>
+    (await api.post('/auth/change-password', { current_password: currentPassword, new_password: newPassword })).data;
+
+export const getAccount = async () => (await api.get('/auth/account')).data;
+
+// ============== Platform admin (Lumina IQ staff) ==============
+
+export const getPlatformMe = async () => (await api.get('/platform/me')).data;
+
+export const listPlatformSchools = async ({ status = '', q = '', page = 1 } = {}) =>
+    (await api.get('/platform/institutions', { params: { status, q, page } })).data;
+
+export const approveSchool = async (id, note = '') => (await api.post(`/platform/institutions/${id}/approve`, { note })).data;
+
+export const suspendSchool = async (id, note = '') => (await api.post(`/platform/institutions/${id}/suspend`, { note })).data;
+
+export const extendSchool = async (id, body) => (await api.post(`/platform/institutions/${id}/extend`, body)).data;
+
+export const getSchoolAudit = async (id) => (await api.get(`/platform/institutions/${id}/audit`)).data;
+
+// Full extracted text of a document (reader fallback when there's no original PDF)
+export const getDocumentText = async (projectId, documentId) =>
+    (await api.get(`/documents/${projectId}/${documentId}/text`)).data;
+
+// Permanently delete the signed-in account and all of its data
+export const deleteAccount = async () => (await api.delete('/auth/account')).data;

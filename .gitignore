@@ -348,7 +348,7 @@ vite.config.ts.timestamp-*
 
 nul
 
-# LuminaIQ temp files
+# Lumina IQ temp files
 backend/temp/
 *.pdf
 
@@ -372,3 +372,9 @@ logs_extracted*/
 *.bat
 *.ps1
 .vercel
+play-store-keys/
+azure-deploy-secrets/
+.jury/
+
+# The marketing site keeps its helpers in src/lib (not a Python build dir)
+!frontend/website/src/lib/

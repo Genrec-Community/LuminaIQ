@@ -3,6 +3,7 @@ from typing import Any, List
 from services.notes_service import notes_service
 from models.schemas import NotesGenerateRequest, NotesGenerateResponse
 from api.deps import get_current_user
+from services.usage_service import usage, metered
 
 router = APIRouter()
 
@@ -49,6 +50,8 @@ async def generate_notes(
     current_user: dict = Depends(get_current_user),
 ) -> Any:
     """Generate notes for a project (auto-saves to DB)"""
+    metered(current_user, "notes")
+    await usage.consume(current_user["id"], "tools")
     try:
         result = await notes_service.generate_notes(
             project_id=request.project_id,

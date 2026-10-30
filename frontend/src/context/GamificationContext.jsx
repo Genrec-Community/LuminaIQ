@@ -24,6 +24,7 @@ const ACTIVITY_COOLDOWNS = {
     quiz: 0,                // No cooldown for quiz — score-based, awarded once per attempt
     exam: 0,
     pomodoro: 300000,       // 5 min cooldown for pomodoro
+    sprint: 4000,           // Power Hour cards
 };
 
 /**

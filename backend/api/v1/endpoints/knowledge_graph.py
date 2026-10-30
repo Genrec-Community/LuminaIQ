@@ -1,3 +1,4 @@
+from db.client import async_db
 """
 Knowledge Graph API Endpoints
 
@@ -15,6 +16,7 @@ from api.deps import get_current_user
 from services.knowledge_graph_service import knowledge_graph
 from services.graph_analytics_service import graph_analytics
 from utils.logger import logger
+from services.usage_service import usage, metered
 
 router = APIRouter()
 
@@ -72,23 +74,23 @@ async def get_knowledge_graph(
         graph_data = await knowledge_graph.get_full_graph(project_id)
         
         # Get project info for center node
-        from db.client import get_supabase_client
+        from db.client import get_supabase_client, async_db
         client = get_supabase_client()
         project = (
-            client.table("projects")
+            (await async_db(lambda: client.table("projects")
             .select("name")
             .eq("id", project_id)
-            .execute()
+            .execute()))
         )
         project_name = project.data[0]["name"] if project.data else "Project"
         
         # Get document names for book nodes
         documents = (
-            client.table("documents")
+            (await async_db(lambda: client.table("documents")
             .select("id, filename, topics")
             .eq("project_id", project_id)
             .eq("upload_status", "completed")
-            .execute()
+            .execute()))
         )
         
         # Build enhanced graph with books
@@ -166,6 +168,8 @@ async def get_topic_summary(
     Get or generate a summary for a specific topic using RAG.
     Summaries are cached for performance.
     """
+    metered(current_user, "summary")
+    await usage.check(current_user["id"], "tools")
     try:
         result = await graph_analytics.get_topic_summary(
             project_id=request.project_id,
@@ -173,6 +177,8 @@ async def get_topic_summary(
             user_id=current_user["id"],
             force_regenerate=request.force_regenerate
         )
+        if isinstance(result, dict) and not result.get("cached"):
+            await usage.charge(current_user["id"], "tools")
         return result
         
     except Exception as e:

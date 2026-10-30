@@ -2,18 +2,19 @@ import React, { useState, useCallback, useEffect } from 'react';
 import {
     X, Globe, Upload, BookOpen, ArrowLeft, File, Check,
     Lock, ChevronDown, ChevronUp, Tag, Loader2, Search,
-    Download, ChevronLeft, ChevronRight
+    Download, ChevronLeft, ChevronRight, ClipboardPaste, Zap
 } from 'lucide-react';
 import { getPublicBooks, importBook } from '../api';
 import { useToast } from '../context/ToastContext';
+import { MAX_UPLOAD_MB } from '../utils/pricing';
 
 /* ─────────────────────────────────────────────────────────────
    Step 1 — Source Picker
 ───────────────────────────────────────────────────────────── */
 const SourcePicker = ({ onChoose }) => (
     <div className="p-8">
-        <h2 className="text-2xl font-bold text-[#4A3B32] mb-1">Add Document</h2>
-        <p className="text-sm text-[#8a6a5c] mb-8">
+        <h2 className="text-2xl font-bold text-[#163628] mb-1">Add Document</h2>
+        <p className="text-sm text-[#5E5046] mb-8">
             How would you like to add content to this project?
         </p>
 
@@ -21,15 +22,15 @@ const SourcePicker = ({ onChoose }) => (
             {/* Book Store Option */}
             <button
                 onClick={() => onChoose('store')}
-                className="group flex flex-col items-center text-center p-7 rounded-2xl border-2 border-[#E6D5CC] hover:border-[#C8A288] hover:bg-[#FDF6F0] transition-all duration-200 hover:shadow-lg hover:shadow-[#C8A288]/10"
+                className="group flex flex-col items-center text-center p-7 rounded-2xl border-2 border-[#E6D5CC] hover:border-[#1E5C42] hover:bg-[#FDF6F0] transition-all duration-200 hover:shadow-lg hover:shadow-[#1E5C42]/10"
             >
                 <div className="h-16 w-16 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-emerald-500/20 group-hover:scale-110 transition-transform duration-200">
                     <Globe className="h-8 w-8 text-white" />
                 </div>
-                <h3 className="text-base font-bold text-[#4A3B32] mb-2">
+                <h3 className="text-base font-bold text-[#163628] mb-2">
                     From Book Store
                 </h3>
-                <p className="text-xs text-[#8a6a5c] leading-relaxed">
+                <p className="text-xs text-[#5E5046] leading-relaxed">
                     Browse books shared publicly by other users and add them to your project instantly
                 </p>
                 <span className="mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-xs font-semibold">
@@ -41,25 +42,122 @@ const SourcePicker = ({ onChoose }) => (
             {/* Upload Option */}
             <button
                 onClick={() => onChoose('upload')}
-                className="group flex flex-col items-center text-center p-7 rounded-2xl border-2 border-[#E6D5CC] hover:border-[#C8A288] hover:bg-[#FDF6F0] transition-all duration-200 hover:shadow-lg hover:shadow-[#C8A288]/10"
+                className="group flex flex-col items-center text-center p-7 rounded-2xl border-2 border-[#E6D5CC] hover:border-[#1E5C42] hover:bg-[#FDF6F0] transition-all duration-200 hover:shadow-lg hover:shadow-[#1E5C42]/10"
             >
-                <div className="h-16 w-16 bg-gradient-to-br from-[#C8A288] to-[#B08B72] rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-[#C8A288]/20 group-hover:scale-110 transition-transform duration-200">
+                <div className="h-16 w-16 bg-gradient-to-br from-[#1E5C42] to-[#163628] rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-[#1E5C42]/20 group-hover:scale-110 transition-transform duration-200">
                     <Upload className="h-8 w-8 text-white" />
                 </div>
-                <h3 className="text-base font-bold text-[#4A3B32] mb-2">
+                <h3 className="text-base font-bold text-[#163628] mb-2">
                     Upload Your File
                 </h3>
-                <p className="text-xs text-[#8a6a5c] leading-relaxed">
+                <p className="text-xs text-[#5E5046] leading-relaxed">
                     Upload a PDF, DOCX or TXT file — keep it private or share it publicly in the Book Store
                 </p>
-                <span className="mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FDF6F0] text-[#C8A288] border border-[#E6D5CC] rounded-full text-xs font-semibold">
+                <span className="mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FDF6F0] text-[#1E5C42] border border-[#E6D5CC] rounded-full text-xs font-semibold">
                     <Upload className="h-3 w-3" />
                     PDF / DOCX / TXT
                 </span>
             </button>
         </div>
+
+        {/* Paste text: fastest path, no upload or OCR */}
+        <button
+            onClick={() => onChoose('paste')}
+            className="group mt-4 flex w-full items-center gap-4 rounded-2xl border-2 border-dashed border-[#E6D5CC] p-4 text-left transition-all duration-200 hover:border-[#1E5C42] hover:bg-[#FDF6F0]"
+        >
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#FDF6F0] text-[#1E5C42] transition-transform duration-200 group-hover:scale-110">
+                <ClipboardPaste className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-bold text-[#163628]">Paste text instead</h3>
+                <p className="text-xs leading-relaxed text-[#5E5046]">
+                    Open your PDF, select all (Ctrl/Cmd + A), copy and paste it here. Ready in seconds, no upload or scanning.
+                </p>
+            </div>
+            <span className="hidden shrink-0 items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700 sm:inline-flex">
+                <Zap className="h-3 w-3" /> Fastest
+            </span>
+        </button>
     </div>
 );
+
+/* ─────────────────────────────────────────────────────────────
+   Step 2C — Paste text
+───────────────────────────────────────────────────────────── */
+const MIN_PASTE_WORDS = 30;
+const MAX_PASTE_CHARS = 4_000_000; // ~ a 1,500-page book; the stored text limit is 5 MB
+
+const PasteStep = ({ onUpload, uploading, onBack }) => {
+    const [title, setTitle] = useState('');
+    const [text, setText] = useState('');
+    const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+    const tooShort = words < MIN_PASTE_WORDS;
+    const tooLong = text.length > MAX_PASTE_CHARS;
+
+    const submit = () => {
+        if (tooShort || tooLong || uploading) return;
+        const name = (title.trim() || text.trim().split('\n')[0].slice(0, 60) || 'Pasted text')
+            .replace(/[\\/:*?"<>|]+/g, ' ').trim();
+        // globalThis.File: this module imports lucide's File icon, which shadows the DOM File
+        const file = new globalThis.File([text], `${name}.txt`, { type: 'text/plain' });
+        onUpload([file], {});
+    };
+
+    return (
+        <div className="flex h-full flex-col">
+            <div className="shrink-0 border-b border-[#E6D5CC] px-6 pb-4 pt-6">
+                <div className="flex items-center gap-3">
+                    <button onClick={onBack} className="rounded-xl p-2 text-[#5E5046] transition-colors hover:bg-[#FDF6F0] hover:text-[#163628]" aria-label="Back">
+                        <ArrowLeft className="h-4 w-4" />
+                    </button>
+                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-[#1E5C42] to-[#163628]">
+                        <ClipboardPaste className="h-4 w-4 text-white" />
+                    </div>
+                    <div>
+                        <h3 className="font-bold text-[#163628]">Paste text</h3>
+                        <p className="text-xs text-[#5E5046]">Copy from your PDF viewer, a website or notes</p>
+                    </div>
+                </div>
+            </div>
+            <div className="flex min-h-0 flex-1 flex-col gap-3 p-6">
+                <input
+                    value={title}
+                    onChange={e => setTitle(e.target.value)}
+                    placeholder="Title (e.g. Human Values and Ethics)"
+                    className="w-full rounded-xl border border-[#E6D5CC] bg-[#FDF6F0] px-4 py-2.5 text-sm text-[#163628] outline-none placeholder:text-[#b8a094] focus:ring-2 focus:ring-[#1E5C42]"
+                />
+                <textarea
+                    value={text}
+                    onChange={e => setText(e.target.value)}
+                    autoFocus
+                    placeholder={'Paste the book or chapter text here.\n\nTip: in the PDF, press Ctrl/Cmd + A to select everything, Ctrl/Cmd + C to copy, then Ctrl/Cmd + V here.'}
+                    className="min-h-[260px] w-full flex-1 resize-none rounded-xl border border-[#E6D5CC] bg-white px-4 py-3 text-sm leading-relaxed text-[#163628] outline-none placeholder:text-[#b8a094] focus:ring-2 focus:ring-[#1E5C42]"
+                />
+                <div className="flex items-center justify-between text-xs">
+                    <span className={tooLong ? 'font-semibold text-red-600' : 'text-[#5E5046]'}>
+                        {words.toLocaleString()} words
+                        {tooLong ? ' · too long, split it into parts' : tooShort && words > 0 ? ` · add at least ${MIN_PASTE_WORDS} words` : ''}
+                    </span>
+                    {words > 0 && !tooShort && !tooLong && (
+                        <span className="text-[#a08070]">about {Math.max(1, Math.round(words / 300))} pages</span>
+                    )}
+                </div>
+            </div>
+            <div className="shrink-0 border-t border-[#E6D5CC] px-6 py-4">
+                <button
+                    onClick={submit}
+                    disabled={tooShort || tooLong || uploading}
+                    className={`flex w-full items-center justify-center gap-2 rounded-2xl py-3 font-semibold transition-all ${tooShort || tooLong || uploading
+                        ? 'cursor-not-allowed bg-[#E6D5CC] text-[#a08070]'
+                        : 'bg-gradient-to-r from-[#1E5C42] to-[#163628] text-white shadow-lg shadow-[#1E5C42]/30 hover:shadow-xl'}`}
+                >
+                    {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                    Add to project
+                </button>
+            </div>
+        </div>
+    );
+};
 
 /* ─────────────────────────────────────────────────────────────
    Step 2A — Book Store Browse & Import
@@ -123,41 +221,41 @@ const BookStoreStep = ({ projectId, onImported, onBack }) => {
             {/* Header */}
             <div className="px-6 pt-6 pb-4 border-b border-[#E6D5CC] shrink-0">
                 <div className="flex items-center gap-3 mb-4">
-                    <button onClick={onBack} className="p-2 hover:bg-[#FDF6F0] rounded-xl transition-colors text-[#8a6a5c] hover:text-[#4A3B32]">
+                    <button onClick={onBack} className="p-2 hover:bg-[#FDF6F0] rounded-xl transition-colors text-[#5E5046] hover:text-[#163628]">
                         <ArrowLeft className="h-4 w-4" />
                     </button>
                     <div className="h-8 w-8 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center">
                         <Globe className="h-4 w-4 text-white" />
                     </div>
                     <div>
-                        <h3 className="font-bold text-[#4A3B32]">Book Store</h3>
-                        <p className="text-xs text-[#8a6a5c]">Import a community book into your project</p>
+                        <h3 className="font-bold text-[#163628]">Book Store</h3>
+                        <p className="text-xs text-[#5E5046]">Import a community book into your project</p>
                     </div>
                 </div>
 
                 <form onSubmit={handleSearch} className="flex gap-2">
                     <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8a6a5c]" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#5E5046]" />
                         <input
                             type="text"
                             value={searchInput}
                             onChange={e => setSearchInput(e.target.value)}
                             placeholder="Search by title, author, topic..."
-                            className="w-full pl-9 pr-3 py-2.5 bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl text-sm focus:ring-2 focus:ring-[#C8A288] outline-none"
+                            className="w-full pl-9 pr-3 py-2.5 bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl text-sm focus:ring-2 focus:ring-[#1E5C42] outline-none"
                             autoFocus
                         />
                     </div>
-                    <button type="submit" className="px-4 py-2.5 bg-[#C8A288] text-white rounded-xl text-sm font-medium hover:bg-[#B08B72] transition-colors">
+                    <button type="submit" className="px-4 py-2.5 bg-[#1E5C42] text-white rounded-xl text-sm font-medium hover:bg-[#163628] transition-colors">
                         Search
                     </button>
                     {search && (
-                        <button type="button" onClick={() => { setSearch(''); setSearchInput(''); setPage(1); }} className="p-2.5 border border-[#E6D5CC] rounded-xl text-[#8a6a5c] hover:bg-[#FDF6F0]">
+                        <button type="button" onClick={() => { setSearch(''); setSearchInput(''); setPage(1); }} className="p-2.5 border border-[#E6D5CC] rounded-xl text-[#5E5046] hover:bg-[#FDF6F0]">
                             <X className="h-4 w-4" />
                         </button>
                     )}
                 </form>
                 {!loading && (
-                    <p className="text-xs text-[#8a6a5c] mt-2">
+                    <p className="text-xs text-[#5E5046] mt-2">
                         {search ? `${total} result${total !== 1 ? 's' : ''} for "${search}"` : `${total} books in the store`}
                     </p>
                 )}
@@ -181,9 +279,9 @@ const BookStoreStep = ({ projectId, onImported, onBack }) => {
                     </div>
                 ) : books.length === 0 ? (
                     <div className="text-center py-16">
-                        <BookOpen className="h-12 w-12 text-[#C8A288] mx-auto mb-3 opacity-40" />
-                        <p className="font-medium text-[#4A3B32]">{search ? 'No books match your search' : 'No public books yet'}</p>
-                        <p className="text-sm text-[#8a6a5c] mt-1">Be the first to share a book!</p>
+                        <BookOpen className="h-12 w-12 text-[#1E5C42] mx-auto mb-3 opacity-40" />
+                        <p className="font-medium text-[#163628]">{search ? 'No books match your search' : 'No public books yet'}</p>
+                        <p className="text-sm text-[#5E5046] mt-1">Be the first to share a book!</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -191,25 +289,25 @@ const BookStoreStep = ({ projectId, onImported, onBack }) => {
                             const isImported = importedIds.has(book.id);
                             const isImporting = importingIds.has(book.id);
                             return (
-                                <div key={book.id} className="flex flex-col p-4 bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl hover:border-[#C8A288] hover:shadow-md hover:shadow-[#C8A288]/10 transition-all">
+                                <div key={book.id} className="flex flex-col p-4 bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl hover:border-[#1E5C42] hover:shadow-md hover:shadow-[#1E5C42]/10 transition-all">
                                     <div className="flex items-start gap-3 mb-2">
-                                        <div className="h-10 w-8 bg-gradient-to-br from-[#C8A288] to-[#B08B72] rounded-lg flex items-center justify-center shrink-0 shadow-sm">
+                                        <div className="h-10 w-8 bg-gradient-to-br from-[#1E5C42] to-[#163628] rounded-lg flex items-center justify-center shrink-0 shadow-sm">
                                             <BookOpen className="h-4 w-4 text-white" />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <h4 className="font-semibold text-sm text-[#4A3B32] line-clamp-1 leading-tight">{book.title}</h4>
-                                            {book.author && <p className="text-xs text-[#8a6a5c]">by {book.author}</p>}
+                                            <h4 className="font-semibold text-sm text-[#163628] line-clamp-1 leading-tight">{book.title}</h4>
+                                            {book.author && <p className="text-xs text-[#5E5046]">by {book.author}</p>}
                                         </div>
                                     </div>
 
                                     {book.description && (
-                                        <p className="text-xs text-[#8a6a5c] line-clamp-2 mb-2 leading-relaxed">{book.description}</p>
+                                        <p className="text-xs text-[#5E5046] line-clamp-2 mb-2 leading-relaxed">{book.description}</p>
                                     )}
 
                                     {book.tags?.length > 0 && (
                                         <div className="flex flex-wrap gap-1 mb-2">
                                             {book.tags.slice(0, 3).map((tag, i) => (
-                                                <span key={i} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-white text-[#8a6a5c] rounded-full text-[10px] border border-[#E6D5CC]">
+                                                <span key={i} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-white text-[#5E5046] rounded-full text-[10px] border border-[#E6D5CC]">
                                                     <Tag className="h-2 w-2" />{tag}
                                                 </span>
                                             ))}
@@ -217,7 +315,7 @@ const BookStoreStep = ({ projectId, onImported, onBack }) => {
                                     )}
 
                                     <div className="flex items-center justify-between mt-auto pt-2 border-t border-[#E6D5CC]">
-                                        <span className="text-[10px] text-[#8a6a5c] flex items-center gap-1">
+                                        <span className="text-[10px] text-[#5E5046] flex items-center gap-1">
                                             <Download className="h-2.5 w-2.5" />
                                             {book.import_count || 0} imports
                                         </span>
@@ -227,7 +325,7 @@ const BookStoreStep = ({ projectId, onImported, onBack }) => {
                                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                                                 isImported
                                                     ? 'bg-emerald-50 text-emerald-600 border border-emerald-200 cursor-default'
-                                                    : 'bg-[#C8A288] text-white hover:bg-[#B08B72] disabled:opacity-60 shadow-sm hover:shadow-md'
+                                                    : 'bg-[#1E5C42] text-white hover:bg-[#163628] disabled:opacity-60 shadow-sm hover:shadow-md'
                                             }`}
                                         >
                                             {isImporting ? (
@@ -253,7 +351,7 @@ const BookStoreStep = ({ projectId, onImported, onBack }) => {
                         className="p-2 border border-[#E6D5CC] rounded-lg hover:bg-[#FDF6F0] disabled:opacity-40 transition-colors">
                         <ChevronLeft className="h-4 w-4" />
                     </button>
-                    <span className="text-sm text-[#8a6a5c] font-medium">Page {page} of {totalPages}</span>
+                    <span className="text-sm text-[#5E5046] font-medium">Page {page} of {totalPages}</span>
                     <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
                         className="p-2 border border-[#E6D5CC] rounded-lg hover:bg-[#FDF6F0] disabled:opacity-40 transition-colors">
                         <ChevronRight className="h-4 w-4" />
@@ -286,15 +384,18 @@ const UploadStep = ({ onUpload, uploading, onBack }) => {
             accept.some(ext => f.name.toLowerCase().endsWith(ext))
         );
         if (files.length) {
-            setSelectedFiles(files);
+            // Picking again adds to the list (several books at once), without repeats
+            setSelectedFiles(prev => [...prev, ...files.filter(f => !prev.some(p => p.name === f.name && p.size === f.size))]);
             if (!bookTitle) setBookTitle(files[0].name.replace(/\.[^.]+$/, ''));
         }
     }, [bookTitle]);
 
     const handleFileSelect = (e) => {
         const files = Array.from(e.target.files);
+        e.target.value = '';
         if (files.length) {
-            setSelectedFiles(files);
+            // Picking again adds to the list (several books at once), without repeats
+            setSelectedFiles(prev => [...prev, ...files.filter(f => !prev.some(p => p.name === f.name && p.size === f.size))]);
             if (!bookTitle) setBookTitle(files[0].name.replace(/\.[^.]+$/, ''));
         }
     };
@@ -316,15 +417,15 @@ const UploadStep = ({ onUpload, uploading, onBack }) => {
             {/* Header */}
             <div className="px-6 pt-6 pb-4 border-b border-[#E6D5CC] shrink-0">
                 <div className="flex items-center gap-3">
-                    <button onClick={onBack} className="p-2 hover:bg-[#FDF6F0] rounded-xl transition-colors text-[#8a6a5c] hover:text-[#4A3B32]">
+                    <button onClick={onBack} className="p-2 hover:bg-[#FDF6F0] rounded-xl transition-colors text-[#5E5046] hover:text-[#163628]">
                         <ArrowLeft className="h-4 w-4" />
                     </button>
-                    <div className="h-8 w-8 bg-gradient-to-br from-[#C8A288] to-[#B08B72] rounded-xl flex items-center justify-center">
+                    <div className="h-8 w-8 bg-gradient-to-br from-[#1E5C42] to-[#163628] rounded-xl flex items-center justify-center">
                         <Upload className="h-4 w-4 text-white" />
                     </div>
                     <div>
-                        <h3 className="font-bold text-[#4A3B32]">Upload File</h3>
-                        <p className="text-xs text-[#8a6a5c]">Choose visibility after selecting your file</p>
+                        <h3 className="font-bold text-[#163628]">Upload File</h3>
+                        <p className="text-xs text-[#5E5046]">Choose visibility after selecting your file</p>
                     </div>
                 </div>
             </div>
@@ -336,17 +437,17 @@ const UploadStep = ({ onUpload, uploading, onBack }) => {
                     onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
                     onDragLeave={e => { e.preventDefault(); setIsDragging(false); }}
                     className={`border-2 border-dashed rounded-2xl p-10 text-center transition-all ${
-                        isDragging ? 'border-[#C8A288] bg-[#FDF6F0] scale-[1.01]' : 'border-[#E6D5CC] hover:border-[#C8A288] hover:bg-[#FDF6F0]/50'
+                        isDragging ? 'border-[#1E5C42] bg-[#FDF6F0] scale-[1.01]' : 'border-[#E6D5CC] hover:border-[#1E5C42] hover:bg-[#FDF6F0]/50'
                     }`}
                 >
-                    <div className={`h-14 w-14 mx-auto mb-3 rounded-2xl flex items-center justify-center ${isDragging ? 'bg-[#C8A288]' : 'bg-[#F5EBE4]'}`}>
-                        <Upload className={`h-7 w-7 ${isDragging ? 'text-white' : 'text-[#C8A288]'}`} />
+                    <div className={`h-14 w-14 mx-auto mb-3 rounded-2xl flex items-center justify-center ${isDragging ? 'bg-[#1E5C42]' : 'bg-[#F5EBE4]'}`}>
+                        <Upload className={`h-7 w-7 ${isDragging ? 'text-white' : 'text-[#1E5C42]'}`} />
                     </div>
-                    <p className="text-sm font-semibold text-[#4A3B32] mb-1">
-                        {isDragging ? 'Drop it!' : 'Drag & drop your file here'}
+                    <p className="text-sm font-semibold text-[#163628] mb-1">
+                        {isDragging ? 'Drop it!' : 'Drag & drop your books here'}
                     </p>
-                    <p className="text-xs text-[#8a6a5c] mb-3">PDF, DOCX, TXT — up to 10MB</p>
-                    <label className="inline-block px-5 py-2.5 bg-[#C8A288] text-white text-sm font-medium rounded-xl hover:bg-[#B08B72] cursor-pointer transition-colors shadow-md shadow-[#C8A288]/20">
+                    <p className="text-xs text-[#5E5046] mb-3">PDF, DOCX, TXT — up to {MAX_UPLOAD_MB} MB each. Pick several at once.</p>
+                    <label className="inline-block px-5 py-2.5 bg-[#1E5C42] text-white text-sm font-medium rounded-xl hover:bg-[#163628] cursor-pointer transition-colors shadow-md shadow-[#1E5C42]/20">
                         Browse Files
                         <input type="file" multiple accept=".pdf,.docx,.txt" onChange={handleFileSelect} className="hidden" />
                     </label>
@@ -357,12 +458,12 @@ const UploadStep = ({ onUpload, uploading, onBack }) => {
                     <div className="space-y-2">
                         {selectedFiles.map((f, i) => (
                             <div key={i} className="flex items-center gap-3 p-3 bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl">
-                                <div className="h-8 w-8 bg-[#C8A288]/10 rounded-lg flex items-center justify-center shrink-0">
-                                    <File className="h-4 w-4 text-[#C8A288]" />
+                                <div className="h-8 w-8 bg-[#1E5C42]/10 rounded-lg flex items-center justify-center shrink-0">
+                                    <File className="h-4 w-4 text-[#1E5C42]" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-[#4A3B32] truncate">{f.name}</p>
-                                    <p className="text-xs text-[#8a6a5c]">{(f.size / 1024 / 1024).toFixed(2)} MB</p>
+                                    <p className="text-sm font-medium text-[#163628] truncate">{f.name}</p>
+                                    <p className="text-xs text-[#5E5046]">{(f.size / 1024 / 1024).toFixed(2)} MB</p>
                                 </div>
                                 {!uploading && (
                                     <button onClick={() => setSelectedFiles(fs => fs.filter((_, j) => j !== i))} className="p-1 hover:bg-red-100 rounded-lg transition-colors">
@@ -383,22 +484,22 @@ const UploadStep = ({ onUpload, uploading, onBack }) => {
                             onClick={() => { setIsPublic(p => !p); if (!isPublic) setShowMeta(true); }}
                             className={`w-full flex items-center justify-between px-4 py-4 transition-all ${
                                 isPublic
-                                    ? 'bg-gradient-to-r from-[#C8A288]/15 to-[#B08B72]/5'
+                                    ? 'bg-gradient-to-r from-[#1E5C42]/15 to-[#163628]/5'
                                     : 'bg-[#FAFAF9] hover:bg-[#FDF6F0]'
                             }`}
                         >
                             <div className="flex items-center gap-3">
-                                <div className={`h-10 w-10 rounded-xl flex items-center justify-center transition-colors ${isPublic ? 'bg-[#C8A288] shadow-md shadow-[#C8A288]/30' : 'bg-[#E6D5CC]'}`}>
+                                <div className={`h-10 w-10 rounded-xl flex items-center justify-center transition-colors ${isPublic ? 'bg-[#1E5C42] shadow-md shadow-[#1E5C42]/30' : 'bg-[#E6D5CC]'}`}>
                                     {isPublic
                                         ? <Globe className="h-5 w-5 text-white" />
-                                        : <Lock className="h-5 w-5 text-[#8a6a5c]" />
+                                        : <Lock className="h-5 w-5 text-[#5E5046]" />
                                     }
                                 </div>
                                 <div className="text-left">
-                                    <p className="text-sm font-bold text-[#4A3B32]">
+                                    <p className="text-sm font-bold text-[#163628]">
                                         {isPublic ? '🌐 Public — Visible in Book Store' : '🔒 Private — Only you'}
                                     </p>
-                                    <p className="text-xs text-[#8a6a5c]">
+                                    <p className="text-xs text-[#5E5046]">
                                         {isPublic
                                             ? 'This book will appear in the public Book Store'
                                             : 'Only you can use this document in your projects'}
@@ -406,7 +507,7 @@ const UploadStep = ({ onUpload, uploading, onBack }) => {
                                 </div>
                             </div>
                             {/* Toggle pill */}
-                            <div className={`w-11 h-6 rounded-full relative shrink-0 transition-colors duration-200 ${isPublic ? 'bg-[#C8A288]' : 'bg-[#D9C8BE]'}`}>
+                            <div className={`w-11 h-6 rounded-full relative shrink-0 transition-colors duration-200 ${isPublic ? 'bg-[#1E5C42]' : 'bg-[#D9C8BE]'}`}>
                                 <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-md transition-all duration-200 ${isPublic ? 'left-6' : 'left-1'}`} />
                             </div>
                         </button>
@@ -417,7 +518,7 @@ const UploadStep = ({ onUpload, uploading, onBack }) => {
                                 <button
                                     type="button"
                                     onClick={() => setShowMeta(p => !p)}
-                                    className="flex items-center gap-1.5 text-xs text-[#8a6a5c] hover:text-[#C8A288] transition-colors font-medium"
+                                    className="flex items-center gap-1.5 text-xs text-[#5E5046] hover:text-[#1E5C42] transition-colors font-medium"
                                 >
                                     {showMeta ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                                     {showMeta ? 'Hide book info' : 'Add book info (optional but recommended)'}
@@ -426,52 +527,52 @@ const UploadStep = ({ onUpload, uploading, onBack }) => {
                                 {showMeta && (
                                     <div className="space-y-3">
                                         <div>
-                                            <label className="block text-xs font-semibold text-[#4A3B32] mb-1.5">
-                                                Book Title <span className="text-[#C8A288]">*</span>
+                                            <label className="block text-xs font-semibold text-[#163628] mb-1.5">
+                                                Book Title <span className="text-[#1E5C42]">*</span>
                                             </label>
                                             <input
                                                 type="text"
                                                 value={bookTitle}
                                                 onChange={e => setBookTitle(e.target.value)}
                                                 placeholder="e.g., Introduction to Physics"
-                                                className="w-full px-3 py-2.5 text-sm bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl focus:ring-2 focus:ring-[#C8A288] outline-none"
+                                                className="w-full px-3 py-2.5 text-sm bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl focus:ring-2 focus:ring-[#1E5C42] outline-none"
                                             />
                                         </div>
                                         <div className="grid grid-cols-2 gap-3">
                                             <div>
-                                                <label className="block text-xs font-semibold text-[#4A3B32] mb-1.5">Author</label>
+                                                <label className="block text-xs font-semibold text-[#163628] mb-1.5">Author</label>
                                                 <input
                                                     type="text"
                                                     value={bookAuthor}
                                                     onChange={e => setBookAuthor(e.target.value)}
                                                     placeholder="e.g., Jane Smith"
-                                                    className="w-full px-3 py-2.5 text-sm bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl focus:ring-2 focus:ring-[#C8A288] outline-none"
+                                                    className="w-full px-3 py-2.5 text-sm bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl focus:ring-2 focus:ring-[#1E5C42] outline-none"
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-semibold text-[#4A3B32] mb-1.5">
-                                                    Tags <span className="font-normal text-[#8a6a5c]">(comma sep)</span>
+                                                <label className="block text-xs font-semibold text-[#163628] mb-1.5">
+                                                    Tags <span className="font-normal text-[#5E5046]">(comma sep)</span>
                                                 </label>
                                                 <div className="relative">
-                                                    <Tag className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-[#8a6a5c]" />
+                                                    <Tag className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-[#5E5046]" />
                                                     <input
                                                         type="text"
                                                         value={bookTags}
                                                         onChange={e => setBookTags(e.target.value)}
                                                         placeholder="physics, science"
-                                                        className="w-full pl-7 pr-2.5 py-2.5 text-sm bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl focus:ring-2 focus:ring-[#C8A288] outline-none"
+                                                        className="w-full pl-7 pr-2.5 py-2.5 text-sm bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl focus:ring-2 focus:ring-[#1E5C42] outline-none"
                                                     />
                                                 </div>
                                             </div>
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-semibold text-[#4A3B32] mb-1.5">Description</label>
+                                            <label className="block text-xs font-semibold text-[#163628] mb-1.5">Description</label>
                                             <textarea
                                                 value={bookDescription}
                                                 onChange={e => setBookDescription(e.target.value)}
                                                 placeholder="Brief description to help others discover this book..."
                                                 rows={2}
-                                                className="w-full px-3 py-2.5 text-sm bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl focus:ring-2 focus:ring-[#C8A288] outline-none resize-none"
+                                                className="w-full px-3 py-2.5 text-sm bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl focus:ring-2 focus:ring-[#1E5C42] outline-none resize-none"
                                             />
                                         </div>
                                     </div>
@@ -483,11 +584,11 @@ const UploadStep = ({ onUpload, uploading, onBack }) => {
                 {selectedFiles.length > 1 && (
                     <div className="p-4 bg-[#FDF6F0] rounded-xl border border-[#E6D5CC] flex items-start gap-3">
                         <div className="h-8 w-8 bg-[#E6D5CC] rounded-xl flex items-center justify-center shrink-0">
-                            <Lock className="h-4 w-4 text-[#8a6a5c]" />
+                            <Lock className="h-4 w-4 text-[#5E5046]" />
                         </div>
                         <div>
-                            <p className="text-sm font-bold text-[#4A3B32]">Batch Upload (Private)</p>
-                            <p className="text-xs text-[#8a6a5c]">To share books in the public Book Store, please upload them one at a time.</p>
+                            <p className="text-sm font-bold text-[#163628]">Batch Upload (Private)</p>
+                            <p className="text-xs text-[#5E5046]">To share books in the public Book Store, please upload them one at a time.</p>
                         </div>
                     </div>
                 )}
@@ -500,10 +601,10 @@ const UploadStep = ({ onUpload, uploading, onBack }) => {
                     disabled={uploading || !selectedFiles.length}
                     className={`w-full py-3.5 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2 shadow-lg ${
                         uploading || !selectedFiles.length
-                            ? 'bg-[#E6D5CC] text-[#8a6a5c] cursor-not-allowed shadow-none'
+                            ? 'bg-[#E6D5CC] text-[#5E5046] cursor-not-allowed shadow-none'
                             : isPublic
-                                ? 'bg-gradient-to-r from-[#C8A288] to-[#B08B72] text-white hover:shadow-xl hover:shadow-[#C8A288]/25 hover:scale-[1.01]'
-                                : 'bg-gradient-to-r from-[#C8A288] to-[#B08B72] text-white hover:shadow-xl hover:shadow-[#C8A288]/25 hover:scale-[1.01]'
+                                ? 'bg-gradient-to-r from-[#1E5C42] to-[#163628] text-white hover:shadow-xl hover:shadow-[#1E5C42]/25 hover:scale-[1.01]'
+                                : 'bg-gradient-to-r from-[#1E5C42] to-[#163628] text-white hover:shadow-xl hover:shadow-[#1E5C42]/25 hover:scale-[1.01]'
                     }`}
                 >
                     {uploading ? (
@@ -518,7 +619,7 @@ const UploadStep = ({ onUpload, uploading, onBack }) => {
                     )}
                 </button>
                 {isPublic && (
-                    <p className="text-center text-xs text-[#8a6a5c] mt-2">
+                    <p className="text-center text-xs text-[#5E5046] mt-2">
                         📚 Your book will appear in the public Book Store after processing
                     </p>
                 )}
@@ -537,12 +638,11 @@ const UploadStep = ({ onUpload, uploading, onBack }) => {
      onClose    — close the modal
 ───────────────────────────────────────────────────────────── */
 const AddDocumentModal = ({ projectId, uploading, onUpload, onImported, onClose }) => {
-    const [step, setStep] = useState('pick'); // 'pick' | 'store' | 'upload'
+    const [step, setStep] = useState('pick'); // 'pick' | 'store' | 'upload' | 'paste'
 
     const handleUpload = (files, bookOptions) => {
         onUpload(files, bookOptions);
-        // Modal stays open so the user can see the uploading spinner in UploadStep
-        // Parent should close it after upload completes
+        // The parent closes the modal at once; progress shows in the document list
     };
 
     const handleImported = (doc) => {
@@ -552,7 +652,7 @@ const AddDocumentModal = ({ projectId, uploading, onUpload, onImported, onClose 
 
     return (
         <div
-            className="fixed inset-0 bg-[#2A1F18]/40 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+            className="fixed inset-0 bg-[#182B22]/40 backdrop-blur-sm flex items-center justify-center p-4 z-50"
             onClick={e => e.target === e.currentTarget && onClose()}
         >
             <div
@@ -563,17 +663,17 @@ const AddDocumentModal = ({ projectId, uploading, onUpload, onImported, onClose 
                 <div className="flex items-center justify-between px-6 pt-5 pb-0 shrink-0">
                     <div className="flex gap-1.5">
                         {/* Step indicator dots */}
-                        {['pick', 'store', 'upload'].map((s, i) => (
+                        {['pick', step === 'paste' ? 'paste' : step === 'store' ? 'store' : 'upload'].map((s, i) => (
                             <div key={s} className={`h-1.5 rounded-full transition-all duration-300 ${
                                 step === s
-                                    ? 'w-6 bg-[#C8A288]'
+                                    ? 'w-6 bg-[#1E5C42]'
                                     : 'w-1.5 bg-[#E6D5CC]'
                             }`} />
                         ))}
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-2 hover:bg-[#FDF6F0] rounded-full transition-colors text-[#8a6a5c] hover:text-[#4A3B32]"
+                        className="p-2 hover:bg-[#FDF6F0] rounded-full transition-colors text-[#5E5046] hover:text-[#163628]"
                     >
                         <X className="h-5 w-5" />
                     </button>
@@ -593,6 +693,13 @@ const AddDocumentModal = ({ projectId, uploading, onUpload, onImported, onClose 
                     )}
                     {step === 'upload' && (
                         <UploadStep
+                            onUpload={handleUpload}
+                            uploading={uploading}
+                            onBack={() => setStep('pick')}
+                        />
+                    )}
+                    {step === 'paste' && (
+                        <PasteStep
                             onUpload={handleUpload}
                             uploading={uploading}
                             onBack={() => setStep('pick')}

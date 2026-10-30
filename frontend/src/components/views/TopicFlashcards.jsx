@@ -25,21 +25,21 @@ const FlashCard = ({ card, index, total, flipped, onFlip }) => {
                     className="absolute inset-0 w-full h-full rounded-2xl border-2 border-[#E6D5CC] bg-white shadow-lg p-8 flex flex-col items-center justify-center"
                     style={{ backfaceVisibility: 'hidden' }}
                 >
-                    <div className="absolute top-4 left-4 text-xs font-bold text-[#C8A288] bg-[#FDF6F0] px-2.5 py-1 rounded-full">
+                    <div className="absolute top-4 left-4 text-xs font-bold text-[#1E5C42] bg-[#FDF6F0] px-2.5 py-1 rounded-full">
                         {index + 1} / {total}
                     </div>
                     <div className="absolute top-4 right-4">
-                        <div className="flex items-center gap-1 text-xs text-[#8a6a5c]">
+                        <div className="flex items-center gap-1 text-xs text-[#5E5046]">
                             <Eye className="h-3 w-3" />
                             <span>Question</span>
                         </div>
                     </div>
                     <div className="text-center">
-                        <p className="text-lg font-bold text-[#4A3B32] leading-relaxed">
+                        <p className="text-lg font-bold text-[#163628] leading-relaxed">
                             {card.front}
                         </p>
                     </div>
-                    <p className="absolute bottom-4 text-xs text-[#8a6a5c] font-medium">
+                    <p className="absolute bottom-4 text-xs text-[#5E5046] font-medium">
                         Click to reveal answer
                     </p>
                 </div>
@@ -62,7 +62,7 @@ const FlashCard = ({ card, index, total, flipped, onFlip }) => {
                         </div>
                     </div>
                     <div className="text-center">
-                        <p className="text-base text-[#4A3B32] leading-relaxed">
+                        <p className="text-base text-[#163628] leading-relaxed">
                             {card.back}
                         </p>
                     </div>
@@ -186,7 +186,7 @@ const TopicFlashcards = ({ projectId, topic, selectedDocuments = [], onClose }) 
                 <div className="flex items-center gap-3 min-w-0">
                     <button
                         onClick={onClose}
-                        className="p-2 hover:bg-[#FDF6F0] rounded-lg transition-colors text-[#8a6a5c] flex-shrink-0"
+                        className="p-2 hover:bg-[#FDF6F0] rounded-lg transition-colors text-[#5E5046] flex-shrink-0"
                         title="Back to Learning Path"
                     >
                         <ArrowLeft className="h-5 w-5" />
@@ -195,8 +195,8 @@ const TopicFlashcards = ({ projectId, topic, selectedDocuments = [], onClose }) 
                         <Layers className="h-5 w-5" />
                     </div>
                     <div className="min-w-0">
-                        <h3 className="font-bold text-[#4A3B32] text-lg truncate">Flashcards</h3>
-                        <p className="text-xs text-[#8a6a5c] truncate">{topic}</p>
+                        <h3 className="font-bold text-[#163628] text-lg truncate">Flashcards</h3>
+                        <p className="text-xs text-[#5E5046] truncate">{topic}</p>
                     </div>
                 </div>
 
@@ -204,7 +204,7 @@ const TopicFlashcards = ({ projectId, topic, selectedDocuments = [], onClose }) 
                     <button
                         onClick={shuffleCards}
                         disabled={loading || flashcards.length === 0}
-                        className="p-2 hover:bg-[#FDF6F0] rounded-lg transition-colors text-[#8a6a5c] disabled:opacity-50"
+                        className="p-2 hover:bg-[#FDF6F0] rounded-lg transition-colors text-[#5E5046] disabled:opacity-50"
                         title="Shuffle cards"
                     >
                         <Shuffle className="h-4 w-4" />
@@ -212,7 +212,7 @@ const TopicFlashcards = ({ projectId, topic, selectedDocuments = [], onClose }) 
                     <button
                         onClick={resetCards}
                         disabled={loading || flashcards.length === 0}
-                        className="p-2 hover:bg-[#FDF6F0] rounded-lg transition-colors text-[#8a6a5c] disabled:opacity-50"
+                        className="p-2 hover:bg-[#FDF6F0] rounded-lg transition-colors text-[#5E5046] disabled:opacity-50"
                         title="Reset progress"
                     >
                         <RotateCcw className="h-4 w-4" />
@@ -221,7 +221,7 @@ const TopicFlashcards = ({ projectId, topic, selectedDocuments = [], onClose }) 
                     <button
                         onClick={loadFlashcards}
                         disabled={loading}
-                        className="p-2 hover:bg-[#FDF6F0] rounded-lg transition-colors text-[#8a6a5c] disabled:opacity-50"
+                        className="p-2 hover:bg-[#FDF6F0] rounded-lg transition-colors text-[#5E5046] disabled:opacity-50"
                         title="Generate new cards"
                     >
                         <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
@@ -239,8 +239,8 @@ const TopicFlashcards = ({ projectId, topic, selectedDocuments = [], onClose }) 
                             <Layers className="absolute inset-0 m-auto h-6 w-6 text-amber-500" />
                         </div>
                         <div className="text-center">
-                            <p className="text-[#4A3B32] font-bold">Generating Flashcards</p>
-                            <p className="text-xs text-[#8a6a5c] mt-1">Creating study cards for "{topic}"...</p>
+                            <p className="text-[#163628] font-bold">Generating Flashcards</p>
+                            <p className="text-xs text-[#5E5046] mt-1">Creating study cards for "{topic}"...</p>
                         </div>
                     </div>
                 ) : error ? (
@@ -248,11 +248,11 @@ const TopicFlashcards = ({ projectId, topic, selectedDocuments = [], onClose }) 
                         <div className="h-16 w-16 bg-red-100 rounded-full flex items-center justify-center">
                             <X className="h-8 w-8 text-red-500" />
                         </div>
-                        <p className="text-[#4A3B32] font-bold">Generation Failed</p>
-                        <p className="text-sm text-[#8a6a5c] text-center max-w-md">{error}</p>
+                        <p className="text-[#163628] font-bold">Generation Failed</p>
+                        <p className="text-sm text-[#5E5046] text-center max-w-md">{error}</p>
                         <button
                             onClick={loadFlashcards}
-                            className="px-4 py-2 bg-[#C8A288] text-white rounded-lg font-medium hover:bg-[#B08B72] transition-colors flex items-center gap-2"
+                            className="px-4 py-2 bg-[#1E5C42] text-white rounded-lg font-medium hover:bg-[#163628] transition-colors flex items-center gap-2"
                         >
                             <RefreshCw className="h-4 w-4" />
                             Try Again
@@ -273,7 +273,7 @@ const TopicFlashcards = ({ projectId, topic, selectedDocuments = [], onClose }) 
                                         {unknown.size}
                                     </span>
                                 </div>
-                                <span className="text-xs font-bold text-[#8a6a5c]">
+                                <span className="text-xs font-bold text-[#5E5046]">
                                     {totalReviewed}/{flashcards.length} reviewed
                                 </span>
                             </div>
@@ -297,7 +297,7 @@ const TopicFlashcards = ({ projectId, topic, selectedDocuments = [], onClose }) 
                                     onClick={() => { setCurrentIndex(idx); setFlipped(false); }}
                                     className={`h-2.5 w-2.5 rounded-full transition-all ${
                                         idx === currentIndex
-                                            ? 'bg-[#C8A288] scale-125'
+                                            ? 'bg-[#1E5C42] scale-125'
                                             : known.has(idx)
                                                 ? 'bg-green-400'
                                                 : unknown.has(idx)
@@ -344,7 +344,7 @@ const TopicFlashcards = ({ projectId, topic, selectedDocuments = [], onClose }) 
                                 <button
                                     onClick={goPrev}
                                     disabled={currentIndex === 0}
-                                    className="flex items-center gap-2 px-4 py-2 text-[#8a6a5c] hover:bg-[#E6D5CC]/50 rounded-lg transition-colors disabled:opacity-30 font-medium text-sm"
+                                    className="flex items-center gap-2 px-4 py-2 text-[#5E5046] hover:bg-[#E6D5CC]/50 rounded-lg transition-colors disabled:opacity-30 font-medium text-sm"
                                 >
                                     <ArrowLeft className="h-4 w-4" />
                                     Previous
@@ -352,7 +352,7 @@ const TopicFlashcards = ({ projectId, topic, selectedDocuments = [], onClose }) 
                                 <button
                                     onClick={goNext}
                                     disabled={currentIndex === flashcards.length - 1}
-                                    className="flex items-center gap-2 px-4 py-2 text-[#8a6a5c] hover:bg-[#E6D5CC]/50 rounded-lg transition-colors disabled:opacity-30 font-medium text-sm"
+                                    className="flex items-center gap-2 px-4 py-2 text-[#5E5046] hover:bg-[#E6D5CC]/50 rounded-lg transition-colors disabled:opacity-30 font-medium text-sm"
                                 >
                                     Next
                                     <ArrowRight className="h-4 w-4" />
@@ -361,7 +361,7 @@ const TopicFlashcards = ({ projectId, topic, selectedDocuments = [], onClose }) 
                         </div>
 
                         {/* Keyboard hints */}
-                        <div className="mt-4 flex gap-4 text-[10px] text-[#8a6a5c] font-medium">
+                        <div className="mt-4 flex gap-4 text-[10px] text-[#5E5046] font-medium">
                             <span>Space: Flip</span>
                             <span>Arrow keys: Navigate</span>
                         </div>

@@ -1,4 +1,5 @@
 import os
+import time
 import asyncio
 from typing import Optional, List, Dict, Any
 from concurrent.futures import ThreadPoolExecutor
@@ -118,8 +119,25 @@ class DocumentService:
             await self._update_document_status(
                 document_id, "processing", "Extracting text..."
             )
+            last_beat = [0.0]
+
+            def on_ocr_page(done: int, total: int):
+                # Called from the extraction thread while a scanned PDF is OCR'd
+                asyncio.run_coroutine_threadsafe(
+                    progress.emit(document_id, "extracting", int(done * 100 / max(total, 1)),
+                                  f"Scanning page {done}/{total}"),
+                    loop,
+                )
+                # Heartbeat (bumps updated_at) so the app can tell slow from stopped
+                if time.monotonic() - last_beat[0] >= 30 or done == total:
+                    last_beat[0] = time.monotonic()
+                    asyncio.run_coroutine_threadsafe(
+                        self._update_document_status(document_id, "processing", f"Scanning page {done}/{total}"),
+                        loop,
+                    )
+
             text = await loop.run_in_executor(
-                self._extraction_executor, self.file_parser.extract_text, file_path
+                self._extraction_executor, self.file_parser.extract_text, file_path, on_ocr_page
             )
 
             if not text:
@@ -132,22 +150,23 @@ class DocumentService:
                 f"Extracted {len(text)} characters"
             )
 
-            # ── 2. Save extracted text to Supabase texts/ bucket ──────────────
-            text_storage_path = await self._save_text_to_storage(
-                document_id, project_id, filename, text
-            )
-            if text_storage_path:
-                await self._update_document_text_path(document_id, text_storage_path)
+            # ── 2+3. Save extracted text (texts/ bucket) and chunk it, in parallel ──
+            async def save_text():
+                path = await self._save_text_to_storage(
+                    document_id, project_id, filename, text
+                )
+                if path:
+                    await self._update_document_text_path(document_id, path)
+                return path
 
-            # ── 3. Chunk text ──────────────────────────────────────────────────
             logger.info(f"Chunking text from {filename}")
-            await self._update_document_status(
-                document_id, "processing", "Chunking text..."
-            )
             await progress.emit(document_id, "chunking", 0, "Splitting into chunks...")
-
-            chunks = await loop.run_in_executor(
-                None, lambda: self.text_chunker.chunk_text(text)
+            text_storage_path, chunks, _ = await asyncio.gather(
+                save_text(),
+                loop.run_in_executor(None, lambda: self.text_chunker.chunk_text(text)),
+                # Keep the original PDF so students can read it in the app and
+                # citations can open at the exact passage
+                self._save_original_to_storage(document_id, project_id, filename, file_path),
             )
 
             if not chunks:
@@ -168,63 +187,79 @@ class DocumentService:
             collection_name = f"project_{project_id}"
             await qdrant_service.create_collection(collection_name)
 
-            # ── 5. Process embeddings with global limits + progress ────────────
+            # ── 5+6. Embeddings and topic extraction run in parallel ───────────
+            # Topics are extracted from the stored text, so they don't need to
+            # wait for the vectors; the slower of the two sets the pace.
+            await self._update_document_status(
+                document_id, "processing", "Indexing and finding topics..."
+            )
             await progress.emit(
                 document_id, "embedding", 0,
                 f"Embedding {len(chunks)} chunks..."
             )
-            await self._process_embeddings_direct(
-                chunks, document_id, filename, collection_name
-            )
-
-            # ── 6. Generate Topics (LLM-gated) ────────────────────────────────
-            await self._update_document_status(
-                document_id, "processing", "Generating topics..."
-            )
-            await progress.emit(
-                document_id, "topics", 0, "Generating document topics..."
-            )
             llm_semaphore = EmbeddingQueue.get_llm_semaphore()
-            try:
-                from services.mcq_service import mcq_service
 
-                async with llm_semaphore:
-                    await mcq_service.generate_document_topics(project_id, document_id)
-                logger.info(f"Topics generated for {filename}")
-                await progress.emit(document_id, "topics", 100, "Topics generated")
-            except Exception as topic_err:
-                logger.error(f"Failed to generate topics for {filename}: {topic_err}")
-                await progress.emit(document_id, "topics", 100, "Topic generation skipped")
+            async def embed():
+                try:
+                    await self._process_embeddings_direct(
+                        chunks, document_id, filename, collection_name, heartbeat=True
+                    )
+                    return None
+                except Exception as embed_err:
+                    return embed_err
+
+            async def topics():
+                try:
+                    from services.mcq_service import mcq_service
+
+                    async with llm_semaphore:
+                        await mcq_service.generate_document_topics(project_id, document_id)
+                    logger.info(f"Topics generated for {filename}")
+                except Exception as topic_err:
+                    logger.error(f"Failed to generate topics for {filename}: {topic_err}")
+
+            embed_err, _ = await asyncio.gather(embed(), topics())
+            if embed_err:
+                if not text_storage_path:
+                    raise embed_err
+                # The text is saved: the document stays usable (search falls back
+                # to the stored text) and the index is rebuilt in the background
+                # by ensure_project_indexed once the embedding provider works.
+                logger.error(
+                    f"[{filename}] Embedding failed, continuing without vectors "
+                    f"(will re-index later): {embed_err}"
+                )
+                self._reindex_failed_at[document_id] = time.time()
+                # Drop a partial index so the rebuild (which looks for documents
+                # without vectors) redoes this document completely
+                try:
+                    await qdrant_service.delete_vectors(collection_name, document_id)
+                except Exception as del_err:
+                    logger.warning(f"[{filename}] Could not clear partial vectors: {del_err}")
+            await progress.emit(document_id, "topics", 100, "Topics ready")
 
             # ── 7. Auto-build knowledge graph from all project topics ──────────
             await progress.emit(document_id, "graph", 0, "Building knowledge graph...")
             try:
                 from services.knowledge_graph_service import knowledge_graph
 
+                from services.topic_ordering import topics_in_book_order
+
+                # Includes the current doc: it is marked completed only after this step
                 docs = await async_db(
                     lambda: get_supabase_client()
                     .table("documents")
-                    .select("topics")
+                    .select("id, topics, upload_status")
                     .eq("project_id", project_id)
-                    .eq("upload_status", "completed")
+                    .in_("upload_status", ["completed", "processing"])
+                    .order("created_at")
                     .execute()
                 )
-                all_topics = []
-                for d in docs.data or []:
-                    all_topics.extend(d.get("topics") or [])
-
-                # Also include topics from the current doc (not yet marked completed)
-                current_doc = await async_db(
-                    lambda: get_supabase_client()
-                    .table("documents")
-                    .select("topics")
-                    .eq("id", document_id)
-                    .execute()
+                # Book order keeps related topics in the same LLM batch
+                all_topics = topics_in_book_order(
+                    [d for d in (docs.data or [])
+                     if d["upload_status"] == "completed" or d["id"] == document_id]
                 )
-                if current_doc.data:
-                    all_topics.extend(current_doc.data[0].get("topics") or [])
-
-                all_topics = list(set(all_topics))
                 if len(all_topics) >= 2:
                     logger.info(
                         f"Auto-building knowledge graph with {len(all_topics)} topics"
@@ -295,6 +330,38 @@ class DocumentService:
             logger.error(f"Failed to save text to storage for {document_id}: {e}")
             return None
 
+    ORIGINALS_BUCKET = "documents"
+    MAX_ORIGINAL_BYTES = 50 * 1024 * 1024  # Supabase free-tier per-file limit
+
+    async def _save_original_to_storage(
+        self, document_id: str, project_id: str, filename: str, file_path: str
+    ) -> Optional[str]:
+        """Store the uploaded PDF (originals of other types aren't viewable, so skip them)."""
+        try:
+            if not filename.lower().endswith(".pdf") or not os.path.exists(file_path):
+                return None
+            if os.path.getsize(file_path) > self.MAX_ORIGINAL_BYTES:
+                logger.info(f"[{filename}] Original too large to store; reader will show text")
+                return None
+            path = f"{project_id}/{document_id}.pdf"
+            with open(file_path, "rb") as f:
+                data = f.read()
+
+            def _upload():
+                get_supabase_client().storage.from_(self.ORIGINALS_BUCKET).upload(
+                    file=data, path=path,
+                    file_options={"content-type": "application/pdf", "upsert": "true"},
+                )
+
+            await async_db(_upload)
+            stored = f"{self.ORIGINALS_BUCKET}/{path}"
+            await async_db(lambda: self.client.table("documents").update({"file_url": stored})
+                           .eq("id", document_id).execute())
+            return stored
+        except Exception as e:
+            logger.warning(f"[{filename}] Original file not stored: {e}")
+            return None
+
     async def _update_document_text_path(self, document_id: str, path: str):
         """Update text_storage_path in the documents record."""
         try:
@@ -358,7 +425,8 @@ class DocumentService:
             logger.warning(f"Failed to clean up temp file {file_path}: {e}")
 
     async def _process_embeddings_direct(
-        self, chunks: List[str], document_id: str, filename: str, collection_name: str
+        self, chunks: List[str], document_id: str, filename: str, collection_name: str,
+        heartbeat: bool = False,
     ):
         """
         Process embeddings using GLOBAL concurrency limits (shared across all docs).
@@ -382,13 +450,22 @@ class DocumentService:
         )
 
         completed = [0]
+        embed_beat = [time.monotonic()]
         failed_batches = []
+        # A rejected key or bad config fails every batch: stop after the first
+        fatal = []
 
         async def process_batch(batch_idx: int, start_index: int, batch_data: List[str]):
             retries = 6
             for attempt in range(retries):
+                if fatal:
+                    failed_batches.append(batch_idx)
+                    return
                 try:
                     async with embed_semaphore:
+                        if fatal:  # another batch hit a fatal error while we waited
+                            failed_batches.append(batch_idx)
+                            return
                         batch_embeddings = await embedding_service.generate_embeddings(
                             batch_data
                         )
@@ -417,6 +494,12 @@ class DocumentService:
                         document_id, "embedding", pct,
                         f"Batch {completed[0]}/{total_batches}"
                     )
+                    # Heartbeat (bumps updated_at) so the app can tell slow from stopped
+                    if heartbeat and time.monotonic() - embed_beat[0] >= 30:
+                        embed_beat[0] = time.monotonic()
+                        await self._update_document_status(
+                            document_id, "embedding", f"Learning part {completed[0]}/{total_batches}"
+                        )
 
                     if completed[0] % 5 == 0 or completed[0] == total_batches:
                         logger.info(
@@ -446,9 +529,11 @@ class DocumentService:
                         continue
 
                     logger.error(f"[{filename}] Batch {batch_idx + 1} failed: {e}")
-                    if attempt == retries - 1:
-                        failed_batches.append(batch_idx)
-                        return  # Let other batches complete
+                    if any(x in error_str for x in ["401", "402", "403", "invalid api key", "api key not valid", "invalid_api_key", "404", "credits are depleted", "insufficient_quota"]):
+                        fatal.append(e)
+                    # Non-retryable, or out of retries: give up on this batch
+                    failed_batches.append(batch_idx)
+                    return  # Let other batches complete
 
         tasks = [
             process_batch(idx, start_idx, batch)
@@ -462,6 +547,145 @@ class DocumentService:
             raise Exception(error_msg)
         else:
             logger.info(f"[{filename}] Embedding completed: {total_batches} batches")
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Index self-healing
+    # ──────────────────────────────────────────────────────────────────────────
+
+    # Document IDs currently being re-indexed (prevents duplicate background jobs)
+    _reindexing: set = set()
+    # Strong refs to background tasks so they aren't garbage-collected mid-run
+    _background_tasks: set = set()
+    # document_id -> time of last failed re-index (avoid retrying on every request)
+    _reindex_failed_at: dict = {}
+    REINDEX_RETRY_SECONDS = 600
+
+    async def load_stored_text(self, document: Dict[str, Any]) -> Optional[str]:
+        """Download a document's extracted text from the texts/ bucket."""
+        path = document.get("text_storage_path") or (
+            f"{document['project_id']}/{document['id']}.txt"
+            if document.get("project_id") else None
+        )
+        if not path:
+            return None
+        try:
+            text_bytes = await async_db(
+                lambda: self.client.storage.from_(
+                    settings.BOOK_IMPORT_TEXTS_BUCKET
+                ).download(path)
+            )
+            return text_bytes.decode("utf-8") if text_bytes else None
+        except Exception as e:
+            logger.warning(f"Could not load stored text for {document.get('id')}: {e}")
+            return None
+
+    async def ensure_project_indexed(self, project_id: str) -> List[str]:
+        """
+        Find "completed" documents that have no vectors in Qdrant (e.g. the
+        collection was wiped or the vector DB was replaced) and re-embed them
+        in the background from their stored text.
+
+        Returns the IDs of documents being re-indexed.
+        """
+        collection_name = f"project_{project_id}"
+        docs = await async_db(
+            lambda: self.client.table("documents")
+            .select("id, project_id, filename, text_storage_path")
+            .eq("project_id", project_id)
+            .eq("upload_status", "completed")
+            .execute()
+        )
+
+        import time
+
+        reindexing = []
+        for doc in docs.data or []:
+            if doc["id"] in self._reindexing:
+                reindexing.append(doc["id"])
+                continue
+            failed_at = self._reindex_failed_at.get(doc["id"])
+            if failed_at and time.time() - failed_at < self.REINDEX_RETRY_SECONDS:
+                continue
+            try:
+                count = await qdrant_service.count_document_vectors(
+                    collection_name, doc["id"]
+                )
+            except Exception as e:
+                logger.warning(f"Vector count failed for {doc['id']}: {e}")
+                continue
+            if count > 0:
+                continue
+
+            logger.warning(
+                f"[Reindex] Document {doc['filename']} ({doc['id']}) is marked "
+                f"completed but has no vectors in {collection_name} — re-indexing"
+            )
+            self._reindexing.add(doc["id"])
+            reindexing.append(doc["id"])
+            task = asyncio.create_task(self._reindex_from_storage(doc))
+            self._background_tasks.add(task)
+            task.add_done_callback(self._background_tasks.discard)
+
+        return reindexing
+
+    async def _reindex_from_storage(self, document: Dict[str, Any]):
+        """
+        Re-chunk and re-embed a document from its stored text.
+
+        Deliberately does NOT change upload_status: the document stays usable
+        (search falls back to its stored text meanwhile), and environments that
+        share one database but use separate vector stores (e.g. a test
+        deployment) never flip production documents to processing/failed.
+        """
+        document_id = document["id"]
+        project_id = document["project_id"]
+        filename = document["filename"]
+        progress = get_progress_manager()
+
+        try:
+            text = await self.load_stored_text(document)
+            if not text:
+                logger.error(
+                    f"[Reindex] {filename} ({document_id}) has no vectors and no stored "
+                    "text — it must be re-uploaded to be searchable here"
+                )
+                return
+
+            async with EmbeddingQueue.get_doc_semaphore():
+                loop = asyncio.get_running_loop()
+                chunks = await loop.run_in_executor(
+                    None, lambda: self.text_chunker.chunk_text(text)
+                )
+                if not chunks:
+                    logger.error(f"[Reindex] No chunks generated for {filename}")
+                    return
+
+                collection_name = f"project_{project_id}"
+                await qdrant_service.create_collection(collection_name)
+                # Drop any partial vectors so we don't duplicate chunks
+                await qdrant_service.delete_vectors(collection_name, document_id)
+                await progress.emit(
+                    document_id, "embedding", 0,
+                    f"Re-indexing {len(chunks)} chunks..."
+                )
+                await self._process_embeddings_direct(
+                    chunks, document_id, filename, collection_name
+                )
+
+            await progress.emit(document_id, "completed", 100, "Document re-indexed")
+            logger.info(f"[Reindex] {filename} re-indexed ({len(chunks)} chunks)")
+            self._reindex_failed_at.pop(document_id, None)
+
+        except Exception as e:
+            import time
+
+            self._reindex_failed_at[document_id] = time.time()
+            logger.error(
+                f"[Reindex] Failed for {filename}: {e} — will retry after "
+                f"{self.REINDEX_RETRY_SECONDS // 60} minutes"
+            )
+        finally:
+            self._reindexing.discard(document_id)
 
     # ──────────────────────────────────────────────────────────────────────────
     # Database helpers
@@ -494,9 +718,17 @@ class DocumentService:
             collection_name = f"project_{project_id}"
             await qdrant_service.delete_vectors(collection_name, document_id)
 
-            # Delete extracted text from texts/ bucket
+            # Delete extracted text from texts/ bucket, unless class copies of
+            # this book (other documents) still read it
             try:
                 text_storage_path = f"{project_id}/{document_id}.txt"
+                still_used = await async_db(
+                    lambda: self.client.table("documents").select("id")
+                    .eq("text_storage_path", text_storage_path).neq("id", document_id)
+                    .limit(1).execute()
+                )
+                if still_used.data:
+                    raise RuntimeError("text still used by class copies; kept")
 
                 def _delete_text():
                     self.client.storage.from_(

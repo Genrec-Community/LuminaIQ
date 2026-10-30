@@ -1,5 +1,5 @@
 from typing import List, Optional, Dict, Any
-from db.client import get_supabase_client
+from db.client import get_supabase_client, async_db
 from utils.logger import logger
 from services.rag_service import rag_service
 from services.llm_service import llm_service
@@ -14,30 +14,30 @@ class FlashcardService:
         """Get all flashcard sets for a project with card counts"""
         try:
             # Get flashcard sets
-            response = self.supabase.table('flashcard_sets') \
+            response = (await async_db(lambda: self.supabase.table('flashcard_sets') \
                 .select('*') \
                 .eq('user_id', user_id) \
                 .eq('project_id', project_id) \
                 .order('created_at', desc=True) \
-                .execute()
+                .execute()))
             
             sets = response.data or []
             
             # Get card counts and cards for each set
             for flashcard_set in sets:
-                cards_response = self.supabase.table('flashcards') \
+                cards_response = (await async_db(lambda: self.supabase.table('flashcards') \
                     .select('id', count='exact') \
                     .eq('set_id', flashcard_set['id']) \
-                    .execute()
+                    .execute()))
                 
                 flashcard_set['card_count'] = cards_response.count or 0
                 
                 # Get cards for the set
-                cards_data = self.supabase.table('flashcards') \
+                cards_data = (await async_db(lambda: self.supabase.table('flashcards') \
                     .select('*') \
                     .eq('set_id', flashcard_set['id']) \
                     .order('position') \
-                    .execute()
+                    .execute()))
                 
                 flashcard_set['cards'] = cards_data.data or []
             
@@ -67,9 +67,9 @@ class FlashcardService:
                 'description': description
             }
             
-            set_response = self.supabase.table('flashcard_sets') \
+            set_response = (await async_db(lambda: self.supabase.table('flashcard_sets') \
                 .insert(set_data) \
-                .execute()
+                .execute()))
             
             if not set_response.data:
                 raise Exception("Failed to create flashcard set")
@@ -89,9 +89,9 @@ class FlashcardService:
                     for idx, card in enumerate(cards)
                 ]
                 
-                cards_response = self.supabase.table('flashcards') \
+                cards_response = (await async_db(lambda: self.supabase.table('flashcards') \
                     .insert(cards_data) \
-                    .execute()
+                    .execute()))
                 
                 flashcard_set['cards'] = cards_response.data or []
                 flashcard_set['card_count'] = len(flashcard_set['cards'])
@@ -114,11 +114,11 @@ class FlashcardService:
     ) -> Dict[str, Any]:
         """Update a flashcard set"""
         try:
-            response = self.supabase.table('flashcard_sets') \
+            response = (await async_db(lambda: self.supabase.table('flashcard_sets') \
                 .update(updates) \
                 .eq('id', set_id) \
                 .eq('user_id', user_id) \
-                .execute()
+                .execute()))
             
             if not response.data:
                 raise Exception("Flashcard set not found or unauthorized")
@@ -132,11 +132,11 @@ class FlashcardService:
     async def delete_flashcard_set(self, user_id: str, set_id: str):
         """Delete a flashcard set (cards will be deleted via CASCADE)"""
         try:
-            response = self.supabase.table('flashcard_sets') \
+            response = (await async_db(lambda: self.supabase.table('flashcard_sets') \
                 .delete() \
                 .eq('id', set_id) \
                 .eq('user_id', user_id) \
-                .execute()
+                .execute()))
             
             if not response.data:
                 raise Exception("Flashcard set not found or unauthorized")
@@ -151,21 +151,21 @@ class FlashcardService:
         """Get all flashcards in a set"""
         try:
             # Verify ownership
-            set_response = self.supabase.table('flashcard_sets') \
+            set_response = (await async_db(lambda: self.supabase.table('flashcard_sets') \
                 .select('id') \
                 .eq('id', set_id) \
                 .eq('user_id', user_id) \
-                .execute()
+                .execute()))
             
             if not set_response.data:
                 raise Exception("Flashcard set not found or unauthorized")
             
             # Get cards
-            response = self.supabase.table('flashcards') \
+            response = (await async_db(lambda: self.supabase.table('flashcards') \
                 .select('*') \
                 .eq('set_id', set_id) \
                 .order('position') \
-                .execute()
+                .execute()))
             
             return response.data or []
         
@@ -221,7 +221,8 @@ Generate exactly {num_cards} high-quality flashcards. Return ONLY the JSON array
             response = await llm_service.chat_completion(
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.7,
-                max_tokens=6000
+                max_tokens=6000,
+                light=True
             )
             
             # Parse the response to extract flashcards

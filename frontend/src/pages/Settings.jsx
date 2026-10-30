@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
+    Crown,
     Settings as SettingsIcon,
     BookOpen,
     Moon,
@@ -27,11 +28,18 @@ import {
     Eye,
     Zap,
     Trophy,
-    Type
+    Type,
+    KeyRound
 } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
+import PlanUsage from '../components/PlanUsage';
+import ChangePasswordForm from '../components/ChangePasswordForm';
+import DeleteAccountForm from '../components/DeleteAccountForm';
 import { useGamification } from '../context/GamificationContext';
 import { useAuth } from '../context/AuthContext';
+import { AI_CHARACTERS, USER_AVATARS, AI_AVATARS, AGE_GROUPS, getCharacter, displayName } from '../utils/persona';
+import { onboardedKey } from '../components/Onboarding';
+import { THEMES, FONT_STYLES, ACCENT_PRESETS, resolveThemeId } from '../utils/themes';
 
 /**
  * TextInput — MUST be defined at module level (outside Settings component).
@@ -77,11 +85,11 @@ const TextInput = ({ value, onChange, label, description, icon: Icon, placeholde
         <div className="p-4 bg-white rounded-2xl border border-[#E6D5CC]/80">
             <div className="flex items-center gap-3.5 mb-3">
                 <div className="h-10 w-10 bg-[#FDF6F0] rounded-xl flex items-center justify-center shrink-0">
-                    <Icon className="h-5 w-5 text-[#C8A288]" />
+                    <Icon className="h-5 w-5 text-[#1E5C42]" />
                 </div>
                 <div className="min-w-0">
-                    <p className="font-semibold text-[#4A3B32] text-sm">{label}</p>
-                    <p className="text-xs text-[#8a6a5c] mt-0.5">{description}</p>
+                    <p className="font-semibold text-[#163628] text-sm">{label}</p>
+                    <p className="text-xs text-[#5E5046] mt-0.5">{description}</p>
                 </div>
             </div>
             <input
@@ -93,7 +101,7 @@ const TextInput = ({ value, onChange, label, description, icon: Icon, placeholde
                 placeholder={placeholder}
                 autoComplete="off"
                 spellCheck={false}
-                className="w-full px-4 py-2.5 bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl focus:ring-2 focus:ring-[#C8A288] focus:border-transparent outline-none text-[#4A3B32] font-medium text-sm placeholder-[#8a6a5c]/40 transition-shadow"
+                className="w-full px-4 py-2.5 bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl focus:ring-2 focus:ring-[#1E5C42] focus:border-transparent outline-none text-[#163628] font-medium text-sm placeholder-[#5E5046]/40 transition-shadow"
             />
         </div>
     );
@@ -101,40 +109,45 @@ const TextInput = ({ value, onChange, label, description, icon: Icon, placeholde
 
 const Settings = () => {
     const navigate = useNavigate();
-    const { settings, updateSetting, resetSettings } = useSettings();
+    const { settings, updateSetting, updateSettings, resetSettings } = useSettings();
     const { data: gamificationData } = useGamification();
     const { user } = useAuth();
-    const [activeSection, setActiveSection] = useState('profile');
+    const [searchParams] = useSearchParams();
+    const [activeSection, setActiveSection] = useState(searchParams.get('section') || 'profile');
 
     const isDark = settings?.darkMode ?? false;
 
     // Shorthand theme tokens used throughout this page
-    const bg     = isDark ? '#1c1814' : '#FDF6F0';
-    const paper  = isDark ? '#252018' : '#FFFFFF';
-    const border  = isDark ? '#3d3028' : '#E6D5CC';
-    const muted   = isDark ? '#8a7060' : '#8a6a5c';
-    const heading = isDark ? '#e8e2dc' : '#4A3B32';
-    const inputBg = isDark ? '#1e1a16' : '#FDF6F0';
+    // Theme-aware (see utils/themes.js); fallbacks are the classic palette
+    const bg     = isDark ? 'var(--dm-bg, #0F1D16)' : 'var(--th-bg, #FDF6F0)';
+    const paper  = isDark ? 'var(--dm-surface, #182C21)' : 'var(--th-surface, #FFFFFF)';
+    const border  = isDark ? 'var(--dm-border-strong, #293E34)' : 'var(--th-border, #E6D5CC)';
+    const muted   = isDark ? 'var(--dm-text-secondary, #8a7060)' : 'var(--th-muted, #5E5046)';
+    const heading = isDark ? 'var(--dm-text-primary, #e8e2dc)' : 'var(--th-text, #163628)';
+    const inputBg = isDark ? 'var(--dm-surface-elevated, #161F1B)' : 'var(--th-alt, #FDF6F0)';
 
 
     const sections = [
         { id: 'profile', label: 'Profile', icon: User },
+        { id: 'companion', label: 'AI Buddy', icon: Sparkles },
         { id: 'study', label: 'Study', icon: Layers },
         { id: 'focus', label: 'Focus', icon: Maximize2 },
         { id: 'ai', label: 'AI & Quiz', icon: Brain },
         { id: 'appearance', label: 'Display', icon: Sun },
         { id: 'notifications', label: 'Alerts', icon: Bell },
+        { id: 'plan', label: 'Plan', icon: Crown },
+        { id: 'account', label: 'Account', icon: KeyRound },
     ];
 
     // --- Reusable Components ---
 
     const ToggleSwitch = ({ enabled, onChange, label, description, icon: Icon, comingSoon = false }) => (
-        <div className={`flex items-center justify-between p-4 rounded-2xl border hover:border-[#C8A288]/50 transition-all group ${comingSoon ? 'opacity-70' : ''}`}
+        <div className={`flex items-center justify-between p-4 rounded-2xl border hover:border-[#1E5C42]/50 transition-all group ${comingSoon ? 'opacity-70' : ''}`}
             style={{ background: paper, borderColor: border }}>
             <div className="flex items-center gap-3.5 min-w-0">
-                <div className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0 group-hover:bg-[#C8A288]/10 transition-colors"
+                <div className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0 group-hover:bg-[#1E5C42]/10 transition-colors"
                     style={{ background: inputBg }}>
-                    <Icon className="h-5 w-5 text-[#C8A288]" />
+                    <Icon className="h-5 w-5 text-[#1E5C42]" />
                 </div>
                 <div className="min-w-0">
                     <div className="flex items-center gap-2">
@@ -151,13 +164,13 @@ const Settings = () => {
                 disabled={comingSoon}
                 className={`relative w-12 h-7 rounded-full transition-all shrink-0 ml-3 ${
                     comingSoon ? 'bg-gray-200 cursor-not-allowed' :
-                    enabled ? 'bg-[#C8A288] shadow-inner' : 'bg-[#E6D5CC]'
+                    enabled ? 'bg-[#1E5C42] shadow-inner' : 'bg-[#E6D5CC]'
                 }`}
             >
                 <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-transform ${
                     enabled && !comingSoon ? 'translate-x-[22px]' : 'translate-x-0.5'
                 }`}>
-                    {enabled && !comingSoon && <Check className="h-3.5 w-3.5 text-[#C8A288] m-[5px]" />}
+                    {enabled && !comingSoon && <Check className="h-3.5 w-3.5 text-[#1E5C42] m-[5px]" />}
                 </div>
             </button>
         </div>
@@ -168,7 +181,7 @@ const Settings = () => {
         <div className="p-4 rounded-2xl border" style={{ background: paper, borderColor: border }}>
             <div className="flex items-center gap-3.5 mb-3">
                 <div className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: inputBg }}>
-                    <Icon className="h-5 w-5 text-[#C8A288]" />
+                    <Icon className="h-5 w-5 text-[#1E5C42]" />
                 </div>
                 <div>
                     <p className="font-semibold text-sm" style={{ color: heading }}>{label}</p>
@@ -178,7 +191,7 @@ const Settings = () => {
             <select
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl focus:ring-2 focus:ring-[#C8A288] focus:border-transparent outline-none font-medium text-sm cursor-pointer border"
+                className="w-full px-4 py-2.5 rounded-xl focus:ring-2 focus:ring-[#1E5C42] focus:border-transparent outline-none font-medium text-sm cursor-pointer border"
                 style={{ background: inputBg, color: heading, borderColor: border }}
             >
                 {options.map(opt => (
@@ -193,7 +206,7 @@ const Settings = () => {
         <div className="p-4 rounded-2xl border" style={{ background: paper, borderColor: border }}>
             <div className="flex items-center gap-3.5">
                 <div className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: inputBg }}>
-                    <Icon className="h-5 w-5 text-[#C8A288]" />
+                    <Icon className="h-5 w-5 text-[#1E5C42]" />
                 </div>
                 <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm" style={{ color: heading }}>{label}</p>
@@ -223,7 +236,7 @@ const Settings = () => {
 
     const SectionHeader = ({ icon: Icon, title, subtitle }) => (
         <div className="flex items-center gap-3 mb-5">
-            <div className="h-9 w-9 bg-gradient-to-br from-[#C8A288] to-[#A08072] rounded-xl flex items-center justify-center shadow-sm">
+            <div className="h-9 w-9 bg-gradient-to-br from-[#1E5C42] to-[#163628] rounded-xl flex items-center justify-center shadow-sm">
                 <Icon className="h-4.5 w-4.5 text-white" />
             </div>
             <div>
@@ -241,20 +254,16 @@ const Settings = () => {
             <SectionHeader icon={User} title="Student Profile" subtitle="Personalize your learning experience" />
 
             {/* Profile Card */}
-            <div className="bg-gradient-to-br from-[#C8A288] via-[#B08B72] to-[#8a6a5c] rounded-2xl p-5 text-white relative overflow-hidden">
+            <div className="bg-gradient-to-br from-[#1E5C42] via-[#163628] to-[#5E5046] rounded-2xl p-5 text-white relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
                 <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
                 <div className="relative z-10 flex items-center gap-4">
                     <div className="h-14 w-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/30 shadow-lg shrink-0">
-                        {settings.studentName ? (
-                            <span className="text-xl font-black">{settings.studentName.charAt(0).toUpperCase()}</span>
-                        ) : (
-                            <User className="h-6 w-6" />
-                        )}
+                        <span className="text-3xl">{settings.userAvatar || '🦊'}</span>
                     </div>
                     <div className="flex-1 min-w-0">
                         <p className="text-base font-bold truncate">
-                            {settings.studentName || 'Set your name below'}
+                            {settings.studentName || 'Set your name below'}{settings.nickname ? ` · "${settings.nickname}"` : ''}
                         </p>
                         <p className="text-white/70 text-xs font-medium mt-0.5">
                             {gamificationData ? `Level ${gamificationData.level} — ${gamificationData.level_title}` : 'Getting started...'}
@@ -281,6 +290,48 @@ const Settings = () => {
                     icon={Pencil}
                     placeholder="Enter your name..."
                 />
+                <TextInput
+                    value={settings.nickname}
+                    onChange={(v) => updateSetting('nickname', v)}
+                    label="Nickname"
+                    description="What your AI buddy calls you"
+                    icon={Sparkles}
+                    placeholder="e.g. Captain, Doc, Pri..."
+                />
+                <ChoiceGrid label="Your Avatar" value={settings.userAvatar || '🦊'} options={USER_AVATARS} onPick={(v) => updateSetting('userAvatar', v)} />
+                <SelectOption
+                    value={settings.ageGroup || ''}
+                    onChange={(v) => updateSetting('ageGroup', v)}
+                    label="About You"
+                    description="Your AI adapts its language to you"
+                    icon={User}
+                    options={[{ value: '', label: 'Prefer not to say' }, ...Object.entries(AGE_GROUPS).map(([value, g]) => ({ value, label: g.label }))]}
+                />
+                <TextInput
+                    value={settings.examName}
+                    onChange={(v) => updateSetting('examName', v)}
+                    label="Upcoming Exam"
+                    description="Shown in your countdown and used to focus answers"
+                    icon={Trophy}
+                    placeholder="e.g. Class 12 Boards, NEET, AWS cert"
+                />
+                <div className="flex items-center justify-between gap-4 p-4 bg-white rounded-2xl border border-[#E6D5CC]/80">
+                    <div className="flex items-center gap-3.5">
+                        <div className="h-10 w-10 bg-[#FDF6F0] rounded-xl flex items-center justify-center shrink-0">
+                            <Clock className="h-5 w-5 text-[#1E5C42]" />
+                        </div>
+                        <div>
+                            <p className="font-semibold text-[#163628] text-sm">Exam Date</p>
+                            <p className="text-xs text-[#5E5046] mt-0.5">We'll count down the days</p>
+                        </div>
+                    </div>
+                    <input
+                        type="date"
+                        value={settings.examDate || ''}
+                        onChange={(e) => updateSetting('examDate', e.target.value)}
+                        className="px-3 py-2 bg-[#FDF6F0] border border-[#E6D5CC] rounded-xl text-sm text-[#163628] outline-none focus:ring-2 focus:ring-[#1E5C42]"
+                    />
+                </div>
                 <TextInput
                     value={settings.learningGoal}
                     onChange={(v) => updateSetting('learningGoal', v)}
@@ -329,11 +380,11 @@ const Settings = () => {
                 <div className="p-4 bg-white rounded-2xl border border-[#E6D5CC]/80">
                     <div className="flex items-center gap-3.5 mb-3">
                         <div className="h-10 w-10 bg-[#FDF6F0] rounded-xl flex items-center justify-center shrink-0">
-                            <BookMarked className="h-5 w-5 text-[#C8A288]" />
+                            <BookMarked className="h-5 w-5 text-[#1E5C42]" />
                         </div>
                         <div>
-                            <p className="font-semibold text-[#4A3B32] text-sm">Subjects of Interest</p>
-                            <p className="text-xs text-[#8a6a5c] mt-0.5">Select topics you're interested in</p>
+                            <p className="font-semibold text-[#163628] text-sm">Subjects of Interest</p>
+                            <p className="text-xs text-[#5E5046] mt-0.5">Select topics you're interested in</p>
                         </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -351,8 +402,8 @@ const Settings = () => {
                                     }}
                                     className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                                         selected
-                                            ? 'bg-[#C8A288] text-white shadow-sm'
-                                            : 'bg-[#FDF6F0] text-[#8a6a5c] border border-[#E6D5CC] hover:border-[#C8A288] hover:text-[#4A3B32]'
+                                            ? 'bg-[#1E5C42] text-white shadow-sm'
+                                            : 'bg-[#FDF6F0] text-[#5E5046] border border-[#E6D5CC] hover:border-[#1E5C42] hover:text-[#163628]'
                                     }`}
                                 >
                                     {selected && <Check className="h-3 w-3 inline mr-1 -mt-0.5" />}
@@ -366,6 +417,102 @@ const Settings = () => {
         </div>
     );
 
+    const ChoiceGrid = ({ label, value, options, onPick }) => (
+        <div className="p-4 bg-white rounded-2xl border border-[#E6D5CC]/80">
+            <p className="font-semibold text-[#163628] text-sm mb-3">{label}</p>
+            <div className="flex flex-wrap gap-2">
+                {options.map(o => (
+                    <button
+                        key={o}
+                        onClick={() => onPick(o)}
+                        className={`h-10 w-10 text-xl rounded-xl border-2 transition-all active:scale-90 ${value === o ? 'border-[#1E5C42] bg-[#1E5C42]/10' : 'border-[#E6D5CC] hover:border-[#1E5C42]/60'}`}
+                    >
+                        {o}
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+
+    const renderCompanion = () => {
+        const character = getCharacter(settings.aiCharacter);
+        const aiDisplay = settings.aiName?.trim() || 'Lumi';
+        return (
+            <div className="space-y-5">
+                <SectionHeader icon={Sparkles} title="Your AI Study Buddy" subtitle="Name it, pick a personality, make it yours" />
+
+                <div className="flex items-start gap-4 p-5 rounded-2xl bg-gradient-to-br from-[#1E5C42] via-[#163628] to-[#5E5046] text-white">
+                    <div className="h-14 w-14 shrink-0 rounded-2xl bg-white/20 border border-white/30 flex items-center justify-center text-3xl">{settings.aiAvatar || '✨'}</div>
+                    <div>
+                        <p className="font-bold">{aiDisplay} <span className="text-white/70 font-medium text-xs">· {character.label}</span></p>
+                        <p className="text-sm text-white/90 mt-1">{character.greet(displayName(settings, user))}</p>
+                    </div>
+                </div>
+
+                <div className="space-y-3">
+                    <TextInput
+                        value={settings.aiName}
+                        onChange={(v) => updateSetting('aiName', v.slice(0, 24))}
+                        label="Buddy's Name"
+                        description="Shown in chat, Power Hour and your dashboard"
+                        icon={Pencil}
+                        placeholder="Lumi"
+                    />
+                    <ChoiceGrid label="Buddy's Avatar" value={settings.aiAvatar || '✨'} options={AI_AVATARS} onPick={(v) => updateSetting('aiAvatar', v)} />
+
+                    <div className="p-4 bg-white rounded-2xl border border-[#E6D5CC]/80">
+                        <p className="font-semibold text-[#163628] text-sm mb-3">Personality</p>
+                        <div className="grid sm:grid-cols-2 gap-2">
+                            {Object.entries(AI_CHARACTERS).map(([k, c]) => (
+                                <button
+                                    key={k}
+                                    onClick={() => updateSetting('aiCharacter', k)}
+                                    className={`flex items-start gap-3 p-3 rounded-xl border-2 text-left transition-all ${settings.aiCharacter === k ? 'border-[#1E5C42] bg-[#1E5C42]/10' : 'border-[#E6D5CC] hover:border-[#1E5C42]/60'}`}
+                                >
+                                    <span className="text-2xl">{c.emoji}</span>
+                                    <span>
+                                        <span className="block text-sm font-semibold text-[#163628]">{c.label}</span>
+                                        <span className="block text-xs text-[#5E5046]">{c.tagline}</span>
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <SelectOption
+                        value={settings.aiHumor || 'some'}
+                        onChange={(v) => updateSetting('aiHumor', v)}
+                        label="Humour"
+                        description="How playful should your buddy be?"
+                        icon={Sparkles}
+                        options={[
+                            { value: 'none', label: 'Strictly serious' },
+                            { value: 'some', label: 'A little fun' },
+                            { value: 'lots', label: 'Lots of jokes & mnemonics' },
+                        ]}
+                    />
+                    <ToggleSwitch
+                        enabled={settings.aiEmoji !== false}
+                        onChange={(v) => updateSetting('aiEmoji', v)}
+                        label="Use Emojis"
+                        description="Let your buddy sprinkle emojis in replies"
+                        icon={Sparkles}
+                    />
+                    <button
+                        onClick={() => {
+                            try { localStorage.removeItem(onboardedKey(user?.id)); } catch { /* ignore */ }
+                            updateSetting('onboardingComplete', false);
+                            navigate('/dashboard');
+                        }}
+                        className="w-full p-3 rounded-2xl border-2 border-dashed border-[#E6D5CC] text-sm font-semibold text-[#5E5046] hover:border-[#1E5C42] hover:text-[#163628] transition-colors"
+                    >
+                        ✨ Replay the welcome setup
+                    </button>
+                </div>
+            </div>
+        );
+    };
+
     const renderStudy = () => (
         <div className="space-y-5">
             <SectionHeader icon={Layers} title="Study Settings" subtitle="Configure how you learn" />
@@ -373,21 +520,21 @@ const Settings = () => {
             {/* Book Isolation - Featured Card */}
             <div className={`p-5 rounded-2xl border-2 transition-all ${
                 settings.bookIsolation 
-                    ? 'bg-[#C8A288]/5 border-[#C8A288]/60' 
+                    ? 'bg-[#1E5C42]/5 border-[#1E5C42]/60' 
                     : 'bg-white border-[#E6D5CC]'
             }`}>
                 <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3.5">
                         <div className={`h-11 w-11 rounded-xl flex items-center justify-center shrink-0 ${
-                            settings.bookIsolation ? 'bg-[#C8A288]' : 'bg-[#FDF6F0]'
+                            settings.bookIsolation ? 'bg-[#1E5C42]' : 'bg-[#FDF6F0]'
                         }`}>
                             <BookOpen className={`h-5 w-5 ${
-                                settings.bookIsolation ? 'text-white' : 'text-[#C8A288]'
+                                settings.bookIsolation ? 'text-white' : 'text-[#1E5C42]'
                             }`} />
                         </div>
                         <div>
-                            <p className="font-bold text-[#4A3B32]">Book-Level Isolation</p>
-                            <p className="text-xs text-[#8a6a5c] mt-0.5 max-w-sm leading-relaxed">
+                            <p className="font-bold text-[#163628]">Book-Level Isolation</p>
+                            <p className="text-xs text-[#5E5046] mt-0.5 max-w-sm leading-relaxed">
                                 Track progress, analytics, and paths separately per document
                             </p>
                         </div>
@@ -395,13 +542,13 @@ const Settings = () => {
                     <button
                         onClick={() => updateSetting('bookIsolation', !settings.bookIsolation)}
                         className={`relative w-12 h-7 rounded-full transition-all shrink-0 ${
-                            settings.bookIsolation ? 'bg-[#C8A288]' : 'bg-[#E6D5CC]'
+                            settings.bookIsolation ? 'bg-[#1E5C42]' : 'bg-[#E6D5CC]'
                         }`}
                     >
                         <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-transform ${
                             settings.bookIsolation ? 'translate-x-[22px]' : 'translate-x-0.5'
                         }`}>
-                            {settings.bookIsolation && <Check className="h-3.5 w-3.5 text-[#C8A288] m-[5px]" />}
+                            {settings.bookIsolation && <Check className="h-3.5 w-3.5 text-[#1E5C42] m-[5px]" />}
                         </div>
                     </button>
                 </div>
@@ -410,8 +557,8 @@ const Settings = () => {
             {/* Pomodoro Settings */}
             <div className="pt-2">
                 <div className="flex items-center gap-2 mb-3">
-                    <Timer className="h-4 w-4 text-[#C8A288]" />
-                    <p className="text-sm font-bold text-[#4A3B32]">Pomodoro Timer</p>
+                    <Timer className="h-4 w-4 text-[#1E5C42]" />
+                    <p className="text-sm font-bold text-[#163628]">Pomodoro Timer</p>
                 </div>
                 <div className="space-y-3">
                     <NumberInput
@@ -481,8 +628,8 @@ const Settings = () => {
                                 <Eye className="h-3.5 w-3.5 text-emerald-600" />
                             </div>
                             <div>
-                                <p className="text-sm font-semibold text-[#4A3B32]">Hides all sidebars</p>
-                                <p className="text-xs text-[#8a6a5c] mt-0.5">Navigation, documents panel, and header are hidden to maximize reading area</p>
+                                <p className="text-sm font-semibold text-[#163628]">Hides all sidebars</p>
+                                <p className="text-xs text-[#5E5046] mt-0.5">Navigation, documents panel, and header are hidden to maximize reading area</p>
                             </div>
                         </div>
                         <div className="flex items-start gap-3">
@@ -490,19 +637,19 @@ const Settings = () => {
                                 <Keyboard className="h-3.5 w-3.5 text-emerald-600" />
                             </div>
                             <div>
-                                <p className="text-sm font-semibold text-[#4A3B32]">Keyboard shortcuts</p>
+                                <p className="text-sm font-semibold text-[#163628]">Keyboard shortcuts</p>
                                 <div className="flex flex-wrap gap-2 mt-1.5">
                                     <div className="flex items-center gap-1">
-                                        <kbd className="px-2 py-0.5 bg-[#FDF6F0] border border-[#E6D5CC] rounded text-[10px] font-mono font-bold text-[#4A3B32]">Ctrl</kbd>
-                                        <span className="text-[10px] text-[#8a6a5c]">+</span>
-                                        <kbd className="px-2 py-0.5 bg-[#FDF6F0] border border-[#E6D5CC] rounded text-[10px] font-mono font-bold text-[#4A3B32]">Shift</kbd>
-                                        <span className="text-[10px] text-[#8a6a5c]">+</span>
-                                        <kbd className="px-2 py-0.5 bg-[#FDF6F0] border border-[#E6D5CC] rounded text-[10px] font-mono font-bold text-[#4A3B32]">Z</kbd>
-                                        <span className="text-xs text-[#8a6a5c] ml-1">Toggle</span>
+                                        <kbd className="px-2 py-0.5 bg-[#FDF6F0] border border-[#E6D5CC] rounded text-[10px] font-mono font-bold text-[#163628]">Ctrl</kbd>
+                                        <span className="text-[10px] text-[#5E5046]">+</span>
+                                        <kbd className="px-2 py-0.5 bg-[#FDF6F0] border border-[#E6D5CC] rounded text-[10px] font-mono font-bold text-[#163628]">Shift</kbd>
+                                        <span className="text-[10px] text-[#5E5046]">+</span>
+                                        <kbd className="px-2 py-0.5 bg-[#FDF6F0] border border-[#E6D5CC] rounded text-[10px] font-mono font-bold text-[#163628]">Z</kbd>
+                                        <span className="text-xs text-[#5E5046] ml-1">Toggle</span>
                                     </div>
                                     <div className="flex items-center gap-1">
-                                        <kbd className="px-2 py-0.5 bg-[#FDF6F0] border border-[#E6D5CC] rounded text-[10px] font-mono font-bold text-[#4A3B32]">Esc</kbd>
-                                        <span className="text-xs text-[#8a6a5c] ml-1">Exit</span>
+                                        <kbd className="px-2 py-0.5 bg-[#FDF6F0] border border-[#E6D5CC] rounded text-[10px] font-mono font-bold text-[#163628]">Esc</kbd>
+                                        <span className="text-xs text-[#5E5046] ml-1">Exit</span>
                                     </div>
                                 </div>
                             </div>
@@ -512,8 +659,8 @@ const Settings = () => {
                                 <Maximize2 className="h-3.5 w-3.5 text-emerald-600" />
                             </div>
                             <div>
-                                <p className="text-sm font-semibold text-[#4A3B32]">Quick access</p>
-                                <p className="text-xs text-[#8a6a5c] mt-0.5">Click the expand icon in the header toolbar to enter focus mode instantly</p>
+                                <p className="text-sm font-semibold text-[#163628]">Quick access</p>
+                                <p className="text-xs text-[#5E5046] mt-0.5">Click the expand icon in the header toolbar to enter focus mode instantly</p>
                             </div>
                         </div>
                     </div>
@@ -524,11 +671,11 @@ const Settings = () => {
             <div className="p-4 bg-white rounded-2xl border border-[#E6D5CC]/80">
                 <div className="flex items-center gap-3.5 mb-3">
                     <div className="h-10 w-10 bg-[#FDF6F0] rounded-xl flex items-center justify-center shrink-0">
-                        <Keyboard className="h-5 w-5 text-[#C8A288]" />
+                        <Keyboard className="h-5 w-5 text-[#1E5C42]" />
                     </div>
                     <div>
-                        <p className="font-semibold text-[#4A3B32] text-sm">All Keyboard Shortcuts</p>
-                        <p className="text-xs text-[#8a6a5c] mt-0.5">Quick access to features</p>
+                        <p className="font-semibold text-[#163628] text-sm">All Keyboard Shortcuts</p>
+                        <p className="text-xs text-[#5E5046] mt-0.5">Quick access to features</p>
                     </div>
                 </div>
                 <div className="space-y-2">
@@ -541,12 +688,12 @@ const Settings = () => {
                             <div className="flex items-center gap-1">
                                 {shortcut.keys.map((key, j) => (
                                     <span key={j} className="flex items-center gap-1">
-                                        {j > 0 && <span className="text-[10px] text-[#8a6a5c]">+</span>}
-                                        <kbd className="px-2 py-0.5 bg-white border border-[#E6D5CC] rounded text-[11px] font-mono font-bold text-[#4A3B32] shadow-sm">{key}</kbd>
+                                        {j > 0 && <span className="text-[10px] text-[#5E5046]">+</span>}
+                                        <kbd className="px-2 py-0.5 bg-white border border-[#E6D5CC] rounded text-[11px] font-mono font-bold text-[#163628] shadow-sm">{key}</kbd>
                                     </span>
                                 ))}
                             </div>
-                            <span className="text-xs text-[#8a6a5c] font-medium">{shortcut.desc}</span>
+                            <span className="text-xs text-[#5E5046] font-medium">{shortcut.desc}</span>
                         </div>
                     ))}
                 </div>
@@ -598,46 +745,105 @@ const Settings = () => {
         </div>
     );
 
+    const activeTheme = resolveThemeId(settings);
+
     const renderAppearance = () => (
         <div className="space-y-5">
             <SectionHeader icon={Sun} title="Appearance" subtitle="Customize the look and feel" />
             <div className="space-y-3">
-                {/* Dark Mode — fully functional */}
-                <div className={`p-5 rounded-2xl border-2 transition-all ${
-                    settings.darkMode
-                        ? 'bg-[#2a2927] border-[#C8A288]/60'
-                        : 'bg-white border-[#E6D5CC]'
-                }`}>
-                    <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3.5">
-                            <div className={`h-11 w-11 rounded-xl flex items-center justify-center shrink-0 ${
-                                settings.darkMode ? 'bg-[#4A3B32]' : 'bg-[#FDF6F0]'
-                            }`}>
-                                {settings.darkMode
-                                    ? <Moon className="h-5 w-5 text-[#C8A288]" />
-                                    : <Sun className="h-5 w-5 text-[#C8A288]" />}
-                            </div>
-                            <div>
-                                <p className="font-bold text-[#4A3B32]">
-                                    {settings.darkMode ? 'Dark Mode — On' : 'Dark Mode — Off'}
-                                </p>
-                                <p className="text-xs text-[#8a6a5c] mt-0.5">
-                                    {settings.darkMode ? 'Warm near-black theme, easy on the eyes' : 'Switch to a rich dark theme'}
-                                </p>
-                            </div>
+                {/* Theme gallery */}
+                <div className="p-4 bg-white rounded-2xl border border-[#E6D5CC]/80">
+                    <div className="flex items-center justify-between mb-3">
+                        <div>
+                            <p className="font-semibold text-[#163628] text-sm">Theme</p>
+                            <p className="text-xs text-[#5E5046] mt-0.5">Pick a vibe — applies instantly everywhere</p>
                         </div>
-                        <button
-                            onClick={() => updateSetting('darkMode', !settings.darkMode)}
-                            className={`relative w-12 h-7 rounded-full transition-all shrink-0 ${
-                                settings.darkMode ? 'bg-[#C8A288]' : 'bg-[#E6D5CC]'
-                            }`}
-                        >
-                            <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-transform ${
-                                settings.darkMode ? 'translate-x-[22px]' : 'translate-x-0.5'
-                            }`}>
-                                {settings.darkMode && <Check className="h-3.5 w-3.5 text-[#C8A288] m-[5px]" />}
-                            </div>
-                        </button>
+                        <span className="text-xs font-semibold text-[#1E5C42]">{THEMES[activeTheme].name}</span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                        {Object.entries(THEMES).map(([id, t]) => {
+                            const active = activeTheme === id;
+                            return (
+                                <button
+                                    key={id}
+                                    onClick={() => updateSettings({ theme: id, darkMode: t.mode === 'dark' })}
+                                    className={`text-left rounded-xl border-2 overflow-hidden transition-all active:scale-[0.98] ${active ? 'border-[#1E5C42] shadow-md shadow-[#1E5C42]/20' : 'border-[#E6D5CC] hover:border-[#1E5C42]/60'}`}
+                                    aria-pressed={active}
+                                >
+                                    {/* Mini preview */}
+                                    <div className="h-16 p-2 flex gap-1.5" style={{ background: t.swatch[0] }}>
+                                        <div className="w-5 rounded-md" style={{ background: t.swatch[1] }} />
+                                        <div className="flex-1 rounded-md p-1.5 flex flex-col justify-between" style={{ background: t.swatch[1] }}>
+                                            <div className="h-1.5 w-3/4 rounded-full" style={{ background: t.swatch[3], opacity: 0.8 }} />
+                                            <div className="h-3 w-1/2 rounded-md" style={{ background: t.swatch[2] }} />
+                                        </div>
+                                    </div>
+                                    <div className="px-2.5 py-2">
+                                        <p className="text-xs font-bold text-[#163628] flex items-center gap-1">
+                                            {t.name} {active && <Check className="h-3.5 w-3.5 text-[#1E5C42]" />}
+                                        </p>
+                                        <p className="text-[10.5px] leading-snug text-[#5E5046]">{t.blurb}</p>
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Accent colour */}
+                <div className="p-4 bg-white rounded-2xl border border-[#E6D5CC]/80">
+                    <div className="flex items-center justify-between mb-3">
+                        <div>
+                            <p className="font-semibold text-[#163628] text-sm">Accent colour</p>
+                            <p className="text-xs text-[#5E5046] mt-0.5">Buttons, highlights and progress bars</p>
+                        </div>
+                        {settings.customAccent && (
+                            <button onClick={() => updateSetting('customAccent', '')} className="text-xs font-semibold text-[#5E5046] hover:text-[#163628]">
+                                Use theme default
+                            </button>
+                        )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        {ACCENT_PRESETS.map(c => (
+                            <button
+                                key={c}
+                                onClick={() => updateSetting('customAccent', c)}
+                                className={`h-8 w-8 rounded-full border-2 transition-transform active:scale-90 ${settings.customAccent?.toLowerCase() === c.toLowerCase() ? 'border-[#163628] scale-110' : 'border-white shadow'}`}
+                                style={{ background: c }}
+                                title={c}
+                                aria-label={`Accent ${c}`}
+                            />
+                        ))}
+                        <label className="h-8 px-3 rounded-full border border-[#E6D5CC] flex items-center gap-2 text-xs font-semibold text-[#163628] cursor-pointer hover:border-[#1E5C42]">
+                            <input
+                                type="color"
+                                value={settings.customAccent || '#1E5C42'}
+                                onChange={(e) => updateSetting('customAccent', e.target.value)}
+                                className="h-5 w-5 cursor-pointer rounded border-0 bg-transparent p-0"
+                            />
+                            Custom
+                        </label>
+                    </div>
+                </div>
+
+                {/* Font style */}
+                <div className="p-4 bg-white rounded-2xl border border-[#E6D5CC]/80">
+                    <p className="font-semibold text-[#163628] text-sm">Font style</p>
+                    <p className="text-xs text-[#5E5046] mt-0.5 mb-3">How text looks across the app</p>
+                    <div className="grid grid-cols-5 gap-2">
+                        {[['auto', { name: 'Theme', stack: 'inherit' }], ...Object.entries(FONT_STYLES)].map(([key, f]) => {
+                            const active = (settings.fontStyle || 'auto') === key;
+                            return (
+                                <button
+                                    key={key}
+                                    onClick={() => updateSetting('fontStyle', key)}
+                                    className={`rounded-xl border-2 py-2 text-center transition-all ${active ? 'border-[#1E5C42] bg-[#1E5C42]/10' : 'border-[#E6D5CC] hover:border-[#1E5C42]/60'}`}
+                                >
+                                    <span className="block text-lg text-[#163628]" style={{ fontFamily: f.stack }}>Aa</span>
+                                    <span className="block text-[10.5px] font-semibold text-[#5E5046]">{f.name}</span>
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
 
@@ -669,7 +875,7 @@ const Settings = () => {
                 <div className="p-4 rounded-2xl border flex items-center justify-between" style={{ background: paper, borderColor: border }}>
                     <div className="flex items-center gap-3.5">
                         <div className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: inputBg }}>
-                            <Sparkles className="h-5 w-5 text-[#C8A288]" />
+                            <Sparkles className="h-5 w-5 text-[#1E5C42]" />
                         </div>
                         <div>
                             <p className="font-semibold text-sm" style={{ color: heading }}>App Tutorials</p>
@@ -684,7 +890,7 @@ const Settings = () => {
                                 navigate('/dashboard');
                             }
                         }}
-                        className="px-4 py-2 bg-[#FDF6F0] hover:bg-[#E6D5CC] text-[#C8A288] border border-[#E6D5CC] rounded-xl font-semibold text-sm transition-colors shrink-0"
+                        className="px-4 py-2 bg-[#FDF6F0] hover:bg-[#E6D5CC] text-[#1E5C42] border border-[#E6D5CC] rounded-xl font-semibold text-sm transition-colors shrink-0"
                     >
                         Restart Tour
                     </button>
@@ -693,6 +899,29 @@ const Settings = () => {
         </div>
     );
 
+
+    const renderPlan = () => (
+        <div className="space-y-5">
+            <SectionHeader icon={Crown} title="Plan & usage" subtitle="What your plan includes and how much you've used" />
+            <PlanUsage />
+        </div>
+    );
+
+    const renderAccount = () => (
+        <div className="space-y-5">
+            <SectionHeader icon={KeyRound} title="Password" subtitle="Change the password you sign in with" />
+            <div className="max-w-md">
+                <ChangePasswordForm />
+                <p className="mt-3 text-xs" style={{ color: muted }}>
+                    Signed in with Google or an email code? You don't have a password here. Forgot your password? Use "Forgot password?" on the sign-in page. School students can ask their school to reset theirs.
+                </p>
+            </div>
+            <SectionHeader icon={KeyRound} title="Delete account" subtitle="Remove your account and all its data" />
+            <div className="max-w-md">
+                <DeleteAccountForm />
+            </div>
+        </div>
+    );
 
     const renderNotifications = () => (
         <div className="space-y-5">
@@ -725,13 +954,13 @@ const Settings = () => {
             </div>
 
             {/* Coming soon info */}
-            <div className="p-4 rounded-2xl border" style={{ background: isDark ? '#2a1e10' : '#fffbf2', borderColor: isDark ? '#5a3a20' : '#fde68a' }}>
+            <div className="p-4 rounded-2xl border" style={{ background: isDark ? '#12291E' : '#fffbf2', borderColor: isDark ? '#2C4A38' : '#fde68a' }}>
                 <div className="flex items-start gap-3">
-                    <div className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5" style={{ background: isDark ? '#3a2810' : '#fef3c7' }}>
+                    <div className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5" style={{ background: isDark ? '#173426' : '#fef3c7' }}>
                         <Sparkles className="h-4 w-4 text-amber-500" />
                     </div>
                     <div>
-                        <p className="font-semibold text-sm" style={{ color: isDark ? '#d4a060' : '#78350f' }}>Features in Development</p>
+                        <p className="font-semibold text-sm" style={{ color: isDark ? '#D3EE6A' : '#78350f' }}>Features in Development</p>
                         <p className="text-xs mt-0.5 leading-relaxed" style={{ color: isDark ? '#a07840' : '#92400e' }}>
                             Study reminders, sound effects, and streaks are being built. Settings marked with "Soon" will be enabled in a future update.
                         </p>
@@ -745,11 +974,14 @@ const Settings = () => {
     const renderSection = () => {
         switch (activeSection) {
             case 'profile': return renderProfile();
+            case 'companion': return renderCompanion();
             case 'study': return renderStudy();
             case 'focus': return renderFocus();
             case 'ai': return renderAI();
             case 'appearance': return renderAppearance();
             case 'notifications': return renderNotifications();
+            case 'plan': return renderPlan();
+            case 'account': return renderAccount();
             default: return renderProfile();
         }
     };
@@ -770,7 +1002,7 @@ const Settings = () => {
                         <ChevronLeft className="h-5 w-5" style={{ color: heading }} />
                     </button>
                     <div className="flex items-center gap-2.5">
-                        <div className="h-9 w-9 bg-gradient-to-br from-[#C8A288] to-[#A08072] rounded-xl flex items-center justify-center shadow-sm">
+                        <div className="h-9 w-9 bg-gradient-to-br from-[#1E5C42] to-[#163628] rounded-xl flex items-center justify-center shadow-sm">
                             <SettingsIcon className="h-4.5 w-4.5 text-white" />
                         </div>
                         <h1 className="text-lg font-bold" style={{ color: heading }}>Settings</h1>
@@ -793,10 +1025,10 @@ const Settings = () => {
                                         onClick={() => setActiveSection(sec.id)}
                                         className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all"
                                         style={isActive
-                                            ? { background: '#C8A288', color: '#fff' }
+                                            ? { background: 'var(--lumina-accent)', color: 'var(--lumina-on-accent)' }
                                             : { color: muted, background: 'transparent' }
                                         }
-                                        onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = isDark ? '#2e2620' : 'rgba(230,213,204,0.4)'; }}
+                                        onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = isDark ? '#212F28' : 'rgba(230,213,204,0.4)'; }}
                                         onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
                                     >
                                         <Icon className="h-4 w-4 shrink-0" />
@@ -832,7 +1064,7 @@ const Settings = () => {
                                     key={sec.id}
                                     onClick={() => setActiveSection(sec.id)}
                                     className="flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg text-[10px] font-medium transition-colors"
-                                    style={{ color: isActive ? '#C8A288' : muted }}
+                                    style={{ color: isActive ? '#1E5C42' : muted }}
                                 >
                                     <Icon className="h-4.5 w-4.5" />
                                     <span>{sec.label}</span>

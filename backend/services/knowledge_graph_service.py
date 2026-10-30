@@ -13,8 +13,8 @@ DSA Used:
 - Adjacency List for graph storage
 - BFS for finding related topics at distance K
 - DFS for detecting cycles
-- Topological Sort (Kahn's Algorithm) for learning path generation
-- Priority Queue for weighted path finding
+- Weighted, cycle-safe topological sort for learning paths
+  (see services/topic_ordering.py)
 """
 
 import heapq
@@ -53,6 +53,8 @@ class KnowledgeGraph:
     # Per-project build locks — prevents concurrent /build calls racing each other
     _build_locks: WeakValueDictionary = WeakValueDictionary()
     _locks_meta_lock = asyncio.Lock()
+
+    RELATION_KINDS = {"REQUIRES", "SUPPORTS", "PART_OF", "CONTRASTS_WITH", "APPLIED_IN"}
 
     def __init__(self):
         self.client = get_supabase_client()
@@ -201,34 +203,39 @@ class KnowledgeGraph:
 
         target_relationships = max(15, len(batch_topics) * 2)
 
-        prompt = f"""You are an expert curriculum designer. Create a learning dependency graph for these topics.
+        prompt = f"""You are an expert curriculum designer. Map how these topics relate, so a learner
+can be guided through them in the best order.
 
 TOPICS:
 {topics_str}
 
-TASK: Identify which topics must be learned before others.
-
-RELATIONSHIP TYPES:
-- "prerequisite": Topic A MUST be learned before Topic B
-- "related": Topics are connected but order doesn't matter
+RELATIONSHIP KINDS:
+- "REQUIRES": B cannot be understood without A first (strict prerequisite). Use sparingly.
+- "SUPPORTS": A helps explain or understand B, but B is learnable without it.
+- "PART_OF": A is a component or sub-idea of the larger topic B.
+- "CONTRASTS_WITH": A and B are easily confused and should be compared.
+- "APPLIED_IN": A is used in the method, technique or scenario B.
 
 RULES:
 1. Use EXACT topic names from the numbered list (copy exactly)
 2. Every topic should connect to at least one other topic
-3. Foundational/intro topics have no prerequisites
-4. Create {target_relationships} relationships total
-5. Weight: 0.9 = essential prerequisite, 0.5 = helpful, 0.3 = loosely related
+3. Foundational/intro topics have nothing they REQUIRE
+4. Create about {target_relationships} relationships in total
+5. "weight": strength, 0.9 = essential, 0.5 = helpful, 0.3 = loose
+6. "confidence": how sure you are the relationship is correct (0.0-1.0)
+7. "basis": "explicit" if the material states it, "inferred" if it is your teaching judgement
+8. Do not chain REQUIRES through everything: most links are SUPPORTS or APPLIED_IN
 
 OUTPUT FORMAT - Return ONLY valid JSON, no markdown:
 [
-  {{"from_topic": "Topic 1 Name", "to_topic": "Topic 2 Name", "relation_type": "prerequisite", "weight": 0.9}}
+  {{"from_topic": "Topic 1 Name", "to_topic": "Topic 2 Name", "kind": "REQUIRES", "weight": 0.9, "confidence": 0.8, "basis": "inferred"}}
 ]"""
 
         messages = [{"role": "user", "content": prompt}]
 
         try:
             response = await llm_service.chat_completion(
-                messages, temperature=0.2, max_tokens=self.MAX_TOKENS
+                messages, temperature=0.2, max_tokens=self.MAX_TOKENS, light=True
             )
         except Exception as llm_err:
             logger.error(f"LLM call failed for knowledge graph batch: {llm_err}")
@@ -259,16 +266,24 @@ OUTPUT FORMAT - Return ONLY valid JSON, no markdown:
             to_exists = to_topic_raw.lower() in topics_lower
 
             if from_exists and to_exists and from_topic != to_topic:
-                relation_type = rel.get("relation_type", "related")
-                if relation_type not in [
-                    "prerequisite",
-                    "related",
-                    "subtopic",
-                    "builds_on",
-                ]:
-                    relation_type = "related"
-                if relation_type in ["builds_on", "subtopic"]:
-                    relation_type = "prerequisite"
+                kind = str(rel.get("kind") or "").upper().replace(" ", "_")
+                if not kind:
+                    # Older answer format
+                    legacy = rel.get("relation_type", "related")
+                    kind = "REQUIRES" if legacy in ("prerequisite", "builds_on") else "SUPPORTS"
+                if kind not in self.RELATION_KINDS:
+                    kind = "SUPPORTS"
+                try:
+                    weight = min(1.0, max(0.1, float(rel.get("weight", 0.5))))
+                except (TypeError, ValueError):
+                    weight = 0.5
+                try:
+                    confidence = min(1.0, max(0.0, float(rel.get("confidence", 0.6))))
+                except (TypeError, ValueError):
+                    confidence = 0.6
+                # The model proposes; a doubtful "requires" is only treated as support
+                if kind == "REQUIRES" and confidence < 0.5:
+                    kind = "SUPPORTS"
 
                 edges.append(
                     {
@@ -276,8 +291,12 @@ OUTPUT FORMAT - Return ONLY valid JSON, no markdown:
                         "project_id": project_id,
                         "from_topic": from_topic,
                         "to_topic": to_topic,
-                        "relation_type": relation_type,
-                        "weight": min(1.0, max(0.1, float(rel.get("weight", 0.5)))),
+                        # Older screens read relation_type; the engine reads kind
+                        "relation_type": "prerequisite" if kind == "REQUIRES" else "related",
+                        "weight": weight,
+                        "kind": kind,
+                        "confidence": round(confidence, 2),
+                        "evidence": "explicit" if str(rel.get("basis", "")).lower() == "explicit" else "inferred",
                     }
                 )
 
@@ -546,159 +565,83 @@ OUTPUT FORMAT - Return ONLY valid JSON, no markdown:
 
     # ============== Learning Path Generation ==============
 
-    async def generate_learning_path(
-        self, project_id: str, target_topics: Optional[List[str]] = None
-    ) -> List[Dict[str, Any]]:
-        """
-        Generate optimal learning path using Topological Sort.
-        Includes document source for each topic.
-        """
-        try:
-            # Get topic-to-document mapping
-            topic_doc_map = await self._get_topic_document_mapping(project_id)
-
-            # Get all edges
-            result = await async_db(lambda: 
-                self.client.table("topic_relations")
-                .select("*")
+    async def load_project_documents(self, project_id: str) -> List[Dict[str, Any]]:
+        """Completed documents, oldest first, with topics and (if stored) outline."""
+        def _query(columns):
+            return (
+                self.client.table("documents")
+                .select(columns)
                 .eq("project_id", project_id)
-                .eq("relation_type", "prerequisite")
+                .eq("upload_status", "completed")
+                .order("created_at")
                 .execute()
             )
+        try:
+            result = await async_db(lambda: _query("id, filename, topics, topic_outline, created_at"))
+        except Exception as e:
+            # topic_outline column not migrated yet (see migrations/004_topic_outline.sql)
+            if "topic_outline" not in str(e):
+                raise
+            result = await async_db(lambda: _query("id, filename, topics, created_at"))
+        return result.data or []
 
-            edges = result.data or []
+    async def get_prerequisite_edges(self, project_id: str) -> List[Dict[str, Any]]:
+        result = await async_db(lambda:
+            self.client.table("topic_relations")
+            .select("from_topic, to_topic, weight, relation_type")
+            .eq("project_id", project_id)
+            .eq("relation_type", "prerequisite")
+            .execute()
+        )
+        return result.data or []
 
-            if not edges:
-                # No prerequisites - return topics with doc info
-                if target_topics:
-                    return [
-                        {
-                            "topic": t,
-                            "order": i + 1,
-                            "prerequisites": [],
-                            "document": topic_doc_map.get(t, "Unknown"),
-                        }
-                        for i, t in enumerate(target_topics)
-                    ]
+    async def generate_learning_path(
+        self,
+        project_id: str,
+        target_topics: Optional[List[str]] = None,
+        documents: Optional[List[Dict[str, Any]]] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Learning path for the project, ordered by services.topic_ordering
+        (weighted, cycle-safe topological sort — the same order every screen
+        uses). With target_topics, only those topics and everything they
+        transitively depend on are included.
+        """
+        from services.topic_ordering import order_topics, topics_in_book_order, chapter_lookup
 
-                # Get all topics from documents
-                all_topics = list(topic_doc_map.keys())
-                if all_topics:
-                    return [
-                        {
-                            "topic": t,
-                            "order": i + 1,
-                            "prerequisites": [],
-                            "document": topic_doc_map.get(t, "Unknown"),
-                        }
-                        for i, t in enumerate(sorted(all_topics))
-                    ]
+        try:
+            if documents is None:
+                documents = await self.load_project_documents(project_id)
+            edges = await self.get_prerequisite_edges(project_id)
 
-                return []
-
-            # Build graph adjacency list + in-degree counts from edges
-            graph = defaultdict(list)
-            in_degree = defaultdict(int)
-
-            for edge in edges:
-                from_topic = edge["from_topic"]
-                to_topic = edge["to_topic"]
-                graph[from_topic].append(to_topic)
-                in_degree[to_topic] += 1
-                if from_topic not in in_degree:
-                    in_degree[from_topic] = 0
-
-            # ── Seed all_topics from documents (source of truth) ─────────────
-            # Every topic from every completed document MUST appear in the path,
-            # even if the LLM created no edges for it during graph build.
-            all_topics = set(topic_doc_map.keys())
-
-            # Defensive: include any edge-endpoint topics not in doc map
-            for edge in edges:
-                all_topics.add(edge["from_topic"])
-                all_topics.add(edge["to_topic"])
-
-            # Ensure every topic has an in_degree entry (default 0 = queue-ready)
-            for t in all_topics:
-                if t not in in_degree:
-                    in_degree[t] = 0
-
-            # Filter if target_topics provided
+            topics = topics_in_book_order(documents)
             if target_topics:
-                needed = set(target_topics)
-                to_check = list(target_topics)
+                # Ancestor closure via reverse adjacency (O(V + E))
+                parents = defaultdict(list)
+                for e in edges:
+                    parents[e["to_topic"]].append(e["from_topic"])
+                needed, stack = set(), [t for t in target_topics]
+                while stack:
+                    t = stack.pop()
+                    if t in needed:
+                        continue
+                    needed.add(t)
+                    stack.extend(parents.get(t, []))
+                topics = [t for t in topics if t in needed] + [
+                    t for t in target_topics if t not in topics
+                ]
 
-                while to_check:
-                    topic = to_check.pop()
-                    for edge in edges:
-                        if (
-                            edge["to_topic"] == topic
-                            and edge["from_topic"] not in needed
-                        ):
-                            needed.add(edge["from_topic"])
-                            to_check.append(edge["from_topic"])
+            doc_names = {}
+            for doc in documents:
+                for t in doc.get("topics") or []:
+                    doc_names.setdefault(t, doc.get("filename", "Unknown"))
+            chapters = chapter_lookup(documents)
 
-                all_topics = needed
-
-            # Kahn's Algorithm
-            queue = deque()
-            for topic in all_topics:
-                if in_degree.get(topic, 0) == 0:
-                    queue.append(topic)
-
-            learning_path = []
-            order = 1
-
-            while queue:
-                topic = queue.popleft()
-
-                if topic in all_topics:
-                    prereqs = [
-                        e["from_topic"]
-                        for e in edges
-                        if e["to_topic"] == topic and e["from_topic"] in all_topics
-                    ]
-
-                    learning_path.append(
-                        {
-                            "topic": topic,
-                            "order": order,
-                            "prerequisites": prereqs,
-                            "document": topic_doc_map.get(topic, "Unknown"),
-                        }
-                    )
-                    order += 1
-
-                for dependent in graph.get(topic, []):
-                    in_degree[dependent] -= 1
-                    if in_degree[dependent] == 0:
-                        queue.append(dependent)
-
-            # Handle cycles
-            processed_topics = {item["topic"] for item in learning_path}
-            remaining_topics = all_topics - processed_topics
-
-            if remaining_topics:
-                logger.warning(
-                    f"Cycle detected - adding {len(remaining_topics)} remaining topics"
-                )
-                for topic in sorted(remaining_topics):
-                    prereqs = [
-                        e["from_topic"]
-                        for e in edges
-                        if e["to_topic"] == topic and e["from_topic"] in all_topics
-                    ]
-                    learning_path.append(
-                        {
-                            "topic": topic,
-                            "order": order,
-                            "prerequisites": prereqs,
-                            "document": topic_doc_map.get(topic, "Unknown"),
-                        }
-                    )
-                    order += 1
-
-            return learning_path
+            path = order_topics(topics, edges)
+            for item in path:
+                item["document"] = doc_names.get(item["topic"], "Unknown")
+                item["chapter"] = (chapters.get(item["topic"]) or {}).get("chapter")
+            return path
 
         except Exception as e:
             logger.error(f"Error generating learning path: {e}")

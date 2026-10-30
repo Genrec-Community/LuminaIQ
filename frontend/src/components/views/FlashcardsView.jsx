@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Layers, Plus, Trash2, Edit2, Save, X, ChevronDown, Loader2, BookOpen, Sparkles, Shuffle, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
-import { getFlashcardSets, createFlashcardSet, deleteFlashcardSet, generateFlashcardsWithAI } from '../../api';
+import { getFlashcardSets, createFlashcardSet, deleteFlashcardSet, generateFlashcardsWithAI, recordLearning } from '../../api';
 
 const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
     const toast = useToast();
@@ -186,7 +186,14 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
         }
     };
 
+    // Self-graded recall is evidence for the learner model (when the set has a topic)
+    const recordCard = (known) => {
+        const topic = studyCards[currentCardIndex]?.topic || selectedSet?.topic;
+        if (topic) recordLearning(projectId, { topic, correct: known, kind: 'flashcard', source: 'flashcards' });
+    };
+
     const markKnown = () => {
+        recordCard(true);
         const cardId = studyCards[currentCardIndex]?.id;
         if (cardId) {
             setKnownCards(prev => new Set(prev).add(cardId));
@@ -196,6 +203,7 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
     };
 
     const markUnknown = () => {
+        recordCard(false);
         const cardId = studyCards[currentCardIndex]?.id;
         if (cardId) {
             setUnknownCards(prev => new Set(prev).add(cardId));
@@ -227,7 +235,7 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
     if (loading) {
         return (
             <div className="h-full flex items-center justify-center">
-                <Loader2 className="h-8 w-8 text-[#C8A288] animate-spin" />
+                <Loader2 className="h-8 w-8 text-[#1E5C42] animate-spin" />
             </div>
         );
     }
@@ -244,23 +252,23 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
                 {/* Study Header */}
                 <div className="flex items-center justify-between px-4 md:px-6 py-3 border-b border-[#E6D5CC]/50 bg-white/50 shrink-0">
                     <div className="min-w-0">
-                        <h2 className="text-lg font-bold text-[#4A3B32] truncate">{selectedSet.title}</h2>
-                        <p className="text-xs text-[#8a6a5c]">
+                        <h2 className="text-lg font-bold text-[#163628] truncate">{selectedSet.title}</h2>
+                        <p className="text-xs text-[#5E5046]">
                             Card {currentCardIndex + 1} of {studyCards.length}
                             {knownCards.size > 0 && <span className="text-green-600 ml-2">Known: {knownCards.size}</span>}
                             {unknownCards.size > 0 && <span className="text-red-500 ml-2">Review: {unknownCards.size}</span>}
                         </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                        <button onClick={shuffleCards} className="p-2 text-[#8a6a5c] hover:bg-[#FDF6F0] rounded-lg transition-colors" title="Shuffle">
+                        <button onClick={shuffleCards} className="p-2 text-[#5E5046] hover:bg-[#FDF6F0] rounded-lg transition-colors" title="Shuffle">
                             <Shuffle className="h-4 w-4" />
                         </button>
-                        <button onClick={resetStudy} className="p-2 text-[#8a6a5c] hover:bg-[#FDF6F0] rounded-lg transition-colors" title="Reset">
+                        <button onClick={resetStudy} className="p-2 text-[#5E5046] hover:bg-[#FDF6F0] rounded-lg transition-colors" title="Reset">
                             <RotateCcw className="h-4 w-4" />
                         </button>
                         <button
                             onClick={() => setSelectedSet(null)}
-                            className="px-3 py-1.5 text-sm text-[#8a6a5c] hover:bg-[#FDF6F0] rounded-lg transition-colors"
+                            className="px-3 py-1.5 text-sm text-[#5E5046] hover:bg-[#FDF6F0] rounded-lg transition-colors"
                         >
                             Exit
                         </button>
@@ -270,7 +278,7 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
                 {/* Progress Bar */}
                 <div className="h-1.5 bg-[#E6D5CC]/30">
                     <div
-                        className="h-full bg-gradient-to-r from-[#C8A288] to-[#A08072] transition-all duration-300"
+                        className="h-full bg-gradient-to-r from-[#1E5C42] to-[#163628] transition-all duration-300"
                         style={{ width: `${progress}%` }}
                     />
                 </div>
@@ -280,22 +288,22 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
                     {allReviewed ? (
                         // Completion summary
                         <div className="text-center max-w-md">
-                            <div className="h-20 w-20 bg-gradient-to-br from-[#C8A288] to-[#A08072] rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+                            <div className="h-20 w-20 bg-gradient-to-br from-[#1E5C42] to-[#163628] rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
                                 <BookOpen className="h-10 w-10 text-white" />
                             </div>
-                            <h3 className="text-2xl font-bold text-[#4A3B32] mb-2">Session Complete!</h3>
+                            <h3 className="text-2xl font-bold text-[#163628] mb-2">Session Complete!</h3>
                             <div className="flex justify-center gap-6 mb-6">
                                 <div className="text-center">
                                     <p className="text-3xl font-bold text-green-600">{knownCards.size}</p>
-                                    <p className="text-sm text-[#8a6a5c]">Known</p>
+                                    <p className="text-sm text-[#5E5046]">Known</p>
                                 </div>
                                 <div className="text-center">
                                     <p className="text-3xl font-bold text-red-500">{unknownCards.size}</p>
-                                    <p className="text-sm text-[#8a6a5c]">Need Review</p>
+                                    <p className="text-sm text-[#5E5046]">Need Review</p>
                                 </div>
                             </div>
                             <div className="flex gap-3 justify-center">
-                                <button onClick={resetStudy} className="px-5 py-2.5 bg-[#C8A288] text-white rounded-lg hover:bg-[#B08B72] transition-colors">
+                                <button onClick={resetStudy} className="px-5 py-2.5 bg-[#1E5C42] text-white rounded-lg hover:bg-[#163628] transition-colors">
                                     Study Again
                                 </button>
                                 <button onClick={() => setSelectedSet(null)} className="px-5 py-2.5 border border-[#E6D5CC] rounded-lg hover:bg-[#FDF6F0] transition-colors">
@@ -318,16 +326,16 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
                             >
                                 {/* Front */}
                                 <div
-                                    className="absolute inset-0 bg-white rounded-2xl border-2 border-[#C8A288] shadow-xl p-6 md:p-8 flex flex-col items-center justify-center"
+                                    className="absolute inset-0 bg-white rounded-2xl border-2 border-[#1E5C42] shadow-xl p-6 md:p-8 flex flex-col items-center justify-center"
                                     style={{ backfaceVisibility: 'hidden' }}
                                 >
-                                    <p className="text-xs text-[#8a6a5c] mb-4 uppercase tracking-wide font-semibold">Question</p>
-                                    <p className="text-lg md:text-xl text-center text-[#4A3B32] leading-relaxed">{currentCard.front}</p>
-                                    <p className="text-xs text-[#8a6a5c] mt-6">Click or press Space to flip</p>
+                                    <p className="text-xs text-[#5E5046] mb-4 uppercase tracking-wide font-semibold">Question</p>
+                                    <p className="text-lg md:text-xl text-center text-[#163628] leading-relaxed">{currentCard.front}</p>
+                                    <p className="text-xs text-[#5E5046] mt-6">Click or press Space to flip</p>
                                 </div>
                                 {/* Back */}
                                 <div
-                                    className="absolute inset-0 bg-gradient-to-br from-[#C8A288] to-[#A08072] rounded-2xl border-2 border-[#C8A288] shadow-xl p-6 md:p-8 flex flex-col items-center justify-center"
+                                    className="absolute inset-0 bg-gradient-to-br from-[#1E5C42] to-[#163628] rounded-2xl border-2 border-[#1E5C42] shadow-xl p-6 md:p-8 flex flex-col items-center justify-center"
                                     style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
                                 >
                                     <p className="text-xs text-white/70 mb-4 uppercase tracking-wide font-semibold">Answer</p>
@@ -370,7 +378,7 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
                                 >
                                     <ChevronLeft className="h-5 w-5" />
                                 </button>
-                                <span className="text-sm text-[#8a6a5c] tabular-nums min-w-[60px] text-center">
+                                <span className="text-sm text-[#5E5046] tabular-nums min-w-[60px] text-center">
                                     {currentCardIndex + 1} / {studyCards.length}
                                 </span>
                                 <button
@@ -394,20 +402,20 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
             <div className="max-w-6xl mx-auto">
                 <div className="flex items-center justify-between mb-8">
                     <div>
-                        <h2 className="text-2xl font-bold text-[#4A3B32]">Flashcards</h2>
-                        <p className="text-[#8a6a5c]">Create and study flashcard sets</p>
+                        <h2 className="text-2xl font-bold text-[#163628]">Flashcards</h2>
+                        <p className="text-[#5E5046]">Create and study flashcard sets</p>
                     </div>
                     <div className="flex gap-2">
                         <button
                             onClick={() => setShowAIModal(true)}
-                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#C8A288] to-[#A08072] text-white rounded-lg hover:opacity-90 transition-opacity shadow-sm"
+                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#1E5C42] to-[#163628] text-white rounded-lg hover:opacity-90 transition-opacity shadow-sm"
                         >
                             <Sparkles className="h-4 w-4" />
                             AI Generate
                         </button>
                         <button
                             onClick={() => setShowCreateModal(true)}
-                            className="flex items-center gap-2 px-4 py-2 border border-[#E6D5CC] text-[#4A3B32] rounded-lg hover:bg-[#FDF6F0] transition-colors"
+                            className="flex items-center gap-2 px-4 py-2 border border-[#E6D5CC] text-[#163628] rounded-lg hover:bg-[#FDF6F0] transition-colors"
                         >
                             <Plus className="h-4 w-4" />
                             Manual
@@ -418,12 +426,12 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
                 {flashcardSets.length === 0 ? (
                     <div className="text-center py-16">
                         <Layers className="h-16 w-16 text-[#E6D5CC] mx-auto mb-4" />
-                        <h3 className="text-xl font-bold text-[#4A3B32] mb-2">No Flashcard Sets Yet</h3>
-                        <p className="text-[#8a6a5c] mb-6">Create your first flashcard set to start studying</p>
+                        <h3 className="text-xl font-bold text-[#163628] mb-2">No Flashcard Sets Yet</h3>
+                        <p className="text-[#5E5046] mb-6">Create your first flashcard set to start studying</p>
                         <div className="flex gap-3 justify-center">
                             <button
                                 onClick={() => setShowAIModal(true)}
-                                className="px-6 py-3 bg-gradient-to-r from-[#C8A288] to-[#A08072] text-white rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2"
+                                className="px-6 py-3 bg-gradient-to-r from-[#1E5C42] to-[#163628] text-white rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2"
                             >
                                 <Sparkles className="h-5 w-5" />
                                 Generate with AI
@@ -446,9 +454,9 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
                             >
                                 <div className="flex items-start justify-between mb-3">
                                     <div className="flex-1 min-w-0">
-                                        <h3 className="font-bold text-[#4A3B32] mb-1 truncate">{set.title}</h3>
+                                        <h3 className="font-bold text-[#163628] mb-1 truncate">{set.title}</h3>
                                         {set.topic && (
-                                            <p className="text-sm text-[#8a6a5c] truncate">{set.topic}</p>
+                                            <p className="text-sm text-[#5E5046] truncate">{set.topic}</p>
                                         )}
                                     </div>
                                     <button
@@ -459,17 +467,17 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
                                     </button>
                                 </div>
                                 <div className="flex items-center gap-3 mb-4">
-                                    <div className="flex items-center gap-1.5 text-xs text-[#8a6a5c] bg-[#FDF6F0] px-2.5 py-1 rounded-full">
+                                    <div className="flex items-center gap-1.5 text-xs text-[#5E5046] bg-[#FDF6F0] px-2.5 py-1 rounded-full">
                                         <Layers className="h-3 w-3" />
                                         {set.card_count || set.cards?.length || 0} cards
                                     </div>
                                     {set.description && (
-                                        <p className="text-xs text-[#8a6a5c] truncate">{set.description}</p>
+                                        <p className="text-xs text-[#5E5046] truncate">{set.description}</p>
                                     )}
                                 </div>
                                 <button
                                     onClick={(e) => { e.stopPropagation(); startStudying(set); }}
-                                    className="w-full py-2 bg-[#C8A288] text-white rounded-lg hover:bg-[#B08B72] transition-colors text-sm font-medium"
+                                    className="w-full py-2 bg-[#1E5C42] text-white rounded-lg hover:bg-[#163628] transition-colors text-sm font-medium"
                                 >
                                     Study
                                 </button>
@@ -485,8 +493,8 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
                     <div className="bg-white rounded-2xl p-6 max-w-md w-full">
                         <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-2">
-                                <Sparkles className="h-5 w-5 text-[#C8A288]" />
-                                <h3 className="text-xl font-bold text-[#4A3B32]">AI Generate Flashcards</h3>
+                                <Sparkles className="h-5 w-5 text-[#1E5C42]" />
+                                <h3 className="text-xl font-bold text-[#163628]">AI Generate Flashcards</h3>
                             </div>
                             <button onClick={() => setShowAIModal(false)} className="p-2 hover:bg-[#FDF6F0] rounded-lg transition-colors">
                                 <X className="h-5 w-5" />
@@ -495,11 +503,11 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
 
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-[#4A3B32] mb-2">Topic</label>
+                                <label className="block text-sm font-medium text-[#163628] mb-2">Topic</label>
                                 <select
                                     value={aiFormData.topic}
                                     onChange={(e) => setAiFormData({ ...aiFormData, topic: e.target.value })}
-                                    className="w-full px-4 py-2 border border-[#E6D5CC] rounded-lg focus:ring-2 focus:ring-[#C8A288] outline-none"
+                                    className="w-full px-4 py-2 border border-[#E6D5CC] rounded-lg focus:ring-2 focus:ring-[#1E5C42] outline-none"
                                 >
                                     <option value="">Select a topic</option>
                                     {availableTopics.map((topic, idx) => (
@@ -511,23 +519,23 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
 
                             {aiFormData.topic === 'custom' && (
                                 <div>
-                                    <label className="block text-sm font-medium text-[#4A3B32] mb-2">Custom Topic</label>
+                                    <label className="block text-sm font-medium text-[#163628] mb-2">Custom Topic</label>
                                     <input
                                         type="text"
                                         value={aiFormData.customTopic}
                                         onChange={(e) => setAiFormData({ ...aiFormData, customTopic: e.target.value })}
                                         placeholder="Enter custom topic"
-                                        className="w-full px-4 py-2 border border-[#E6D5CC] rounded-lg focus:ring-2 focus:ring-[#C8A288] outline-none"
+                                        className="w-full px-4 py-2 border border-[#E6D5CC] rounded-lg focus:ring-2 focus:ring-[#1E5C42] outline-none"
                                     />
                                 </div>
                             )}
 
                             <div>
-                                <label className="block text-sm font-medium text-[#4A3B32] mb-2">Number of Cards</label>
+                                <label className="block text-sm font-medium text-[#163628] mb-2">Number of Cards</label>
                                 <select
                                     value={aiFormData.numCards}
                                     onChange={(e) => setAiFormData({ ...aiFormData, numCards: parseInt(e.target.value) })}
-                                    className="w-full px-4 py-2 border border-[#E6D5CC] rounded-lg focus:ring-2 focus:ring-[#C8A288] outline-none"
+                                    className="w-full px-4 py-2 border border-[#E6D5CC] rounded-lg focus:ring-2 focus:ring-[#1E5C42] outline-none"
                                 >
                                     <option value={5}>5 cards</option>
                                     <option value={8}>8 cards</option>
@@ -557,7 +565,7 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
                             <button
                                 onClick={handleAIGenerate}
                                 disabled={aiGenerating}
-                                className="flex-1 py-2 bg-gradient-to-r from-[#C8A288] to-[#A08072] text-white rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+                                className="flex-1 py-2 bg-gradient-to-r from-[#1E5C42] to-[#163628] text-white rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
                             >
                                 {aiGenerating ? (
                                     <>
@@ -581,7 +589,7 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
                     <div className="bg-white rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                         <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-xl font-bold text-[#4A3B32]">Create Flashcard Set</h3>
+                            <h3 className="text-xl font-bold text-[#163628]">Create Flashcard Set</h3>
                             <button
                                 onClick={() => setShowCreateModal(false)}
                                 className="p-2 hover:bg-[#FDF6F0] rounded-lg transition-colors"
@@ -592,22 +600,22 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
 
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-[#4A3B32] mb-2">Title</label>
+                                <label className="block text-sm font-medium text-[#163628] mb-2">Title</label>
                                 <input
                                     type="text"
                                     value={formData.title}
                                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                                     placeholder="e.g., Biology Chapter 3"
-                                    className="w-full px-4 py-2 border border-[#E6D5CC] rounded-lg focus:ring-2 focus:ring-[#C8A288] outline-none"
+                                    className="w-full px-4 py-2 border border-[#E6D5CC] rounded-lg focus:ring-2 focus:ring-[#1E5C42] outline-none"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-[#4A3B32] mb-2">Topic (Optional)</label>
+                                <label className="block text-sm font-medium text-[#163628] mb-2">Topic (Optional)</label>
                                 <select
                                     value={formData.topic}
                                     onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
-                                    className="w-full px-4 py-2 border border-[#E6D5CC] rounded-lg focus:ring-2 focus:ring-[#C8A288] outline-none"
+                                    className="w-full px-4 py-2 border border-[#E6D5CC] rounded-lg focus:ring-2 focus:ring-[#1E5C42] outline-none"
                                 >
                                     <option value="">Select a topic</option>
                                     {availableTopics.map((topic, idx) => (
@@ -618,10 +626,10 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
 
                             <div>
                                 <div className="flex items-center justify-between mb-2">
-                                    <label className="block text-sm font-medium text-[#4A3B32]">Cards</label>
+                                    <label className="block text-sm font-medium text-[#163628]">Cards</label>
                                     <button
                                         onClick={addCard}
-                                        className="text-sm text-[#C8A288] hover:text-[#B08B72] font-medium"
+                                        className="text-sm text-[#1E5C42] hover:text-[#163628] font-medium"
                                     >
                                         + Add Card
                                     </button>
@@ -630,7 +638,7 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
                                     {formData.cards.map((card, index) => (
                                         <div key={index} className="border border-[#E6D5CC] rounded-lg p-4">
                                             <div className="flex items-center justify-between mb-2">
-                                                <span className="text-sm font-medium text-[#8a6a5c]">Card {index + 1}</span>
+                                                <span className="text-sm font-medium text-[#5E5046]">Card {index + 1}</span>
                                                 {formData.cards.length > 1 && (
                                                     <button
                                                         onClick={() => removeCard(index)}
@@ -645,14 +653,14 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
                                                 value={card.front}
                                                 onChange={(e) => updateCard(index, 'front', e.target.value)}
                                                 placeholder="Front (Question)"
-                                                className="w-full px-3 py-2 border border-[#E6D5CC] rounded-lg mb-2 focus:ring-2 focus:ring-[#C8A288] outline-none"
+                                                className="w-full px-3 py-2 border border-[#E6D5CC] rounded-lg mb-2 focus:ring-2 focus:ring-[#1E5C42] outline-none"
                                             />
                                             <textarea
                                                 value={card.back}
                                                 onChange={(e) => updateCard(index, 'back', e.target.value)}
                                                 placeholder="Back (Answer)"
                                                 rows={2}
-                                                className="w-full px-3 py-2 border border-[#E6D5CC] rounded-lg focus:ring-2 focus:ring-[#C8A288] outline-none resize-none"
+                                                className="w-full px-3 py-2 border border-[#E6D5CC] rounded-lg focus:ring-2 focus:ring-[#1E5C42] outline-none resize-none"
                                             />
                                         </div>
                                     ))}
@@ -669,7 +677,7 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
                             </button>
                             <button
                                 onClick={handleCreateSet}
-                                className="flex-1 py-2 bg-[#C8A288] text-white rounded-lg hover:bg-[#B08B72] transition-colors"
+                                className="flex-1 py-2 bg-[#1E5C42] text-white rounded-lg hover:bg-[#163628] transition-colors"
                             >
                                 Create Set
                             </button>

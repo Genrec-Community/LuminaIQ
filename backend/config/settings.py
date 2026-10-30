@@ -68,6 +68,66 @@ class Settings(BaseSettings):
     LLM_API_KEY: str = Field(default="")
     LLM_BASE_URL: str = Field(default="")
     LLM_MODEL: str = Field(default="gpt-4.1-mini")
+    # Which chat model provider to use:
+    #   "auto"   → Azure OpenAI if configured, otherwise the OpenAI-compatible LLM_* provider
+    #   "azure"  → always Azure OpenAI
+    #   "openai" → always the OpenAI-compatible provider (LLM_BASE_URL / LLM_API_KEY / LLM_MODEL),
+    #              e.g. Inception Mercury, while embeddings can still use Azure
+    LLM_PROVIDER: str = Field(default="auto")
+    # Optional reasoning effort for providers that support it (e.g. Mercury: "low" | "medium" | "high")
+    LLM_REASONING_EFFORT: str = Field(default="")
+    # Optional cheaper model (same provider, base URL and key) for bulk structured
+    # work: quiz questions, flashcards, mindmaps, topic summaries and knowledge-graph
+    # links. Empty = everything uses LLM_MODEL. Not used with Azure.
+    LLM_LIGHT_MODEL: str = Field(default="")
+    # Optional stronger "Deep" model: Topper chat answers in Deep mode, Topper cram
+    # cards and Visual Lab builds. Empty = LLM_MODEL. Base URL / key default to the
+    # main provider's, so a different OpenAI-compatible provider can be used here.
+    LLM_DEEP_MODEL: str = Field(default="")
+    LLM_DEEP_BASE_URL: str = Field(default="")
+    LLM_DEEP_API_KEY: str = Field(default="")
+    # Model per plan, so paying users get better models. Comma-separated plan=model
+    # pairs on the main provider (with Azure, the values are deployment names), e.g.
+    #   free=gpt-4.1-nano,scholar=gpt-4.1-mini,topper=gpt-4.1,institution=gpt-4.1-mini
+    # A plan left out uses LLM_MODEL (or LLM_LIGHT_MODEL for bulk work). Deep answers
+    # always use LLM_DEEP_MODEL.
+    LLM_TIER_MODELS: str = Field(default="")
+    # ── Razorpay (payments) ── fill these in Render; empty = payments disabled
+    RAZORPAY_KEY_ID: str = Field(default="")            # rzp_test_... / rzp_live_...
+    RAZORPAY_KEY_SECRET: str = Field(default="")
+    RAZORPAY_WEBHOOK_SECRET: str = Field(default="")    # set when creating the webhook
+    # Optional Razorpay Subscription plan IDs. When set, Scholar / Topper renew
+    # automatically. When empty, students pay once for a month or a year (one-time
+    # order, no auto-renewal), which needs no setup beyond the keys.
+    # scripts/create_razorpay_plans.py creates the plans and prints the IDs.
+    RAZORPAY_PLAN_SCHOLAR_MONTHLY: str = Field(default="")
+    RAZORPAY_PLAN_SCHOLAR_YEARLY: str = Field(default="")
+    RAZORPAY_PLAN_TOPPER_MONTHLY: str = Field(default="")
+    RAZORPAY_PLAN_TOPPER_YEARLY: str = Field(default="")
+    # ── Schools (institution plan) ──
+    # Domain of school-created student sign-in IDs (studentname-07@luminaiq.fun).
+    # These are sign-in names only: no mailbox exists and no email is ever sent to them.
+    STUDENT_LOGIN_DOMAIN: str = Field(default="luminaiq.fun")
+    # New schools wait for a platform admin to approve them before anything works.
+    INSTITUTION_REQUIRE_APPROVAL: bool = Field(default=True)
+    # Free trial given when a school is approved (0 = no trial: pay first).
+    INSTITUTION_TRIAL_DAYS: int = Field(default=14)
+    # Our GSTIN. Empty = no GST is added to school prices; set it to add 18% GST.
+    INSTITUTION_GSTIN: str = Field(default="")
+    # Comma-separated emails that can use the platform admin console (/platform),
+    # in addition to users with the 'owner' or 'admin' role in user_roles.
+    PLATFORM_ADMIN_EMAILS: str = Field(default="")
+    # Day boundary for daily plan limits
+    PLAN_TIMEZONE: str = Field(default="Asia/Kolkata")
+    # Enforce the per-plan limits in services/plans.py. With false, usage is still
+    # counted but nothing is blocked (every plan is effectively unlimited).
+    PLAN_LIMITS_ENABLED: bool = Field(default=True)
+    # On boot, make one tiny call to the LLM, embeddings, Qdrant and storage and log
+    # "[SelfCheck] ..." lines (see services/self_check.py)
+    SELF_CHECK_ON_STARTUP: bool = Field(default=True)
+    # Hourly sweep that marks schools whose paid term ended as expired.
+    # Off on the test backend, which shares the live database.
+    SCHOOL_EXPIRY_SWEEP: bool = Field(default=True)
 
     # Webhook
     MAIN_API_WEBHOOK_SECRET: str = Field(default="supersecretwebhook")
@@ -80,6 +140,16 @@ class Settings(BaseSettings):
     EMBEDDING_BASE_URL: str = Field(default="")
     EMBEDDING_MODEL: str = Field(default="text-embedding-3-small")
     EMBEDDING_DIMENSION: int = 1536
+    # "auto" → Azure if configured, else OpenAI-compatible EMBEDDING_BASE_URL/EMBEDDING_API_KEY;
+    # "azure" or "openai" to force one. EMBEDDING_DIMENSION must match the chosen model.
+    EMBEDDING_PROVIDER: str = Field(default="auto")
+    # Ask the provider to return EMBEDDING_DIMENSION-sized vectors (the OpenAI
+    # "dimensions" parameter). Use with models that support shortening, e.g.
+    # Gemini gemini-embedding-001 (768/1536/3072) or OpenAI text-embedding-3-*.
+    EMBEDDING_SEND_DIMENSIONS: bool = Field(default=False)
+    # Appended to book collection names (project_<id><suffix>). Change it when switching
+    # embedding model: books are then re-embedded from their stored text automatically.
+    QDRANT_COLLECTION_SUFFIX: str = Field(default="")
 
     # ─────────────────────────────────────────────────────────
     # Qdrant Vector Store
@@ -94,6 +164,18 @@ class Settings(BaseSettings):
     # Format: https://<region>.api.cognitive.microsoft.com/
     AZURE_CV_ENDPOINT: str = ""
     AZURE_CV_KEY: str = ""
+    # Google Cloud Vision OCR for scanned PDFs: service-account JSON key, raw or base64
+    GOOGLE_VISION_CREDENTIALS: str = ""
+    # Self-hosted Indra OCR service (ocr-service/), tried before Google Vision
+    INDRA_OCR_URL: str = ""
+    INDRA_OCR_TOKEN: str = ""
+    # Pages per calendar month (UTC) sent to Google Vision; the rest use Tesseract.
+    # Google's free tier is 1,000 pages a month, so this stays under it.
+    GOOGLE_VISION_MONTHLY_PAGES: int = 900
+    # Local OCR (Tesseract, in the Docker image) for scanned PDFs when Azure isn't set
+    OCR_LOCAL_ENABLED: bool = True
+    OCR_DPI: int = 200
+    OCR_MAX_PAGES: int = 600
 
     # Together AI (optional - for some services)
     TOGETHER_API_KEY: str = Field(default="")
@@ -115,6 +197,7 @@ class Settings(BaseSettings):
         "https://lumina-iq-livid.vercel.app",
         "https://luminaiq.fun",
         "https://www.luminaiq.fun",
+        "https://test.luminaiq.fun",
     ]
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")

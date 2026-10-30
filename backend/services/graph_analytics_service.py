@@ -11,7 +11,7 @@ Features:
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from collections import Counter, defaultdict
-from db.client import get_supabase_client
+from db.client import get_supabase_client, async_db
 from services.llm_service import llm_service
 from services.embedding_service import embedding_service
 from services.qdrant_service import qdrant_service
@@ -62,7 +62,7 @@ class GraphAnalyticsService:
                 "metadata": metadata or {}
             }
             
-            result = self.client.table("graph_analytics").insert(record).execute()
+            result = (await async_db(lambda: self.client.table("graph_analytics").insert(record).execute()))
             logger.info(f"Recorded {event_type} event for topic '{topic}'")
             
             return result.data[0] if result.data else {}
@@ -85,7 +85,7 @@ class GraphAnalyticsService:
                 if "id" not in interaction:
                     interaction["id"] = str(uuid4())
             
-            self.client.table("graph_analytics").insert(interactions).execute()
+            (await async_db(lambda: self.client.table("graph_analytics").insert(interactions).execute()))
             logger.info(f"Recorded {len(interactions)} batch interactions")
             return len(interactions)
             
@@ -111,11 +111,11 @@ class GraphAnalyticsService:
             # Check cache first
             if not force_regenerate:
                 cached = (
-                    self.client.table("topic_summaries")
+                    (await async_db(lambda: self.client.table("topic_summaries")
                     .select("*")
                     .eq("project_id", project_id)
                     .eq("topic", topic)
-                    .execute()
+                    .execute()))
                 )
                 
                 if cached.data:
@@ -145,27 +145,52 @@ class GraphAnalyticsService:
             
             # Search for relevant content
             collection_name = f"project_{project_id}"
-            query_embedding = await embedding_service.generate_embedding(topic)
+            try:
+                query_embedding = await embedding_service.generate_embedding(topic)
+                results = await qdrant_service.search(
+                    collection_name=collection_name,
+                    query_vector=query_embedding,
+                    limit=8
+                )
+            except Exception as search_err:
+                # Embeddings/index unavailable: the stored-text path below takes over
+                logger.warning(f"Vector search failed for topic '{topic}': {search_err}")
+                results = []
             
-            results = await qdrant_service.search(
-                collection_name=collection_name,
-                query_vector=query_embedding,
-                limit=8
-            )
-            
-            if not results:
-                return {
-                    "topic": topic,
-                    "summary": f"No content found for '{topic}' in the uploaded documents.",
-                    "sources": [],
-                    "cached": False
-                }
-            
-            # Build context from search results
             context_parts = []
             sources = []
             seen_docs = set()
-            
+            reindexing = []
+
+            if not results:
+                # Vector search found nothing even though the project has documents:
+                # the search index is missing. Rebuild it in the background and
+                # answer from the stored document text in the meantime.
+                from services.document_service import document_service
+
+                try:
+                    reindexing = await document_service.ensure_project_indexed(project_id)
+                except Exception as reindex_err:
+                    logger.error(f"Failed to check/rebuild index for {project_id}: {reindex_err}")
+
+                context_parts, sources = await self.keyword_context_from_stored_text(
+                    project_id, topic
+                )
+
+                if not context_parts:
+                    msg = f"No content found for '{topic}' in the uploaded documents."
+                    if reindexing:
+                        msg = (
+                            f"Your documents are being re-indexed ({len(reindexing)} "
+                            f"document(s)). Please try '{topic}' again in a few minutes."
+                        )
+                    return {
+                        "topic": topic,
+                        "summary": msg,
+                        "sources": [],
+                        "cached": False
+                    }
+
             for hit in results:
                 context_parts.append(hit["text"])
                 doc_id = hit.get("document_id", "")
@@ -174,10 +199,10 @@ class GraphAnalyticsService:
                     # Get document name
                     try:
                         doc_res = (
-                            self.client.table("documents")
+                            (await async_db(lambda: self.client.table("documents")
                             .select("filename")
                             .eq("id", doc_id)
-                            .execute()
+                            .execute()))
                         )
                         if doc_res.data:
                             sources.append({
@@ -208,12 +233,22 @@ Generate the summary now:"""
 
             messages = [{"role": "user", "content": prompt}]
             summary = await llm_service.chat_completion(
-                messages, temperature=0.3, max_tokens=1000
+                messages, temperature=0.3, max_tokens=1000, light=True
             )
             
+            # Don't cache summaries built from the keyword fallback — once the
+            # index is rebuilt, vector search gives better context.
+            if not results:
+                return {
+                    "topic": topic,
+                    "summary": summary,
+                    "sources": sources,
+                    "cached": False
+                }
+
             # Cache the summary
             try:
-                self.client.table("topic_summaries").upsert(
+                (await async_db(lambda: self.client.table("topic_summaries").upsert(
                     {
                         "project_id": project_id,
                         "topic": topic,
@@ -222,7 +257,7 @@ Generate the summary now:"""
                         "updated_at": datetime.utcnow().isoformat()
                     },
                     on_conflict="project_id,topic"
-                ).execute()
+                ).execute()))
             except Exception as cache_err:
                 logger.warning(f"Failed to cache summary: {cache_err}")
             
@@ -243,6 +278,102 @@ Generate the summary now:"""
                 "sources": [],
                 "cached": False
             }
+
+    async def keyword_context_from_stored_text(
+        self,
+        project_id: str,
+        topic: str,
+        max_passages: int = 8,
+        window: int = 1200,
+        document_ids: Optional[List[str]] = None,
+        per_passage_sources: bool = False,
+        overview_if_empty: bool = False,
+    ) -> tuple:
+        """
+        Fallback retrieval when the vector index is unavailable: scan each
+        document's stored text for passages that mention the topic's keywords.
+        Returns (context_parts, sources). With per_passage_sources, sources[i]
+        describes context_parts[i] (so inline citations [n] line up).
+        """
+        import re
+        from services.document_service import document_service
+
+        stopwords = {
+            "a", "an", "and", "the", "of", "in", "on", "by", "to", "for", "with",
+            "its", "their", "is", "are", "as", "at", "from", "or", "e", "g", "eg",
+            # question words that would otherwise match every page
+            "what", "which", "who", "whom", "why", "how", "when", "where", "does",
+            "did", "can", "could", "would", "should", "this", "that", "these",
+            "those", "about", "tell", "explain", "describe", "give", "me", "you",
+            "your", "book", "document", "chapter", "text", "please", "main", "mean",
+        }
+        keywords = [
+            w for w in re.findall(r"[a-z0-9]+", topic.lower())
+            if len(w) > 2 and w not in stopwords
+        ]
+        if not keywords and not overview_if_empty:
+            return [], []
+
+        try:
+            query = (
+                self.client.table("documents")
+                .select("id, project_id, filename, text_storage_path")
+                .eq("project_id", project_id)
+                .eq("upload_status", "completed")
+            )
+            if document_ids:
+                query = query.in_("id", document_ids)
+            docs = await async_db(lambda: query.execute())
+        except Exception as e:
+            logger.warning(f"Keyword fallback: failed to list documents: {e}")
+            return [], []
+
+        texts = []  # (doc, text)
+        for doc in docs.data or []:
+            text = await document_service.load_stored_text(doc)
+            if text:
+                texts.append((doc, text))
+
+        candidates = []  # (score, passage, doc)
+        if keywords:
+            for doc, text in texts:
+                lower = text.lower()
+                for start in range(0, len(lower), window // 2):
+                    segment = lower[start:start + window]
+                    # Require most keywords to appear so passages are actually on-topic
+                    distinct = sum(1 for k in keywords if k in segment)
+                    if distinct >= max(1, (len(keywords) + 1) // 2):
+                        score = sum(segment.count(k) for k in keywords)
+                        candidates.append((distinct * 10 + score, text[start:start + window], doc))
+            candidates.sort(key=lambda c: c[0], reverse=True)
+
+        if not candidates and overview_if_empty:
+            # Broad question ("what is this book about?"): opening pages plus
+            # evenly spaced samples give the model a view of the whole book.
+            per_doc = max(2, max_passages // max(1, len(texts)))
+            for doc, text in texts:
+                step = max(window, len(text) // per_doc)
+                for i, start in enumerate(range(0, len(text), step)):
+                    if i >= per_doc:
+                        break
+                    candidates.append((0, text[start:start + window], doc))
+
+        context_parts, sources, seen_docs = [], [], set()
+        for _, passage, doc in candidates[:max_passages]:
+            context_parts.append(passage)
+            if per_passage_sources or doc["id"] not in seen_docs:
+                seen_docs.add(doc["id"])
+                sources.append({
+                    "doc_id": doc["id"],
+                    "doc_name": doc["filename"],
+                    "chunk_text": passage if per_passage_sources else passage[:100] + "...",
+                })
+
+        logger.info(
+            f"Keyword fallback for '{topic}': {len(context_parts)} passages "
+            f"from {len(seen_docs)} document(s)"
+        )
+        return context_parts, sources
 
     # ============== Learning Suggestions ==============
 
@@ -265,13 +396,13 @@ Generate the summary now:"""
         try:
             # Get user's interaction history
             history = (
-                self.client.table("graph_analytics")
+                (await async_db(lambda: self.client.table("graph_analytics")
                 .select("topic, event_type, duration_ms, created_at")
                 .eq("project_id", project_id)
                 .eq("user_id", user_id)
                 .order("created_at", desc=True)
                 .limit(100)
-                .execute()
+                .execute()))
             )
             
             interactions = history.data or []
@@ -379,7 +510,7 @@ Generate the summary now:"""
                 "started_at": datetime.utcnow().isoformat()
             }
             
-            result = self.client.table("learning_sessions").insert(session).execute()
+            result = (await async_db(lambda: self.client.table("learning_sessions").insert(session).execute()))
             session_id = result.data[0]["id"] if result.data else session["id"]
             
             logger.info(f"Started learning session {session_id}")
@@ -404,10 +535,10 @@ Generate the summary now:"""
             }
             
             result = (
-                self.client.table("learning_sessions")
+                (await async_db(lambda: self.client.table("learning_sessions")
                 .update(update)
                 .eq("id", session_id)
-                .execute()
+                .execute()))
             )
             
             logger.info(f"Ended learning session {session_id}")
@@ -431,23 +562,23 @@ Generate the summary now:"""
             
             # Get all interactions
             interactions = (
-                self.client.table("graph_analytics")
+                (await async_db(lambda: self.client.table("graph_analytics")
                 .select("*")
                 .eq("project_id", project_id)
                 .eq("user_id", user_id)
                 .gte("created_at", cutoff)
                 .order("created_at", desc=True)
-                .execute()
+                .execute()))
             ).data or []
             
             # Get sessions
             sessions = (
-                self.client.table("learning_sessions")
+                (await async_db(lambda: self.client.table("learning_sessions")
                 .select("*")
                 .eq("project_id", project_id)
                 .eq("user_id", user_id)
                 .gte("started_at", cutoff)
-                .execute()
+                .execute()))
             ).data or []
             
             # Analyze

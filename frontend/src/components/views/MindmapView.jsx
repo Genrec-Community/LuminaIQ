@@ -172,7 +172,7 @@ const MindmapRenderer = ({ data }) => {
                     <div
                         className={`px-3 py-2 md:px-4 md:py-2.5 rounded-xl border-2 shadow-sm transition-all duration-200 max-w-[150px] md:max-w-[200px] text-center ${
                             isRoot
-                                ? 'bg-gradient-to-br from-[#C8A288] to-[#A08072] border-[#8B7060] text-white font-bold text-sm md:text-base px-4 py-2.5 md:px-6 md:py-3.5 shadow-lg shadow-[#C8A288]/30'
+                                ? 'bg-gradient-to-br from-[#1E5C42] to-[#163628] border-[#8B7060] text-white font-bold text-sm md:text-base px-4 py-2.5 md:px-6 md:py-3.5 shadow-lg shadow-[#1E5C42]/30'
                                 : depth === 1
                                     ? `font-semibold text-xs md:text-sm`
                                     : 'bg-white text-xs font-medium'
@@ -180,7 +180,7 @@ const MindmapRenderer = ({ data }) => {
                         style={!isRoot ? {
                             backgroundColor: depth === 1 ? color.bg : '#fff',
                             borderColor: depth === 1 ? color.border : color.border + '60',
-                            color: depth === 1 ? color.text : '#4A3B32',
+                            color: depth === 1 ? color.text : '#163628',
                         } : {}}
                     >
                         {node.label}
@@ -198,7 +198,7 @@ const MindmapRenderer = ({ data }) => {
                         {/* Vertical connector */}
                         <div
                             className="absolute left-1/2 -top-3 w-0.5 h-3"
-                            style={{ backgroundColor: isRoot ? '#C8A288' : color.border }}
+                            style={{ backgroundColor: isRoot ? '#1E5C42' : color.border }}
                         />
                         
                         <div className="flex gap-2 md:gap-4 items-start relative">
@@ -207,7 +207,7 @@ const MindmapRenderer = ({ data }) => {
                                 <div
                                     className="absolute top-0 h-0.5 left-[calc(50%/(var(--count)))] right-[calc(50%/(var(--count)))]"
                                     style={{
-                                        backgroundColor: isRoot ? '#C8A288' : color.border,
+                                        backgroundColor: isRoot ? '#1E5C42' : color.border,
                                         left: `${100 / (node.children.length * 2)}%`,
                                         right: `${100 / (node.children.length * 2)}%`,
                                     }}
@@ -233,7 +233,7 @@ const MindmapRenderer = ({ data }) => {
 
     if (!tree) {
         return (
-            <div className="flex items-center justify-center h-full text-[#8a6a5c]">
+            <div className="flex items-center justify-center h-full text-[#5E5046]">
                 <p>No mindmap data available</p>
             </div>
         );
@@ -244,19 +244,19 @@ const MindmapRenderer = ({ data }) => {
             {/* Zoom Controls */}
             <div className="absolute top-3 right-3 z-10 flex flex-col gap-1 bg-white rounded-xl border border-[#E6D5CC] shadow-md p-1">
                 <button onClick={() => setZoom(z => Math.min(2, z + 0.2))} className="p-2 hover:bg-[#FDF6F0] rounded-lg transition-colors" title="Zoom In">
-                    <ZoomIn className="h-4 w-4 text-[#4A3B32]" />
+                    <ZoomIn className="h-4 w-4 text-[#163628]" />
                 </button>
                 <button onClick={() => setZoom(z => Math.max(0.3, z - 0.2))} className="p-2 hover:bg-[#FDF6F0] rounded-lg transition-colors" title="Zoom Out">
-                    <ZoomOut className="h-4 w-4 text-[#4A3B32]" />
+                    <ZoomOut className="h-4 w-4 text-[#163628]" />
                 </button>
                 <div className="w-full h-px bg-[#E6D5CC]" />
                 <button onClick={resetView} className="p-2 hover:bg-[#FDF6F0] rounded-lg transition-colors" title="Reset View">
-                    <Maximize2 className="h-4 w-4 text-[#4A3B32]" />
+                    <Maximize2 className="h-4 w-4 text-[#163628]" />
                 </button>
             </div>
 
             {/* Zoom indicator */}
-            <div className="absolute bottom-3 right-3 z-10 px-2.5 py-1 bg-white/80 backdrop-blur-sm rounded-full text-xs text-[#8a6a5c] border border-[#E6D5CC]">
+            <div className="absolute bottom-3 right-3 z-10 px-2.5 py-1 bg-white/80 backdrop-blur-sm rounded-full text-xs text-[#5E5046] border border-[#E6D5CC]">
                 {Math.round(zoom * 100)}%
             </div>
 
@@ -377,7 +377,7 @@ const MindmapView = ({ projectId, availableTopics, selectedDocuments }) => {
     if (loading) {
         return (
             <div className="h-full flex items-center justify-center">
-                <Loader2 className="h-8 w-8 text-[#C8A288] animate-spin" />
+                <Loader2 className="h-8 w-8 text-[#1E5C42] animate-spin" />
             </div>
         );
     }
@@ -388,15 +388,15 @@ const MindmapView = ({ projectId, availableTopics, selectedDocuments }) => {
             <div className="h-full flex flex-col">
                 <div className="flex items-center justify-between px-3 md:px-6 py-2 md:py-3 border-b border-[#E6D5CC]/50 bg-white/50 shrink-0">
                     <div className="min-w-0">
-                        <h2 className="text-base md:text-lg font-bold text-[#4A3B32] truncate">{selectedMindmap.title}</h2>
-                        <p className="text-xs text-[#8a6a5c]">
+                        <h2 className="text-base md:text-lg font-bold text-[#163628] truncate">{selectedMindmap.title}</h2>
+                        <p className="text-xs text-[#5E5046]">
                             {selectedMindmap.topic} · {selectedMindmap.data?.nodes?.length || 0} nodes
                         </p>
                     </div>
                     <div className="flex gap-2 shrink-0">
                         <button
                             onClick={() => setSelectedMindmap(null)}
-                            className="px-4 py-2 text-sm text-[#8a6a5c] hover:bg-[#FDF6F0] rounded-lg transition-colors"
+                            className="px-4 py-2 text-sm text-[#5E5046] hover:bg-[#FDF6F0] rounded-lg transition-colors"
                         >
                             Back to List
                         </button>
@@ -417,12 +417,12 @@ const MindmapView = ({ projectId, availableTopics, selectedDocuments }) => {
             <div className="max-w-6xl mx-auto">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 md:mb-8">
                     <div>
-                        <h2 className="text-xl md:text-2xl font-bold text-[#4A3B32]">Mindmaps</h2>
-                        <p className="text-sm md:text-base text-[#8a6a5c]">Generate visual mindmaps from your documents</p>
+                        <h2 className="text-xl md:text-2xl font-bold text-[#163628]">Mindmaps</h2>
+                        <p className="text-sm md:text-base text-[#5E5046]">Generate visual mindmaps from your documents</p>
                     </div>
                     <button
                         onClick={() => setShowCreateModal(true)}
-                        className="flex items-center justify-center gap-2 px-4 py-2 bg-[#C8A288] text-white rounded-lg hover:bg-[#B08B72] transition-colors shrink-0 text-sm md:text-base"
+                        className="flex items-center justify-center gap-2 px-4 py-2 bg-[#1E5C42] text-white rounded-lg hover:bg-[#163628] transition-colors shrink-0 text-sm md:text-base"
                     >
                         <Plus className="h-5 w-5" />
                         Generate Mindmap
@@ -432,11 +432,11 @@ const MindmapView = ({ projectId, availableTopics, selectedDocuments }) => {
                 {mindmaps.length === 0 ? (
                     <div className="text-center py-16">
                         <Zap className="h-16 w-16 text-[#E6D5CC] mx-auto mb-4" />
-                        <h3 className="text-xl font-bold text-[#4A3B32] mb-2">No Mindmaps Yet</h3>
-                        <p className="text-[#8a6a5c] mb-6">Generate your first mindmap to visualize concepts</p>
+                        <h3 className="text-xl font-bold text-[#163628] mb-2">No Mindmaps Yet</h3>
+                        <p className="text-[#5E5046] mb-6">Generate your first mindmap to visualize concepts</p>
                         <button
                             onClick={() => setShowCreateModal(true)}
-                            className="px-6 py-3 bg-[#C8A288] text-white rounded-lg hover:bg-[#B08B72] transition-colors"
+                            className="px-6 py-3 bg-[#1E5C42] text-white rounded-lg hover:bg-[#163628] transition-colors"
                         >
                             Generate Your First Mindmap
                         </button>
@@ -451,8 +451,8 @@ const MindmapView = ({ projectId, availableTopics, selectedDocuments }) => {
                             >
                                 <div className="flex items-start justify-between mb-3">
                                     <div className="flex-1 min-w-0">
-                                        <h3 className="font-bold text-[#4A3B32] mb-1 truncate">{mindmap.title}</h3>
-                                        <p className="text-sm text-[#8a6a5c] truncate">{mindmap.topic}</p>
+                                        <h3 className="font-bold text-[#163628] mb-1 truncate">{mindmap.title}</h3>
+                                        <p className="text-sm text-[#5E5046] truncate">{mindmap.topic}</p>
                                     </div>
                                     <button
                                         onClick={(e) => deleteMindmap(mindmap.id, e)}
@@ -464,18 +464,18 @@ const MindmapView = ({ projectId, availableTopics, selectedDocuments }) => {
                                 
                                 {/* Mini preview of node count */}
                                 <div className="flex items-center gap-3 mb-4">
-                                    <div className="flex items-center gap-1.5 text-xs text-[#8a6a5c] bg-[#FDF6F0] px-2.5 py-1 rounded-full">
+                                    <div className="flex items-center gap-1.5 text-xs text-[#5E5046] bg-[#FDF6F0] px-2.5 py-1 rounded-full">
                                         <Zap className="h-3 w-3" />
                                         {mindmap.data?.nodes?.length || mindmap.node_count || 0} nodes
                                     </div>
-                                    <p className="text-xs text-[#8a6a5c]">
+                                    <p className="text-xs text-[#5E5046]">
                                         {new Date(mindmap.created_at).toLocaleDateString()}
                                     </p>
                                 </div>
                                 
                                 <button
                                     onClick={(e) => { e.stopPropagation(); viewMindmap(mindmap); }}
-                                    className="w-full py-2 bg-[#C8A288] text-white rounded-lg hover:bg-[#B08B72] transition-colors flex items-center justify-center gap-2 text-sm"
+                                    className="w-full py-2 bg-[#1E5C42] text-white rounded-lg hover:bg-[#163628] transition-colors flex items-center justify-center gap-2 text-sm"
                                 >
                                     <Eye className="h-4 w-4" />
                                     View Mindmap
@@ -491,7 +491,7 @@ const MindmapView = ({ projectId, availableTopics, selectedDocuments }) => {
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
                     <div className="bg-white rounded-2xl p-6 max-w-md w-full">
                         <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-xl font-bold text-[#4A3B32]">Generate Mindmap</h3>
+                            <h3 className="text-xl font-bold text-[#163628]">Generate Mindmap</h3>
                             <button
                                 onClick={() => setShowCreateModal(false)}
                                 className="p-2 hover:bg-[#FDF6F0] rounded-lg transition-colors"
@@ -502,22 +502,22 @@ const MindmapView = ({ projectId, availableTopics, selectedDocuments }) => {
 
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-[#4A3B32] mb-2">Title</label>
+                                <label className="block text-sm font-medium text-[#163628] mb-2">Title</label>
                                 <input
                                     type="text"
                                     value={formData.title}
                                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                                     placeholder="e.g., Cell Biology Overview"
-                                    className="w-full px-4 py-2 border border-[#E6D5CC] rounded-lg focus:ring-2 focus:ring-[#C8A288] outline-none"
+                                    className="w-full px-4 py-2 border border-[#E6D5CC] rounded-lg focus:ring-2 focus:ring-[#1E5C42] outline-none"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-[#4A3B32] mb-2">Topic</label>
+                                <label className="block text-sm font-medium text-[#163628] mb-2">Topic</label>
                                 <select
                                     value={formData.topic}
                                     onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
-                                    className="w-full px-4 py-2 border border-[#E6D5CC] rounded-lg focus:ring-2 focus:ring-[#C8A288] outline-none"
+                                    className="w-full px-4 py-2 border border-[#E6D5CC] rounded-lg focus:ring-2 focus:ring-[#1E5C42] outline-none"
                                 >
                                     <option value="">Select a topic</option>
                                     {availableTopics.map((topic, idx) => (
@@ -529,13 +529,13 @@ const MindmapView = ({ projectId, availableTopics, selectedDocuments }) => {
 
                             {formData.topic === 'custom' && (
                                 <div>
-                                    <label className="block text-sm font-medium text-[#4A3B32] mb-2">Custom Topic</label>
+                                    <label className="block text-sm font-medium text-[#163628] mb-2">Custom Topic</label>
                                     <input
                                         type="text"
                                         value={formData.customTopic}
                                         onChange={(e) => setFormData({ ...formData, customTopic: e.target.value })}
                                         placeholder="Enter custom topic"
-                                        className="w-full px-4 py-2 border border-[#E6D5CC] rounded-lg focus:ring-2 focus:ring-[#C8A288] outline-none"
+                                        className="w-full px-4 py-2 border border-[#E6D5CC] rounded-lg focus:ring-2 focus:ring-[#1E5C42] outline-none"
                                     />
                                 </div>
                             )}
@@ -560,7 +560,7 @@ const MindmapView = ({ projectId, availableTopics, selectedDocuments }) => {
                             <button
                                 onClick={handleGenerateMindmap}
                                 disabled={generating}
-                                className="flex-1 py-2 bg-[#C8A288] text-white rounded-lg hover:bg-[#B08B72] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                className="flex-1 py-2 bg-[#1E5C42] text-white rounded-lg hover:bg-[#163628] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                             >
                                 {generating ? (
                                     <>

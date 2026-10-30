@@ -19,6 +19,7 @@ from api.deps import get_current_user
 from utils.background_jobs import job_manager, JobStatus
 from utils.cache import content_cache
 import logging
+from services.usage_service import usage, metered
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +93,14 @@ async def submit_job(
         else:
             raise HTTPException(400, f"Unknown job type: {job_type}")
     
+    # Plan limits: background generations count like the direct endpoints
+    metered(current_user, job_type)
+    if job_type == "generate_mcq":
+        n = (request.metadata or {}).get("num_questions") or 1
+        await usage.consume(current_user["id"], "questions", max(1, int(n)))
+    elif job_type in ("generate_notes", "generate_mindmap", "generate_flashcards"):
+        await usage.consume(current_user["id"], "tools")
+
     # Create job
     job = job_manager.create_job(
         job_type=job_type,

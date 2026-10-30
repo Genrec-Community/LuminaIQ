@@ -1,0 +1,101 @@
+# Test backend for test.luminaiq.fun, deployed from branch jaisamyukth-changes.
+#   - Azure Container App "luminaiq-api-test", next to the live "luminaiq-api"
+#   - Same settings as live (BACKEND_ENV secret), so it uses the SAME Supabase database
+#   - Scales to zero when idle, so it costs almost nothing between tests
+#   - The hourly school expiry sweep and the startup self-check are off here
+# The test website itself is the Vercel preview of jaisamyukth-changes (test.luminaiq.fun),
+# whose VITE_MAIN_API_URL points at this app. The live site deploys from main (azure.yml).
+name: Deploy test backend
+
+on:
+  push:
+    branches: [jaisamyukth-changes]
+    paths: ["backend/**", ".github/workflows/azure-test.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: azure-test-deploy
+  cancel-in-progress: true
+
+env:
+  RG: ${{ vars.AZURE_RESOURCE_GROUP || 'luminaiq' }}
+  APP: luminaiq-api-test
+  ENVIRONMENT: luminaiq-env
+  TEST_ORIGINS: https://test.luminaiq.fun,https://luminaiqfrontend-git-jaisamyukth-changes-genrecais-projects.vercel.app,http://localhost:5173,http://localhost:3000
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Build and push test image
+        run: |
+          set -euo pipefail
+          az extension add --name containerapp --upgrade --only-show-errors
+          SUB=$(az account show --query id -o tsv)
+          ACR="luminaiq$(echo -n "$SUB" | sha1sum | cut -c1-8)"
+          echo "ACR=$ACR" >> "$GITHUB_ENV"
+          az acr login -n "$ACR" --only-show-errors
+          # Own tag so the live deploy's "backend:latest" is never touched
+          IMAGE="$ACR.azurecr.io/backend-test:${GITHUB_SHA}"
+          docker build -t "$IMAGE" backend/
+          docker push "$IMAGE"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      - name: Deploy test backend
+        env:
+          BACKEND_ENV: ${{ secrets.BACKEND_ENV }}
+          PLATFORM_ADMINS: ${{ vars.PLATFORM_ADMIN_EMAILS }}
+        run: |
+          set -euo pipefail
+          SECRETS=()
+          ENVS=("PORT=8000" "SELF_CHECK_ON_STARTUP=false" "SCHOOL_EXPIRY_SWEEP=false" "BACKEND_CORS_ORIGINS=$TEST_ORIGINS")
+          [ -n "$PLATFORM_ADMINS" ] && ENVS+=("PLATFORM_ADMIN_EMAILS=$PLATFORM_ADMINS")
+          while IFS= read -r line || [ -n "$line" ]; do
+            line="${line%$'\r'}"
+            [[ -z "$line" || "$line" == \#* || "$line" != *=* ]] && continue
+            key="${line%%=*}"; val="${line#*=}"
+            val="${val%\"}"; val="${val#\"}"
+            case "$key" in PORT|SELF_CHECK_ON_STARTUP|SCHOOL_EXPIRY_SWEEP|BACKEND_CORS_ORIGINS) continue;; esac
+            if [ "$key" = "PLATFORM_ADMIN_EMAILS" ] && [ -n "$PLATFORM_ADMINS" ]; then continue; fi
+            name=$(echo "$key" | tr 'A-Z_' 'a-z-')
+            echo "::add-mask::$val"
+            SECRETS+=("$name=$val"); ENVS+=("$key=secretref:$name")
+          done <<< "$BACKEND_ENV"
+          if [ ${#SECRETS[@]} -eq 0 ]; then echo "::error::BACKEND_ENV secret is empty"; exit 1; fi
+          USER=$(az acr credential show -n "$ACR" --query username -o tsv)
+          PASS=$(az acr credential show -n "$ACR" --query "passwords[0].value" -o tsv)
+          echo "::add-mask::$PASS"
+          if az containerapp show -n "$APP" -g "$RG" >/dev/null 2>&1; then
+            az containerapp secret set -n "$APP" -g "$RG" --secrets "${SECRETS[@]}" -o none
+            az containerapp update -n "$APP" -g "$RG" --image "$IMAGE" \
+              --min-replicas 0 --max-replicas 2 --cpu 1 --memory 2Gi \
+              --set-env-vars "${ENVS[@]}" -o none
+          else
+            az containerapp create -n "$APP" -g "$RG" --environment "$ENVIRONMENT" --image "$IMAGE" \
+              --registry-server "$ACR.azurecr.io" --registry-username "$USER" --registry-password "$PASS" \
+              --target-port 8000 --ingress external --transport auto \
+              --min-replicas 0 --max-replicas 2 --cpu 1 --memory 2Gi \
+              --secrets "${SECRETS[@]}" --env-vars "${ENVS[@]}" -o none
+          fi
+
+      - name: Test backend URL and health
+        run: |
+          set -euo pipefail
+          FQDN=$(az containerapp show -n "$APP" -g "$RG" --query properties.configuration.ingress.fqdn -o tsv)
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "https://$FQDN/health" || true)
+            [ "$code" = "200" ] && break; sleep 10
+          done
+          echo "Health: $code"
+          { echo "### Test backend"; echo "- API: https://$FQDN/api/v1"; echo "- Health: $code"; } >> "$GITHUB_STEP_SUMMARY"
+          [ "$code" = "200" ]

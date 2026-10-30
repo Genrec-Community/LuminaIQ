@@ -10,6 +10,7 @@ from models.schemas import (
 )
 from typing import Any, List, Dict
 from api.deps import get_current_user
+from services.usage_service import usage, metered
 
 router = APIRouter()
 
@@ -63,6 +64,8 @@ async def generate_subjective_test(
     - medium: Paragraph answers (max 10 questions)
     - large: Detailed comprehensive answers (max 5 questions)
     """
+    metered(current_user, "subjective_test")
+    await usage.consume(current_user["id"], "tools")
     try:
         result = await evaluation_service.generate_subjective_test(
             project_id=request.project_id,
@@ -83,6 +86,8 @@ async def submit_subjective_test_endpoint(
     """
     Submit subjective test answers for evaluation
     """
+    metered(current_user, "grading")
+    await usage.consume(current_user["id"], "tools")
     try:
         result = await evaluation_service.submit_subjective_test(
             test_id=request.test_id, answers=request.answers
@@ -99,6 +104,8 @@ async def submit_evaluation(
     """
     Submit a subjective answer for AI evaluation (Single Question)
     """
+    metered(current_user, "grading")
+    await usage.consume(current_user["id"], "tools")
     try:
         result = await evaluation_service.evaluate_answer(
             project_id=request.project_id,

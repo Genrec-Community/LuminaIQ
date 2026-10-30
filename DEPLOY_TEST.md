@@ -1,0 +1,177 @@
+# Test environment — test.luminaiq.fun
+
+Branch: **`jaisamyukth-changes`** · Production (`main`, luminaiq.fun) is not touched.
+
+## Status
+
+| Piece | Resource | Status |
+|---|---|---|
+| Database / auth | Supabase project **Lumina IQ** (`bcosfvilvwyxtrctsmez`, ap-south-1) — **shared with production** | ✅ migration `004_topic_outline` applied |
+| Frontend | Vercel project **`luminaiq-test`** (`prj_QdOOgYdPFsppjAWfn5AFcqTDQQWL`) | ✅ created, deployed, domain attached |
+| Domain | `test.luminaiq.fun` → Vercel | ✅ resolving (Cloudflare CNAME) |
+| Supabase auth redirect | `https://test.luminaiq.fun/**` | ⏳ dashboard-only setting (step 2) |
+| Vector DB | new Qdrant Cloud cluster | ⚠️ should be set on the Render service (`QDRANT_URL`, `QDRANT_API_KEY`) — not verified by Claude |
+| Backend | Render service **`luminaiq-backend-test`** (`srv-db5p2k2jnfac73b8hpcg`), workspace *Jai Samyukth*, project *Luminaiq-test*, Singapore, free plan, Docker, root `backend/`, branch `jaisamyukth-changes` | ✅ live at https://luminaiq-backend-test.onrender.com |
+
+Production for comparison: Vercel project `lumina-iq` (luminaiq.fun, www.luminaiq.fun) and Render
+service `luminaiq-backend`. Neither was modified.
+
+## What is already configured
+
+### Vercel — `luminaiq-test`
+- Git: `Genrec-Community/LuminaIQ`, root directory `frontend`, framework Vite.
+- Domain `test.luminaiq.fun` is bound to branch `jaisamyukth-changes`
+  (every push to that branch redeploys the test site).
+- Ignored build step: builds **only** run for `jaisamyukth-changes`; pushes to `main` are skipped
+  so the test project never mirrors production.
+- Environment variables (all environments):
+
+  | Key | Value |
+  |---|---|
+  | `VITE_MAIN_API_URL` | `https://luminaiq-backend-test.onrender.com/api/v1` |
+  | `VITE_SUPABASE_URL` | `https://bcosfvilvwyxtrctsmez.supabase.co` |
+  | `VITE_SUPABASE_ANON_KEY` | Supabase legacy anon key (public, same as production) |
+
+  If Render gives the backend a different URL in step 4, update `VITE_MAIN_API_URL` in
+  Vercel → luminaiq-test → Settings → Environment Variables, then redeploy.
+- Deployment URL (Vercel login required because of deployment protection):
+  `luminaiq-test.vercel.app`. The custom domain is public.
+
+### Render — `luminaiq-backend-test`
+- Created manually in the dashboard (equivalent to `render.test.yaml`), auto-deploys on every push
+  to `jaisamyukth-changes`.
+- `BACKEND_CORS_ORIGINS` = `https://test.luminaiq.fun,https://luminaiq-test.vercel.app,http://localhost:5173`
+- Must carry the same Supabase / Azure OpenAI / `SECRET_KEY` variables as production
+  (`luminaiq-backend`, workspace *My Workspace*), with its own `QDRANT_URL` / `QDRANT_API_KEY`.
+- Health check: `GET /health` → `{"status":"healthy","service":"lumina-backend"}`.
+
+### AI providers (all OpenAI-compatible)
+The backend picks providers from env vars — any OpenAI-compatible API works:
+
+| Purpose | Switch | Settings |
+|---|---|---|
+| Chat / topics / quizzes | `LLM_PROVIDER` = `auto` \| `azure` \| `openai` | `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, optional `LLM_REASONING_EFFORT`, optional `LLM_LIGHT_MODEL` (cheaper model on the same provider for quiz questions, flashcards, mindmaps, topic summaries and knowledge-graph links; empty = `LLM_MODEL`) |
+| Book search (embeddings) | `EMBEDDING_PROVIDER` = `auto` \| `azure` \| `openai` | `EMBEDDING_BASE_URL`, `EMBEDDING_API_KEY`, `EMBEDDING_MODEL`, `EMBEDDING_DIMENSION` |
+
+`auto` = Azure OpenAI when `AZURE_OPENAI_*` is set, otherwise the OpenAI-compatible settings.
+
+Test service currently: `LLM_PROVIDER=openai`, `LLM_BASE_URL=https://api.inceptionlabs.ai/v1`,
+`LLM_MODEL=mercury-2.5`, `LLM_REASONING_EFFORT=low` (key stored only in Render).
+Mercury has no embeddings API, so embeddings still need Azure (`AZURE_OPENAI_*` with
+`EMBEDDING_MODEL=text-embedding-3-small`, `EMBEDDING_DIMENSION=1536`) or another
+OpenAI-compatible embeddings provider with `EMBEDDING_PROVIDER=openai`.
+
+#### Free embeddings with Google Gemini (no Azure needed)
+1. Get a free key at https://aistudio.google.com → **Get API key**.
+2. Set on the Render service:
+   ```
+   EMBEDDING_PROVIDER=openai
+   EMBEDDING_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
+   EMBEDDING_API_KEY=<gemini key>
+   EMBEDDING_MODEL=gemini-embedding-001
+   EMBEDDING_DIMENSION=768
+   EMBEDDING_SEND_DIMENSIONS=true
+   ```
+3. Save → redeploy. An empty collection with the old vector size is recreated automatically and
+   books re-embed from their stored text (failed attempts retry every 10 minutes).
+
+### Vercel deployment protection
+Turned **off** for `luminaiq-test` (Vercel Authentication was redirecting `test.luminaiq.fun`
+assets such as `site.webmanifest` to `vercel.com/sso-api`, which blocks every visitor not logged in
+to Vercel). The preview toolbar is disabled too. Production project settings are unchanged.
+
+### Supabase — `Lumina IQ`
+Applied `backend/migrations/004_topic_outline.sql` as migration `004_topic_outline`:
+- `documents.topic_outline JSONB DEFAULT '[]'` (+ column comment)
+- `idx_documents_project_status_created (project_id, upload_status, created_at)`
+- `idx_topic_relations_project_type (project_id, relation_type)`
+
+Additive only — production keeps working and simply ignores the new column.
+
+## Remaining steps (need your logins)
+
+### 1. Cloudflare DNS (≈2 min)
+`luminaiq.fun` uses Cloudflare nameservers. In Cloudflare → luminaiq.fun → DNS → **Add record**:
+
+| Type | Name | Target | Proxy status |
+|---|---|---|---|
+| CNAME | `test` | `cname.vercel-dns.com` | **DNS only** (grey cloud) |
+
+Vercel issues the HTTPS certificate automatically once the record resolves (usually minutes).
+
+### 2. Supabase auth redirect (≈1 min)
+Supabase → Lumina IQ → Authentication → URL Configuration → **Redirect URLs** → add
+`https://test.luminaiq.fun/**`. Without this, Google sign-in on the test site redirects to production.
+
+### 3. Qdrant (≈3 min)
+https://cloud.qdrant.io → **Create cluster** (free tier, region near Render). Copy the cluster URL
+(`https://xxxx.cloud.qdrant.io:6333`) and create an API key.
+
+### 4. Render backend (≈10 min, mostly build time)
+1. Environment Groups → open `luminaiq-env` → copy every variable into a new group
+   **`luminaiq-test-env`**, then change:
+   - `QDRANT_URL` / `QDRANT_API_KEY` → the new cluster
+   - `BACKEND_CORS_ORIGINS` (only if the group defines it) → add `https://test.luminaiq.fun`
+2. **New + → Blueprint** → this repo → Blueprint path **`render.test.yaml`** → Apply.
+3. Check `https://luminaiq-backend-test.onrender.com/health` returns `{"status":"healthy"}`.
+
+The new Qdrant starts empty: the first time a project is opened on the test site the backend
+re-embeds its books from the stored text automatically (no re-uploads).
+
+## Things to know (shared database)
+- Accounts, projects and books are the same on test and production.
+- **Deleting a document on test deletes it in production too.**
+- Re-embedding into the new Qdrant uses Azure embedding quota once per book.
+- The test backend never changes a document's processing status, so production users never see
+  their books flip to "processing"/"failed" because of the test environment.
+- Render free tier sleeps after inactivity; the first request can take ~1 minute.
+
+## Supabase advisor notes (pre-existing, not caused by these changes)
+- Security: `increment_xp` has a mutable `search_path`; `vector` extension lives in `public`;
+  leaked-password protection is off (Authentication → Policies).
+- Performance: many RLS policies re-evaluate `auth.uid()` per row (`auth_rls_initplan`), multiple
+  permissive policies per table, and 19 duplicate indexes. Worth a cleanup pass later.
+
+## Shared book library (cost saving)
+
+Visual Lab simulations and cram cards are reused across students who upload the
+same book (`backend/services/book_library.py`, migration `006_shared_book_library`).
+Books are matched by a MinHash sketch of their text, topics by normalised name, so a
+different PDF of the same book with renamed topics still reuses earlier work.
+Shared simulations are stored as `.html` files in the private `shared-assets`
+bucket. Only book-derived content is shared, and only with users whose own upload
+matches the book.
+
+
+## Plans, limits and payments (Razorpay)
+
+Plans and limits live in `backend/services/plans.py` (Free, Scholar ₹299 / ₹2,499 yr,
+Topper ₹999 / ₹8,499 yr, Institution ₹179 per student, Exam Night Pass ₹49 for 48 h).
+Every AI feature is metered (`services/usage_service.py`); over the limit the API returns
+`402 limit_reached` and the app shows an upgrade prompt. Token usage per user/day/model is
+logged in `llm_usage_daily` for real cost tracking. Migrations: `007_plans_and_usage`,
+`008_exam_night_pass`.
+
+Until the Razorpay variables are set, the Pricing page shows "payments are being switched on"
+and everyone is on Free. To switch payments on (test mode first):
+
+1. Razorpay Dashboard → Settings → API Keys → generate **test** keys.
+2. Create the subscription plans once:
+   `cd backend && RAZORPAY_KEY_ID=rzp_test_… RAZORPAY_KEY_SECRET=… python scripts/create_razorpay_plans.py`
+3. Razorpay Dashboard → Webhooks → add `https://luminaiq-backend-test.onrender.com/api/v1/billing/webhook`
+   with a secret of your choice and the events: `subscription.activated`, `subscription.charged`,
+   `subscription.pending`, `subscription.halted`, `subscription.cancelled`, `subscription.completed`,
+   `payment.captured`.
+4. Render → `luminaiq-backend-test` → Environment:
+
+   | Key | Value |
+   |---|---|
+   | `RAZORPAY_KEY_ID` | `rzp_test_…` |
+   | `RAZORPAY_KEY_SECRET` | from step 1 |
+   | `RAZORPAY_WEBHOOK_SECRET` | from step 3 |
+   | `RAZORPAY_PLAN_SCHOLAR_MONTHLY` / `_YEARLY`, `RAZORPAY_PLAN_TOPPER_MONTHLY` / `_YEARLY` | printed by step 2 |
+
+5. Pay with Razorpay's test UPI / cards. For live: repeat 1–4 with live keys (plan IDs differ).
+
+Optional model tiers: `LLM_LIGHT_MODEL` (bulk work), `LLM_DEEP_MODEL` (+ `LLM_DEEP_BASE_URL`,
+`LLM_DEEP_API_KEY`) for Deep answers, Topper cram cards and Visual Lab.

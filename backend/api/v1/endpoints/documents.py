@@ -21,6 +21,7 @@ from api.deps import get_current_user
 from utils.embedding_queue import get_embedding_queue
 from utils.logger import logger
 from db.client import async_db, get_supabase_client
+from services.usage_service import usage, metered
 
 router = APIRouter()
 
@@ -37,6 +38,101 @@ class SearchResult(BaseModel):
     document_name: Optional[str] = None
     chunk_id: Optional[int] = None
     score: float
+
+
+async def _existing_copy(project_id: str, filename: str, file_size: int) -> Optional[dict]:
+    """A copy of this file (same name and size) already in the project that hasn't failed."""
+    try:
+        res = await async_db(
+            lambda: get_supabase_client().table("documents").select("*")
+            .eq("project_id", project_id).eq("filename", filename).eq("file_size", file_size)
+            .neq("upload_status", "failed").limit(1).execute()
+        )
+        return res.data[0] if res.data else None
+    except Exception as e:
+        logger.debug(f"Duplicate check skipped: {e}")
+        return None
+
+
+async def _start_processing(
+    current_user: dict, project_id: str, temp_path: str, filename: str, content_type: str,
+    file_size: int, is_public: bool = False, book_title: Optional[str] = None,
+    book_author: Optional[str] = None, book_description: Optional[str] = None,
+    book_tags: Optional[str] = None,
+) -> dict:
+    """Create the document record and process the file at temp_path in the background."""
+    # The same book sent twice (double tap, retry) is not processed again
+    existing = await _existing_copy(project_id, filename, file_size)
+    if existing:
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+        return existing
+
+    # 3. Create document record in Supabase
+    doc_data = {
+        "project_id": project_id,
+        "filename": filename,
+        "file_type": content_type,
+        "file_size": file_size,
+        "upload_status": "pending",
+        "user_id": current_user.get("id"),
+    }
+
+    response = await async_db(
+        lambda: get_supabase_client()
+        .table("documents")
+        .insert(doc_data)
+        .execute()
+    )
+
+    if not response.data:
+        raise HTTPException(500, "Failed to create document record")
+
+    document = response.data[0]
+    document_id = document["id"]
+
+    # 4. Start CONCURRENT background processing
+    # asyncio.create_task = truly parallel (vs Starlette BackgroundTasks which are serial)
+    book_meta = None
+    if is_public:
+        book_meta = {
+            "title": book_title or filename,
+            "author": book_author,
+            "description": book_description,
+            "tags": [t.strip() for t in (book_tags or "").split(",") if t.strip()],
+            "file_size": file_size,
+            "file_type": content_type,
+            "user_id": current_user.get("id"),
+        }
+
+    task = asyncio.create_task(
+        document_service.process_document(
+            document_id=document_id,
+            project_id=project_id,
+            file_path=temp_path,
+            filename=filename,
+            user_id=current_user.get("id"),
+            book_meta=book_meta,
+        )
+    )
+
+    # Ensure background task errors are always logged (not silently swallowed)
+    def _log_task_exception(t):
+        if t.cancelled():
+            logger.warning(f"Background processing cancelled for {filename}")
+        elif t.exception():
+            logger.error(
+                f"Background processing FAILED for {filename}: {t.exception()}"
+            )
+
+    task.add_done_callback(_log_task_exception)
+
+    logger.info(
+        f"Document {filename} upload started, processing in background "
+        f"(public={is_public})"
+    )
+
+    return document
 
 
 @router.post("/upload", response_model=DocumentUploadResponse)
@@ -64,6 +160,8 @@ async def upload_document(
     NOTE: Raw original files are NOT stored in Supabase Storage.
     Only the extracted .txt is stored (10-50x smaller than PDFs).
     """
+    metered(current_user, "upload")
+    await usage.check_books(current_user["id"])
     temp_path = None
     try:
         # 1. Validate File Type
@@ -118,78 +216,18 @@ async def upload_document(
                 os.unlink(temp_file.name)
                 raise HTTPException(
                     status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                    f"File size exceeds limit of {settings.MAX_FILE_SIZE} bytes",
+                    f"This file is larger than the {settings.MAX_FILE_SIZE // (1024 * 1024)} MB upload limit.",
                 )
             temp_file.write(chunk)
 
         temp_file.close()
         temp_path = temp_file.name
 
-        # 3. Create document record in Supabase
-        doc_data = {
-            "project_id": project_id,
-            "filename": file.filename,
-            "file_type": file.content_type,
-            "file_size": file_size,
-            "upload_status": "pending",
-            "user_id": current_user.get("id"),
-        }
-
-        response = await async_db(
-            lambda: get_supabase_client()
-            .table("documents")
-            .insert(doc_data)
-            .execute()
+        # 3-4. Create the record and start background processing
+        return await _start_processing(
+            current_user, project_id, temp_path, file.filename, file.content_type, file_size,
+            is_public, book_title, book_author, book_description, book_tags,
         )
-
-        if not response.data:
-            raise HTTPException(500, "Failed to create document record")
-
-        document = response.data[0]
-        document_id = document["id"]
-
-        # 4. Start CONCURRENT background processing
-        # asyncio.create_task = truly parallel (vs Starlette BackgroundTasks which are serial)
-        book_meta = None
-        if is_public:
-            book_meta = {
-                "title": book_title or file.filename,
-                "author": book_author,
-                "description": book_description,
-                "tags": [t.strip() for t in (book_tags or "").split(",") if t.strip()],
-                "file_size": file_size,
-                "file_type": file.content_type,
-                "user_id": current_user.get("id"),
-            }
-
-        task = asyncio.create_task(
-            document_service.process_document(
-                document_id=document_id,
-                project_id=project_id,
-                file_path=temp_path,
-                filename=file.filename,
-                user_id=current_user.get("id"),
-                book_meta=book_meta,
-            )
-        )
-
-        # Ensure background task errors are always logged (not silently swallowed)
-        def _log_task_exception(t):
-            if t.cancelled():
-                logger.warning(f"Background processing cancelled for {file.filename}")
-            elif t.exception():
-                logger.error(
-                    f"Background processing FAILED for {file.filename}: {t.exception()}"
-                )
-
-        task.add_done_callback(_log_task_exception)
-
-        logger.info(
-            f"Document {file.filename} upload started, processing in background "
-            f"(public={is_public})"
-        )
-
-        return document
 
     except HTTPException:
         if temp_path and os.path.exists(temp_path):
@@ -206,6 +244,165 @@ async def upload_document(
                 pass
         logger.error(f"Upload error: {str(e)}")
         raise HTTPException(500, str(e))
+
+
+UPLOADS_BUCKET = "uploads"
+
+_UPLOAD_TYPES = {
+    "pdf": "application/pdf",
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "txt": "text/plain",
+}
+
+
+class StorageUploadRequest(BaseModel):
+    project_id: str
+    storage_path: str
+    filename: str
+    is_public: bool = False
+    book_title: Optional[str] = None
+    book_author: Optional[str] = None
+    book_description: Optional[str] = None
+    book_tags: Optional[str] = None
+
+
+class UploadUrlRequest(BaseModel):
+    project_id: str
+    filename: str
+    size: int
+
+
+def upload_object_path(user_id: str, project_id: str, filename: str, size: int) -> str:
+    """Stable per file (name + size), so a re-picked file resumes the same upload."""
+    import re
+    import unicodedata
+
+    name = unicodedata.normalize("NFKD", filename)
+    name = re.sub(r"[^\w.-]+", "_", name)[-120:]
+    return f"{user_id}/{project_id}/{size}-{name}"
+
+
+async def create_signed_upload(path: str) -> str:
+    """A short-lived token that lets the browser upload this one object (any login method)."""
+    import httpx
+
+    base = settings.SUPABASE_URL.rstrip("/")
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(
+            f"{base}/storage/v1/object/upload/sign/{UPLOADS_BUCKET}/{path}",
+            headers={"Authorization": f"Bearer {settings.SUPABASE_SERVICE_KEY}",
+                     "apikey": settings.SUPABASE_SERVICE_KEY, "x-upsert": "true"},
+            json={},
+        )
+    if resp.status_code >= 400:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Couldn't prepare the upload ({resp.status_code}).")
+    url = resp.json().get("url", "")
+    from urllib.parse import parse_qs, urlparse
+
+    token = (parse_qs(urlparse(url).query).get("token") or [""])[0]
+    if not token:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Couldn't prepare the upload (no token).")
+    return token
+
+
+@router.post("/upload-url")
+async def get_upload_url(request: UploadUrlRequest, current_user: dict = Depends(get_current_user)):
+    """
+    Permission for the browser to upload one book straight to storage
+    (resumable), without needing a Supabase session in the browser: email
+    logins go through this API and have none.
+    """
+    metered(current_user, "upload")
+    await usage.check_books(current_user["id"])
+    ext = os.path.splitext(request.filename)[1].lower().lstrip(".")
+    if ext not in _UPLOAD_TYPES:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Supported files: PDF, DOCX and TXT.")
+    if request.size <= 0 or request.size > settings.MAX_FILE_SIZE:
+        raise HTTPException(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            f"This file is larger than the {settings.MAX_FILE_SIZE // (1024 * 1024)} MB upload limit.",
+        )
+    if await _existing_copy(request.project_id, request.filename, request.size):
+        raise HTTPException(status.HTTP_409_CONFLICT, f"\"{request.filename}\" is already in this project.")
+    path = upload_object_path(current_user["id"], request.project_id, request.filename, request.size)
+    token = await create_signed_upload(path)
+    if ext == "pdf":
+        # A scanned book may need the OCR service: wake it while the file uploads
+        from utils.indra_ocr_client import warm_up
+        warm_up()
+    return {"bucket": UPLOADS_BUCKET, "path": path, "token": token}
+
+
+@router.post("/upload-from-storage")
+async def upload_from_storage(
+    request: StorageUploadRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Process a file the browser uploaded straight to Supabase Storage (resumable,
+    in chunks; survives a page refresh). The file must be in the user's own
+    folder of the private "uploads" bucket. It is streamed here, processed like
+    a normal upload, and removed from the bucket.
+    """
+    import httpx
+
+    metered(current_user, "upload")
+    await usage.check_books(current_user["id"])
+
+    path = request.storage_path.strip("/")
+    if not path.startswith(f"{current_user['id']}/") or ".." in path:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "That upload doesn't belong to you.")
+    file_ext = os.path.splitext(request.filename)[1].lower().lstrip(".")
+    if file_ext not in _UPLOAD_TYPES:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Supported files: PDF, DOCX and TXT.")
+
+    url = f"{settings.SUPABASE_URL.rstrip('/')}/storage/v1/object/{UPLOADS_BUCKET}/{path}"
+    headers = {"Authorization": f"Bearer {settings.SUPABASE_SERVICE_KEY}", "apikey": settings.SUPABASE_SERVICE_KEY}
+    os.makedirs("temp", exist_ok=True)
+    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_ext}", dir="temp")
+    temp_path = temp_file.name
+    file_size = 0
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(300, connect=20)) as client:
+            async with client.stream("GET", url, headers=headers) as resp:
+                if resp.status_code == 404:
+                    raise HTTPException(status.HTTP_404_NOT_FOUND, "The upload wasn't found. Please upload the file again.")
+                if resp.status_code >= 400:
+                    raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Couldn't fetch the upload ({resp.status_code}).")
+                async for chunk in resp.aiter_bytes(1024 * 1024):
+                    file_size += len(chunk)
+                    if file_size > settings.MAX_FILE_SIZE:
+                        raise HTTPException(
+                            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                            f"This file is larger than the {settings.MAX_FILE_SIZE // (1024 * 1024)} MB upload limit.",
+                        )
+                    temp_file.write(chunk)
+        temp_file.close()
+
+        document = await _start_processing(
+            current_user, request.project_id, temp_path, request.filename, _UPLOAD_TYPES[file_ext], file_size,
+            request.is_public, request.book_title, request.book_author, request.book_description, request.book_tags,
+        )
+    except HTTPException:
+        temp_file.close()
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+        raise
+    except Exception as e:
+        temp_file.close()
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+        logger.error(f"Upload-from-storage error: {e}")
+        raise HTTPException(500, str(e))
+
+    # The file is now on this server (the original PDF is kept by processing); free the bucket
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            await client.request("DELETE", f"{settings.SUPABASE_URL.rstrip('/')}/storage/v1/object/{UPLOADS_BUCKET}",
+                                 headers=headers, json={"prefixes": [path]})
+    except Exception as e:
+        logger.debug(f"Could not remove {path} from {UPLOADS_BUCKET}: {e}")
+    return document
 
 
 @router.get("/{project_id}", response_model=DocumentList)
@@ -225,6 +422,70 @@ async def list_documents(
         raise HTTPException(500, str(e))
 
 
+async def _owned_document(project_id: str, document_id: str, user_id: str) -> dict:
+    """The document, if it belongs to one of this user's projects (else 404)."""
+    client = get_supabase_client()
+    project = await async_db(lambda: client.table("projects").select("user_id")
+                             .eq("id", project_id).limit(1).execute())
+    if not project.data or project.data[0]["user_id"] != user_id:
+        raise HTTPException(404, "Document not found")
+    doc = await async_db(lambda: client.table("documents")
+                         .select("id, project_id, filename, file_type, file_url, text_storage_path")
+                         .eq("id", document_id).eq("project_id", project_id).limit(1).execute())
+    if not doc.data:
+        raise HTTPException(404, "Document not found")
+    return doc.data[0]
+
+
+@router.post("/{project_id}/{document_id}/retry")
+async def retry_document(
+    project_id: str,
+    document_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Process a failed document again without re-uploading: from the stored
+    original PDF when there is one, else from its extracted text.
+    """
+    doc = await _owned_document(project_id, document_id, current_user["id"])
+    client = get_supabase_client()
+    status_row = await async_db(lambda: client.table("documents").select("upload_status")
+                                .eq("id", document_id).limit(1).execute())
+    if status_row.data and status_row.data[0]["upload_status"] != "failed":
+        raise HTTPException(status.HTTP_409_CONFLICT, "This document isn't in a failed state.")
+
+    data, suffix = None, None
+    if doc.get("file_url") and "/" in doc["file_url"]:
+        bucket, path = doc["file_url"].split("/", 1)
+        try:
+            data = await async_db(lambda: client.storage.from_(bucket).download(path))
+            suffix = os.path.splitext(path)[1] or ".pdf"
+        except Exception as e:
+            logger.warning(f"Retry: original not available for {document_id}: {e}")
+    if not data:
+        text = await document_service.load_stored_text(doc)
+        if text:
+            data, suffix = text.encode("utf-8"), ".txt"
+    if not data:
+        raise HTTPException(status.HTTP_410_GONE, "The file for this document is gone. Please upload it again.")
+
+    os.makedirs("temp", exist_ok=True)
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix, dir="temp") as f:
+        f.write(data)
+        temp_path = f.name
+
+    await async_db(lambda: client.table("documents")
+                   .update({"upload_status": "pending", "error_message": None})
+                   .eq("id", document_id).execute())
+    task = asyncio.create_task(document_service.process_document(
+        document_id=document_id, project_id=project_id, file_path=temp_path,
+        filename=doc["filename"], user_id=current_user["id"],
+    ))
+    document_service._background_tasks.add(task)
+    task.add_done_callback(document_service._background_tasks.discard)
+    return {"status": "pending", "document_id": document_id}
+
+
 @router.get("/{project_id}/{document_id}/url")
 async def get_document_url(
     project_id: str,
@@ -232,64 +493,54 @@ async def get_document_url(
     current_user: dict = Depends(get_current_user),
 ):
     """
-    Generate a short-lived signed URL for viewing a document in the PDF viewer.
-    Tries common storage path patterns and returns the first that works.
+    How to show a document in the reader:
+      {"kind": "pdf", "url": <signed URL>}  - the original PDF is stored
+      {"kind": "text"}                      - no original (older uploads, other file
+                                              types): the reader shows the full text
+                                              from GET /{project_id}/{document_id}/text
     """
+    doc = await _owned_document(project_id, document_id, current_user["id"])
     supabase = get_supabase_client()
-    BUCKET = "documents"
-    EXPIRY = 3600 * 24  # 24 hours
+    EXPIRY = 3600 * 6
 
-    # Try common storage path conventions
-    extensions = ["pdf", "txt", "docx", "doc", "pptx", "ppt", "xlsx", "xls", "png", "jpg", "jpeg"]
-    candidate_paths = [f"{project_id}/{document_id}.{ext}" for ext in extensions]
-    candidate_paths.insert(0, f"{project_id}/{document_id}")  # no extension
+    # Where the original lives: recorded at upload (class copies point at the
+    # teacher's file), else the legacy conventions
+    candidates = []
+    if doc.get("file_url") and "/" in doc["file_url"]:
+        bucket, path = doc["file_url"].split("/", 1)
+        candidates.append((bucket, path))
+    candidates += [("documents", f"{project_id}/{document_id}.pdf"), ("documents", f"{project_id}/{document_id}")]
 
     def _try_signed():
-        for path in candidate_paths:
+        for bucket, path in candidates:
             try:
-                result = supabase.storage.from_(BUCKET).create_signed_url(path, EXPIRY)
-                if isinstance(result, dict) and result.get("signedURL"):
-                    return result["signedURL"]
-                if isinstance(result, dict) and result.get("signed_url"):
-                    return result["signed_url"]
+                result = supabase.storage.from_(bucket).create_signed_url(path, EXPIRY)
+                if isinstance(result, dict):
+                    url = result.get("signedURL") or result.get("signed_url")
+                    if url:
+                        return url
             except Exception:
                 continue
         return None
 
     url = await async_db(_try_signed)
-    if not url:
-        # Final fallback — try fetching the doc record to find file type hint
-        try:
-            def _get_doc():
-                return (
-                    get_supabase_client()
-                    .table("documents")
-                    .select("filename, file_type")
-                    .eq("id", document_id)
-                    .single()
-                    .execute()
-                )
-            doc_res = await async_db(_get_doc)
-            if doc_res.data:
-                filename = doc_res.data.get("filename", "")
-                ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-                if ext:
-                    def _try_ext():
-                        path = f"{project_id}/{document_id}.{ext}"
-                        try:
-                            result = supabase.storage.from_(BUCKET).create_signed_url(path, EXPIRY)
-                            if isinstance(result, dict):
-                                return result.get("signedURL") or result.get("signed_url")
-                        except Exception:
-                            return None
-                    url = await async_db(_try_ext)
-        except Exception:
-            pass
+    if url:
+        return {"kind": "pdf", "url": url, "filename": doc["filename"]}
+    return {"kind": "text", "filename": doc["filename"]}
 
-    if not url:
-        raise HTTPException(404, "Document file not found in storage. It may have been uploaded as text-only.")
 
-    return {"url": url}
+@router.get("/{project_id}/{document_id}/text")
+async def get_document_text(
+    project_id: str,
+    document_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Full extracted text, for reading documents that have no stored original."""
+    doc = await _owned_document(project_id, document_id, current_user["id"])
+    text = await document_service.load_stored_text({**doc, "project_id": project_id})
+    if not text:
+        raise HTTPException(404, "This document's text isn't available.")
+    return {"filename": doc["filename"], "text": text}
 
 
 @router.delete("/{document_id}")
@@ -344,23 +595,12 @@ async def search_documents(
 ):
     """Semantic search across documents in a project."""
     try:
-        collection_name = f"project_{project_id}"
-
-        # Generate embedding for the search query
-        query_embedding = await embedding_service.generate_embedding(request.query)
-
-        # Build filter conditions
-        filter_conditions = None
-        if request.document_ids and len(request.document_ids) > 0:
-            filter_conditions = {"document_ids": request.document_ids}
-
-        # Search in Qdrant
-        results = await qdrant_service.search(
-            collection_name=collection_name,
-            query_vector=query_embedding,
-            limit=request.limit,
-            filter_conditions=filter_conditions,
-        )
+        # Vector search, or the stored text when the index is unavailable
+        from services.retrieval import search_passages
+        results = (await search_passages(
+            project_id, [request.query], per_query=request.limit,
+            document_ids=request.document_ids or None,
+        ))[:request.limit]
 
         # Get document names from the database for richer results
         doc_names = {}

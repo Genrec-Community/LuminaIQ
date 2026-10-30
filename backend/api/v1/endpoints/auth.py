@@ -1,11 +1,18 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from models.schemas import UserSignup, UserLogin
-from services.auth_service import auth_service
-from api.deps import require_owner
+from services.auth_service import auth_service, SchoolInactive
+from api.deps import require_owner, get_current_user
 from pydantic import BaseModel
 from typing import Any
 
 router = APIRouter()
+
+def _school_inactive(e: SchoolInactive) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail={"code": "school_inactive", "state": e.access.get("state"), "message": str(e)},
+    )
+
 
 class Token(BaseModel):
     access_token: str
@@ -53,6 +60,8 @@ async def login(user_in: UserLogin):
     """
     try:
         return await auth_service.login(user_in.email, user_in.password)
+    except SchoolInactive as e:
+        raise _school_inactive(e)
     except Exception as e:
         error_msg = str(e).lower()
         # Distinguish timeout/network errors from invalid credentials
@@ -75,11 +84,36 @@ async def exchange_token(request: TokenExchangeRequest):
     """
     try:
         return await auth_service.exchange_supabase_token(request.access_token)
+    except SchoolInactive as e:
+        raise _school_inactive(e)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(e),
         )
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@router.post("/change-password")
+async def change_password(request: ChangePasswordRequest, current_user: dict = Depends(get_current_user)):
+    """Change your own password. School-created students do this after their first sign-in."""
+    try:
+        await auth_service.change_password(current_user["id"], request.current_password, request.new_password)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    return {"changed": True}
+
+
+@router.get("/account")
+async def account(current_user: dict = Depends(get_current_user)):
+    """School account details for the signed-in user (managed account, must change password)."""
+    from services.institution_service import institutions
+    return {"id": current_user["id"], "email": current_user.get("email"),
+            **await institutions.account_info(current_user["id"])}
+
 
 @router.post("/create-handler", response_model=Any)
 async def create_handler(
@@ -108,3 +142,57 @@ async def create_handler(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
+
+# Tables keyed by user_id that are not removed by a cascade from auth.users.
+# Payment records are kept (they are financial records), unlinked from the account.
+_USER_TABLES = [
+    "class_book_copies", "class_members", "institution_members", "llm_usage_daily",
+    "usage_counters", "user_gamification", "user_plans",
+]
+
+
+@router.delete("/account")
+async def delete_account(current_user: dict = Depends(get_current_user)):
+    """
+    Permanently delete the signed-in account: every book (files, vectors and
+    extracted text), study data and the login itself. Required by Google Play
+    for apps with accounts; also used by the website.
+    """
+    from db.client import get_supabase_client, async_db
+    from services.document_service import document_service
+    from services.qdrant_service import qdrant_service
+    from utils.logger import logger
+
+    user_id = current_user["id"]
+    client = get_supabase_client()
+    projects = (await async_db(lambda: client.table("projects").select("id").eq("user_id", user_id).execute())).data or []
+    for p in projects:
+        pid = p["id"]
+        docs = (await async_db(lambda: client.table("documents").select("id").eq("project_id", pid).execute())).data or []
+        for d in docs:
+            try:
+                await document_service.delete_document(pid, d["id"])
+            except Exception as e:
+                logger.warning(f"[DeleteAccount] document {d['id']}: {e}")
+        try:
+            await qdrant_service.async_client.delete_collection(f"project_{pid}")
+        except Exception:
+            pass  # no collection for an empty book
+    await async_db(lambda: client.table("documents").delete().eq("user_id", user_id).execute())
+    await async_db(lambda: client.table("projects").delete().eq("user_id", user_id).execute())
+    for table in _USER_TABLES:
+        try:
+            await async_db(lambda: client.table(table).delete().eq("user_id", user_id).execute())
+        except Exception as e:
+            logger.warning(f"[DeleteAccount] {table}: {e}")
+    try:
+        await async_db(lambda: client.table("payments").update({"user_id": None}).eq("user_id", user_id).execute())
+    except Exception as e:
+        logger.warning(f"[DeleteAccount] payments: {e}")
+    try:
+        await async_db(lambda: client.auth.admin.delete_user(user_id))
+    except Exception as e:
+        logger.error(f"[DeleteAccount] auth user {user_id}: {e}")
+        raise HTTPException(500, "Your data was deleted but the login could not be removed. Contact support.")
+    logger.info(f"[DeleteAccount] deleted account {user_id} ({len(projects)} books)")
+    return {"deleted": True}

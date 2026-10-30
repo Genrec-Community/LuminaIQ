@@ -49,8 +49,8 @@ const GamificationPanel = ({ onClose }) => {
     if (!data) {
         return (
             <div className="w-[420px] bg-white rounded-2xl shadow-2xl border border-[#E6D5CC] p-8 flex flex-col items-center gap-3">
-                <div className="h-10 w-10 border-3 border-[#C8A288] border-t-transparent rounded-full animate-spin" />
-                <p className="text-sm text-[#8a6a5c]">Loading progress...</p>
+                <div className="h-10 w-10 border-3 border-[#1E5C42] border-t-transparent rounded-full animate-spin" />
+                <p className="text-sm text-[#5E5046]">Loading progress...</p>
             </div>
         );
     }
@@ -71,7 +71,7 @@ const GamificationPanel = ({ onClose }) => {
         <div className="w-[420px] max-h-[85vh] bg-white rounded-2xl shadow-2xl border border-[#E6D5CC] flex flex-col overflow-hidden">
             {/* Header with gradient */}
             <div className="relative overflow-hidden shrink-0">
-                <div className="bg-gradient-to-br from-[#C8A288] via-[#B08B72] to-[#8a6a5c] px-5 pt-4 pb-4">
+                <div className="bg-gradient-to-br from-[#1E5C42] via-[#163628] to-[#5E5046] px-5 pt-4 pb-4">
                     {/* Decorative circles */}
                     <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
                     <div className="absolute bottom-0 left-0 w-20 h-20 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
@@ -151,8 +151,8 @@ const GamificationPanel = ({ onClose }) => {
                             onClick={() => setActiveTab(tab.id)}
                             className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-bold transition-all border-b-2 ${
                                 isActive
-                                    ? 'border-[#C8A288] text-[#C8A288] bg-white'
-                                    : 'border-transparent text-[#8a6a5c] hover:text-[#4A3B32] hover:bg-white/50'
+                                    ? 'border-[#1E5C42] text-[#1E5C42] bg-white'
+                                    : 'border-transparent text-[#5E5046] hover:text-[#163628] hover:bg-white/50'
                             }`}
                         >
                             <Icon className="h-3.5 w-3.5" />
@@ -184,7 +184,7 @@ function renderOverview(stats, data, earnedBadgeIds, allBadges) {
                 <span className="text-2xl" role="img" aria-label="flame">🔥</span>
                 <div className="flex-1">
                     <p className="text-white font-black text-lg leading-none">{streakDays} Day{streakDays !== 1 ? 's' : ''}</p>
-                    <p className="text-[#C8A288] text-[11px] font-medium mt-0.5">
+                    <p className="text-[#1E5C42] text-[11px] font-medium mt-0.5">
                         {streakDays === 0 ? 'Start your streak by studying today!' :
                          streakDays === 1 ? 'Day 1 — keep it going tomorrow!' :
                          streakDays < 7 ? 'Building momentum — keep it up!' :
@@ -193,13 +193,13 @@ function renderOverview(stats, data, earnedBadgeIds, allBadges) {
                     </p>
                 </div>
                 <div className="text-right">
-                    <p className="text-[10px] text-[#C8A288]/60 font-medium uppercase tracking-wider">Current Streak</p>
+                    <p className="text-[10px] text-[#1E5C42]/60 font-medium uppercase tracking-wider">Current Streak</p>
                 </div>
             </div>
 
             {/* Quick Stats Grid */}
             <div>
-                <h4 className="text-[10px] font-bold text-[#8a6a5c] uppercase tracking-wider mb-2">Activity Stats</h4>
+                <h4 className="text-[10px] font-bold text-[#5E5046] uppercase tracking-wider mb-2">Activity Stats</h4>
                 <div className="grid grid-cols-3 gap-2">
                     <StatCard icon={CheckCircle} label="Quizzes" value={stats.quizzes_completed || 0} color="blue" />
                     <StatCard icon={Star} label="Perfect" value={stats.perfect_scores || 0} color="amber" />
@@ -212,7 +212,7 @@ function renderOverview(stats, data, earnedBadgeIds, allBadges) {
 
             {/* Next Milestones */}
             <div>
-                <h4 className="text-[10px] font-bold text-[#8a6a5c] uppercase tracking-wider mb-2">Next Milestones</h4>
+                <h4 className="text-[10px] font-bold text-[#5E5046] uppercase tracking-wider mb-2">Next Milestones</h4>
                 <div className="space-y-2">
                     {getNextMilestones(stats, data.total_xp, data.level, earnedBadgeIds, allBadges).map((m, i) => (
                         <MilestoneRow key={i} milestone={m} />
@@ -220,8 +220,8 @@ function renderOverview(stats, data, earnedBadgeIds, allBadges) {
                     {getNextMilestones(stats, data.total_xp, data.level, earnedBadgeIds, allBadges).length === 0 && (
                         <div className="text-center py-4">
                             <Trophy className="h-8 w-8 text-amber-400 mx-auto mb-2" />
-                            <p className="text-sm font-bold text-[#4A3B32]">All milestones achieved!</p>
-                            <p className="text-xs text-[#8a6a5c]">You're a true scholar</p>
+                            <p className="text-sm font-bold text-[#163628]">All milestones achieved!</p>
+                            <p className="text-xs text-[#5E5046]">You're a true scholar</p>
                         </div>
                     )}
                 </div>
@@ -236,7 +236,7 @@ function renderBadges(earnedBadges, allBadges, earnedBadgeIds) {
             {/* Earned Badges */}
             {earnedBadges.length > 0 && (
                 <div>
-                    <h4 className="text-[10px] font-bold text-[#8a6a5c] uppercase tracking-wider mb-2">
+                    <h4 className="text-[10px] font-bold text-[#5E5046] uppercase tracking-wider mb-2">
                         Recently Earned
                     </h4>
                     <div className="grid grid-cols-2 gap-2">
@@ -250,7 +250,7 @@ function renderBadges(earnedBadges, allBadges, earnedBadgeIds) {
             {/* All Badges by Category */}
             {Object.entries(groupByCategory(allBadges)).map(([category, badges]) => (
                 <div key={category}>
-                    <h4 className="text-[10px] font-bold text-[#8a6a5c] uppercase tracking-wider mb-2 capitalize">
+                    <h4 className="text-[10px] font-bold text-[#5E5046] uppercase tracking-wider mb-2 capitalize">
                         {category}
                     </h4>
                     <div className="grid grid-cols-3 gap-2">
@@ -281,7 +281,7 @@ function renderLevels(data, allLevels) {
                         key={lvl.level}
                         className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
                             isCurrentLevel
-                                ? 'bg-gradient-to-r from-[#FDF6F0] to-amber-50/50 border-[#C8A288] shadow-sm'
+                                ? 'bg-gradient-to-r from-[#FDF6F0] to-amber-50/50 border-[#1E5C42] shadow-sm'
                                 : isUnlocked
                                     ? 'bg-white border-[#E6D5CC]/50'
                                     : 'bg-gray-50/50 border-gray-100 opacity-50'
@@ -290,9 +290,9 @@ function renderLevels(data, allLevels) {
                         {/* Level Number */}
                         <div className={`h-10 w-10 rounded-lg flex items-center justify-center font-bold text-sm shrink-0 ${
                             isCurrentLevel
-                                ? 'bg-gradient-to-br from-[#C8A288] to-[#8a6a5c] text-white shadow-sm'
+                                ? 'bg-gradient-to-br from-[#1E5C42] to-[#5E5046] text-white shadow-sm'
                                 : isUnlocked
-                                    ? 'bg-[#E6D5CC] text-[#4A3B32]'
+                                    ? 'bg-[#E6D5CC] text-[#163628]'
                                     : 'bg-gray-200 text-gray-400'
                         }`}>
                             {isUnlocked ? lvl.level : <Lock className="h-3.5 w-3.5" />}
@@ -301,14 +301,14 @@ function renderLevels(data, allLevels) {
                         {/* Level Info */}
                         <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
-                                <p className={`text-sm font-bold truncate ${isUnlocked ? 'text-[#4A3B32]' : 'text-gray-400'}`}>
+                                <p className={`text-sm font-bold truncate ${isUnlocked ? 'text-[#163628]' : 'text-gray-400'}`}>
                                     {lvl.title}
                                 </p>
                                 {isCurrentLevel && (
                                     <Sparkles className="h-3.5 w-3.5 text-amber-400 shrink-0" />
                                 )}
                             </div>
-                            <p className="text-[11px] text-[#8a6a5c]">
+                            <p className="text-[11px] text-[#5E5046]">
                                 {lvl.xp_required.toLocaleString()} XP
                             </p>
 
@@ -319,7 +319,7 @@ function renderLevels(data, allLevels) {
                                         initial={{ width: 0 }}
                                         animate={{ width: `${data.level_progress || 0}%` }}
                                         transition={{ duration: 1, delay: 0.5 }}
-                                        className="h-full bg-gradient-to-r from-[#C8A288] to-amber-400 rounded-full"
+                                        className="h-full bg-gradient-to-r from-[#1E5C42] to-amber-400 rounded-full"
                                     />
                                 </div>
                             )}
@@ -354,8 +354,8 @@ const StatCard = ({ icon: Icon, label, value, color }) => {
             <div className={`h-8 w-8 rounded-lg ${c} flex items-center justify-center mx-auto mb-1.5`}>
                 <Icon className="h-4 w-4" />
             </div>
-            <p className="text-base font-black text-[#4A3B32]">{value}</p>
-            <p className="text-[10px] text-[#8a6a5c] font-medium">{label}</p>
+            <p className="text-base font-black text-[#163628]">{value}</p>
+            <p className="text-[10px] text-[#5E5046] font-medium">{label}</p>
         </div>
     );
 };
@@ -373,8 +373,8 @@ const BadgeMini = ({ badge, earned }) => {
                 <Icon className="h-4 w-4 text-white" />
             </div>
             <div className="min-w-0">
-                <p className="text-xs font-bold text-[#4A3B32] truncate">{badge.title}</p>
-                <p className="text-[10px] text-[#8a6a5c] truncate">{badge.description}</p>
+                <p className="text-xs font-bold text-[#163628] truncate">{badge.title}</p>
+                <p className="text-[10px] text-[#5E5046] truncate">{badge.description}</p>
             </div>
         </div>
     );
@@ -405,10 +405,10 @@ const BadgeCard = ({ badge, earned }) => {
                 )}
             </div>
 
-            <p className={`text-[11px] font-bold truncate ${earned ? 'text-[#4A3B32]' : 'text-gray-400'}`}>
+            <p className={`text-[11px] font-bold truncate ${earned ? 'text-[#163628]' : 'text-gray-400'}`}>
                 {badge.title}
             </p>
-            <p className={`text-[9px] leading-tight mt-0.5 ${earned ? 'text-[#8a6a5c]' : 'text-gray-300'}`}>
+            <p className={`text-[9px] leading-tight mt-0.5 ${earned ? 'text-[#5E5046]' : 'text-gray-300'}`}>
                 {badge.description}
             </p>
 
@@ -429,18 +429,18 @@ const MilestoneRow = ({ milestone }) => {
     return (
         <div className="flex items-center gap-3 p-3 bg-[#FDF6F0] rounded-xl border border-[#E6D5CC]/30">
             <div className="h-8 w-8 rounded-lg bg-[#E6D5CC]/50 flex items-center justify-center shrink-0">
-                <milestone.icon className="h-4 w-4 text-[#C8A288]" />
+                <milestone.icon className="h-4 w-4 text-[#1E5C42]" />
             </div>
             <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-center mb-1">
-                    <p className="text-xs font-semibold text-[#4A3B32] truncate">{milestone.title}</p>
-                    <span className="text-[10px] text-[#8a6a5c] font-medium shrink-0 ml-2">
+                    <p className="text-xs font-semibold text-[#163628] truncate">{milestone.title}</p>
+                    <span className="text-[10px] text-[#5E5046] font-medium shrink-0 ml-2">
                         {milestone.current}/{milestone.target}
                     </span>
                 </div>
                 <div className="h-1.5 bg-[#E6D5CC] rounded-full overflow-hidden">
                     <div
-                        className="h-full bg-gradient-to-r from-[#C8A288] to-amber-400 rounded-full transition-all duration-500"
+                        className="h-full bg-gradient-to-r from-[#1E5C42] to-amber-400 rounded-full transition-all duration-500"
                         style={{ width: `${progress}%` }}
                     />
                 </div>

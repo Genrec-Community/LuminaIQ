@@ -1,0 +1,173 @@
+/* ============================================================
+   THEMES — maps the app's hard-coded palette classes to the
+   variables written by src/utils/themes.js.
+   - html[data-accent]                      → accent colour (any theme / custom accent)
+   - html[data-theme][data-theme-mode=light] → light palette (page, cards, text, borders)
+   - dark themes reuse index.css dark mode via --dm-* variables
+   Loaded after index.css so equal-specificity rules here win.
+   ============================================================ */
+
+html { --app-font: var(--font-sans); }
+html body,
+html .font-sans { font-family: var(--app-font) !important; }
+
+/* ── Accent ─────────────────────────────────────────────────── */
+html[data-accent] {
+  --th-accent-hover: color-mix(in srgb, var(--th-accent) 82%, black);
+  --th-accent-soft: color-mix(in srgb, var(--th-accent) 12%, transparent);
+}
+html[data-accent] .bg-\[\#1E5C42\],
+html[data-accent] .hover\:bg-\[\#1E5C42\]:hover,
+html[data-accent] .group:hover .group-hover\:bg-\[\#1E5C42\],
+html[data-accent] .prose-th\:bg-\[\#1E5C42\] th,
+html[data-accent] .selection\:bg-\[\#1E5C42\] ::selection { background-color: var(--th-accent) !important; }
+html[data-accent] .hover\:bg-\[\#163628\]:hover,
+html[data-accent] .hover\:bg-\[\#6B5F55\]:hover,
+html[data-accent] .bg-\[\#6B5F55\] { background-color: var(--th-accent-hover) !important; }
+html[data-accent] .bg-\[\#1E5C42\]\/90 { background-color: color-mix(in srgb, var(--th-accent) 90%, transparent) !important; }
+html[data-accent] .bg-\[\#1E5C42\]\/70 { background-color: color-mix(in srgb, var(--th-accent) 70%, transparent) !important; }
+html[data-accent] .bg-\[\#1E5C42\]\/20,
+html[data-accent] .hover\:bg-\[\#1E5C42\]\/20:hover { background-color: color-mix(in srgb, var(--th-accent) 20%, transparent) !important; }
+html[data-accent] .bg-\[\#1E5C42\]\/15 { background-color: color-mix(in srgb, var(--th-accent) 15%, transparent) !important; }
+html[data-accent] .bg-\[\#1E5C42\]\/10,
+html[data-accent] .group:hover .group-hover\:bg-\[\#1E5C42\]\/10,
+html[data-accent] .bg-\[\#1E5C42\]\/5 { background-color: var(--th-accent-soft) !important; }
+
+html[data-accent] .text-\[\#1E5C42\],
+html[data-accent] .hover\:text-\[\#1E5C42\]:hover,
+html[data-accent] .group:hover .group-hover\:text-\[\#1E5C42\],
+html[data-accent] .group:focus-within .group-focus-within\:text-\[\#1E5C42\],
+html[data-accent] .prose-a\:text-\[\#1E5C42\] a,
+html[data-accent] .prose-code\:text-\[\#1E5C42\] code { color: var(--th-accent) !important; }
+html[data-accent] .text-\[\#1E5C42\]\/60 { color: color-mix(in srgb, var(--th-accent) 60%, transparent) !important; }
+html[data-accent] .hover\:text-\[\#163628\]:hover,
+html[data-accent] .hover\:text-\[\#6B5F55\]:hover,
+html[data-accent] .text-\[\#6B5F55\] { color: var(--th-accent-hover) !important; }
+
+html[data-accent] .border-\[\#1E5C42\],
+html[data-accent] .hover\:border-\[\#1E5C42\]:hover,
+html[data-accent] .focus\:border-\[\#1E5C42\]:focus,
+html[data-accent] .group:hover .group-hover\:border-\[\#1E5C42\],
+html[data-accent] .prose-blockquote\:border-\[\#1E5C42\] blockquote { border-color: var(--th-accent) !important; }
+html[data-accent] .border-\[\#1E5C42\]\/60,
+html[data-accent] .hover\:border-\[\#1E5C42\]\/60:hover,
+html[data-accent] .hover\:border-\[\#1E5C42\]\/50:hover,
+html[data-accent] .hover\:border-\[\#1E5C42\]\/40:hover,
+html[data-accent] .border-\[\#1E5C42\]\/40 { border-color: color-mix(in srgb, var(--th-accent) 55%, transparent) !important; }
+
+html[data-accent] .focus\:ring-\[\#1E5C42\]:focus,
+html[data-accent] .ring-\[\#1E5C42\] { --tw-ring-color: var(--th-accent) !important; }
+html[data-accent] .focus\:ring-\[\#1E5C42\]\/30:focus,
+html[data-accent] .focus\:ring-\[\#1E5C42\]\/10:focus,
+html[data-accent] .ring-\[\#1E5C42\]\/40,
+html[data-accent] .hover\:ring-\[\#1E5C42\]\/40:hover { --tw-ring-color: color-mix(in srgb, var(--th-accent) 35%, transparent) !important; }
+
+html[data-accent] .shadow-\[\#1E5C42\]\/30,
+html[data-accent] .shadow-\[\#1E5C42\]\/20,
+html[data-accent] .shadow-\[\#1E5C42\]\/10,
+html[data-accent] .hover\:shadow-\[\#1E5C42\]\/25:hover,
+html[data-accent] .hover\:shadow-\[\#1E5C42\]\/10:hover { --tw-shadow-color: color-mix(in srgb, var(--th-accent) 25%, transparent) !important; }
+
+/* Gradients built from the brand colours */
+html[data-accent] .from-\[\#1E5C42\] { --tw-gradient-from: var(--th-accent) !important; }
+html[data-accent] .from-\[\#1E5C42\]\/20,
+html[data-accent] .from-\[\#1E5C42\]\/15 { --tw-gradient-from: color-mix(in srgb, var(--th-accent) 18%, transparent) !important; }
+html[data-accent] .via-\[\#163628\] { --tw-gradient-via: var(--th-accent-hover) !important; }
+html[data-accent] .to-\[\#6B5F55\],
+html[data-accent] .to-\[\#163628\],
+html[data-accent] .to-\[\#5E5046\],
+html[data-accent] .to-\[\#B9D94F\] { --tw-gradient-to: var(--th-accent-hover) !important; }
+html[data-accent] .to-\[\#D3EE6A\],
+html[data-accent] .to-\[\#C5E35A\] { --tw-gradient-to: color-mix(in srgb, var(--th-accent) 55%, white) !important; }
+html[data-accent] .to-\[\#163628\]\/10,
+html[data-accent] .to-\[\#163628\]\/5 { --tw-gradient-to: color-mix(in srgb, var(--th-accent) 8%, transparent) !important; }
+
+html[data-accent] .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--th-accent) !important; }
+
+/* ── Light palettes ─────────────────────────────────────────── */
+html[data-theme][data-theme-mode="light"] body,
+html[data-theme][data-theme-mode="light"] .min-h-screen,
+html[data-theme][data-theme-mode="light"] .h-\[100dvh\] { background-color: var(--th-bg) !important; color: var(--th-text); }
+
+html[data-theme][data-theme-mode="light"] .bg-\[\#FDF6F0\],
+html[data-theme][data-theme-mode="light"] .bg-\[\#FDF6F0\]\/95,
+html[data-theme][data-theme-mode="light"] .bg-\[\#FDF6F0\]\/98,
+html[data-theme][data-theme-mode="light"] .bg-\[\#FDF6F0\]\/60,
+html[data-theme][data-theme-mode="light"] .bg-\[\#FDF6F0\]\/50,
+html[data-theme][data-theme-mode="light"] .hover\:bg-\[\#FDF6F0\]:hover,
+html[data-theme][data-theme-mode="light"] .hover\:bg-\[\#FDF6F0\]\/80:hover,
+html[data-theme][data-theme-mode="light"] .hover\:bg-\[\#FDF6F0\]\/50:hover,
+html[data-theme][data-theme-mode="light"] .prose-pre\:bg-\[\#FDF6F0\] pre,
+html[data-theme][data-theme-mode="light"] .prose-code\:bg-\[\#FDF6F0\] code { background-color: var(--th-alt) !important; }
+html[data-theme][data-theme-mode="light"] .from-\[\#FDF6F0\] { --tw-gradient-from: var(--th-alt) !important; }
+html[data-theme][data-theme-mode="light"] .to-\[\#FDF6F0\],
+html[data-theme][data-theme-mode="light"] .to-\[\#f7ede3\] { --tw-gradient-to: var(--th-alt) !important; }
+
+html[data-theme][data-theme-mode="light"] .bg-white,
+html[data-theme][data-theme-mode="light"] .bg-white\/80,
+html[data-theme][data-theme-mode="light"] .bg-white\/95 { background-color: var(--th-surface) !important; }
+
+html[data-theme][data-theme-mode="light"] .bg-\[\#E6D5CC\],
+html[data-theme][data-theme-mode="light"] .bg-\[\#E6D5CC\]\/60,
+html[data-theme][data-theme-mode="light"] .bg-\[\#E6D5CC\]\/50,
+html[data-theme][data-theme-mode="light"] .bg-\[\#E6D5CC\]\/40,
+html[data-theme][data-theme-mode="light"] .bg-\[\#E6D5CC\]\/30,
+html[data-theme][data-theme-mode="light"] .hover\:bg-\[\#E6D5CC\]:hover,
+html[data-theme][data-theme-mode="light"] .hover\:bg-\[\#E6D5CC\]\/50:hover,
+html[data-theme][data-theme-mode="light"] .hover\:bg-\[\#E6D5CC\]\/40:hover,
+html[data-theme][data-theme-mode="light"] .hover\:bg-\[\#E6D5CC\]\/30:hover,
+html[data-theme][data-theme-mode="light"] .active\:bg-\[\#E6D5CC\]:active { background-color: color-mix(in srgb, var(--th-border) 70%, transparent) !important; }
+html[data-theme][data-theme-mode="light"] .from-\[\#E6D5CC\] { --tw-gradient-from: var(--th-border) !important; }
+html[data-theme][data-theme-mode="light"] .to-\[\#E6D5CC\] { --tw-gradient-to: var(--th-border) !important; }
+
+html[data-theme][data-theme-mode="light"] .border-\[\#E6D5CC\],
+html[data-theme][data-theme-mode="light"] .border-\[\#E6D5CC\]\/80,
+html[data-theme][data-theme-mode="light"] .border-\[\#E6D5CC\]\/60,
+html[data-theme][data-theme-mode="light"] .border-\[\#E6D5CC\]\/50,
+html[data-theme][data-theme-mode="light"] .border-\[\#E6D5CC\]\/30,
+html[data-theme][data-theme-mode="light"] .border-\[\#FDF6F0\],
+html[data-theme][data-theme-mode="light"] .hover\:border-\[\#E6D5CC\]\/60:hover,
+html[data-theme][data-theme-mode="light"] .divide-\[\#E6D5CC\] > * + *,
+html[data-theme][data-theme-mode="light"] .prose-td\:border-\[\#E6D5CC\] td,
+html[data-theme][data-theme-mode="light"] .prose-pre\:border-\[\#E6D5CC\] pre { border-color: var(--th-border) !important; }
+
+html[data-theme][data-theme-mode="light"] .text-\[\#163628\],
+html[data-theme][data-theme-mode="light"] .hover\:text-\[\#163628\]:hover,
+html[data-theme][data-theme-mode="light"] .prose-headings\:text-\[\#163628\] :is(h1, h2, h3, h4),
+html[data-theme][data-theme-mode="light"] .prose-strong\:text-\[\#163628\] strong { color: var(--th-text) !important; }
+html[data-theme][data-theme-mode="light"] .text-\[\#5E5046\],
+html[data-theme][data-theme-mode="light"] .text-\[\#2B3F35\],
+html[data-theme][data-theme-mode="light"] .text-\[\#5E5046\]\/80,
+html[data-theme][data-theme-mode="light"] .prose-blockquote\:text-\[\#5E5046\] blockquote { color: var(--th-muted) !important; }
+html[data-theme][data-theme-mode="light"] .text-\[\#5E5046\]\/60,
+html[data-theme][data-theme-mode="light"] .text-\[\#5E5046\]\/50 { color: color-mix(in srgb, var(--th-muted) 60%, transparent) !important; }
+html[data-theme][data-theme-mode="light"] .text-\[\#E6D5CC\] { color: var(--th-border) !important; }
+html[data-theme][data-theme-mode="light"] .bg-\[\#163628\],
+html[data-theme][data-theme-mode="light"] .hover\:bg-\[\#163628\]:hover { background-color: var(--th-text) !important; }
+html[data-theme][data-theme-mode="light"] .placeholder-\[\#5E5046\]::placeholder { color: var(--th-muted) !important; }
+html[data-theme][data-theme-mode="light"] .prose { color: var(--th-text); }
+html[data-theme][data-theme-mode="light"] .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--th-border) !important; }
+
+/* Tables inside answers */
+html[data-theme][data-theme-mode="light"] .prose tbody td,
+html[data-theme][data-theme-mode="light"] .markdown-content tbody td { border-color: var(--th-border); color: var(--th-text); }
+html[data-theme][data-theme-mode="light"] .prose tbody tr:nth-child(even) td,
+html[data-theme][data-theme-mode="light"] .markdown-content tbody tr:nth-child(even) td { background: var(--th-alt); }
+html[data-accent] .prose thead th,
+html[data-accent] .markdown-content thead th { background: var(--th-accent); border-color: var(--th-accent-hover); }
+
+/* ── Dark themes: warm-gold dark-mode details used in the workspace ── */
+html.dark[data-theme] .text-\[\#D3EE6A\],
+html.dark[data-theme] .hover\:text-\[\#E0F590\]:hover,
+html.dark[data-theme] .text-\[\#B7C2B4\],
+html.dark[data-theme] .text-\[\#E9EFD6\],
+html.dark[data-theme] .hover\:text-\[\#D3EE6A\]:hover { color: var(--dm-accent) !important; }
+html.dark[data-theme] .text-\[\#8FA093\],
+html.dark[data-theme] .text-\[\#8FA093\],
+html.dark[data-theme] .text-\[\#8FA093\],
+html.dark[data-theme] .text-\[\#7F8F82\] { color: var(--dm-text-secondary) !important; }
+html.dark[data-theme] .bg-\[\#1E3A16\]\/80 { background-color: var(--dm-accent-bg) !important; }
+html.dark[data-theme] .hover\:bg-\[\#20382B\]\/60:hover,
+html.dark[data-theme] .hover\:bg-\[\#20382B\]\/80:hover,
+html.dark[data-theme] .hover\:bg-\[\#20382B\]:hover { background-color: var(--dm-surface-hover) !important; }
+html.dark[data-theme] .border-\[\#2C4A38\] { border-color: var(--dm-border-strong) !important; }

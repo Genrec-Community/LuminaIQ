@@ -1,6 +1,6 @@
 import asyncio
 from typing import Dict, Any, List
-from db.client import get_supabase_client
+from db.client import get_supabase_client, async_db
 from utils.logger import logger
 from uuid import uuid4
 from datetime import datetime
@@ -19,9 +19,9 @@ class NotesService:
     async def get_notes(self, project_id: str, user_id: str) -> Dict[str, Any]:
         """Get notes for a project"""
         try:
-            response = self.client.table("notes").select("*").eq(
+            response = (await async_db(lambda: self.client.table("notes").select("*").eq(
                 "project_id", project_id
-            ).eq("user_id", user_id).execute()
+            ).eq("user_id", user_id).execute()))
             
             if response.data:
                 note = response.data[0]
@@ -53,21 +53,21 @@ class NotesService:
             
             if existing:
                 # Update existing notes
-                response = self.client.table("notes").update({
+                response = (await async_db(lambda: self.client.table("notes").update({
                     "content": content,
                     "updated_at": datetime.utcnow().isoformat()
-                }).eq("id", existing["id"]).execute()
+                }).eq("id", existing["id"]).execute()))
                 
                 logger.info(f"Updated notes for project {project_id}")
             else:
                 # Create new notes
                 note_id = str(uuid4())
-                response = self.client.table("notes").insert({
+                response = (await async_db(lambda: self.client.table("notes").insert({
                     "id": note_id,
                     "project_id": project_id,
                     "user_id": user_id,
                     "content": content
-                }).execute()
+                }).execute()))
                 
                 logger.info(f"Created notes for project {project_id}")
             
@@ -314,11 +314,11 @@ Respond ONLY with the Markdown content."""
     async def get_saved_notes(self, project_id: str, user_id: str) -> List[Dict[str, Any]]:
         """Get all saved notes for a project"""
         try:
-            response = self.client.table("notes").select(
+            response = (await async_db(lambda: self.client.table("notes").select(
                 "id, project_id, user_id, title, note_type, topic, created_at, updated_at"
             ).eq(
                 "project_id", project_id
-            ).eq("user_id", user_id).order("created_at", desc=True).execute()
+            ).eq("user_id", user_id).order("created_at", desc=True).execute()))
 
             return response.data or []
         except Exception as e:
@@ -328,9 +328,9 @@ Respond ONLY with the Markdown content."""
     async def get_saved_note(self, note_id: str, user_id: str) -> Dict[str, Any]:
         """Get a specific saved note with full content"""
         try:
-            response = self.client.table("notes").select("*").eq(
+            response = (await async_db(lambda: self.client.table("notes").select("*").eq(
                 "id", note_id
-            ).eq("user_id", user_id).execute()
+            ).eq("user_id", user_id).execute()))
 
             if not response.data:
                 raise Exception("Note not found")
@@ -342,9 +342,9 @@ Respond ONLY with the Markdown content."""
     async def delete_saved_note(self, note_id: str, user_id: str):
         """Delete a saved note"""
         try:
-            response = self.client.table("notes").delete().eq(
+            response = (await async_db(lambda: self.client.table("notes").delete().eq(
                 "id", note_id
-            ).eq("user_id", user_id).execute()
+            ).eq("user_id", user_id).execute()))
             if not response.data:
                 raise Exception("Note not found or unauthorized")
             logger.info(f"Deleted note {note_id}")
@@ -376,7 +376,7 @@ Respond ONLY with the Markdown content."""
                 "note_type": note_type,
                 "topic": topic,
             }
-            response = self.client.table("notes").insert(data).execute()
+            response = (await async_db(lambda: self.client.table("notes").insert(data).execute()))
 
             if not response.data:
                 raise Exception("Failed to save notes")
@@ -403,27 +403,9 @@ Respond ONLY with the Markdown content."""
             config = self._get_note_config(note_type, topic)
 
             # 2. Retrieve content in PARALLEL — all queries run concurrently
-            collection_name = f"project_{project_id}"
-            filter_conds = {"document_ids": selected_documents} if selected_documents else None
-
-            async def _search_one(q: str):
-                emb = await embedding_service.generate_embedding(q)
-                return await qdrant_service.search(
-                    collection_name=collection_name,
-                    query_vector=emb,
-                    limit=10,
-                    filter_conditions=filter_conds,
-                )
-
-            results_list = await asyncio.gather(*[_search_one(q) for q in config["queries"]])
-
-            all_hits = []
-            seen_texts = set()
-            for results in results_list:
-                for hit in results:
-                    if hit["text"] not in seen_texts:
-                        all_hits.append(hit)
-                        seen_texts.add(hit["text"])
+            # Vector search, or the stored text when the index is unavailable
+            from services.retrieval import search_passages
+            all_hits = await search_passages(project_id, config["queries"], 10, selected_documents)
 
             if not all_hits:
                 return "No content found to generate notes. Please ensure documents are uploaded and processed."

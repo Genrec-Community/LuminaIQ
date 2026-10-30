@@ -7,8 +7,55 @@ from typing import Any, List
 from api.deps import get_current_user
 from db.client import get_supabase_client, async_db
 from utils.logger import logger
+import asyncio
+from services.usage_service import usage, metered
 
 router = APIRouter()
+
+
+# Keep keys in sync with AI_CHARACTERS in frontend/src/utils/persona.js
+AI_CHARACTER_GUIDANCE = {
+    "buddy": "a cheerful, encouraging study buddy who explains like a friend, uses light puns and celebrates progress",
+    "mentor": "a calm, wise mentor who is patient, uses Socratic questions and connects ideas to the bigger picture",
+    "coach": "a high-energy coach who is goal-focused, motivating, and frames learning like training for a big match",
+    "sage": "a gentle, soothing guide who keeps the student relaxed, reduces exam stress and explains step by step",
+    "scientist": "a curious scientist who loves real-world examples, experiments and explaining how things work",
+    "pirate": "a playful pirate captain who turns learning into a treasure hunt with light pirate talk (never at the cost of clarity)",
+}
+
+AGE_GROUP_GUIDANCE = {
+    "teen": "a teenager (13-17) — use simple words, relatable examples, short paragraphs",
+    "young": "a college student (18-24) — be concise and exam-oriented",
+    "adult": "a working professional — be efficient, practical and respectful of their time",
+    "mature": "a lifelong learner (45+) — be warm, clear and unhurried; avoid slang",
+}
+
+HUMOR_GUIDANCE = {
+    "none": "Do not use jokes.",
+    "some": "Use an occasional light joke or fun analogy where it helps memory.",
+    "lots": "Be playful: sprinkle fun analogies, mnemonics and gentle humour throughout.",
+}
+
+
+def build_persona_block(settings: dict) -> str:
+    """Describe the user's customised AI companion for the system prompt."""
+    name = (settings.get("aiName") or "").strip()
+    character = settings.get("aiCharacter") or ""
+    if not name and character not in AI_CHARACTER_GUIDANCE:
+        return ""
+    lines = ["", "=== YOUR PERSONA (chosen by the student) ==="]
+    if name:
+        lines.append(f"Your name is {name}. Introduce yourself as {name}, not as Lumina IQ.")
+    if character in AI_CHARACTER_GUIDANCE:
+        lines.append(f"Personality: {AI_CHARACTER_GUIDANCE[character]}.")
+    lines.append(HUMOR_GUIDANCE.get(settings.get("aiHumor", "some"), HUMOR_GUIDANCE["some"]))
+    if settings.get("aiEmoji", True) is False:
+        lines.append("Do not use emojis.")
+    lines.append(
+        "Stay in character, but accuracy, clarity and citations always come first. "
+        "End longer answers with one quick memory hook or a check-yourself question."
+    )
+    return "\n".join(lines)
 
 
 async def get_user_context_string(user_id: str) -> str:
@@ -42,7 +89,28 @@ async def get_user_context_string(user_id: str) -> str:
                 "balanced": "Balanced (Mix of everything)"
             }
             context_parts.append(f"Preferred Learning Style: {style_map.get(style, style)}")
-            
+
+        nickname = settings.get("nickname", "")
+        if nickname:
+            context_parts.append(f"Nickname (address the student by this): {nickname}")
+
+        age_group = settings.get("ageGroup", "")
+        if age_group in AGE_GROUP_GUIDANCE:
+            context_parts.append(f"Audience: {AGE_GROUP_GUIDANCE[age_group]}")
+
+        exam_name = settings.get("examName", "")
+        exam_date = settings.get("examDate", "")
+        if exam_name or exam_date:
+            context_parts.append(
+                f"Preparing for: {exam_name or 'an exam'}"
+                + (f" on {exam_date}" if exam_date else "")
+                + " — prioritise exam-relevant points, likely questions and memory tricks."
+            )
+
+        persona = build_persona_block(settings)
+        if persona:
+            context_parts.append(persona)
+
         return "\n".join(context_parts)
     except Exception as e:
         logger.error(f"Error fetching user settings for context: {e}")
@@ -67,11 +135,47 @@ async def get_chat_history(
         )
 
         return [
-            ChatMessage(role=msg["role"], content=msg["content"])
+            ChatMessage(role=msg["role"], content=msg["content"], created_at=msg.get("created_at"))
             for msg in response.data
         ]
     except Exception as e:
         raise HTTPException(500, str(e))
+
+
+# Only the most recent turns go to the model: answers stay grounded in the
+# book, and requests don't grow slower and costlier as a chat gets longer.
+CHAT_HISTORY_LIMIT = 12
+
+
+async def _prepare_chat(request: ChatRequest, user_id: str):
+    """
+    Load recent history and the student's profile in parallel, and start
+    saving the new user message in the background. Returns
+    (history, user_context, save_task); await save_task before saving the reply
+    so the two stay in order.
+    """
+    client = get_supabase_client()
+
+    async def load_history():
+        res = await async_db(
+            lambda: client.table("chat_messages")
+            .select("role, content")
+            .eq("project_id", request.project_id)
+            .order("created_at", desc=True)
+            .limit(CHAT_HISTORY_LIMIT)
+            .execute()
+        )
+        return [{"role": m["role"], "content": m["content"]} for m in reversed(res.data or [])]
+
+    history, user_context = await asyncio.gather(
+        load_history(), get_user_context_string(user_id)
+    )
+    save_task = asyncio.create_task(async_db(
+        lambda: client.table("chat_messages").insert(
+            {"project_id": request.project_id, "role": "user", "content": request.message}
+        ).execute()
+    ))
+    return history, user_context, save_task
 
 
 @router.post("/message", response_model=ChatResponse)
@@ -81,43 +185,26 @@ async def chat_message(
     """
     Send a message to the RAG chat (Blocking/Non-streaming)
     """
+    feature = "deep" if request.deep else "chat"
+    metered(current_user, feature)
+    await usage.consume(current_user["id"], feature)
     try:
         client = get_supabase_client()
-        # Save User Message (non-blocking)
-        await async_db(
-            lambda: client.table("chat_messages").insert(
-                {
-                    "project_id": request.project_id,
-                    "role": "user",
-                    "content": request.message,
-                }
-            ).execute()
+        chat_history_dicts, user_context_str, save_task = await _prepare_chat(
+            request, current_user["id"]
         )
-
-        # Fetch full history for context (non-blocking)
-        history_res = await async_db(
-            lambda: client.table("chat_messages")
-            .select("*")
-            .eq("project_id", request.project_id)
-            .order("created_at", desc=False)
-            .execute()
-        )
-
-        chat_history_dicts = [
-            {"role": msg["role"], "content": msg["content"]} for msg in history_res.data
-        ]
-
-        user_context_str = await get_user_context_string(current_user["id"])
 
         result = await rag_service.get_answer(
             project_id=request.project_id,
             question=request.message,
             selected_documents=request.selected_documents,
-            chat_history=chat_history_dicts[:-1],  # Exclude current msg to avoid duplication if RAG appends it
+            chat_history=chat_history_dicts,
             system_prompt=request.system_prompt,
             user_context=user_context_str,
+            deep=request.deep,
         )
 
+        await save_task
         # Save Assistant Message (non-blocking)
         await async_db(
             lambda: client.table("chat_messages").insert(
@@ -143,33 +230,13 @@ async def chat_stream(
     """
     Send a message to the RAG chat (Streaming)
     """
+    feature = "deep" if request.deep else "chat"
+    metered(current_user, feature)
+    await usage.consume(current_user["id"], feature)
     try:
-        client = get_supabase_client()
-        # Save User Message (non-blocking)
-        await async_db(
-            lambda: client.table("chat_messages").insert(
-                {
-                    "project_id": request.project_id,
-                    "role": "user",
-                    "content": request.message,
-                }
-            ).execute()
+        chat_history_dicts, user_context_str, save_task = await _prepare_chat(
+            request, current_user["id"]
         )
-
-        # Fetch full history (non-blocking)
-        history_res = await async_db(
-            lambda: client.table("chat_messages")
-            .select("*")
-            .eq("project_id", request.project_id)
-            .order("created_at", desc=False)
-            .execute()
-        )
-
-        chat_history_dicts = [
-            {"role": msg["role"], "content": msg["content"]} for msg in history_res.data
-        ]
-
-        user_context_str = await get_user_context_string(current_user["id"])
 
         # Wrapper generator to intercept and save the final answer
         async def stream_and_save():
@@ -180,9 +247,10 @@ async def chat_stream(
                 project_id=request.project_id,
                 question=request.message,
                 selected_documents=request.selected_documents,
-                chat_history=chat_history_dicts[:-1],
+                chat_history=chat_history_dicts,
                 system_prompt=request.system_prompt,
                 user_context=user_context_str,
+                deep=request.deep,
             ):
                 # Check for sources marker
                 if "__SOURCES__:" in chunk:
@@ -205,6 +273,7 @@ async def chat_stream(
 
             # Save Assistant Message after stream ends (non-blocking)
             try:
+                await save_task
                 await async_db(
                     lambda: get_supabase_client().table("chat_messages").insert(
                         {
@@ -216,9 +285,14 @@ async def chat_stream(
                     ).execute()
                 )
             except Exception as save_err:
-                print(f"Failed to save assistant message: {save_err}")
+                logger.error(f"Failed to save assistant message: {save_err}")
 
-        return StreamingResponse(stream_and_save(), media_type="text/event-stream")
+        return StreamingResponse(
+            stream_and_save(),
+            media_type="text/event-stream",
+            # Deliver tokens as they're generated instead of letting proxies buffer them
+            headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"},
+        )
     except Exception as e:
         raise HTTPException(500, str(e))
 
@@ -230,6 +304,8 @@ async def get_project_summary(
     """
     Generate a summary for the project documents
     """
+    metered(current_user, "summary")
+    await usage.consume(current_user["id"], "tools")
     try:
         result = await rag_service.generate_summary(
             request.project_id, request.selected_documents

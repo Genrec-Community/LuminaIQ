@@ -1,5 +1,5 @@
 """
-Gamification Service — XP, Levels, and Badges system for LuminaIQ.
+Gamification Service — XP, Levels, and Badges system for Lumina IQ.
 
 Required Supabase table:
 
@@ -19,7 +19,7 @@ CREATE INDEX idx_user_gamification_user_id ON user_gamification(user_id);
 
 from typing import Dict, Any, List
 from datetime import datetime
-from db.client import get_supabase_client
+from db.client import get_supabase_client, async_db
 from utils.logger import logger
 from uuid import uuid4
 import asyncio
@@ -66,6 +66,7 @@ XP_REWARDS = {
     "pomodoro": 25,         # Completing a pomodoro session
     "quiz": 30,             # Base quiz XP (bonuses added for scores)
     "exam": 35,             # Exam prep practice
+    "sprint": 12,           # Power Hour: per topic card completed
 }
 
 XP_BONUS_PERFECT_QUIZ = 50   # 100% score bonus
@@ -240,10 +241,10 @@ class GamificationService:
         for attempt in range(3):
             try:
                 result = (
-                    self.client.table("user_gamification")
+                    (await async_db(lambda: self.client.table("user_gamification")
                     .select("*")
                     .eq("user_id", user_id)
-                    .execute()
+                    .execute()))
                 )
 
                 if result.data:
@@ -275,7 +276,7 @@ class GamificationService:
                         "badges": [],
                         "stats": DEFAULT_STATS.copy(),
                     }
-                    self.client.table("user_gamification").insert(record).execute()
+                    (await async_db(lambda: self.client.table("user_gamification").insert(record).execute()))
 
                     level_info = self._calculate_level(0)
                     return {
@@ -335,19 +336,19 @@ class GamificationService:
 
             # Get current state
             result = (
-                self.client.table("user_gamification")
+                (await async_db(lambda: self.client.table("user_gamification")
                 .select("*")
                 .eq("user_id", user_id)
-                .execute()
+                .execute()))
             )
 
             if not result.data:
                 await self.get_gamification(user_id)
                 result = (
-                    self.client.table("user_gamification")
+                    (await async_db(lambda: self.client.table("user_gamification")
                     .select("*")
                     .eq("user_id", user_id)
-                    .execute()
+                    .execute()))
                 )
 
             row = result.data[0]
@@ -367,6 +368,7 @@ class GamificationService:
                 "path": "paths_completed",
                 "exam": "exams_taken",
                 "knowledge_graph": "graphs_explored",
+                "sprint": "topics_mastered",
             }
 
             stat_key = stat_mapping.get(activity_type)
@@ -409,9 +411,9 @@ class GamificationService:
                 "stats": stats,
                 "updated_at": datetime.utcnow().isoformat(),
             }
-            self.client.table("user_gamification").update(update).eq(
+            (await async_db(lambda: self.client.table("user_gamification").update(update).eq(
                 "id", row["id"]
-            ).execute()
+            ).execute()))
 
             return {
                 "xp_earned": total_earned,

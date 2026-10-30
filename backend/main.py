@@ -28,11 +28,17 @@ app = FastAPI(
 
 # CORS Configuration
 # Security Fix: Use explicit origins from settings
-origins = settings.BACKEND_CORS_ORIGINS
+origins = list(settings.BACKEND_CORS_ORIGINS)
+# The Android app (Capacitor) serves the web build from these origins
+for app_origin in ("https://localhost", "capacitor://localhost"):
+    if app_origin not in origins:
+        origins.append(app_origin)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    # The website on Azure Static Web Apps (its default *.azurestaticapps.net address)
+    allow_origin_regex=r"https://[a-z0-9-]+(\.[a-z0-9]+)?\.azurestaticapps\.net",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -44,6 +50,16 @@ async def startup_event():
     """Initialize on startup"""
     # Apply log filter to reduce noisy HTTP logs
     setup_uvicorn_log_filter()
+    if settings.INDRA_OCR_URL:
+        from utils.indra_ocr_client import keep_warm
+        app.state.ocr_keep_warm = asyncio.create_task(keep_warm())
+    if settings.SELF_CHECK_ON_STARTUP:
+        from services.self_check import run_self_check
+        app.state.self_check = asyncio.create_task(run_self_check())
+    # Label schools whose paid term has ended (access already stops by date on its own)
+    if settings.SCHOOL_EXPIRY_SWEEP:
+        from services.institution_service import expiry_loop
+        app.state.school_expiry = asyncio.create_task(expiry_loop())
 
 
 @app.on_event("shutdown")
@@ -97,12 +113,12 @@ async def options_handler(full_path: str):
 app.include_router(api_router, prefix="/api/v1")
 
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 async def root():
     return {"message": "Welcome to Lumina IQ API"}
 
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 async def health():
     """Health check endpoint"""
     return {"status": "healthy", "service": "lumina-backend"}

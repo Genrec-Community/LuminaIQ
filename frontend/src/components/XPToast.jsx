@@ -2,6 +2,10 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Zap, Award, TrendingUp, Star } from 'lucide-react';
 import { useGamification } from '../context/GamificationContext';
+import { isAppShell } from '../utils/platform';
+
+// Phone app: a small pill under the top bar, clear of the feed's caption and buttons
+const APP_SHELL = isAppShell();
 
 const ACTIVITY_LABELS = {
     quiz: 'Quiz Completed',
@@ -13,13 +17,14 @@ const ACTIVITY_LABELS = {
     path: 'Path Progress',
     exam: 'Exam Practice',
     knowledge_graph: 'Graph Explored',
+    sprint: 'Power Hour Card',
 };
 
 const XPToast = () => {
     const { xpEvents, dismissXpEvent } = useGamification();
 
     return (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[110] flex flex-col items-center gap-2 pointer-events-none">
+        <div className={`fixed left-1/2 -translate-x-1/2 z-[110] flex flex-col items-center gap-2 pointer-events-none ${APP_SHELL ? 'bottom-[calc(var(--sab)+92px)]' : 'top-4'}`}>
             <AnimatePresence>
                 {xpEvents.map((event) => (
                     <motion.div
@@ -85,6 +90,11 @@ const XPToast = () => {
                                     <Star className="h-6 w-6 text-yellow-200 fill-yellow-200" />
                                 </motion.div>
                             </motion.div>
+                        ) : APP_SHELL ? (
+                            <motion.div onClick={() => dismissXpEvent(event.id)}
+                                className="flex items-center gap-1.5 rounded-full bg-[#142A1F]/90 px-3.5 py-1.5 text-[13px] font-extrabold text-amber-300 shadow-lg backdrop-blur">
+                                <Zap className="h-4 w-4 fill-amber-300" /> +{event.xp_earned} XP
+                            </motion.div>
                         ) : (
                             /* Regular XP Toast */
                             <motion.div
@@ -92,7 +102,7 @@ const XPToast = () => {
                                 onClick={() => dismissXpEvent(event.id)}
                             >
                                 {/* Accent bar */}
-                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-[#C8A288] to-amber-400 rounded-l-xl" />
+                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-[#1E5C42] to-amber-400 rounded-l-xl" />
 
                                 <motion.div
                                     initial={{ scale: 0, rotate: -180 }}
@@ -108,11 +118,11 @@ const XPToast = () => {
                                         initial={{ opacity: 0, x: 10 }}
                                         animate={{ opacity: 1, x: 0 }}
                                         transition={{ delay: 0.15 }}
-                                        className="text-sm font-bold text-[#4A3B32]"
+                                        className="text-sm font-bold text-[#163628]"
                                     >
                                         +{event.xp_earned} XP
                                     </motion.p>
-                                    <p className="text-[11px] text-[#8a6a5c] font-medium">
+                                    <p className="text-[11px] text-[#5E5046] font-medium">
                                         {ACTIVITY_LABELS[event.activity] || 'Activity'}
                                     </p>
                                 </div>

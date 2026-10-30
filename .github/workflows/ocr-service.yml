@@ -1,0 +1,36 @@
+name: OCR service
+
+# Builds the Indra OCR service image and runs it with Render's free limits
+# (512 MB, 0.1 CPU) on realistic scanned spreads: speed, peak memory, accuracy.
+on:
+  push:
+    branches: [jaisamyukth-changes]
+    paths: ['ocr-service/**', '.github/workflows/ocr-service.yml']
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t lumina-ocr ocr-service
+      - name: Test tools
+        run: pip install pillow requests
+      - name: Memory and speed at Render limits
+        run: |
+          mem() { echo "$(( $(docker exec $1 cat /sys/fs/cgroup/$2) / 1048576 )) MB"; }
+          run() {  # name cpus max_side
+            docker run -d --name $1 --memory 512m --memory-swap 512m --cpus $2 -e OCR_TOKEN=ci -e OCR_MAX_SIDE=$3 -p $4:10000 lumina-ocr
+            python ocr-service/ci_test.py --url http://127.0.0.1:$4 --token ci --pages 4 --side $3 --label "$1 ($2 CPU, $3 px)" \
+              --mem-cmd "docker exec $1 cat /sys/fs/cgroup/memory.current" || echo "FAILED: $1"
+            echo "[$1] peak memory: $(mem $1 memory.peak)"
+            docker inspect -f "[$1] OOM killed: {{.State.OOMKilled}}" $1
+          }
+          run free-2400 0.1 2400 8080
+          run free-1800 0.1 1800 8081
+          run starter-2400 0.5 2400 8082
+      - name: Logs
+        if: always()
+        run: for c in free-2400 free-1800; do echo "== $c"; docker logs $c 2>&1 | grep -v onnxruntime | tail -15; done
