@@ -9,6 +9,7 @@ resolve_model() is the one place that decides which runs. Token usage is
 recorded per user (services/usage_service.py).
 """
 import asyncio
+import time
 from dataclasses import dataclass
 from typing import AsyncIterator, Dict, List, Optional
 
@@ -163,13 +164,23 @@ def client_for(cfg: ModelConfig) -> openai.AsyncOpenAI:
     return _clients[key]
 
 
-async def _record_usage(model: str, usage) -> None:
+async def _record_usage(cfg: "ModelConfig", usage, latency_ms: int = 0, ok: bool = True) -> None:
+    """Per-call telemetry (ai_calls) plus the daily per-user totals (llm_usage_daily)."""
+    tokens_in = (getattr(usage, "prompt_tokens", 0) or 0) if usage else 0
+    tokens_out = (getattr(usage, "completion_tokens", 0) or 0) if usage else 0
+    details = getattr(usage, "prompt_tokens_details", None) if usage else None
+    cached = (getattr(details, "cached_tokens", 0) or 0) if details else 0
+    try:
+        from services.telemetry import telemetry
+        telemetry.record("llm", cfg.model, role=cfg.role, input_tokens=tokens_in, output_tokens=tokens_out,
+                         cached_tokens=cached, latency_ms=latency_ms, ok=ok)
+    except Exception as e:
+        logger.debug(f"[LLM] telemetry not recorded: {e}")
     if not usage:
         return
     try:
         from services.usage_service import usage as usage_service
-        await usage_service.record_tokens(model, getattr(usage, "prompt_tokens", 0) or 0,
-                                          getattr(usage, "completion_tokens", 0) or 0)
+        await usage_service.record_tokens(cfg.model, tokens_in, tokens_out)
     except Exception as e:
         logger.debug(f"[LLM] token usage not recorded: {e}")
 
@@ -194,6 +205,10 @@ async def _create(client: openai.AsyncOpenAI, kwargs: dict):
             else:
                 raise
     return await client.chat.completions.create(**kwargs)
+
+
+def _ms(started: float) -> int:
+    return int((time.perf_counter() - started) * 1000)
 
 
 def _task(light: bool, deep: bool, task: Optional[str]) -> str:
@@ -223,8 +238,13 @@ class LLMService:
         cfg = resolve_model(_task(light, deep, task))
         client = client_for(cfg)
         kwargs = self._kwargs(cfg, messages, temperature, max_tokens)
-        resp = await _create(client, kwargs)
-        await _record_usage(cfg.model, getattr(resp, "usage", None))
+        started = time.perf_counter()
+        try:
+            resp = await _create(client, kwargs)
+        except Exception:
+            await _record_usage(cfg, None, _ms(started), ok=False)
+            raise
+        await _record_usage(cfg, getattr(resp, "usage", None), _ms(started))
         choice = resp.choices[0] if resp.choices else None
         text = strip_reasoning((choice.message.content if choice else "") or "")
         if len(text) < self.EMPTY_RESPONSE_MIN_CHARS and choice and choice.finish_reason == "length":
@@ -232,8 +252,9 @@ class LLMService:
             budget_key = "max_completion_tokens" if "max_completion_tokens" in kwargs else "max_tokens"
             kwargs[budget_key] = min(max_tokens * 3, 16000)
             logger.warning(f"[LLM] reply cut off at {max_tokens} tokens; retrying with {kwargs[budget_key]}")
+            started = time.perf_counter()
             resp = await _create(client, kwargs)
-            await _record_usage(cfg.model, getattr(resp, "usage", None))
+            await _record_usage(cfg, getattr(resp, "usage", None), _ms(started))
             text = strip_reasoning((resp.choices[0].message.content if resp.choices else "") or "")
         return text
 
@@ -245,17 +266,26 @@ class LLMService:
         client = client_for(cfg)
         kwargs = self._kwargs(cfg, messages, temperature, max_tokens)
         kwargs.update(stream=True, stream_options={"include_usage": True})
-        stream = await _create(client, kwargs)
+        started = time.perf_counter()
+        try:
+            stream = await _create(client, kwargs)
+        except Exception:
+            await _record_usage(cfg, None, _ms(started), ok=False)
+            raise
         filt = _ReasoningFilter()
+        recorded = False
         async for chunk in stream:
             if getattr(chunk, "usage", None):
-                await _record_usage(cfg.model, chunk.usage)
+                await _record_usage(cfg, chunk.usage, _ms(started))
+                recorded = True
             if not chunk.choices:
                 continue
             delta = chunk.choices[0].delta.content or ""
             out = filt.feed(delta) if delta else ""
             if out:
                 yield out
+        if not recorded:      # the provider sent no usage: still count the call
+            await _record_usage(cfg, None, _ms(started))
         rest = filt.flush()
         if rest:
             yield rest

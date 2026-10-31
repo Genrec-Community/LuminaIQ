@@ -42,7 +42,7 @@ Anti-goals (a failure even if it "works"):
   backend change. RAG changes must also pass the eval in §6 (Phase 3).
 - **Migrations:**
   - One database (`DATABASE_URL`): `backend/db/schema/NNNN_name.sql`, applied in order on startup by `db/migrate.py`
-    (or `uv run python -m db.migrate`). `0001_init.sql` is the fresh-start schema; the next file is `0002_`.
+    (or `uv run python -m db.migrate`). `0001_init.sql` is the fresh-start schema; the latest is `0005_cost.sql`, so the next file is `0006_`.
     Never edit an applied file; add a new one.
   - `backend/db/supabase_auth.sql` is the only SQL that runs in Supabase (the Google sign-up allowlist on `auth.users`).
 - **Database access:** services call `get_supabase_client().table(...)` / `.rpc(...)` as before. That now goes to our
@@ -300,6 +300,24 @@ threshold are dropped so no irrelevant citations show.
 
 **Done when:** the dashboard shows the cache hit rate, and generating study tools for a shared book a second time costs nothing.
 
+**Status (2026-10-31): done.** `services/telemetry.py` (every model, embedding and rerank call plus every cache hit →
+`ai_calls`, buffered writes, optional Langfuse over its HTTP API), `services/shared_content.py` (shared-book scope,
+quiz/flashcard pools with per-student "seen" and shuffled options, one-per-key notes and mindmaps),
+`services/answer_cache.py` (first questions, exact then semantic), `services/context_builder.py` (token budgets),
+`services/cost_report.py` + `GET /platform/costs` + the "AI costs" tab, monthly token caps (`MONTHLY_TOKENS` in
+`services/plans.py`), `PREGENERATE_SHARED` job for class books; schema `0005_cost.sql`.
+Builder's calls:
+- A *shared book* is a bookstore import or class-book copy (or its original), found through `book_imports` /
+  `class_book_copies` (`shared_root_documents()` in SQL). Pools are keyed by that root document, not by retrieved chunk
+  hashes: copies share chunks anyway and the root is stable when retrieval changes.
+- A project mixing a shared book with a personal upload counts as personal (nothing shared).
+- Pool explanations never mention option letters, so options can be shuffled per student.
+- Students are charged quota only for newly generated quiz questions / flashcard sets; chat answers from the cache
+  still count as a chat answer (the limit is about use, not cost).
+- Flashcards and mindmaps no longer generate a whole chat answer just to get context: they read passages directly
+  (one model call per generation instead of two or three).
+- Prices come from `*_PRICE_*` settings, never a hard-coded table. A mindmap the model botched (fallback) is never shared.
+
 ### Phase 5: Memory and context across all states
 1. **Layer 1: profile.** Level, goals, exam date and preferred explanation style (existing settings plus level).
 2. **Layer 2: learner model.** Weak and strong topics, mastery and common mistakes, built from the existing learning data
@@ -376,6 +394,10 @@ threshold are dropped so no irrelevant citations show.
 | `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` / `LANGFUSE_HOST` | Optional AI-call tracing | empty (off) |
 | `PREGENERATE_SHARED` | Pre-generate study content for shared/class books | `false` |
 | `SEMANTIC_CACHE_THRESHOLD` | Similarity for the semantic answer cache | `0.95` |
+| `ANSWER_CACHE_ENABLED` / `ANSWER_CACHE_TTL_DAYS` | First-question answer cache on shared books | `true` / `30` |
+| `SHARED_CONTENT_ENABLED` | Shared quiz/flashcard pools, notes and mindmaps for shared books | `true` |
+| `SMALL_LLM_PRICE_*` / `BIG_LLM_PRICE_*` / `EMBEDDING_PRICE_INPUT` / `RERANK_PRICE_PER_CALL` | USD per 1M tokens (per call for rerank), for cost estimates | `0` (unknown) |
+| `CONTEXT_BUDGET_EXCERPTS` / `_HISTORY` / `_PROFILE` | Token budgets per prompt part | `6000` / `2500` / `1200` |
 | `MODERATION_ENABLED` | Input moderation for the school level | `true` |
 | `RATE_LIMIT_*` | Per-user / per-IP limits | sensible defaults |
 
@@ -393,6 +415,23 @@ The owner will provide the real `.env`. Keep `.env.example` complete and up to d
 
 ## 8. Results log
 Record load-test numbers (Phase 1), RAG eval baselines and results (Phase 3), and cache hit rates (Phase 4) here, with the date and commit.
+
+### 2026-10-31 · Phase 4 shared-book reuse (end-to-end, fake model server)
+A teacher's 4-page book published to a class; two students (same level) each generate a 5-question quiz, 5
+flashcards, Summary notes and a mindmap on "Respiration", then ask the same first chat question. Run against
+`scripts/fake_openai.py` with the real app, worker and Postgres.
+
+| Tool | Model calls, student 1 | Model calls, student 2 |
+| --- | --- | --- |
+| Quiz (5 questions) | 1 | **0** (same questions, options reshuffled) |
+| Flashcards (5) | 1 | **0** |
+| Notes | 1 | **0** |
+| Mindmap | 1 | **0** |
+| First chat question | 1 | **0** (citations point at student 2's own copy) |
+
+Dashboard (`/platform/costs`): cache hit rate 45% overall (50% per tool: one generation, one reuse). Real hit rates
+depend on class sizes; re-measure in production and record them here. (Bookstore import couldn't be exercised
+here because it copies text through Supabase Storage; class copies use the same sharing code.)
 
 ### 2026-10-31 · Phase 3 RAG eval (`uv run python -m scripts.rag_eval`)
 **Not run with real models yet: no keys in this environment.** The harness was smoke-tested against

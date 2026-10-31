@@ -80,6 +80,11 @@ async def shutdown_event():
     if worker:
         await worker.stop()   # let running jobs finish; queued ones wait for the next process
     try:
+        from services.telemetry import telemetry
+        await telemetry.flush()   # AI-call rows still in memory
+    except Exception:
+        pass
+    try:
         from services.embedding_service import embedding_service
         embedding_service.shutdown()
     except Exception:

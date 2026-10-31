@@ -11,6 +11,7 @@ from models.schemas import (
 from typing import Any, List, Dict
 from api.access import assert_row_access
 from api.deps import get_current_user
+from services import levels
 from services.usage_service import usage, metered
 
 router = APIRouter()
@@ -74,18 +75,25 @@ async def generate_mcq(
     Generate MCQ questions for a chapter/topic
     """
     metered(current_user, "questions")
-    await usage.consume(current_user["id"], "questions", max(1, request.num_questions or 1))
+    wanted = max(1, request.num_questions or 1)
+    # Questions drawn from a shared book's pool are free: check now, charge only new ones
+    await usage.check(current_user["id"], "questions", wanted)
     try:
+        eff = await levels.effective_for(current_user["id"])
         result = await mcq_service.generate_mcq(
             project_id=request.project_id,
             topic=request.topic,
             num_questions=request.num_questions,
             selected_documents=request.selected_documents,
             difficulty=request.difficulty,
+            user_id=current_user["id"],
+            level=eff.get("level", ""),
         )
-        return result
     except Exception as e:
         raise HTTPException(500, str(e))
+    if result.get("generated"):
+        await usage.charge(current_user["id"], "questions", min(result["generated"], wanted))
+    return result
 
 
 @router.post("/submit", response_model=MCQSubmitResponse)

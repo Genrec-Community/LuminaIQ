@@ -5,6 +5,7 @@ import {
     getPlatformMe, listPlatformSchools, approveSchool, suspendSchool, extendSchool, getSchoolAudit, apiErrorText,
     getPlatformLevels,
 } from '../api';
+import AICosts from '../components/platform/AICosts';
 
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
 
@@ -135,7 +136,7 @@ const LevelsOverview = () => {
 const Platform = () => {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
-    const tab = searchParams.get('tab') === 'levels' ? 'levels' : 'schools';
+    const tab = ['levels', 'costs'].includes(searchParams.get('tab')) ? searchParams.get('tab') : 'schools';
     const [allowed, setAllowed] = useState(null);
     const [status, setStatus] = useState('pending');
     const [q, setQ] = useState('');
@@ -166,10 +167,10 @@ const Platform = () => {
                 {allowed === null && <div className="flex items-center gap-2 text-[#5E5046]"><Loader2 className="h-4 w-4 animate-spin" /> Checking access…</div>}
                 {allowed === false && <p className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-800">This page is for Lumina IQ staff.</p>}
                 {allowed && (
-                    <div role="tablist" className="mb-5 inline-flex rounded-2xl border border-[#E6D5CC] bg-white p-1">
-                        {[['schools', 'Schools'], ['levels', 'Levels & tools']].map(([id, label]) => (
+                    <div role="tablist" className="mb-5 inline-flex max-w-full overflow-x-auto rounded-2xl border border-[#E6D5CC] bg-white p-1">
+                        {[['schools', 'Schools'], ['levels', 'Levels & tools'], ['costs', 'AI costs']].map(([id, label]) => (
                             <button key={id} role="tab" aria-selected={tab === id}
-                                onClick={() => setSearchParams(id === 'levels' ? { tab: 'levels' } : {})}
+                                onClick={() => setSearchParams(id === 'schools' ? {} : { tab: id })}
                                 className={`rounded-xl px-4 py-1.5 text-sm font-semibold ${tab === id ? 'bg-[#163628] text-white' : 'text-[#5E5046]'}`}>
                                 {label}
                             </button>
@@ -177,6 +178,7 @@ const Platform = () => {
                     </div>
                 )}
                 {allowed && tab === 'levels' && <LevelsOverview />}
+                {allowed && tab === 'costs' && <AICosts />}
                 {allowed && tab === 'schools' && (
                     <>
                         <div className="mb-4 flex flex-wrap items-center gap-2">

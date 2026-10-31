@@ -10,8 +10,11 @@ from api.deps import get_current_user
 from db.client import get_supabase_client, async_db
 from utils.logger import logger
 import asyncio
+import json
 from services.usage_service import usage, metered
-from services import levels, safety
+from config.settings import settings as app_settings
+from services import answer_cache, context_builder, levels, safety, shared_content
+from services.telemetry import meter
 from services.prompts.levels import build_level_block, resolve_hints
 
 router = APIRouter()
@@ -176,6 +179,8 @@ async def _prepare_chat(request: ChatRequest, user_id: str):
     )
     # The answer style for their level, school safety rules, hints-first and outside-book
     level_block = build_level_block(eff, resolve_hints(eff, request.hints))
+    # The profile has a budget; the level rules (including school safety) are never trimmed
+    user_context = context_builder.trim(user_context, app_settings.CONTEXT_BUDGET_PROFILE)
     user_context = f"{user_context}\n\n{level_block}" if user_context else level_block
     save_task = asyncio.create_task(async_db(
         lambda: client.table("chat_messages").insert(
@@ -183,6 +188,20 @@ async def _prepare_chat(request: ChatRequest, user_id: str):
         ).execute()
     ))
     return history, user_context, save_task, eff
+
+
+async def _answer_cache_plan(request: ChatRequest, history, eff):
+    """
+    (scope, key) when this message may use the shared answer cache: the first question of
+    a chat about shared-library or class books, without hints-first or a custom prompt.
+    """
+    if history or request.system_prompt or resolve_hints(eff, request.hints):
+        return None
+    scope = await shared_content.scope_for(request.project_id, request.selected_documents)
+    if not scope:
+        return None
+    return scope, answer_cache.scope_key(scope, eff.get("level") or "general", request.deep,
+                                         eff.get("outside_book", True))
 
 
 async def _save_reply(request: ChatRequest, save_task, answer: str, sources=None) -> None:
@@ -214,15 +233,28 @@ async def chat_message(
             await _save_reply(request, save_task, safe_reply)
             return {"answer": safe_reply, "sources": []}
 
-        result = await rag_service.get_answer(
-            project_id=request.project_id,
-            question=request.message,
-            selected_documents=request.selected_documents,
-            chat_history=chat_history_dicts,
-            system_prompt=request.system_prompt,
-            user_context=user_context_str,
-            deep=request.deep,
-        )
+        plan = await _answer_cache_plan(request, chat_history_dicts, eff)
+        if plan:
+            hit = await answer_cache.lookup(plan[0], plan[1], request.message)
+            if hit:
+                await _save_reply(request, save_task, hit["answer"], hit["sources"])
+                return {"answer": hit["answer"], "sources": hit["sources"]}
+            # A cached answer is shared by every student of this book: neutral voice, level style only
+            user_context_str = build_level_block(eff, False)
+
+        with meter() as cost:
+            result = await rag_service.get_answer(
+                project_id=request.project_id,
+                question=request.message,
+                selected_documents=request.selected_documents,
+                chat_history=chat_history_dicts,
+                system_prompt=request.system_prompt,
+                user_context=user_context_str,
+                deep=request.deep,
+            )
+        if plan:
+            await answer_cache.store(plan[0], plan[1], request.message, result["answer"], result["sources"],
+                                     cost.cost)
 
         await save_task
         # Save Assistant Message (non-blocking)
@@ -271,38 +303,52 @@ async def chat_stream(
             return StreamingResponse(caring_reply(), media_type="text/event-stream",
                                      headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"})
 
+        plan = await _answer_cache_plan(request, chat_history_dicts, eff)
+        hit = await answer_cache.lookup(plan[0], plan[1], request.message) if plan else None
+        if hit:
+            async def cached_reply():
+                text = hit["answer"]
+                for i in range(0, len(text), 400):
+                    yield text[i:i + 400]
+                yield f"\n\n__SOURCES__:{json.dumps(hit['sources'])}"
+                try:
+                    await _save_reply(request, save_task, text, hit["sources"])
+                except Exception as save_err:
+                    logger.error(f"Failed to save cached reply: {save_err}")
+            return StreamingResponse(cached_reply(), media_type="text/event-stream",
+                                     headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"})
+        if plan:
+            # A cached answer is shared by every student of this book: neutral voice, level style only
+            user_context_str = build_level_block(eff, False)
+
         # Wrapper generator to intercept and save the final answer
         async def stream_and_save():
             full_answer = ""
             sources = []
+            with meter() as spent:
+                async for chunk in rag_service.get_answer_stream(
+                    project_id=request.project_id,
+                    question=request.message,
+                    selected_documents=request.selected_documents,
+                    chat_history=chat_history_dicts,
+                    system_prompt=request.system_prompt,
+                    user_context=user_context_str,
+                    deep=request.deep,
+                ):
+                    if "__SOURCES__:" in chunk:
+                        text, _, raw = chunk.partition("__SOURCES__:")
+                        full_answer += text
+                        try:
+                            sources = json.loads(raw)
+                        except Exception:
+                            pass
+                    else:
+                        full_answer += chunk
+                    yield chunk   # the frontend reads the sources marker itself
 
-            async for chunk in rag_service.get_answer_stream(
-                project_id=request.project_id,
-                question=request.message,
-                selected_documents=request.selected_documents,
-                chat_history=chat_history_dicts,
-                system_prompt=request.system_prompt,
-                user_context=user_context_str,
-                deep=request.deep,
-            ):
-                # Check for sources marker
-                if "__SOURCES__:" in chunk:
-                    parts = chunk.split("__SOURCES__:")
-                    full_answer += parts[0]
-                    yield parts[0]  # Send final text part
-
-                    # Process sources
-                    try:
-                        import json
-
-                        sources = json.loads(parts[1])
-                    except:
-                        pass
-
-                    yield chunk  # Forward the marker to frontend
-                else:
-                    full_answer += chunk
-                    yield chunk
+            full_answer = full_answer.rstrip()
+            if plan:
+                await answer_cache.store(plan[0], plan[1], request.message, full_answer, sources, spent.cost)
 
             # Save Assistant Message after stream ends (non-blocking)
             try:

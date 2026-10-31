@@ -81,6 +81,11 @@ class Worker:
             if self._running:
                 await asyncio.gather(*self._running, return_exceptions=True)
         finally:
+            try:
+                from services.telemetry import telemetry
+                await telemetry.flush()
+            except Exception:
+                pass
             self._stopped.set()
             logger.info(f"[Worker] {self.worker_id} stopped")
 
@@ -104,6 +109,10 @@ class Worker:
     async def _run(self, job: Dict[str, Any]) -> None:
         beat = asyncio.create_task(self._heartbeat(job["id"]))
         try:
+            # AI calls made by this job are counted for the user who queued it
+            from services.usage_service import current_feature, current_user_id
+            current_user_id.set(str(job["user_id"]) if job.get("user_id") else None)
+            current_feature.set(f"job:{job['kind']}")
             fn = HANDLERS.get(job["kind"])
             if fn is None:
                 raise RuntimeError(f"No handler for job kind '{job['kind']}'")

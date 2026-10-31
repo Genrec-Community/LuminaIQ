@@ -1,7 +1,6 @@
 from typing import List, Optional, Dict, Any
 from db.client import get_supabase_client, async_db
 from utils.logger import logger
-from services.rag_service import rag_service
 from services.llm_service import llm_service
 import json
 import re
@@ -179,24 +178,61 @@ class FlashcardService:
         project_id: str,
         topic: str,
         num_cards: int,
-        selected_documents: List[str]
+        selected_documents: List[str],
+        level: str = "",
     ) -> Dict[str, Any]:
-        """Generate flashcards using AI based on document content"""
-        try:
-            # Get relevant context from documents
-            context = ""
-            if selected_documents:
-                rag_results = await rag_service.get_answer(
-                    project_id=project_id,
-                    question=f"Provide comprehensive key facts, concepts, definitions, formulas, and important details about {topic}. Include specific examples and distinctions.",
-                    selected_documents=selected_documents,
-                    chat_history=[]
-                )
-                context = rag_results['answer']
-            
-            # Generate flashcards using LLM with improved prompt
-            prompt = f"""You are an expert educator creating high-quality study flashcards. Generate exactly {num_cards} flashcards for the topic: "{topic}"
+        """
+        A flashcard set on a topic, saved for the student. Shared-library and class books
+        draw cards from the book's shared pool (only missing cards are generated).
+        """
+        from services import shared_content
 
+        scope = await shared_content.scope_for(project_id, selected_documents)
+
+        async def make(n: int) -> List[Dict[str, str]]:
+            return await self.make_cards(project_id, topic, n, selected_documents, level)
+
+        try:
+            cards_data, generated = await shared_content.draw(
+                user_id, scope, "flashcards", topic, level, num_cards, make)
+            if not cards_data:
+                raise Exception("Failed to generate flashcards from LLM response")
+            flashcard_set = await self.create_flashcard_set(
+                user_id=user_id,
+                project_id=project_id,
+                title=f"{topic} - Flashcards",
+                topic=topic,
+                description=f"AI-generated flashcards for {topic}",
+                cards=cards_data,
+            )
+            logger.info(f"Flashcards for '{topic}': {len(cards_data)} cards, {generated} generated")
+            return {**flashcard_set, "generated": generated} if isinstance(flashcard_set, dict) else flashcard_set
+        except Exception as e:
+            logger.error(f"Error generating flashcards with AI: {e}")
+            raise Exception(f"Failed to generate flashcards: {str(e)}")
+
+    async def make_cards(self, project_id: str, topic: str, n: int,
+                         selected_documents: Optional[List[str]], level: str) -> List[Dict[str, str]]:
+        """n new flashcards from the book (one model call)."""
+        # Book passages straight from search: no full chat answer needed just for context
+        from services.retrieval import passages_text
+        context = await passages_text(
+            project_id, [topic, f"definitions and key facts about {topic}", f"examples of {topic}"],
+            per_query=4, document_ids=selected_documents or None, limit=10)
+        response = await llm_service.chat_completion(
+            messages=[{"role": "user", "content": self._flashcard_prompt(topic, n, context, level)}],
+            temperature=0.7, max_tokens=6000, light=True)
+        cards = self._parse_flashcards_response(response, n)
+        if not cards:
+            raise Exception("Failed to generate flashcards from LLM response")
+        return cards
+
+    @staticmethod
+    def _flashcard_prompt(topic: str, num_cards: int, context: str, level: str) -> str:
+        from services.prompts.levels import LEVEL_STYLE
+        audience = f"\nThe learners:\n{LEVEL_STYLE[level]}\nWrite the cards at this level.\n" if level in LEVEL_STYLE else ""
+        return f"""You are an expert educator creating high-quality study flashcards. Generate exactly {num_cards} flashcards for the topic: "{topic}"
+{audience}
 Context from study documents:
 {context if context else "No specific context provided. Use general knowledge about this topic."}
 
@@ -208,6 +244,7 @@ Requirements for excellent flashcards:
 5. Progress from basic concepts to more nuanced details
 6. Use the document context to create accurate, specific cards (not generic)
 7. Avoid yes/no questions - ask "what", "how", "why", "explain", "compare"
+8. Write maths in LaTeX: $...$ inline, $$...$$ for display (escape backslashes for JSON)
 
 Return ONLY a valid JSON array (no markdown, no explanation):
 [
@@ -217,40 +254,6 @@ Return ONLY a valid JSON array (no markdown, no explanation):
 
 Generate exactly {num_cards} high-quality flashcards. Return ONLY the JSON array."""
 
-            # Call LLM with more tokens for better quality
-            response = await llm_service.chat_completion(
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.7,
-                max_tokens=6000,
-                light=True
-            )
-            
-            # Parse the response to extract flashcards
-            cards_data = self._parse_flashcards_response(response, num_cards)
-            
-            if not cards_data:
-                raise Exception("Failed to generate flashcards from LLM response")
-            
-            # Create the flashcard set
-            title = f"{topic} - Flashcards"
-            description = f"AI-generated flashcards for {topic}"
-            
-            flashcard_set = await self.create_flashcard_set(
-                user_id=user_id,
-                project_id=project_id,
-                title=title,
-                topic=topic,
-                description=description,
-                cards=cards_data
-            )
-            
-            logger.info(f"Generated {len(cards_data)} flashcards for topic: {topic}")
-            return flashcard_set
-        
-        except Exception as e:
-            logger.error(f"Error generating flashcards with AI: {e}")
-            raise Exception(f"Failed to generate flashcards: {str(e)}")
-    
     def _parse_flashcards_response(self, response: str, num_cards: int) -> List[Dict[str, str]]:
         """Parse LLM response into flashcard data with multiple fallback strategies."""
         # Strategy 1: Direct JSON array extraction

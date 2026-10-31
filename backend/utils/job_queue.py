@@ -108,4 +108,8 @@ def housekeeping(pg, finished_job_days: int = 14) -> Dict[str, int]:
     counts["jobs"] = len(pg.fetch(
         """DELETE FROM jobs WHERE status IN ('done', 'failed')
            AND finished_at < now() - make_interval(days => %s) RETURNING id""", (finished_job_days,)))
+    try:
+        counts["answers"] = len(pg.fetch("DELETE FROM answer_cache WHERE expires_at < now() RETURNING id"))
+    except Exception:
+        pass   # table missing on an old schema: nothing to clean
     return counts

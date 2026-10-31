@@ -423,11 +423,26 @@ class InstitutionService:
             "class_id": class_id, "source_document_id": document_id,
             "title": doc["filename"], "published_by": user["id"],
         }, on_conflict="class_id,source_document_id").execute())).data[0]
+        await self._maybe_pregenerate(class_id, doc)
         copied = 0
         for member in await self._all("class_members", class_id=class_id):
             if member.get("project_id") and await self._copy_book_to(book, member["user_id"], member["project_id"]):
                 copied += 1
         return {"book": book, "copied_to": copied}
+
+    async def _maybe_pregenerate(self, class_id: str, doc: Dict[str, Any]) -> None:
+        """Queue filling the book's quiz and flashcard pools for the class level (PREGENERATE_SHARED)."""
+        from config.settings import settings
+        if not settings.PREGENERATE_SHARED:
+            return
+        try:
+            cls = await self._one("institution_classes", id=class_id)
+            from services.jobs import enqueue
+            await enqueue("pregenerate_shared", {"project_id": doc["project_id"], "document_id": doc["id"],
+                                                 "level": (cls or {}).get("level") or "school"},
+                          dedupe_key=f"pregenerate:{doc['id']}:{(cls or {}).get('level')}")
+        except Exception as e:
+            logger.warning(f"[Institution] pre-generation not queued: {e}")
 
     async def _copy_book_to(self, book: Dict[str, Any], user_id: str, project_id: str) -> bool:
         """Give one student a copy of a class book (idempotent)."""

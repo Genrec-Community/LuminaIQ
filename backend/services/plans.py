@@ -27,12 +27,14 @@ FEATURE_PERIOD = {
     "cram": "month",
     "visual": "month",
     "books": "total",
+    "ai_tokens": "month",
 }
 
 # Short names for "not included in your plan" messages
 FEATURE_NAMES = {
     "chat": "Chat answers", "questions": "Quiz questions", "tools": "Study tools",
     "deep": "Deep answers", "cram": "Cram cards", "visual": "Visual Lab builds", "books": "More books",
+    "ai_tokens": "More AI use this month",
 }
 
 FEATURE_LABELS = {
@@ -43,6 +45,7 @@ FEATURE_LABELS = {
     "cram": "cram cards this month",
     "visual": "Visual Lab builds this month",
     "books": "books",
+    "ai_tokens": "AI tokens this month",
 }
 
 PLANS: Dict[str, Dict[str, Any]] = {
@@ -75,6 +78,21 @@ PLANS: Dict[str, Dict[str, Any]] = {
                    "cram": 500, "visual": 15, "books": None},
     },
 }
+
+# Safety net on top of the per-feature limits: total AI tokens (input + output, cache hits
+# excluded) one account may use per calendar month. Set well above what normal use of the
+# feature limits needs, so only runaway usage hits it. None = no cap.
+MONTHLY_TOKENS: Dict[str, Optional[int]] = {
+    "free": 5_000_000,
+    "scholar": 15_000_000,
+    "topper": 40_000_000,
+    "institution": 15_000_000,
+}
+
+
+def monthly_token_cap(plan: str) -> Optional[int]:
+    return MONTHLY_TOKENS.get(plan, MONTHLY_TOKENS["free"])
+
 
 # Paid personal plans (bought by students themselves)
 PAID_PLANS = ("scholar", "topper")

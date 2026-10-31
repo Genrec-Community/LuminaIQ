@@ -18,7 +18,7 @@ from typing import Any, AsyncIterator, Dict, List, Optional
 
 from config.settings import settings
 from db.client import async_db, get_supabase_client
-from services import retrieval, vector_store
+from services import context_builder, retrieval, vector_store
 from services.llm_service import llm_service
 from utils.logger import logger
 
@@ -43,12 +43,14 @@ How to answer:
 
 
 def _history_messages(history: List[Dict[str, str]]) -> List[Dict[str, str]]:
-    return [{"role": m["role"], "content": m["content"]}
-            for m in (history or [])[-HISTORY_TURNS:]
-            if m.get("role") in ("user", "assistant") and m.get("content")]
+    turns = [{"role": m["role"], "content": m["content"]}
+             for m in (history or [])[-HISTORY_TURNS:]
+             if m.get("role") in ("user", "assistant") and m.get("content")]
+    return context_builder.fit_history(turns, settings.CONTEXT_BUDGET_HISTORY)
 
 
 def _excerpts_block(passages: List[retrieval.Passage], grounded: bool) -> str:
+    passages = context_builder.fit_passages(passages, settings.CONTEXT_BUDGET_EXCERPTS)
     if not passages:
         return "EXCERPTS FROM THE STUDENT'S DOCUMENTS:\n(none found for this question)"
     lines = ["EXCERPTS FROM THE STUDENT'S DOCUMENTS:"]
@@ -57,7 +59,7 @@ def _excerpts_block(passages: List[retrieval.Passage], grounded: bool) -> str:
     for i, p in enumerate(passages, 1):
         where = f", page {p.page}" if p.page else ""
         head = f" — {p.heading}" if p.heading else ""
-        lines.append(f"\n[Excerpt {i}{where}{head}]\n{p.text[:4000]}")
+        lines.append(f"\n[Excerpt {i}{where}{head}]\n{p.text}")
     return "\n".join(lines)
 
 
@@ -113,12 +115,14 @@ class RAGService:
         result = await retrieval.retrieve(project_id, question, history=history, document_ids=selected_documents,
                                           top_n=settings.RAG_TOP_PASSAGES, deep=deep)
         if result.passages:
-            return result.passages, result.grounded
+            # The same passages become excerpts and sources, so citation numbers line up
+            return context_builder.fit_passages(result.passages, settings.CONTEXT_BUDGET_EXCERPTS), result.grounded
         if await retrieval._project_has_chunks(project_id):
             return [], False      # indexed, but nothing relevant: outside-book territory
         stored = await retrieval._stored_text_passages(project_id, result.query, settings.RAG_TOP_PASSAGES,
                                                        selected_documents)
         passages = [retrieval.Passage(text=s["text"], document_id=s["document_id"], page=None) for s in stored]
+        passages = context_builder.fit_passages(passages, settings.CONTEXT_BUDGET_EXCERPTS)
         return passages, bool(passages)
 
     async def get_answer(self, project_id: str, question: str, selected_documents: Optional[List[str]] = None,

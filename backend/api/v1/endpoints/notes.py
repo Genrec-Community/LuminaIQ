@@ -5,6 +5,7 @@ from typing import Any, List
 from services.notes_service import notes_service
 from models.schemas import NotesGenerateRequest, NotesGenerateResponse
 from api.deps import get_current_user
+from services import levels
 from services.usage_service import usage, metered
 
 router = APIRouter()
@@ -61,6 +62,7 @@ async def generate_notes(
             topic=request.topic,
             selected_documents=request.selected_documents,
             user_id=current_user["id"],
+            level=(await levels.effective_for(current_user["id"])).get("level", ""),
         )
         # result is now a dict with content + optional note_id
         if isinstance(result, dict):

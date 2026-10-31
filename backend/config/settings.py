@@ -66,6 +66,33 @@ class Settings(BaseSettings):
     RAG_MIN_SIMILARITY: float = 0.30
     RAG_TOP_PASSAGES: int = 6        # passages given to the model per answer
 
+    # ── Cost (Phase 4) ──
+    # Prices in USD per 1M tokens, used to estimate the cost of each call for the admin
+    # dashboard. 0 = unknown (calls are still counted). Cached input defaults to input.
+    SMALL_LLM_PRICE_INPUT: float = 0.0
+    SMALL_LLM_PRICE_OUTPUT: float = 0.0
+    SMALL_LLM_PRICE_CACHED_INPUT: float = -1.0
+    BIG_LLM_PRICE_INPUT: float = 0.0
+    BIG_LLM_PRICE_OUTPUT: float = 0.0
+    BIG_LLM_PRICE_CACHED_INPUT: float = -1.0
+    EMBEDDING_PRICE_INPUT: float = 0.0
+    RERANK_PRICE_PER_CALL: float = 0.0
+    # Token budgets for one chat prompt (rough tokens: characters / 4)
+    CONTEXT_BUDGET_EXCERPTS: int = 6000
+    CONTEXT_BUDGET_HISTORY: int = 2500
+    CONTEXT_BUDGET_PROFILE: int = 1200
+    # Cached answers to first questions on shared books
+    ANSWER_CACHE_ENABLED: bool = True
+    ANSWER_CACHE_TTL_DAYS: int = 30
+    SEMANTIC_CACHE_THRESHOLD: float = 0.95
+    # Shared quiz/flashcard pools and notes for shared-library and class books
+    SHARED_CONTENT_ENABLED: bool = True
+    PREGENERATE_SHARED: bool = False
+    # Optional AI-call tracing (Langfuse), on when both keys are set
+    LANGFUSE_PUBLIC_KEY: str = Field(default="")
+    LANGFUSE_SECRET_KEY: str = Field(default="")
+    LANGFUSE_HOST: str = Field(default="https://cloud.langfuse.com")
+
     # ── Razorpay (payments) ── fill these in Render; empty = payments disabled
     RAZORPAY_KEY_ID: str = Field(default="")            # rzp_test_... / rzp_live_...
     RAZORPAY_KEY_SECRET: str = Field(default="")

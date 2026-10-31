@@ -114,3 +114,43 @@ async def handle_book_clone(job: Dict[str, Any]) -> Dict[str, Any]:
         doc_filename=p["doc_filename"], source_text_path=p.get("source_text_path"),
     )
     return {"document_id": p["document_id"]}
+
+
+# --------------------------------------------------------------------------- shared books
+
+PREGENERATE_TOPICS = 15        # topics per book
+PREGENERATE_QUESTIONS = 10     # pool size per topic (quiz) and per tool (flashcards)
+
+
+@handler("pregenerate_shared")
+async def handle_pregenerate_shared(job: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Fill a class book's quiz and flashcard pools ahead of time (PREGENERATE_SHARED), so
+    students' first quizzes cost nothing. Topics whose pools are already full are skipped.
+    """
+    from services import shared_content
+    from services.flashcard_service import FlashcardService
+    from services.mcq_service import mcq_service
+
+    p = job["payload"]
+    project_id, document_id, level = p["project_id"], p["document_id"], p.get("level") or "school"
+    scope = await shared_content.scope_for(project_id, [document_id])
+    if not scope:
+        return {"skipped": "not a shared book"}
+    docs = get_supabase_client().table("documents").select("topics").eq("id", document_id).limit(1)
+    rows = (await async_db(lambda: docs.execute())).data or []
+    topics = [t for t in (rows[0].get("topics") if rows else None) or [] if isinstance(t, str)][:PREGENERATE_TOPICS]
+    cards = FlashcardService()
+    generated = 0
+    for topic in topics:
+        try:
+            _, g1 = await shared_content.draw(
+                None, scope, "quiz", topic, level, PREGENERATE_QUESTIONS, variant="medium",
+                make=lambda n, t=topic: mcq_service.make_questions(project_id, t, n, [document_id], "medium", level))
+            _, g2 = await shared_content.draw(
+                None, scope, "flashcards", topic, level, PREGENERATE_QUESTIONS,
+                make=lambda n, t=topic: cards.make_cards(project_id, t, n, [document_id], level))
+            generated += g1 + g2
+        except Exception as e:
+            logger.warning(f"[Jobs] pre-generation for '{topic}' failed: {e}")
+    return {"topics": len(topics), "generated": generated}

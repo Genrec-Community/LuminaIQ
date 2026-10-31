@@ -392,7 +392,8 @@ Respond ONLY with the Markdown content."""
         note_type: str,
         topic: str = None,
         selected_documents: List[str] = None,
-        user_id: str = None
+        user_id: str = None,
+        level: str = "",
     ) -> str:
         """Generate notes using AI with type-specific prompts and retrieval strategies."""
         try:
@@ -401,31 +402,30 @@ Respond ONLY with the Markdown content."""
             # 1. Get type-specific configuration
             config = self._get_note_config(note_type, topic)
 
-            # 2. Retrieve content in PARALLEL — all queries run concurrently
-            # Vector search, or the stored text when the index is unavailable
+            from services import shared_content
+            from services.prompts.levels import LEVEL_STYLE
             from services.retrieval import search_passages
-            all_hits = await search_passages(project_id, config["queries"], 10, selected_documents)
 
-            if not all_hits:
+            async def make():
+                # Retrieve content (vector search, or the stored text when the index is unavailable)
+                all_hits = await search_passages(project_id, config["queries"], 10, selected_documents)
+                if not all_hits:
+                    return None
+                chunk_limit = 25 if "Comprehensive" in note_type or "Summary" in note_type else 20
+                context = "\n\n".join([hit["text"] for hit in all_hits[:chunk_limit]])
+                system = config["system_prompt"]
+                if level in LEVEL_STYLE:
+                    system += f"\n\nThe readers:\n{LEVEL_STYLE[level]}\nWrite the notes at this level."
+                return await llm_service.chat_completion(
+                    [{"role": "system", "content": system},
+                     {"role": "user", "content": config["user_prompt"].replace("{context}", context)}],
+                    temperature=config["temperature"], max_tokens=config["max_tokens"])
+
+            # Shared-library and class books reuse one set of notes per type, topic and level
+            scope = await shared_content.scope_for(project_id, selected_documents)
+            response, _ = await shared_content.asset(scope, "notes", [note_type, topic or "", level], make)
+            if not response:
                 return "No content found to generate notes. Please ensure documents are uploaded and processed."
-
-            # Combine content — use more chunks for comprehensive notes
-            chunk_limit = 25 if "Comprehensive" in note_type or "Summary" in note_type else 20
-            context = "\n\n".join([hit["text"] for hit in all_hits[:chunk_limit]])
-
-            # 3. Build the prompt with context
-            user_prompt = config["user_prompt"].replace("{context}", context)
-
-            # 4. Send to LLM with system message for better instruction following
-            messages = [
-                {"role": "system", "content": config["system_prompt"]},
-                {"role": "user", "content": user_prompt}
-            ]
-            response = await llm_service.chat_completion(
-                messages,
-                temperature=config["temperature"],
-                max_tokens=config["max_tokens"]
-            )
 
             # Auto-save generated notes if user_id is provided
             saved_note = None

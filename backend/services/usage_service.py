@@ -27,7 +27,7 @@ from fastapi import HTTPException
 from config.settings import settings
 from db.client import async_db, get_supabase_client
 from services.plans import (FEATURE_LABELS, FEATURE_NAMES, FEATURE_PERIOD, PLANS, RENEWAL_GRACE,
-                           plan_limits as _plan_limits)
+                           monthly_token_cap, plan_limits as _plan_limits)
 from utils.logger import logger
 
 # Who the current request is for; read by the LLM token recorder
@@ -37,6 +37,7 @@ current_feature: contextvars.ContextVar[str] = contextvars.ContextVar("current_f
 current_plan: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar("current_plan", default=None)
 
 _PLAN_TTL = 60  # seconds a resolved plan is cached in-process
+_TOKENS_TTL = 60  # seconds a user's monthly token total is cached in-process
 
 
 def plan_limits(plan: str) -> Dict[str, Optional[int]]:
@@ -99,6 +100,7 @@ class UsageService:
     def __init__(self):
         self.client = get_supabase_client()
         self._plans: Dict[str, tuple] = {}  # user_id -> (expires, plan_row)
+        self._tokens: Dict[str, tuple] = {}  # user_id -> (expires, tokens this month)
 
     # ---------------------------------------------------------------- plans
 
@@ -179,10 +181,40 @@ class UsageService:
         }).execute())
         return int(res.data) if res.data is not None else 0
 
+    # ------------------------------------------------------------- monthly AI budget
+
+    async def month_tokens(self, user_id: str) -> int:
+        cached = self._tokens.get(user_id)
+        if cached and cached[0] > time.time():
+            return cached[1]
+        since = datetime.now(_tz()).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        res = await async_db(lambda: self.client.rpc("user_month_tokens", {
+            "p_user": user_id, "p_since": since.isoformat()}).execute())
+        used = int(res.data or 0)
+        self._tokens[user_id] = (time.time() + _TOKENS_TTL, used)
+        return used
+
+    async def check_tokens(self, user_id: str) -> None:
+        """Raise LimitReached once this month's AI tokens pass the plan's safety cap."""
+        if not user_id or not getattr(settings, "PLAN_LIMITS_ENABLED", False):
+            return
+        row = await self.plan_row(user_id)
+        cap = None if row.get("unlimited") else monthly_token_cap(row["plan"])
+        if not cap:
+            return
+        try:
+            used = await self.month_tokens(user_id)
+        except Exception as e:
+            logger.debug(f"Token budget check unavailable: {e}")
+            return
+        if used >= cap:
+            raise LimitReached(row["plan"], "ai_tokens", cap, used)
+
     async def consume(self, user_id: str, feature: str, amount: int = 1) -> None:
         """Atomically count `amount` uses, or raise LimitReached."""
         if not user_id or amount <= 0:
             return
+        await self.check_tokens(user_id)
         plan = await self.plan(user_id)
         limit = (await self.limits(user_id)).get(feature)
         try:
@@ -202,6 +234,7 @@ class UsageService:
         """Raise LimitReached if `amount` more uses would exceed the plan."""
         if not user_id:
             return
+        await self.check_tokens(user_id)
         plan = await self.plan(user_id)
         limit = (await self.limits(user_id)).get(feature)
         if limit is None:

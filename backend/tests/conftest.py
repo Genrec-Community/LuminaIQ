@@ -43,3 +43,14 @@ def pg_client(pg_url):
     client = PgClient(pg_url, max_size=8)
     yield client
     client.close()
+
+
+@pytest.fixture(autouse=True)
+def _quiet_telemetry(monkeypatch):
+    """AI-call rows stay in memory during tests (no background database writes)."""
+    from services.telemetry import telemetry
+
+    monkeypatch.setattr(telemetry, "_schedule", lambda: None)
+    telemetry._buffer.clear()
+    yield telemetry
+    telemetry._buffer.clear()

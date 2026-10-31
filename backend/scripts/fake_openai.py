@@ -12,6 +12,7 @@ without real keys. Not for production.
 - /v1/chat/completions: answers by quoting the first excerpt in the system prompt
   with a [1](1) citation; for query-rewrite prompts it returns the latest message.
   Supports stream=true.
+  Quiz, flashcard and mindmap prompts get valid JSON with fresh, numbered items.
 - /v1/rerank: scores documents by word overlap with the query.
 """
 import hashlib
@@ -20,6 +21,7 @@ import math
 import os
 import re
 import time
+import uuid
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -50,9 +52,31 @@ async def embeddings(req: Request):
             "usage": {"prompt_tokens": 1, "total_tokens": 1}}
 
 
+def _study_json(last: str):
+    """JSON for the study-tool generators, or None for other prompts."""
+    tag = uuid.uuid4().hex[:6]
+    m = re.search(r"generate (\d+) multiple-choice", last)
+    if m:
+        return json.dumps([{"question": f"Question {tag}-{i}?", "options": [
+            {"option": "A", "text": f"Right {tag}-{i}"}, {"option": "B", "text": "Wrong one"},
+            {"option": "C", "text": "Wrong two"}, {"option": "D", "text": "Wrong three"}],
+            "correct_answer": "A", "explanation": f"Because of Right {tag}-{i}."} for i in range(int(m.group(1)))])
+    m = re.search(r"Generate exactly (\d+) flashcards", last)
+    if m:
+        return json.dumps([{"front": f"Term {tag}-{i}", "back": "Meaning."} for i in range(int(m.group(1)))])
+    if "knowledge mapping expert" in last:
+        return json.dumps({"nodes": [{"id": "1", "label": "Topic", "level": 0},
+                                     {"id": "2", "label": f"Idea {tag}", "level": 1, "parent": "1"}],
+                           "edges": [{"from": "1", "to": "2"}]})
+    return None
+
+
 def _answer(messages):
     system = next((m["content"] for m in messages if m["role"] == "system"), "")
     last = messages[-1]["content"] if messages else ""
+    study = _study_json(last)
+    if study:
+        return study
     if system.startswith("Rewrite the student's latest message"):
         return last.split("Latest message:")[-1].strip()
     if system.startswith("Break the student's question"):

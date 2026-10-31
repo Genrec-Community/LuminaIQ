@@ -7,6 +7,7 @@ embeddings are cached briefly (the same question is often asked twice).
 """
 import asyncio
 import hashlib
+import time
 from typing import List
 
 import openai
@@ -15,6 +16,15 @@ from config.settings import settings
 from utils.logger import logger
 
 _QUERY_CACHE_TTL = 3600
+
+
+def _record(tokens: int, latency_ms: int, ok: bool = True) -> None:
+    try:
+        from services.telemetry import telemetry
+        telemetry.record("embedding", settings.EMBEDDING_MODEL, role="embedding", input_tokens=tokens,
+                         latency_ms=latency_ms, ok=ok)
+    except Exception:
+        pass
 
 
 class EmbeddingService:
@@ -42,7 +52,15 @@ class EmbeddingService:
         if settings.EMBEDDING_SEND_DIMENSIONS:
             kwargs["dimensions"] = settings.EMBEDDING_DIMENSION
         async with self._semaphore:
-            resp = await self.client.embeddings.create(**kwargs)
+            started = time.perf_counter()
+            try:
+                resp = await self.client.embeddings.create(**kwargs)
+            except Exception:
+                _record(0, int((time.perf_counter() - started) * 1000), ok=False)
+                raise
+        usage = getattr(resp, "usage", None)
+        tokens = (getattr(usage, "prompt_tokens", 0) or 0) if usage else sum(len(t) // 4 for t in batch)
+        _record(tokens, int((time.perf_counter() - started) * 1000))
         vectors = [d.embedding for d in sorted(resp.data, key=lambda d: d.index)]
         if vectors and len(vectors[0]) != settings.EMBEDDING_DIMENSION:
             raise ValueError(

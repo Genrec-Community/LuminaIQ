@@ -10,6 +10,7 @@ an email listed in PLATFORM_ADMIN_EMAILS.
 - POST /platform/institutions/{id}/extend         - offline payment / goodwill: days, paid_until, seats
 - POST /platform/institutions/{id}/trial          - mark as trial or paid
 - GET  /platform/institutions/{id}/audit          - what happened to this school
+- GET  /platform/costs?days=30                     - AI cost dashboard (per user, feature, model; cache hits)
 """
 
 from typing import Dict, Optional
@@ -126,3 +127,14 @@ async def update_level(level: str, request: LevelPolicyRequest, admin: dict = De
                                           outside_book=request.outside_book)
     except ValueError as e:
         raise HTTPException(400, str(e))
+
+
+# ---- AI costs (AGENTS.md Phase 4)
+
+@router.get("/costs")
+async def ai_costs(days: int = 30, admin: dict = Depends(require_platform_admin)):
+    """Cost per user, feature and model, cache hit rate and money saved, for the last `days` days."""
+    from services.cost_report import report
+    from services.telemetry import telemetry
+    await telemetry.flush()     # include this process's most recent calls
+    return await report(days)
