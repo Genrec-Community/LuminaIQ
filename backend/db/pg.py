@@ -76,8 +76,8 @@ class Column:
 class _Catalog:
     """Column types, primary keys and function signatures, looked up once per process."""
 
-    def __init__(self, pool: ConnectionPool):
-        self._pool = pool
+    def __init__(self, client: "PgClient"):
+        self._client = client
         self._lock = threading.Lock()
         self._columns: Dict[str, Dict[str, Column]] = {}
         self._pkeys: Dict[str, List[str]] = {}
@@ -85,7 +85,7 @@ class _Catalog:
 
     def columns(self, table: str) -> Dict[str, Column]:
         if table not in self._columns:
-            with self._pool.connection() as conn:
+            with self._client.pool.connection() as conn:
                 rows = conn.execute(
                     """SELECT a.attname AS name, format_type(a.atttypid, a.atttypmod) AS type
                        FROM pg_attribute a JOIN pg_class c ON c.oid = a.attrelid
@@ -108,7 +108,7 @@ class _Catalog:
 
     def primary_key(self, table: str) -> List[str]:
         if table not in self._pkeys:
-            with self._pool.connection() as conn:
+            with self._client.pool.connection() as conn:
                 rows = conn.execute(
                     """SELECT a.attname AS name FROM pg_index i
                        JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
@@ -120,7 +120,7 @@ class _Catalog:
     def function(self, name: str) -> Tuple[Dict[str, str], str, bool]:
         """(argument name -> SQL type, return kind, returns a set)."""
         if name not in self._funcs:
-            with self._pool.connection() as conn:
+            with self._client.pool.connection() as conn:
                 row = conn.execute(
                     """SELECT p.proargnames AS names,
                               ARRAY(SELECT format_type(t, NULL) FROM unnest(p.proargtypes::oid[]) t) AS types,
@@ -440,19 +440,25 @@ class PgClient:
     def __init__(self, conninfo: str, min_size: int = 1, max_size: int = 10):
         if not conninfo:
             raise QueryError("DATABASE_URL is not set")
-        self.pool = ConnectionPool(
+        self._pool = ConnectionPool(
             conninfo, min_size=min_size, max_size=max_size, open=False,
             kwargs={"autocommit": True, "row_factory": dict_row},
         )
         self._opened = False
         self._open_lock = threading.Lock()
-        self.catalog = _Catalog(self.pool)
+        self.catalog = _Catalog(self)
+
+    @property
+    def pool(self) -> ConnectionPool:
+        """The connection pool, opened on first use."""
+        self._ensure_open()
+        return self._pool
 
     def _ensure_open(self) -> None:
         if not self._opened:
             with self._open_lock:
                 if not self._opened:
-                    self.pool.open(wait=True, timeout=10)
+                    self._pool.open(wait=True, timeout=10)
                     self._opened = True
 
     def table(self, name: str) -> Query:
@@ -463,7 +469,14 @@ class PgClient:
         self._ensure_open()
         return RpcCall(self, name, params)
 
+    def fetch(self, query: str, params: Sequence[Any] = ()) -> List[Dict[str, Any]]:
+        """Run hand-written SQL (with %s placeholders); returns rows shaped like table() results."""
+        self._ensure_open()
+        with self.pool.connection() as conn:
+            cur = conn.execute(query, params)
+            return [_row_out(r) for r in cur.fetchall()] if cur.description else []
+
     def close(self) -> None:
         if self._opened:
-            self.pool.close()
+            self._pool.close()
             self._opened = False
