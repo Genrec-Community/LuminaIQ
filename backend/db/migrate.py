@@ -17,6 +17,18 @@ SCHEMA_DIR = Path(__file__).parent / "schema"
 _LOCK_ID = 7_340_112   # any constant shared by every instance
 
 
+def render(sql: str) -> str:
+    """Fill in settings a schema file needs (e.g. the embedding dimension for pgvector)."""
+    if "{{EMBEDDING_DIMENSION}}" in sql:
+        from config.settings import settings
+        dim = int(settings.EMBEDDING_DIMENSION)
+        if not 1 <= dim <= 2000:
+            raise RuntimeError(f"EMBEDDING_DIMENSION={dim}: pgvector's HNSW index supports 1-2000 dimensions. "
+                               "Use a model (or EMBEDDING_SEND_DIMENSIONS) with 2000 or fewer.")
+        sql = sql.replace("{{EMBEDDING_DIMENSION}}", str(dim))
+    return sql
+
+
 def pending_files(applied: set) -> List[Path]:
     return [f for f in sorted(SCHEMA_DIR.glob("[0-9][0-9][0-9][0-9]_*.sql")) if f.stem not in applied]
 
@@ -39,7 +51,7 @@ def migrate(conninfo: Optional[str] = None) -> List[str]:
             applied = {r[0] for r in conn.execute("SELECT version FROM schema_migrations")}
             for f in pending_files(applied):
                 with conn.transaction():
-                    conn.execute(f.read_text())
+                    conn.execute(render(f.read_text()))
                     conn.execute("INSERT INTO schema_migrations (version) VALUES (%s)", (f.stem,))
                 done.append(f.stem)
         finally:

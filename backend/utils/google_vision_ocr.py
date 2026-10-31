@@ -115,7 +115,8 @@ class GoogleVisionOCR:
                             except Exception:
                                 pass
 
-        text = "\n\n".join(t.strip() for t in texts if t and t.strip())
+        from utils.file_parser import PAGE_BREAK
+        text = PAGE_BREAK.join((t or "").strip() for t in texts)
         logger.info(f"[GoogleVision] OCR → {len(text)} chars from {sum(1 for t in texts if t.strip())} pages")
         return text or None
 

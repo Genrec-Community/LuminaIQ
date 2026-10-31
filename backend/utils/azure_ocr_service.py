@@ -229,14 +229,14 @@ class AzureOCRService:
                     line.get("content", "") for line in lines
                     if line.get("content", "").strip()
                 )
-                if page_text:
-                    all_text.append(page_text)
+                all_text.append(page_text or "")   # blank pages too, so page numbers stay right
 
-            if not all_text:
+            if not any(t.strip() for t in all_text):
                 logger.warning("[AzureOCR] No text found in any page")
                 return None
 
-            full = "\n\n".join(all_text)
+            from utils.file_parser import PAGE_BREAK
+            full = PAGE_BREAK.join(all_text)
             logger.info(f"[AzureOCR] Extracted {len(full)} chars (line fallback)")
             return full
 

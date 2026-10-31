@@ -4,6 +4,10 @@ from typing import Optional
 from utils.logger import logger
 
 
+# Between pages of a PDF's text. The chunker uses it to tag every chunk with its
+# page number (for citations); everything else just sees whitespace.
+PAGE_BREAK = "\n\f\n"
+
 class FileParser:
     """
     File parser with multi-stage extraction and smart OCR routing.
@@ -252,7 +256,9 @@ class FileParser:
             parts.append(FileParser._try_tesseract_ocr(
                 file_path, lambda d, _t: report(start + d), start=start, end=total,
             ) or "")
-        return "\n\n".join(t.strip() for t in parts if t and t.strip()) or None
+        # Each engine continued from the page the previous one stopped at
+        text = PAGE_BREAK.join((t or "").strip() for t in parts)
+        return text if text.strip() else None
 
     @staticmethod
     def _try_tesseract_ocr(file_path: str, on_progress=None, start: int = 0, end: Optional[int] = None) -> Optional[str]:
@@ -291,8 +297,7 @@ class FileParser:
                     # psm 3: automatic layout, handles two-page spreads and columns
                     page_text = pytesseract.image_to_string(img, lang="eng", config="--oem 1 --psm 3")
                     img.close()
-                    if page_text.strip():
-                        parts.append(page_text.strip())
+                    parts.append(page_text.strip())   # blank pages too, so page numbers stay right
                     if on_progress:
                         try:
                             on_progress(i + 1, total)
@@ -302,7 +307,7 @@ class FileParser:
             logger.error(f"[FileParser] Tesseract OCR failed: {e}")
             if not parts:
                 return None
-        text = "\n\n".join(parts)
+        text = PAGE_BREAK.join(parts)
         logger.info(f"[FileParser] Tesseract OCR → {len(text)} chars from {len(parts)} pages")
         return text
 
@@ -370,7 +375,8 @@ class FileParser:
             try:
                 import pymupdf4llm
                 logger.info(f"[FileParser] Trying PyMuPDF4LLM ({page_count} pages)...")
-                text = pymupdf4llm.to_markdown(file_path)
+                pages = pymupdf4llm.to_markdown(file_path, page_chunks=True)
+                text = PAGE_BREAK.join((p.get("text") or "").strip() for p in pages)
                 if text and text.strip():
                     logger.info(f"[FileParser] PyMuPDF4LLM: {len(text)} chars")
                     return text.strip()
@@ -388,14 +394,13 @@ class FileParser:
             pages_text = []
             for i, page in enumerate(doc):
                 try:
-                    page_text = page.get_text()
-                    if page_text:
-                        pages_text.append(page_text)
+                    pages_text.append(page.get_text() or "")
                 except Exception as page_err:
+                    pages_text.append("")
                     logger.warning(f"[FileParser] PyMuPDF page {i} failed: {page_err}")
             doc.close()
-            if pages_text:
-                text = "\n\n".join(pages_text)
+            if any(t.strip() for t in pages_text):
+                text = PAGE_BREAK.join(pages_text)
                 logger.info(
                     f"[FileParser] Raw PyMuPDF: {len(text)} chars from {len(pages_text)} pages"
                 )
@@ -412,13 +417,12 @@ class FileParser:
             pages_text = []
             for i, page in enumerate(reader.pages):
                 try:
-                    page_text = page.extract_text()
-                    if page_text:
-                        pages_text.append(page_text)
+                    pages_text.append(page.extract_text() or "")
                 except Exception as page_err:
+                    pages_text.append("")
                     logger.warning(f"[FileParser] PyPDF2 page {i} failed: {page_err}")
-            if pages_text:
-                text = "\n\n".join(pages_text)
+            if any(t.strip() for t in pages_text):
+                text = PAGE_BREAK.join(pages_text)
                 logger.info(
                     f"[FileParser] PyPDF2: {len(text)} chars from {len(pages_text)} pages"
                 )
