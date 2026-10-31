@@ -42,7 +42,8 @@ import {
     EyeOff,
     WifiOff,
     Moon,
-    FlaskConical
+    FlaskConical,
+    Lightbulb,
 } from 'lucide-react';
 import {
     uploadDocument,
@@ -71,6 +72,7 @@ import { Joyride, STATUS } from 'react-joyride';
 import { TOUR_OPTIONS } from '../utils/tourConfig';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
+import { useTools } from '../context/ToolsContext';
 import { useGamification } from '../context/GamificationContext';
 import { recordActivity } from '../utils/studyActivity';
 import { supabase } from '../supabaseClient';
@@ -205,6 +207,7 @@ const ProjectView = () => {
     const toast = useToast();
     const { user } = useAuth();
     const { settings } = useSettings();
+    const tools = useTools();
     const isDark = settings?.darkMode ?? false;
     const { data: gamificationData } = useGamification();
     const [showGamification, setShowGamification] = useState(false);
@@ -239,6 +242,17 @@ const ProjectView = () => {
         }
         setDeepMode(true);
     };
+    // Hints-first: the class can force it; otherwise the student's toggle (default from their level)
+    const [hintsChoice, setHintsChoice] = useState(null);
+    const hintsForced = tools.hint_mode === 'always_on' ? true : tools.hint_mode === 'always_off' ? false : null;
+    const hintsOn = hintsForced ?? hintsChoice ?? !!tools.hints_default;
+    // A tool switched off for this learner (by level or class): open the first one they have
+    useEffect(() => {
+        const order = ['path', 'power', 'chat', 'quiz', 'flashcards', 'notes', 'mindmap', 'qa', 'cram', 'lab', 'knowledge', 'analytics'];
+        if (!tools.loaded || !tools.tools || !order.includes(activeTab) || tools.has(activeTab)) return;
+        const first = order.find((t) => tools.has(t));
+        if (first) setActiveTab(first);
+    }, [tools, activeTab]);
     // Stable handle for memoized chat messages; always calls the latest handler
     const openSourceRef = useRef(null);
     const openSourceStable = useRef((source) => openSourceRef.current?.(source)).current;
@@ -1076,7 +1090,7 @@ const ProjectView = () => {
                     recordActivity(projectId, 'chat');
                     setLoading(false);
                 },
-                { deep: deepMode }
+                { deep: deepMode, hints: hintsOn }
             );
         } catch (error) {
             console.error("Chat error", error);
@@ -1545,7 +1559,7 @@ const ProjectView = () => {
                         </div>
                         {APP_SHELL && (
                             <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 pt-1.5" style={{ scrollbarWidth: 'none' }}>
-                                {APP_TOOLS.map(([id, label]) => (
+                                {APP_TOOLS.filter(([id]) => tools.has(id)).map(([id, label]) => (
                                     <button key={id} onClick={() => setActiveTab(id)}
                                         className={`shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${activeTab === id ? 'bg-[#1E5C42] text-white' : isDark ? 'bg-[#20382B] text-[#B7C2B4]' : 'bg-[#F3E8DF] text-[#396D53]'}`}>
                                         {id === 'chat' ? `Ask ${aiName(settings)}` : label}
@@ -1789,7 +1803,24 @@ const ProjectView = () => {
                                     )}
 
                                     <form onSubmit={handleSendMessage} className="flex gap-2 md:gap-3 items-center">
-                                        {(!isNativeApp() || deepLeft > 0) && <button
+                                        {hintsForced !== false && (
+                                            <button
+                                                type="button"
+                                                onClick={() => hintsForced === null && setHintsChoice(!hintsOn)}
+                                                aria-pressed={hintsOn}
+                                                disabled={hintsForced !== null}
+                                                title={hintsForced ? 'Hints first is on (set by your teacher)'
+                                                    : hintsOn ? 'Hints first: on. You get a hint first, then the next step, then the full solution.'
+                                                        : 'Hints first: get a hint instead of the full answer'}
+                                                className={`shrink-0 flex items-center gap-1 rounded-full px-3 py-2.5 text-xs font-semibold transition-colors disabled:cursor-default ${hintsOn
+                                                    ? 'bg-[#D3EE6A] text-[#163628] shadow-md'
+                                                    : 'bg-[#FDF6F0] text-[#5E5046] hover:text-[#163628]'}`}
+                                            >
+                                                <Lightbulb className="h-4 w-4" />
+                                                <span className="hidden sm:inline">Hints</span>
+                                            </button>
+                                        )}
+                                        {tools.has('deep') && (!isNativeApp() || deepLeft > 0) && <button
                                             type="button"
                                             onClick={toggleDeep}
                                             aria-pressed={deepMode}

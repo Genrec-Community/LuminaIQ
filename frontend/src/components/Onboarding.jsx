@@ -3,7 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, ArrowLeft, Sparkles, Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
-import { AI_CHARACTERS, USER_AVATARS, AI_AVATARS, AGE_GROUPS, getCharacter } from '../utils/persona';
+import { AI_CHARACTERS, USER_AVATARS, AI_AVATARS, getCharacter } from '../utils/persona';
+import { useTools } from '../context/ToolsContext';
+import LevelPicker from './LevelPicker';
 
 export const onboardedKey = (userId) => `lumina_onboarded_${userId}`;
 
@@ -43,12 +45,13 @@ const inputCls = 'w-full px-4 py-3 bg-[#FDF6F0] border border-[#E6D5CC] rounded-
 const Onboarding = ({ onDone, fullScreen = false }) => {
     const { user } = useAuth();
     const { settings, updateSettings } = useSettings();
+    const tools = useTools();
     const [step, setStep] = useState(0);
+    const [level, setLevel] = useState(tools.level || '');
     const [form, setForm] = useState(() => ({
         studentName: settings.studentName || user?.full_name || '',
         nickname: settings.nickname || '',
         userAvatar: settings.userAvatar || '🦊',
-        ageGroup: settings.ageGroup || '',
         aiName: settings.aiName || 'Lumi',
         aiAvatar: settings.aiAvatar || '✨',
         aiCharacter: settings.aiCharacter || 'buddy',
@@ -56,7 +59,6 @@ const Onboarding = ({ onDone, fullScreen = false }) => {
         examName: settings.examName || '',
         examDate: settings.examDate || '',
         dailyStudyGoal: settings.dailyStudyGoal || 30,
-        selfLevel: settings.selfLevel || 'intermediate',
     }));
     const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v?.target ? v.target.value : v }));
 
@@ -65,7 +67,10 @@ const Onboarding = ({ onDone, fullScreen = false }) => {
     const STEPS = 4;
 
     const finish = () => {
-        updateSettings({ ...form, onboardingComplete: true });
+        // The level decides answer style and tools
+        const levelPart = level && !tools.locked ? { studyLevel: level } : {};
+        updateSettings({ ...form, ...levelPart, onboardingComplete: true });
+        if (levelPart.studyLevel && level !== tools.level) tools.chooseLevel(level).catch(() => {});
         try { localStorage.setItem(onboardedKey(user?.id), '1'); } catch { /* ignore */ }
         onDone?.();
     };
@@ -76,7 +81,7 @@ const Onboarding = ({ onDone, fullScreen = false }) => {
         onDone?.();
     };
 
-    const canNext = step !== 1 || form.studentName.trim().length > 0;
+    const canNext = step !== 1 || (form.studentName.trim().length > 0 && (tools.locked || !!level));
 
     const screens = [
         // 0 — Welcome
@@ -127,16 +132,16 @@ const Onboarding = ({ onDone, fullScreen = false }) => {
                     ))}
                 </div>
             </Field>
-            <Field label="Which describes you best?" hint="Your companion adapts its language to you">
-                <div className="grid grid-cols-2 gap-2">
-                    {Object.entries(AGE_GROUPS).map(([k, g]) => (
-                        <Chip key={k} active={form.ageGroup === k} onClick={() => set('ageGroup')(k)} className="p-3 text-left">
-                            <div className="font-semibold text-[#163628] text-sm">{g.label}</div>
-                            <div className="text-xs text-[#5E5046]">{g.hint}</div>
-                        </Chip>
-                    ))}
+            {tools.locked ? (
+                <div className="rounded-2xl border-2 border-[#1E5C42]/30 bg-[#1E5C42]/5 p-4 text-[#163628]">
+                    <div className="text-sm font-semibold">Your level: {tools.level_label}</div>
+                    <div className="text-xs text-[#5E5046]">Set by your class. Answers and tools are made for this level.</div>
                 </div>
-            </Field>
+            ) : (
+                <Field label="What are you studying?" hint="Answers, tools and difficulty are made for this. You can change it in Settings.">
+                    <LevelPicker value={level} onChange={setLevel} />
+                </Field>
+            )}
         </div>,
 
         // 2 — Companion
@@ -206,13 +211,6 @@ const Onboarding = ({ onDone, fullScreen = false }) => {
                             <div className="font-bold text-[#163628]">{g.minutes} min</div>
                             <div className="text-xs text-[#5E5046]">{g.label}</div>
                         </Chip>
-                    ))}
-                </div>
-            </Field>
-            <Field label="How well do you know your subject right now?">
-                <div className="grid grid-cols-3 gap-2">
-                    {[['beginner', '🐣 Just starting'], ['intermediate', '🙂 Know the basics'], ['advanced', '🧠 Polishing up']].map(([k, l]) => (
-                        <Chip key={k} active={form.selfLevel === k} onClick={() => set('selfLevel')(k)} className="p-3 text-sm font-medium text-[#163628]">{l}</Chip>
                     ))}
                 </div>
             </Field>

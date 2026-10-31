@@ -4,6 +4,7 @@ import {
     ChevronDown, Sparkles, X, ArrowRight,
     Brain, CreditCard
 } from 'lucide-react';
+import { useTools } from '../../context/ToolsContext';
 
 // Command definitions with their parameters
 const COMMANDS = [
@@ -170,8 +171,9 @@ export const CommandPicker = ({ filter, onSelect, onClose, visible }) => {
     const ref = useRef(null);
     const [selectedIndex, setSelectedIndex] = useState(0);
 
+    const { has } = useTools();
     const filtered = COMMANDS.filter(cmd =>
-        cmd.id.includes(filter.toLowerCase()) || cmd.label.toLowerCase().includes(filter.toLowerCase())
+        has(cmd.id) && (cmd.id.includes(filter.toLowerCase()) || cmd.label.toLowerCase().includes(filter.toLowerCase()))
     );
 
     useEffect(() => {

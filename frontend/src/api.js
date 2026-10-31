@@ -370,6 +370,8 @@ export const chatMessageStream = async (projectId, message, history = [], select
                     session_history: history,
                     selected_documents: selectedDocuments,
                     deep: !!options.deep,
+                    // Hints-first toggle (undefined = use the level/class default)
+                    ...(typeof options.hints === 'boolean' ? { hints: options.hints } : {}),
                 })
             });
 
@@ -1349,3 +1351,24 @@ export const getDocumentText = async (projectId, documentId) =>
 
 // Permanently delete the signed-in account and all of its data
 export const deleteAccount = async () => (await api.delete('/auth/account')).data;
+
+
+// ─────────────────────────────────────────────────────────────
+// Learner levels and tools (backend: services/levels.py)
+// ─────────────────────────────────────────────────────────────
+
+export const getLevelCatalog = async () => (await api.get('/levels/catalog')).data;
+
+/** { level, level_label, locked, needs_level, tools: [...], hint_mode, hints_default, outside_book } */
+export const getMyLevel = async () => (await api.get('/levels/me')).data;
+
+export const setMyLevel = async (level) => (await api.put('/levels/me', { level })).data;
+
+export const getPlatformLevels = async () => (await api.get('/platform/levels')).data;
+
+export const updatePlatformLevel = async (level, body) => (await api.put(`/platform/levels/${level}`, body)).data;
+
+export const getClassSettings = async (classId) => (await api.get(`/institutions/classes/${classId}/settings`)).data;
+
+export const updateClassSettings = async (classId, body) =>
+    (await api.put(`/institutions/classes/${classId}/settings`, body)).data;

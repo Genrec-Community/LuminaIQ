@@ -121,6 +121,8 @@ async def save_settings(
 ):
     try:
         settings = await user_data.save_settings(current_user["id"], request.settings)
+        from services.levels import forget
+        await forget(current_user["id"])   # studyLevel may have changed
         return {"settings": settings}
     except Exception as e:
         logger.error(f"Error saving settings: {e}")

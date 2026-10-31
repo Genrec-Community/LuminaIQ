@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import Onboarding, { onboardedKey } from './Onboarding';
 import ForcePasswordChange from './ForcePasswordChange';
+import LevelGate from './LevelGate';
+import { useTools } from '../context/ToolsContext';
 
 const hasOnboardedLocally = (userId) => {
     try { return localStorage.getItem(onboardedKey(userId)) === '1'; } catch { return false; }
@@ -12,6 +14,7 @@ const hasOnboardedLocally = (userId) => {
 const PrivateRoute = () => {
     const { user, loading } = useAuth();
     const { settings, loaded } = useSettings();
+    const tools = useTools();
     const location = useLocation();
 
     // Wait for auth to initialize before redirecting
@@ -32,6 +35,7 @@ const PrivateRoute = () => {
         <>
             <Outlet />
             {showOnboarding && <Onboarding />}
+            {!showOnboarding && tools.loaded && tools.needs_level && <LevelGate />}
         </>
     );
 };

@@ -8,7 +8,7 @@ import { useGamification } from '../../context/GamificationContext';
 import { getDailyProgress, onDailyProgress, dailyQuests, LAST_PROJECT_KEY } from '../../utils/dailyProgress';
 import { displayName, aiName, timeGreeting, daysUntil, pick } from '../../utils/persona';
 import { getReviewStats, getLearningPlan } from '../../api';
-import MemoryCurve from '../../components/MemoryCurve';
+import { useTools } from '../../context/ToolsContext';
 import { useBooks, coverFor, emojiFor } from '../data';
 import { Screen, Ring } from '../ui';
 import { tap, reminderScheduled } from '../device';
@@ -40,6 +40,7 @@ export const BookCover = ({ book, size = 'md', onClick }) => {
 };
 
 const Home = () => {
+    const { has } = useTools();
     const navigate = useNavigate();
     const { user } = useAuth();
     const { settings } = useSettings();
@@ -147,15 +148,14 @@ const Home = () => {
                     <p className="-mt-2 text-center text-[13px] font-semibold" style={{ color: 'var(--m-accent-text)' }}>All done today. Legend. 🏆</p>
                 )}
                 {last && (
-                    <MemoryCurve
-                        profile={memory?.profile}
-                        compact
-                        action={
-                            <button type="button" className="lumina-curve__cta m-pressable" onClick={() => openTool(last.id, fading ? 'path' : 'power')}>
-                                <span className="max-w-[15rem] truncate">{fading ? `Review “${fading.topic}” · 3 min` : 'Lock it in · 10 min'}</span> <ChevronRight className="h-4 w-4 shrink-0" />
-                            </button>
-                        }
-                    />
+                    <button onClick={() => openTool(last.id, fading ? 'path' : 'power')} className="m-card m-pressable flex w-full items-center gap-3 p-4 text-left">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl" style={{ background: 'var(--m-accent-soft, #1e5c4222)', color: 'var(--m-accent-text)' }}><Zap className="h-6 w-6" /></div>
+                        <div className="min-w-0 flex-1">
+                            <p className="truncate text-[15px] font-extrabold">{fading ? `Review “${fading.topic}”` : 'Lock in what you learned'}</p>
+                            <p className="text-[13px]" style={{ color: 'var(--m-muted)' }}>{fading ? '3 min, before you forget it' : '10 min Power Hour'}</p>
+                        </div>
+                        <ChevronRight className="h-5 w-5" style={{ color: 'var(--m-muted)' }} />
+                    </button>
                 )}
 
                 {examIn != null && examIn >= 0 && (
@@ -190,7 +190,7 @@ const Home = () => {
                                     { id: 'quiz', icon: CheckSquare, label: 'Quiz' },
                                     { id: 'flashcards', icon: Layers, label: 'Cards' },
                                     { id: 'cram', icon: Moon, label: 'Cram' },
-                                ].map((t) => (
+                                ].filter((t) => has(t.id)).map((t) => (
                                     <button key={t.id} onClick={() => openTool(last.id, t.id)} className="m-pressable flex flex-col items-center gap-1 py-3 text-[12px] font-semibold">
                                         <t.icon className="h-5 w-5" style={{ color: 'var(--m-accent-text)' }} />{t.label}
                                     </button>

@@ -5,6 +5,7 @@ import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import { SettingsProvider } from './context/SettingsContext';
 import { GamificationProvider } from './context/GamificationContext';
+import { ToolsProvider } from './context/ToolsContext';
 import PrivateRoute from './components/PrivateRoute';
 import XPToast from './components/XPToast';
 import LimitModal from './components/LimitModal';
@@ -94,6 +95,7 @@ function App() {
     return (
         <AuthProvider>
             <SettingsProvider>
+                <ToolsProvider>
                 <GamificationProvider>
                     <ToastProvider>
                         <Router>
@@ -134,6 +136,7 @@ function App() {
                         <XPToast />
                     </ToastProvider>
                 </GamificationProvider>
+                </ToolsProvider>
             </SettingsProvider>
         </AuthProvider>
     );
