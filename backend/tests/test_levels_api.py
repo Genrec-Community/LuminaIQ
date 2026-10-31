@@ -101,3 +101,31 @@ def test_only_institution_admin_changes_class_settings(env):
     assert client.put(url, json={"hint_mode": "sometimes"}).status_code == 400
     other_inst, other_cls = make_class(pg, level="school")
     assert client.get(f"/api/v1/institutions/classes/{other_cls['id']}/settings").status_code == 404
+
+
+def test_chat_prompt_carries_level_and_safety_short_circuits(env, monkeypatch):
+    client, pg, user = env
+    set_level(pg, user["id"], "school")
+    project = pg.table("projects").insert({"user_id": user["id"], "name": "B"}).execute().data[0]
+    seen = {}
+
+    async def fake_answer(**kw):
+        seen.update(kw)
+        return {"answer": "Plants make food from light.", "sources": []}
+
+    from services.rag_service import rag_service
+    monkeypatch.setattr(rag_service, "get_answer", fake_answer)
+    res = client.post("/api/v1/chat/message", json={"project_id": project["id"], "message": "What is photosynthesis?",
+                                                    "hints": True})
+    assert res.status_code == 200, res.text
+    assert "Class 5-10" in seen["user_context"] and "HINTS FIRST" in seen["user_context"]
+    assert "SAFETY" in seen["user_context"]
+
+    seen.clear()
+    res = client.post("/api/v1/chat/message", json={"project_id": project["id"], "message": "I want to die"})
+    assert res.status_code == 200 and "14416" in res.json()["answer"]
+    assert seen == {}     # no AI call
+    events = pg.table("safety_events").select("category, user_id").execute().data
+    assert events == [{"category": "distress", "user_id": user["id"]}]
+    saved = pg.table("chat_messages").select("role, content").eq("project_id", project["id"]).execute().data
+    assert any(m["role"] == "assistant" and "14416" in m["content"] for m in saved)

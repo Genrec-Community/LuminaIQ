@@ -81,6 +81,8 @@ class ChatRequest(BaseModel):
     system_prompt: Optional[str] = None
     # Topper "Deep" answer from the stronger model (counts against the Deep allowance)
     deep: bool = False
+    # Hints-first for this message (the chat-menu toggle); the class setting can override it
+    hints: Optional[bool] = None
 
 
 class SourceInfo(BaseModel):

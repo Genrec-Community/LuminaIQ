@@ -11,6 +11,8 @@ from db.client import get_supabase_client, async_db
 from utils.logger import logger
 import asyncio
 from services.usage_service import usage, metered
+from services import levels, safety
+from services.prompts.levels import build_level_block, resolve_hints
 
 router = APIRouter()
 
@@ -73,7 +75,7 @@ async def get_user_context_string(user_id: str) -> str:
         goal = settings.get("learningGoal", "")
         if goal: context_parts.append(f"Learning Goal: {goal}")
         
-        level = settings.get("selfLevel", "")
+        level = "" if settings.get("studyLevel") else settings.get("selfLevel", "")
         if level:
             level_map = {
                 "beginner": "Beginner (Just starting out)",
@@ -96,7 +98,7 @@ async def get_user_context_string(user_id: str) -> str:
         if nickname:
             context_parts.append(f"Nickname (address the student by this): {nickname}")
 
-        age_group = settings.get("ageGroup", "")
+        age_group = "" if settings.get("studyLevel") else settings.get("ageGroup", "")
         if age_group in AGE_GROUP_GUIDANCE:
             context_parts.append(f"Audience: {AGE_GROUP_GUIDANCE[age_group]}")
 
@@ -153,7 +155,7 @@ async def _prepare_chat(request: ChatRequest, user_id: str):
     """
     Load recent history and the student's profile in parallel, and start
     saving the new user message in the background. Returns
-    (history, user_context, save_task); await save_task before saving the reply
+    (history, user_context, save_task, level info); await save_task before saving the reply
     so the two stay in order.
     """
     client = get_supabase_client()
@@ -169,15 +171,25 @@ async def _prepare_chat(request: ChatRequest, user_id: str):
         )
         return [{"role": m["role"], "content": m["content"]} for m in reversed(res.data or [])]
 
-    history, user_context = await asyncio.gather(
-        load_history(), get_user_context_string(user_id)
+    history, user_context, eff = await asyncio.gather(
+        load_history(), get_user_context_string(user_id), levels.effective_for(user_id)
     )
+    # The answer style for their level, school safety rules, hints-first and outside-book
+    level_block = build_level_block(eff, resolve_hints(eff, request.hints))
+    user_context = f"{user_context}\n\n{level_block}" if user_context else level_block
     save_task = asyncio.create_task(async_db(
         lambda: client.table("chat_messages").insert(
             {"project_id": request.project_id, "role": "user", "content": request.message}
         ).execute()
     ))
-    return history, user_context, save_task
+    return history, user_context, save_task, eff
+
+
+async def _save_reply(request: ChatRequest, save_task, answer: str, sources=None) -> None:
+    await save_task
+    await async_db(lambda: get_supabase_client().table("chat_messages").insert(
+        {"project_id": request.project_id, "role": "assistant", "content": answer, "sources": sources or []}
+    ).execute())
 
 
 @router.post("/message", response_model=ChatResponse, dependencies=[Depends(rate_limit("chat")), Depends(require_tool("chat"))])
@@ -194,9 +206,13 @@ async def chat_message(
     await usage.consume(current_user["id"], feature)
     try:
         client = get_supabase_client()
-        chat_history_dicts, user_context_str, save_task = await _prepare_chat(
+        chat_history_dicts, user_context_str, save_task, eff = await _prepare_chat(
             request, current_user["id"]
         )
+        safe_reply = await safety.screen(request.message, eff["level"], current_user["id"])
+        if safe_reply:
+            await _save_reply(request, save_task, safe_reply)
+            return {"answer": safe_reply, "sources": []}
 
         result = await rag_service.get_answer(
             project_id=request.project_id,
@@ -240,9 +256,20 @@ async def chat_stream(
     metered(current_user, feature)
     await usage.consume(current_user["id"], feature)
     try:
-        chat_history_dicts, user_context_str, save_task = await _prepare_chat(
+        chat_history_dicts, user_context_str, save_task, eff = await _prepare_chat(
             request, current_user["id"]
         )
+        safe_reply = await safety.screen(request.message, eff["level"], current_user["id"])
+        if safe_reply:
+            async def caring_reply():
+                yield safe_reply
+                yield "\n\n__SOURCES__:[]"
+                try:
+                    await _save_reply(request, save_task, safe_reply)
+                except Exception as save_err:
+                    logger.error(f"Failed to save safety reply: {save_err}")
+            return StreamingResponse(caring_reply(), media_type="text/event-stream",
+                                     headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"})
 
         # Wrapper generator to intercept and save the final answer
         async def stream_and_save():

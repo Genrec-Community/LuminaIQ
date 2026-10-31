@@ -193,10 +193,12 @@ Each phase ends in a working, deployable state. Within a phase, write a plan (`w
    - `institution_classes.level`, `institution_classes.hint_mode`, `institution_classes.allow_outside_book`
    - `level_tool_policies(level, tool, enabled)`: platform defaults
    - `class_tool_policies(class_id, tool, enabled)`: institution overrides
-2. **Tool catalog** (one source of truth, `backend/services/tools_catalog.py`, mirrored to the frontend through an API):
-   `chat`, `deep_mode`, `image_input`, `qa`, `quiz`, `flashcards`, `notes`, `mindmap`, `knowledge_graph`, `learning_path`,
-   `exam_tonight`, `power_hour`, `visual_lab`, `analytics`, `pomodoro`, `bookstore`, `companion`, `leaderboard`.
-3. **Effective tools** = platform level defaults ∩ plan features ∩ class overrides (institution students only).
+2. **Tool catalog** (one source of truth, `backend/services/tools_catalog.py`, served by `GET /levels/catalog`).
+   Keys are the app's tab ids: `chat`, `deep`, `image`, `qa`, `quiz`, `flashcards`, `notes`, `mindmap`, `knowledge`,
+   `path`, `cram` (Exam Tonight), `power` (Power Hour), `lab` (Visual Lab), `analytics`, `pomodoro`, `bookstore`,
+   `companion`, `leaderboard`.
+3. **Effective tools** = platform level defaults, narrowed by class overrides (institution students only).
+   Plan quotas (`services/plans.py`) stay a separate check on top (builder's call: one rule system each).
    - Computed in one backend function and cached per user.
    - **Enforced on the backend** (403 with a friendly message) and **hidden on the frontend**.
    - `GET /me/tools` returns the effective set.

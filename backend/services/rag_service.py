@@ -176,8 +176,8 @@ If the context is relevant but incomplete:
 
 LEVEL 3 — NO MATCH  
 Only if the context is completely irrelevant:
-→ Respond:
-"I couldn't find the answer in the provided documents."
+→ Follow the OUTSIDE THE BOOK rule in the section above (if there is none, say
+"I couldn't find this in your book.").
 
 ⚠️ DO NOT default to Level 3 unless absolutely necessary.
 
@@ -191,7 +191,7 @@ Only if the context is completely irrelevant:
 ---
 
 5. ANTI-HALLUCINATION (SMART, NOT PARALYZING)
-- Do NOT invent facts outside the context.
+- Do NOT present facts from outside the context as if they came from it (the OUTSIDE THE BOOK rule says how to label general knowledge).
 - BUT you ARE allowed to:
   - Interpret
   - Summarize
@@ -306,7 +306,8 @@ Your job is to make the user understand.
             + "You are a helpful study companion. Answer the student's question using the "
             "excerpts from their documents below. Cite facts inline as [1](1), [2](2) matching "
             "the source numbers. Use clear Markdown. If the excerpts don't cover the question, "
-            "say so briefly and give the best answer you can from them.\n\n"
+            "follow the OUTSIDE THE BOOK rule above (without one, say so briefly and give the "
+            "best answer you can from the excerpts).\n\n"
             f"EXCERPTS:\n{context[:9000]}"
         )
         messages = [{"role": "system", "content": system}]

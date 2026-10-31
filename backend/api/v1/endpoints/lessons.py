@@ -138,8 +138,14 @@ async def lesson(request: LessonRequest, current_user: dict = Depends(get_curren
         "Pick the ONE most easily confused with the topic for the contrast question, or use null if none truly is."
         if contrast_pool else "No contrast topic: set \"contrast\" to null."
     )
+    from services.levels import effective_for
+    from services.prompts.levels import LEVEL_STYLE
+    level = (await effective_for(current_user["id"]))["level"] or "general"
     prompt = f"""You are a master teacher. Build a short lesson that makes the topic below genuinely
 understood and remembered, grounded in the material.
+
+WHO IS LEARNING (pitch every part of the lesson at this level):
+{LEVEL_STYLE[level]}
 
 TOPIC: {topic}
 BUILDS ON: {', '.join(graph['requires'][:5]) or 'nothing in particular'}

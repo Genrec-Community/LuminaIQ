@@ -279,6 +279,11 @@ class Settings(BaseSettings):
     RATE_LIMIT_CHAT_PER_MIN: int = 20
     RATE_LIMIT_GENERATE_PER_MIN: int = 10
     RATE_LIMIT_UPLOAD_PER_HOUR: int = 30
+
+    # Optional moderation API (OpenAI-compatible /moderations) for school-level chat
+    MODERATION_BASE_URL: str = Field(default="")
+    MODERATION_API_KEY: str = Field(default="")
+    MODERATION_MODEL: str = Field(default="omni-moderation-latest")
     # Optional: hot cache, rate limits and progress pub/sub. Empty = off.
     REDIS_URL: str = Field(default="")
 
