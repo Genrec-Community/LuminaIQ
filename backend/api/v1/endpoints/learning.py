@@ -30,6 +30,7 @@ Dashboard:
 """
 
 from fastapi import APIRouter, HTTPException, Depends
+from utils.rate_limit import rate_limit
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 from services.learning_engine import get_learning_engine
@@ -749,7 +750,7 @@ class GenerateMindmapRequest(BaseModel):
     selected_documents: List[str] = []
 
 
-@router.post("/mindmap/generate")
+@router.post("/mindmap/generate", dependencies=[Depends(rate_limit("generate"))])
 async def generate_mindmap(
     request: GenerateMindmapRequest,
     current_user: dict = Depends(get_current_user),
@@ -895,7 +896,7 @@ class GenerateFlashcardsRequest(BaseModel):
     selected_documents: List[str] = []
 
 
-@router.post("/flashcards/generate")
+@router.post("/flashcards/generate", dependencies=[Depends(rate_limit("generate"))])
 async def generate_flashcards(
     request: GenerateFlashcardsRequest,
     current_user: dict = Depends(get_current_user),

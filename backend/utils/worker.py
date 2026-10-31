@@ -32,6 +32,7 @@ def handler(kind: str):
 
 
 class Worker:
+    HOUSEKEEPING_SECONDS = 600.0   # clear expired cache rows, old counters and old jobs
     def __init__(self, pg, *, kinds: Optional[Iterable[str]] = None, concurrency: int = 2,
                  poll_seconds: float = 1.0, heartbeat_seconds: float = 15.0,
                  stale_seconds: float = 300.0):
@@ -53,6 +54,7 @@ class Worker:
     async def run_forever(self) -> None:
         logger.info(f"[Worker] {self.worker_id} started (concurrency {self.concurrency}, kinds {self.kinds})")
         last_reclaim = 0.0
+        last_housekeeping = 0.0
         loop = asyncio.get_running_loop()
         try:
             while not self._stopping.is_set():
@@ -60,6 +62,9 @@ class Worker:
                 if now - last_reclaim >= max(self.stale_seconds / 4, 1.0):
                     last_reclaim = now
                     await self._safe(q.reclaim_stale, self.pg, self.stale_seconds)
+                if now - last_housekeeping >= self.HOUSEKEEPING_SECONDS:
+                    last_housekeeping = now
+                    await self._safe(q.housekeeping, self.pg)
 
                 job = None
                 if len(self._running) < self.concurrency and self.kinds:

@@ -102,3 +102,21 @@ def test_complete_stores_result_and_lists_for_user(pg):
     assert done["status"] == "done" and done["result"] == {"answer": 42} and done["finished_at"]
     assert [j["id"] for j in q.list_for_user(pg, user, 10)] == [job["id"]]
     assert q.get(pg, str(uuid.uuid4())) is None
+
+
+def test_housekeeping_removes_only_old_rows(pg):
+    old = q.enqueue(pg, "demo", {})
+    new = q.enqueue(pg, "demo2", {})
+    for j in (old, new):
+        q.claim(pg, "w", "h", ["demo", "demo2"])
+    q.complete(pg, old["id"])
+    q.complete(pg, new["id"])
+    with pg.pool.connection() as conn:
+        conn.execute("UPDATE jobs SET finished_at = now() - interval '30 days' WHERE id = %s", (old["id"],))
+        conn.execute("INSERT INTO cache_entries VALUES ('gone', '1', now() - interval '1 second'), "
+                     "('kept', '1', now() + interval '1 hour') ON CONFLICT DO NOTHING")
+    counts = q.housekeeping(pg)
+    assert counts["jobs"] == 1 and counts["cache"] >= 1
+    assert q.get(pg, old["id"]) is None and q.get(pg, new["id"])
+    keys = [r["key"] for r in pg.fetch("SELECT key FROM cache_entries")]
+    assert "kept" in keys and "gone" not in keys

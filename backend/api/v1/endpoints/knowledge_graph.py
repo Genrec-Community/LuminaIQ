@@ -10,6 +10,7 @@ Provides:
 """
 
 from fastapi import APIRouter, HTTPException, Depends
+from utils.rate_limit import rate_limit
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 from api.deps import get_current_user
@@ -159,7 +160,7 @@ async def get_knowledge_graph(
 
 # ============== Topic Summaries ==============
 
-@router.post("/topic-summary")
+@router.post("/topic-summary", dependencies=[Depends(rate_limit("generate"))])
 async def get_topic_summary(
     request: TopicSummaryRequest,
     current_user: dict = Depends(get_current_user)

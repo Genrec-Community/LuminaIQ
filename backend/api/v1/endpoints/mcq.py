@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
+from utils.rate_limit import rate_limit
 from services.mcq_service import mcq_service
 from models.schemas import (
     MCQGenerateRequest,
@@ -64,7 +65,7 @@ async def delete_saved_test(
         raise HTTPException(500, str(e))
 
 
-@router.post("/generate", response_model=MCQTestResponse)
+@router.post("/generate", response_model=MCQTestResponse, dependencies=[Depends(rate_limit("generate"))])
 async def generate_mcq(
     request: MCQGenerateRequest, current_user: dict = Depends(get_current_user)
 ):

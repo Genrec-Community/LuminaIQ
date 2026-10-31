@@ -271,6 +271,12 @@ class Settings(BaseSettings):
     WORKER_CONCURRENCY: int = 2       # jobs at once per worker (book processing is heavy)
     JOB_POLL_SECONDS: float = 1.0
     JOB_STALE_SECONDS: float = 300.0  # a running job with no heartbeat for this long is retried
+
+    # Per-user rate limits (floods and runaway clients; plan quotas are separate)
+    RATE_LIMITS_ENABLED: bool = True
+    RATE_LIMIT_CHAT_PER_MIN: int = 20
+    RATE_LIMIT_GENERATE_PER_MIN: int = 10
+    RATE_LIMIT_UPLOAD_PER_HOUR: int = 30
     # Optional: hot cache, rate limits and progress pub/sub. Empty = off.
     REDIS_URL: str = Field(default="")
 

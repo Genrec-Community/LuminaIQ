@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
+from utils.rate_limit import rate_limit
 from fastapi.responses import StreamingResponse
 from services.rag_service import rag_service
 from services.user_data_service import user_data
@@ -178,7 +179,7 @@ async def _prepare_chat(request: ChatRequest, user_id: str):
     return history, user_context, save_task
 
 
-@router.post("/message", response_model=ChatResponse)
+@router.post("/message", response_model=ChatResponse, dependencies=[Depends(rate_limit("chat"))])
 async def chat_message(
     request: ChatRequest, current_user: dict = Depends(get_current_user)
 ):
@@ -223,7 +224,7 @@ async def chat_message(
         raise HTTPException(500, str(e))
 
 
-@router.post("/stream")
+@router.post("/stream", dependencies=[Depends(rate_limit("chat"))])
 async def chat_stream(
     request: ChatRequest, current_user: dict = Depends(get_current_user)
 ):
@@ -297,7 +298,7 @@ async def chat_stream(
         raise HTTPException(500, str(e))
 
 
-@router.post("/summary", response_model=ChatResponse)
+@router.post("/summary", response_model=ChatResponse, dependencies=[Depends(rate_limit("generate"))])
 async def get_project_summary(
     request: SummaryRequest, current_user: dict = Depends(get_current_user)
 ):

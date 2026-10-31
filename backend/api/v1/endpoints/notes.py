@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
+from utils.rate_limit import rate_limit
 from typing import Any, List
 from services.notes_service import notes_service
 from models.schemas import NotesGenerateRequest, NotesGenerateResponse
@@ -44,7 +45,7 @@ async def delete_saved_note(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/generate")
+@router.post("/generate", dependencies=[Depends(rate_limit("generate"))])
 async def generate_notes(
     request: NotesGenerateRequest,
     current_user: dict = Depends(get_current_user),

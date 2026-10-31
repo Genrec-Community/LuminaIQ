@@ -12,6 +12,7 @@ from fastapi import (
     status,
 )
 from pydantic import BaseModel
+from utils.rate_limit import rate_limit
 from services.document_service import document_service
 from services.embedding_service import embedding_service
 from services.qdrant_service import qdrant_service
@@ -119,7 +120,7 @@ async def _start_processing(
     return document
 
 
-@router.post("/upload", response_model=DocumentUploadResponse)
+@router.post("/upload", response_model=DocumentUploadResponse, dependencies=[Depends(rate_limit("upload"))])
 async def upload_document(
     file: UploadFile = File(...),
     project_id: str = Form(...),
@@ -289,7 +290,7 @@ async def create_signed_upload(path: str) -> str:
     return token
 
 
-@router.post("/upload-url")
+@router.post("/upload-url", dependencies=[Depends(rate_limit("upload"))])
 async def get_upload_url(request: UploadUrlRequest, current_user: dict = Depends(get_current_user)):
     """
     Permission for the browser to upload one book straight to storage
@@ -317,7 +318,7 @@ async def get_upload_url(request: UploadUrlRequest, current_user: dict = Depends
     return {"bucket": UPLOADS_BUCKET, "path": path, "token": token}
 
 
-@router.post("/upload-from-storage")
+@router.post("/upload-from-storage", dependencies=[Depends(rate_limit("upload"))])
 async def upload_from_storage(
     request: StorageUploadRequest,
     current_user: dict = Depends(get_current_user),

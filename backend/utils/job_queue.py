@@ -97,3 +97,15 @@ def get(pg, job_id: str) -> Optional[Dict[str, Any]]:
 def list_for_user(pg, user_id: str, limit: int = 10) -> List[Dict[str, Any]]:
     return pg.fetch(f"SELECT {_COLUMNS} FROM jobs WHERE user_id = %s ORDER BY created_at DESC LIMIT %s",
                     (user_id, limit))
+
+
+def housekeeping(pg, finished_job_days: int = 14) -> Dict[str, int]:
+    """Delete expired cache rows, old rate-limit windows and long-finished jobs."""
+    counts = {}
+    counts["cache"] = len(pg.fetch("DELETE FROM cache_entries WHERE expires_at <= now() RETURNING key"))
+    counts["rate_limits"] = len(pg.fetch(
+        "DELETE FROM rate_limit_counters WHERE window_start < now() - interval '1 day' RETURNING key"))
+    counts["jobs"] = len(pg.fetch(
+        """DELETE FROM jobs WHERE status IN ('done', 'failed')
+           AND finished_at < now() - make_interval(days => %s) RETURNING id""", (finished_job_days,)))
+    return counts
