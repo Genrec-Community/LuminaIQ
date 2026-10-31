@@ -263,6 +263,7 @@ class Settings(BaseSettings):
     # Docker Postgres in development, AWS RDS in production. Empty = not configured yet.
     DATABASE_URL: str = Field(default="")
     DB_POOL_SIZE: int = 10          # connections per process
+    DB_THREADS: int = 32            # threads running database/storage calls per process
     RUN_MIGRATIONS: bool = True     # apply db/schema on startup
 
     # Background jobs. WORKER_INLINE runs a worker inside each web process (dev, single box);

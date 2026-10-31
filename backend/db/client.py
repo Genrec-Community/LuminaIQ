@@ -8,10 +8,11 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
 
-# Dedicated thread pool for Supabase calls — prevents blocking the event loop
+# Dedicated thread pool for database and storage calls, so they never block the event loop.
+# Calls wait here for one of the DB_POOL_SIZE connections, so this can be larger than the pool.
 _db_executor = ThreadPoolExecutor(
-    max_workers=64,
-    thread_name_prefix="supabase_db"
+    max_workers=settings.DB_THREADS,
+    thread_name_prefix="db"
 )
 
 

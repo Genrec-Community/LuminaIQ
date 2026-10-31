@@ -229,6 +229,21 @@ Your job is to make the user understand.
 
         return rag_chain
 
+    async def _fill_doc_names(self, docs, names: Dict[str, str]) -> None:
+        """Look up, in one query, the filenames of retrieved chunks that lack one."""
+        missing = sorted({d.metadata.get("document_id") for d in docs
+                          if d.metadata.get("document_id")
+                          and d.metadata.get("document_name", "Unknown") == "Unknown"
+                          and d.metadata.get("document_id") not in names})
+        if not missing:
+            return
+        try:
+            res = await async_db(lambda: self.client.table("documents").select("id, filename")
+                                 .in_("id", missing).execute())
+            names.update({r["id"]: r["filename"] for r in res.data or []})
+        except Exception as e:
+            logger.debug(f"Document name lookup skipped: {e}")
+
     @staticmethod
     def _friendly_error(e: Exception) -> str:
         """Plain-language message for chat errors (raw details go to the logs)."""
@@ -351,24 +366,11 @@ Your job is to make the user understand.
             if "context" in response:
                 logger.debug(f"Retrieved {len(response['context'])} chunks")
 
+                names: Dict[str, str] = {}
+                await self._fill_doc_names(response["context"], names)
                 for i, doc in enumerate(response["context"]):
-                    # Resolve filename from doc.metadata if available
-                    doc_name = doc.metadata.get("document_name", "Unknown")
                     doc_id = doc.metadata.get("document_id", "")
-
-                    # If name missing in metadata, try DB lookup (cached ideally)
-                    if doc_name == "Unknown" and doc_id:
-                        try:
-                            res = (
-                                (await async_db(lambda: self.client.table("documents")
-                                .select("filename")
-                                .eq("id", doc_id)
-                                .execute()))
-                            )
-                            if res.data:
-                                doc_name = res.data[0]["filename"]
-                        except:
-                            pass
+                    doc_name = names.get(doc_id) or doc.metadata.get("document_name", "Unknown")
 
                     sources.append(
                         {
@@ -461,26 +463,10 @@ Your job is to make the user understand.
 
                     # Capture context when available (usually at start or end)
                     if "context" in chunk:
+                        await self._fill_doc_names(chunk["context"], doc_name_cache)
                         for doc in chunk["context"]:
-                            doc_name = doc.metadata.get("document_name", "Unknown")
                             doc_id = doc.metadata.get("document_id", "")
-
-                            # Use cached name first, then metadata, then "Unknown"
-                            if doc_id and doc_id in doc_name_cache:
-                                doc_name = doc_name_cache[doc_id]
-                            elif doc_name == "Unknown" and doc_id:
-                                try:
-                                    res = (
-                                        (await async_db(lambda: self.client.table("documents")
-                                        .select("filename")
-                                        .eq("id", doc_id)
-                                        .execute()))
-                                    )
-                                    if res.data:
-                                        doc_name = res.data[0]["filename"]
-                                        doc_name_cache[doc_id] = doc_name
-                                except:
-                                    pass
+                            doc_name = doc_name_cache.get(doc_id) or doc.metadata.get("document_name", "Unknown")
 
                             sources_data.append(
                                 {
