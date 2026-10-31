@@ -1,206 +1,167 @@
 """
-Caching utilities for fast data access.
+Shared cache for every web and worker process.
 
-Provides in-memory caching for frequently accessed data:
-- User profiles
-- Learning paths
-- Generated content
-- Project metadata
+Redis when REDIS_URL is set; otherwise the cache_entries table in Postgres;
+memory only when neither is configured (tests, scripts). A short in-process
+layer (L1, a few seconds) absorbs repeated reads of hot keys. Values must be
+JSON-serialisable.
 
-For production, use Redis. This provides in-memory caching with TTL.
+    from utils.cache import get_cache
+    cache = get_cache()
+    await cache.set("summary:abc", {...}, ttl=3600)
+    await cache.get("summary:abc")
 """
 
-import time
-import hashlib
-import json
-from typing import Any, Optional, Dict, Callable
-from dataclasses import dataclass
-from datetime import datetime, timedelta
-import logging
 import asyncio
-from functools import wraps
+import json
+import time
+from typing import Any, Dict, Optional, Tuple
 
-logger = logging.getLogger(__name__)
-
-
-@dataclass
-class CacheEntry:
-    """Represents a cached item"""
-    value: Any
-    expires_at: float
-    created_at: float
+from utils.logger import logger
 
 
-class MemoryCache:
-    """
-    Simple in-memory cache with TTL.
-    Thread-safe for async operations.
-    """
-    
-    def __init__(self, default_ttl: int = 300):  # 5 minutes default
-        self._cache: Dict[str, CacheEntry] = {}
-        self._default_ttl = default_ttl
-        self._lock = asyncio.Lock()
-        
-    def _make_key(self, prefix: str, *args, **kwargs) -> str:
-        """Generate a cache key from arguments"""
-        key_parts = [prefix]
-        for arg in args:
-            if arg is not None:
-                key_parts.append(str(arg))
-        for k, v in sorted(kwargs.items()):
-            if v is not None:
-                key_parts.append(f"{k}={v}")
-        key_str = ":".join(key_parts)
-        # Hash long keys
-        if len(key_str) > 200:
-            return hashlib.md5(key_str.encode()).hexdigest()
-        return key_str
-    
+class MemoryBackend:
+    def __init__(self):
+        self._data: Dict[str, Tuple[float, Any]] = {}
+
     async def get(self, key: str) -> Optional[Any]:
-        """Get value from cache"""
-        async with self._lock:
-            entry = self._cache.get(key)
-            if entry is None:
-                return None
-            if time.time() > entry.expires_at:
-                del self._cache[key]
-                return None
-            return entry.value
-    
-    async def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
-        """Set value in cache with TTL"""
-        ttl = ttl or self._default_ttl
-        async with self._lock:
-            self._cache[key] = CacheEntry(
-                value=value,
-                expires_at=time.time() + ttl,
-                created_at=time.time()
-            )
-    
+        item = self._data.get(key)
+        if not item:
+            return None
+        if item[0] < time.time():
+            self._data.pop(key, None)
+            return None
+        return item[1]
+
+    async def set(self, key: str, value: Any, ttl: int) -> None:
+        self._data[key] = (time.time() + ttl, value)
+
     async def delete(self, key: str) -> None:
-        """Delete a key from cache"""
-        async with self._lock:
-            self._cache.pop(key, None)
-    
+        self._data.pop(key, None)
+
     async def clear_prefix(self, prefix: str) -> int:
-        """Clear all keys starting with prefix"""
-        async with self._lock:
-            keys_to_delete = [k for k in self._cache.keys() if k.startswith(prefix)]
-            for key in keys_to_delete:
-                del self._cache[key]
-            return len(keys_to_delete)
-    
-    def get_sync(self, key: str) -> Optional[Any]:
-        """Synchronous get (for non-async contexts)"""
-        entry = self._cache.get(key)
-        if entry is None:
-            return None
-        if time.time() > entry.expires_at:
-            return None
-        return entry.value
-    
-    def set_sync(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
-        """Synchronous set"""
-        ttl = ttl or self._default_ttl
-        self._cache[key] = CacheEntry(
-            value=value,
-            expires_at=time.time() + ttl,
-            created_at=time.time()
-        )
-    
-    async def cleanup_expired(self) -> int:
-        """Remove expired entries"""
-        now = time.time()
-        async with self._lock:
-            expired_keys = [
-                k for k, v in self._cache.items() 
-                if now > v.expires_at
-            ]
-            for key in expired_keys:
-                del self._cache[key]
-            return len(expired_keys)
+        keys = [k for k in self._data if k.startswith(prefix)]
+        for k in keys:
+            del self._data[k]
+        return len(keys)
 
 
-# Cache instances for different data types
-user_cache = MemoryCache(default_ttl=600)  # 10 min for user data
-project_cache = MemoryCache(default_ttl=300)  # 5 min for project data
-learning_cache = MemoryCache(default_ttl=1800)  # 30 min for learning paths
-content_cache = MemoryCache(default_ttl=3600)  # 1 hour for generated content
+class PostgresBackend:
+    def __init__(self, pg):
+        self.pg = pg
+
+    async def _sql(self, query: str, params=()):
+        return await asyncio.to_thread(self.pg.fetch, query, params)
+
+    async def get(self, key: str) -> Optional[Any]:
+        rows = await self._sql("SELECT value FROM cache_entries WHERE key = %s AND expires_at > now()", (key,))
+        return rows[0]["value"] if rows else None
+
+    async def set(self, key: str, value: Any, ttl: int) -> None:
+        await self._sql(
+            """INSERT INTO cache_entries (key, value, expires_at)
+               VALUES (%s, %s::jsonb, now() + make_interval(secs => %s))
+               ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, expires_at = EXCLUDED.expires_at""",
+            (key, json.dumps(value), ttl))
+
+    async def delete(self, key: str) -> None:
+        await self._sql("DELETE FROM cache_entries WHERE key = %s", (key,))
+
+    async def clear_prefix(self, prefix: str) -> int:
+        escaped = prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        rows = await self._sql("DELETE FROM cache_entries WHERE key LIKE %s ESCAPE '\\' RETURNING key",
+                               (escaped + "%",))
+        return len(rows)
+
+    async def purge_expired(self) -> int:
+        rows = await self._sql("DELETE FROM cache_entries WHERE expires_at <= now() RETURNING key")
+        return len(rows)
 
 
-# Decorator for caching async functions
-def cached(cache: MemoryCache, ttl: Optional[int] = None, key_prefix: str = ""):
-    """Decorator to cache async function results"""
-    def decorator(func):
-        @wraps(func)
-        async def wrapper(*args, **kwargs):
-            # Generate cache key
-            cache_key = cache._make_key(key_prefix or func.__name__, *args, **kwargs)
-            
-            # Try to get from cache
-            cached_value = await cache.get(cache_key)
-            if cached_value is not None:
-                logger.debug(f"Cache hit: {cache_key}")
-                return cached_value
-            
-            # Call function and cache result
-            result = await func(*args, **kwargs)
-            await cache.set(cache_key, result, ttl)
-            logger.debug(f"Cache miss (set): {cache_key}")
-            return result
-        return wrapper
-    return decorator
+class RedisBackend:
+    def __init__(self, url: str):
+        from redis import asyncio as aioredis
+        self.r = aioredis.from_url(url)
+
+    async def get(self, key: str) -> Optional[Any]:
+        raw = await self.r.get(key)
+        return json.loads(raw) if raw is not None else None
+
+    async def set(self, key: str, value: Any, ttl: int) -> None:
+        await self.r.set(key, json.dumps(value), ex=max(1, int(ttl)))
+
+    async def delete(self, key: str) -> None:
+        await self.r.delete(key)
+
+    async def clear_prefix(self, prefix: str) -> int:
+        n = 0
+        async for k in self.r.scan_iter(match=prefix.replace("*", "\\*").replace("?", "\\?") + "*"):
+            n += await self.r.delete(k)
+        return n
 
 
-# Cache key generators
-def user_key(user_id: str) -> str:
-    return f"user:{user_id}"
+class Cache:
+    def __init__(self, backend, l1_seconds: float = 5.0):
+        self.backend = backend
+        self.l1_seconds = l1_seconds
+        self._l1: Dict[str, Tuple[float, Any]] = {}
 
-def user_profile_key(user_id: str) -> str:
-    return f"user_profile:{user_id}"
+    def _l1_put(self, key: str, value: Any, ttl: float) -> None:
+        if self.l1_seconds > 0:
+            self._l1[key] = (time.monotonic() + min(self.l1_seconds, ttl), value)
+            if len(self._l1) > 5000:   # keep the local layer small
+                self._l1.clear()
 
-def project_key(project_id: str) -> str:
-    return f"project:{project_id}"
-
-def project_summary_key(project_id: str) -> str:
-    return f"project_summary:{project_id}"
-
-def learning_path_key(user_id: str, project_id: str) -> str:
-    return f"learning_path:{user_id}:{project_id}"
-
-def topics_key(project_id: str) -> str:
-    return f"topics:{project_id}"
-
-
-# Invalidate cache helpers
-async def invalidate_user_cache(user_id: str):
-    """Invalidate all cache entries for a user"""
-    await user_cache.delete(user_key(user_id))
-    await user_cache.delete(user_profile_key(user_id))
-    await learning_cache.clear_prefix(f"learning_path:{user_id}:")
-
-async def invalidate_project_cache(project_id: str):
-    """Invalidate all cache entries for a project"""
-    await project_cache.delete(project_key(project_id))
-    await project_cache.delete(project_summary_key(project_id))
-    await content_cache.clear_prefix(f"content:{project_id}:")
-
-
-# Background cleanup task
-async def start_cache_cleanup():
-    """Start periodic cache cleanup"""
-    while True:
+    async def get(self, key: str) -> Optional[Any]:
+        item = self._l1.get(key)
+        if item and item[0] > time.monotonic():
+            return item[1]
         try:
-            await asyncio.sleep(300)  # Every 5 minutes
-            total_cleaned = 0
-            total_cleaned += await user_cache.cleanup_expired()
-            total_cleaned += await project_cache.cleanup_expired()
-            total_cleaned += await learning_cache.cleanup_expired()
-            total_cleaned += await content_cache.cleanup_expired()
-            if total_cleaned > 0:
-                logger.info(f"Cache cleanup: removed {total_cleaned} expired entries")
-        except asyncio.CancelledError:
-            break
+            value = await self.backend.get(key)
+        except Exception as e:   # a cache outage must never break a request
+            logger.warning(f"[Cache] get failed: {e}")
+            return None
+        if value is not None:
+            self._l1_put(key, value, self.l1_seconds)
+        return value
+
+    async def set(self, key: str, value: Any, ttl: int = 300) -> None:
+        self._l1_put(key, value, ttl)
+        try:
+            await self.backend.set(key, value, ttl)
         except Exception as e:
-            logger.error(f"Cache cleanup error: {e}")
+            logger.warning(f"[Cache] set failed: {e}")
+
+    async def delete(self, key: str) -> None:
+        self._l1.pop(key, None)
+        try:
+            await self.backend.delete(key)
+        except Exception as e:
+            logger.warning(f"[Cache] delete failed: {e}")
+
+    async def clear_prefix(self, prefix: str) -> int:
+        for k in [k for k in self._l1 if k.startswith(prefix)]:
+            del self._l1[k]
+        try:
+            return await self.backend.clear_prefix(prefix)
+        except Exception as e:
+            logger.warning(f"[Cache] clear_prefix failed: {e}")
+            return 0
+
+
+_cache: Optional[Cache] = None
+
+
+def get_cache() -> Cache:
+    """The process-wide cache, on the best backend configured."""
+    global _cache
+    if _cache is None:
+        from config.settings import settings
+        if settings.REDIS_URL:
+            _cache = Cache(RedisBackend(settings.REDIS_URL))
+        elif settings.DATABASE_URL:
+            from db.client import get_supabase_client
+            _cache = Cache(PostgresBackend(get_supabase_client().pg))
+        else:
+            _cache = Cache(MemoryBackend())
+    return _cache
