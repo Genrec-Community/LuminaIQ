@@ -77,7 +77,8 @@ Anti-goals (a failure even if it "works"):
 1. **Scale target:** design for horizontal scaling. Production will be **AWS EC2 with autoscaling** (the owner handles hosting).
    We build software that is stateless per process and configured by environment variables.
 2. **Supabase stays** for auth, file storage and the main database. Moving off Supabase is a later project. Don't start it.
-3. **Docker Compose for local development.** It runs the backend (web + worker) plus Postgres with pgvector, and Redis (optional).
+3. **Docker Compose is for local development only.** It runs the backend (web + worker) plus Postgres with pgvector, and Redis (optional).
+   Production never runs the compose file or its Postgres: it deploys the backend image and uses RDS.
    The backend also runs directly with `uv run run.py`. The frontend, the OCR setup and the Render config stay as they are.
 4. **Qdrant is replaced by pgvector** in a **separate Postgres** (`VECTOR_DATABASE_URL`):
    Docker in development, **AWS RDS** in production. **Fresh start: no data migration.** Don't write migration or

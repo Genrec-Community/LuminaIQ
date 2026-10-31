@@ -378,3 +378,6 @@ azure-deploy-secrets/
 
 # The marketing site keeps its helpers in src/lib (not a Python build dir)
 !frontend/website/src/lib/
+
+# Keep the settings template
+!.env.example

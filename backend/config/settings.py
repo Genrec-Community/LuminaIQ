@@ -257,6 +257,14 @@ class Settings(BaseSettings):
     BOOK_STORE_MAX_DESCRIPTION: int = 2000
     BOOK_IMPORT_TEXTS_BUCKET: str = "texts"   # Supabase bucket for extracted .txt files
 
+    # ─────────────────────────────────────────────────────────
+    # App Postgres (pgvector, job queue, caches) and optional Redis
+    # ─────────────────────────────────────────────────────────
+    # Docker Postgres in development, AWS RDS in production. Empty = not configured yet.
+    VECTOR_DATABASE_URL: str = Field(default="")
+    # Optional: hot cache, rate limits and progress pub/sub. Empty = off.
+    REDIS_URL: str = Field(default="")
+
     @classmethod
     def settings_customise_sources(
         cls,
@@ -280,7 +288,8 @@ class Settings(BaseSettings):
         )
 
     class Config:
-        env_file = ".env"
+        # backend/.env wins over the repo-root .env (which docker compose also reads)
+        env_file = ("../.env", ".env")
         case_sensitive = True
         extra = "ignore"
 
