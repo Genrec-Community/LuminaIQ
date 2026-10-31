@@ -153,3 +153,47 @@ def test_multipart_upload_to_other_users_project_404(client):
     res = client.post("/api/v1/documents/upload", data={"project_id": PA},
                       files={"file": ("a.txt", b"hello", "text/plain")})
     assert res.status_code == 404
+
+
+# ---- rows addressed by their own ID
+
+T_MCQ, T_SUBJ, CARD = str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4())
+
+
+@pytest.fixture
+def rows(db):
+    db.tables["mcq_tests"] = [{"id": T_MCQ, "project_id": PA, "topic": "t"}]
+    db.tables["subjective_tests"] = [{"id": T_SUBJ, "project_id": PA, "topic": "t"}]
+    db.tables["review_cards"] = [{"id": CARD, "user_id": USER_A, "project_id": PA}]
+    return db
+
+
+def test_saved_mcq_test_other_user_404(client, rows):
+    assert client.get(f"/api/v1/mcq/saved/view/{T_MCQ}").status_code == 404
+    assert client.delete(f"/api/v1/mcq/saved/{T_MCQ}").status_code == 404
+    assert rows.tables["mcq_tests"], "the test must not be deleted"
+
+
+def test_saved_subjective_test_other_user_404(client, rows):
+    assert client.get(f"/api/v1/evaluation/saved/view/{T_SUBJ}").status_code == 404
+    assert client.delete(f"/api/v1/evaluation/saved/{T_SUBJ}").status_code == 404
+    assert rows.tables["subjective_tests"]
+
+
+def test_review_card_other_user_404(client, rows):
+    assert client.post(f"/api/v1/learning/review-cards/{CARD}/review", json={"quality": 5}).status_code == 404
+    assert client.delete(f"/api/v1/learning/review-cards/{CARD}").status_code == 404
+    assert rows.tables["review_cards"]
+
+
+def test_row_access_allows_owner(rows):
+    asyncio.run(access.assert_row_access("mcq_tests", T_MCQ, USER_A))
+    asyncio.run(access.assert_row_access("review_cards", CARD, USER_A))
+
+
+def test_progress_stream_other_user_404(client):
+    from jose import jwt
+    from config.settings import settings
+
+    token = jwt.encode({"sub": USER_B}, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    assert client.get(f"/api/v1/progress/{DA}", params={"token": token}).status_code == 404

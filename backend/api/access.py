@@ -134,3 +134,20 @@ async def enforce_resource_access(request: Request,
         # With exactly one project in play, documents must belong to that project.
         scope = project_ids[0] if len(set(project_ids)) == 1 else None
         await assert_documents_in_project(list(documents), user_id, scope)
+
+
+async def assert_row_access(table: str, row_id: str, user_id: str) -> None:
+    """A row addressed by its own ID: it must carry the caller's user_id, or sit in one of their projects."""
+    rid = _valid_ids([row_id])[0]
+    client = get_supabase_client()
+    res = await async_db(lambda: client.table(table).select("*").eq("id", rid).limit(1).execute())
+    if not res.data:
+        raise _not_found()
+    row = res.data[0]
+    if row.get("user_id") is not None:
+        if row["user_id"] != user_id:
+            raise _not_found()
+        return
+    if not row.get("project_id"):
+        raise _not_found()
+    await assert_project_owner(row["project_id"], user_id)
