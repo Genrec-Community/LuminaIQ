@@ -18,6 +18,7 @@ from api.v1.endpoints import (
     mindmaps,
     progress,
     jobs,
+    levels,
     study_modes,
     lessons,
     billing,
@@ -59,3 +60,4 @@ api_router.include_router(books.router, prefix="/books", tags=["books"], depende
 
 # Background jobs for heavy AI tasks
 api_router.include_router(jobs.router, prefix="/jobs", tags=["jobs"], dependencies=_GUARD)
+api_router.include_router(levels.router, prefix="/levels", tags=["levels"])

@@ -31,6 +31,7 @@ Dashboard:
 
 from fastapi import APIRouter, HTTPException, Depends
 from utils.rate_limit import rate_limit
+from utils.tools import require_tool
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 from services.learning_engine import get_learning_engine
@@ -463,7 +464,7 @@ class AddRelationRequest(BaseModel):
     weight: float = Field(default=0.5, ge=0.1, le=1.0)
 
 
-@router.post("/knowledge-graph/{project_id}/build")
+@router.post("/knowledge-graph/{project_id}/build", dependencies=[Depends(require_tool("knowledge"))])
 async def build_knowledge_graph(
     project_id: str,
     request: BuildGraphRequest,
@@ -589,7 +590,7 @@ async def get_topic_prerequisites(
         raise HTTPException(500, str(e))
 
 
-@router.get("/knowledge-graph/{project_id}/learning-path")
+@router.get("/knowledge-graph/{project_id}/learning-path", dependencies=[Depends(require_tool("path"))])
 async def get_learning_path(
     project_id: str,
     target_topics: Optional[str] = None,
@@ -750,7 +751,7 @@ class GenerateMindmapRequest(BaseModel):
     selected_documents: List[str] = []
 
 
-@router.post("/mindmap/generate", dependencies=[Depends(rate_limit("generate"))])
+@router.post("/mindmap/generate", dependencies=[Depends(rate_limit("generate")), Depends(require_tool("mindmap"))])
 async def generate_mindmap(
     request: GenerateMindmapRequest,
     current_user: dict = Depends(get_current_user),
@@ -896,7 +897,7 @@ class GenerateFlashcardsRequest(BaseModel):
     selected_documents: List[str] = []
 
 
-@router.post("/flashcards/generate", dependencies=[Depends(rate_limit("generate"))])
+@router.post("/flashcards/generate", dependencies=[Depends(rate_limit("generate")), Depends(require_tool("flashcards"))])
 async def generate_flashcards(
     request: GenerateFlashcardsRequest,
     current_user: dict = Depends(get_current_user),

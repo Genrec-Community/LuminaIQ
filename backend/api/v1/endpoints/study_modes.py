@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from utils.rate_limit import rate_limit
+from utils.tools import require_tool
 from pydantic import BaseModel, Field
 
 from api.deps import get_current_user
@@ -183,7 +184,7 @@ async def _mastery(user_id: str, project_id: str) -> Dict[str, float]:
     return mastery
 
 
-@router.post("/cram/plan", dependencies=[Depends(rate_limit("generate"))])
+@router.post("/cram/plan", dependencies=[Depends(rate_limit("generate")), Depends(require_tool("cram"))])
 async def cram_plan(request: CramPlanRequest, current_user: dict = Depends(get_current_user)):
     await _require_project(request.project_id, current_user)
 
@@ -247,7 +248,7 @@ def _clean_card(data: Dict[str, Any], topic: str) -> Dict[str, Any]:
     }
 
 
-@router.post("/cram/card", dependencies=[Depends(rate_limit("generate"))])
+@router.post("/cram/card", dependencies=[Depends(rate_limit("generate")), Depends(require_tool("cram"))])
 async def cram_card(request: CramCardRequest, current_user: dict = Depends(get_current_user)):
     await _require_project(request.project_id, current_user)
     topic = request.topic.strip()
@@ -419,7 +420,7 @@ def _sanitize_html(raw: str) -> Optional[str]:
     return html
 
 
-@router.post("/visualize", dependencies=[Depends(rate_limit("generate"))])
+@router.post("/visualize", dependencies=[Depends(rate_limit("generate")), Depends(require_tool("lab"))])
 async def visualize(request: VisualizeRequest, current_user: dict = Depends(get_current_user)):
     await _require_project(request.project_id, current_user)
     topic = request.topic.strip()

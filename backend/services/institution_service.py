@@ -398,6 +398,8 @@ class InstitutionService:
             await async_db(lambda: self.client.table("class_members").upsert({
                 "class_id": cls["id"], "user_id": user_id, "project_id": project_id,
             }, on_conflict="class_id,user_id").execute())
+        from services.levels import forget
+        await forget(user_id)   # their class may now set their level and tools
         for book in await self._all("class_books", class_id=cls["id"]):
             await self._copy_book_to(book, user_id, project_id)
         return project_id
@@ -496,6 +498,8 @@ class InstitutionService:
                            .in_("class_id", chunk).eq("user_id", member_user_id).execute())
         await self._revoke_plan(member_user_id, m["institution_id"])
         self.forget(user_id=member_user_id)
+        from services.levels import forget as forget_level
+        await forget_level(member_user_id)
         await self.audit(m["institution_id"], user["id"], "member_removed", {"user_id": member_user_id})
         return {"removed": member_user_id}
 

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
 from utils.rate_limit import rate_limit
+from utils.tools import assert_tool, require_tool
 from fastapi.responses import StreamingResponse
 from services.rag_service import rag_service
 from services.user_data_service import user_data
@@ -179,7 +180,7 @@ async def _prepare_chat(request: ChatRequest, user_id: str):
     return history, user_context, save_task
 
 
-@router.post("/message", response_model=ChatResponse, dependencies=[Depends(rate_limit("chat"))])
+@router.post("/message", response_model=ChatResponse, dependencies=[Depends(rate_limit("chat")), Depends(require_tool("chat"))])
 async def chat_message(
     request: ChatRequest, current_user: dict = Depends(get_current_user)
 ):
@@ -187,6 +188,8 @@ async def chat_message(
     Send a message to the RAG chat (Blocking/Non-streaming)
     """
     feature = "deep" if request.deep else "chat"
+    if request.deep:
+        await assert_tool(current_user["id"], "deep")
     metered(current_user, feature)
     await usage.consume(current_user["id"], feature)
     try:
@@ -224,7 +227,7 @@ async def chat_message(
         raise HTTPException(500, str(e))
 
 
-@router.post("/stream", dependencies=[Depends(rate_limit("chat"))])
+@router.post("/stream", dependencies=[Depends(rate_limit("chat")), Depends(require_tool("chat"))])
 async def chat_stream(
     request: ChatRequest, current_user: dict = Depends(get_current_user)
 ):
@@ -232,6 +235,8 @@ async def chat_stream(
     Send a message to the RAG chat (Streaming)
     """
     feature = "deep" if request.deep else "chat"
+    if request.deep:
+        await assert_tool(current_user["id"], "deep")
     metered(current_user, feature)
     await usage.consume(current_user["id"], feature)
     try:
@@ -298,7 +303,7 @@ async def chat_stream(
         raise HTTPException(500, str(e))
 
 
-@router.post("/summary", response_model=ChatResponse, dependencies=[Depends(rate_limit("generate"))])
+@router.post("/summary", response_model=ChatResponse, dependencies=[Depends(rate_limit("generate")), Depends(require_tool("chat"))])
 async def get_project_summary(
     request: SummaryRequest, current_user: dict = Depends(get_current_user)
 ):

@@ -12,6 +12,7 @@ DELETE /books/{book_id}  — Delete a book (owner only)
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from utils.rate_limit import rate_limit
+from utils.tools import require_tool
 from pydantic import BaseModel, Field
 from services.book_service import book_service
 from api.deps import get_current_user
@@ -38,7 +39,7 @@ class ImportBookRequest(BaseModel):
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
-@router.get("/")
+@router.get("/", dependencies=[Depends(require_tool("bookstore"))])
 async def list_public_books(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Books per page"),
@@ -88,7 +89,7 @@ async def get_book(book_id: str, current_user: dict = Depends(get_current_user))
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, str(e))
 
 
-@router.post("/{book_id}/import", dependencies=[Depends(rate_limit("upload"))])
+@router.post("/{book_id}/import", dependencies=[Depends(rate_limit("upload")), Depends(require_tool("bookstore"))])
 async def import_book(
     book_id: str,
     request: ImportBookRequest,

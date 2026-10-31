@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from utils.rate_limit import rate_limit
+from utils.tools import require_tool
 from pydantic import BaseModel, Field
 
 from api.deps import get_current_user
@@ -118,7 +119,7 @@ async def _neighbours(project_id: str, topic: str) -> Dict[str, List[str]]:
     return out
 
 
-@router.post("/lesson", dependencies=[Depends(rate_limit("generate"))])
+@router.post("/lesson", dependencies=[Depends(rate_limit("generate")), Depends(require_tool("power"))])
 async def lesson(request: LessonRequest, current_user: dict = Depends(get_current_user)):
     await _require_project(request.project_id, current_user)
     topic = request.topic.strip()
@@ -194,7 +195,7 @@ and skimmable; the whole lesson should take about 8 minutes."""
     return {"lesson": result, "cached": False}
 
 
-@router.post("/lesson/grade", dependencies=[Depends(rate_limit("generate"))])
+@router.post("/lesson/grade", dependencies=[Depends(rate_limit("generate")), Depends(require_tool("power"))])
 async def grade_recall(request: GradeRequest, current_user: dict = Depends(get_current_user)):
     """Grade an explanation written from memory and record it as recall evidence."""
     await _require_project(request.project_id, current_user)

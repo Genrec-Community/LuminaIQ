@@ -1,0 +1,40 @@
+"""A learner's level and the tools they can use (see services/levels.py)."""
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+
+from api.deps import get_current_user
+from services import levels
+from services.tools_catalog import HINT_MODES, LEVELS, TOOLS
+
+router = APIRouter()
+
+
+class LevelRequest(BaseModel):
+    level: str
+
+
+@router.get("/catalog")
+async def catalog():
+    return {
+        "levels": [{"key": k, **v} for k, v in LEVELS.items()],
+        "tools": [{"key": k, "label": v} for k, v in TOOLS.items()],
+        "hint_modes": list(HINT_MODES),
+    }
+
+
+@router.get("/me")
+async def my_level(current_user: dict = Depends(get_current_user)):
+    return await levels.effective_for(current_user["id"])
+
+
+@router.put("/me")
+async def set_my_level(request: LevelRequest, current_user: dict = Depends(get_current_user)):
+    current = await levels.effective_for(current_user["id"])
+    if current["locked"]:
+        raise HTTPException(403, "Your level is set by your class. Ask your teacher to change it.")
+    try:
+        await levels.set_own_level(current_user["id"], request.level)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return await levels.effective_for(current_user["id"])

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
 from utils.rate_limit import rate_limit
+from utils.tools import require_tool
 from services.evaluation_service import evaluation_service
 from models.schemas import (
     EvaluationSubmitRequest,
@@ -55,7 +56,7 @@ async def delete_saved_test(
         raise HTTPException(500, str(e))
 
 
-@router.post("/generate-test", response_model=SubjectiveTestResponse, dependencies=[Depends(rate_limit("generate"))])
+@router.post("/generate-test", response_model=SubjectiveTestResponse, dependencies=[Depends(rate_limit("generate")), Depends(require_tool("qa"))])
 async def generate_subjective_test(
     request: SubjectiveTestGenerateRequest,
     current_user: dict = Depends(get_current_user),
@@ -83,7 +84,7 @@ async def generate_subjective_test(
         raise HTTPException(500, str(e))
 
 
-@router.post("/submit-test", response_model=SubjectiveTestResult, dependencies=[Depends(rate_limit("generate"))])
+@router.post("/submit-test", response_model=SubjectiveTestResult, dependencies=[Depends(rate_limit("generate")), Depends(require_tool("qa"))])
 async def submit_subjective_test_endpoint(
     request: SubjectiveTestSubmitRequest, current_user: dict = Depends(get_current_user)
 ):
@@ -101,7 +102,7 @@ async def submit_subjective_test_endpoint(
         raise HTTPException(500, str(e))
 
 
-@router.post("/submit", response_model=EvaluationResponse, dependencies=[Depends(rate_limit("generate"))])
+@router.post("/submit", response_model=EvaluationResponse, dependencies=[Depends(rate_limit("generate")), Depends(require_tool("qa"))])
 async def submit_evaluation(
     request: EvaluationSubmitRequest, current_user: dict = Depends(get_current_user)
 ):

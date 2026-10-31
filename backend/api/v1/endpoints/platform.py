@@ -12,7 +12,7 @@ an email listed in PLATFORM_ADMIN_EMAILS.
 - GET  /platform/institutions/{id}/audit          - what happened to this school
 """
 
-from typing import Optional
+from typing import Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -98,3 +98,31 @@ async def set_trial(institution_id: str, request: TrialRequest, admin: dict = De
 @router.get("/institutions/{institution_id}/audit")
 async def audit(institution_id: str, admin: dict = Depends(require_platform_admin)):
     return {"events": await institutions.audit_log(institution_id)}
+
+
+# ---- Learner levels: which tools each level gets (AGENTS.md Phase 2)
+
+class LevelPolicyRequest(BaseModel):
+    tools: Dict[str, bool] = {}
+    hints_default: Optional[bool] = None
+    outside_book: Optional[bool] = None
+
+
+@router.get("/levels")
+async def list_levels(admin: dict = Depends(require_platform_admin)):
+    from services import levels as lv
+    from services.tools_catalog import LEVELS, TOOLS
+    return {
+        "levels": [{"key": k, **meta, **(await lv.level_policy(k))} for k, meta in LEVELS.items()],
+        "tools": [{"key": k, "label": v} for k, v in TOOLS.items()],
+    }
+
+
+@router.put("/levels/{level}")
+async def update_level(level: str, request: LevelPolicyRequest, admin: dict = Depends(require_platform_admin)):
+    from services import levels as lv
+    try:
+        return await lv.save_level_policy(level, request.tools, hints_default=request.hints_default,
+                                          outside_book=request.outside_book)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
