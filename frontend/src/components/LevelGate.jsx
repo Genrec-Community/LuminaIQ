@@ -26,8 +26,8 @@ const LevelGate = () => {
     return (
         <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-[#182B22]/50 backdrop-blur-md p-3"
             role="dialog" aria-modal="true" aria-labelledby="level-gate-title">
-            <div className="w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl">
-                <h2 id="level-gate-title" className="text-2xl font-bold text-[#163628]">What are you studying? 📚</h2>
+            <div className="w-full max-w-xl max-h-[calc(100dvh-1.5rem)] overflow-y-auto rounded-3xl bg-white p-5 sm:p-6 shadow-2xl">
+                <h2 id="level-gate-title" className="text-xl sm:text-2xl font-bold text-[#163628]">What are you studying? 📚</h2>
                 <p className="mt-1 mb-5 text-[#5E5046]">
                     So your answers, tools and quizzes are just right for you. You can change it later in Settings.
                 </p>

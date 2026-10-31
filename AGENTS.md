@@ -146,7 +146,7 @@ Anti-goals (a failure even if it "works"):
 - **Memory across books defaults to on.** The setting lets the user turn it off.
 - **The `general` level** gets plain-language answers with the `ugpg` toolset by default.
 - **Gamification design:** see Phase 7.
-- **Android** keeps working through every phase. Login is unchanged because Supabase still handles sign-in.
+- **Android (Capacitor)** only needs to keep working; a separate phone app comes later. The web app must work well on phone browsers.
 
 ---
 
@@ -374,6 +374,8 @@ The owner will provide the real `.env`. Keep `.env.example` complete and up to d
 ---
 
 ## 7. Later (out of scope now)
+- **A separate native phone app** (owner decision, 2026-10-31). Don't invest in the Capacitor shell in `frontend/src/mobile/`
+  beyond keeping it working; the web app must work well in phone browsers.
 - Moving auth, storage and the main DB off Supabase to AWS (owner decision 2).
 - Parental consent flow for under-13 users.
 - Per-student tool exceptions inside a class.
