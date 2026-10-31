@@ -1,6 +1,6 @@
 # Phase 3: RAG Quality — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans. Steps use checkbox (`- [x]`) syntax.
 
 **Goal:** Better answers from the student's book. Follow-up questions find the right passages, search combines meaning and keywords, citations point to pages, and every AI piece talks to any OpenAI-compatible API.
 
@@ -29,10 +29,10 @@
 
 ---
 
-- [ ] **Task 1: OpenAI-compatible AI clients.** `llm_service` rewrite (`chat_completion`, `chat_completion_stream`, `resolve_model(task, plan)`, token usage recording, reasoning-tag filter, temperature fallback for reasoning models), `embedding_service` rewrite (batching, concurrency limit, optional `dimensions`), `services/reranker.py`. Settings `SMALL_LLM_*`, `BIG_LLM_*`, `RERANK_*`; remove Azure/LangChain LLM settings. Tests use a fake HTTP transport.
-- [ ] **Task 2: chunks table and vector store.** `db/schema/0004_chunks.sql` (dimension templated by `db/migrate.py`); `vector_store`: `upsert_chunks`, `search_dense`, `search_keyword`, `delete_document`, `copy_document`, `count`, `first_chunks`. Real-Postgres tests.
-- [ ] **Task 3: chunker.** Structure- and page-aware, maths/table safe, overlap, contextual header, content hash. Unit tests.
-- [ ] **Task 4: retrieval pipeline.** Rewrite, hybrid with RRF, rerank, neighbour merge, grounding, Deep decomposition, plus `search_passages` / `passages_text` for the study tools. Tests with fakes.
-- [ ] **Task 5: ingestion and every caller moved off Qdrant.** document_service (embed and index, reindex, delete), book_service / institution_service (copy), graph_analytics, topic_outline, self_check, study_modes and the auth endpoint. Delete `qdrant_service.py`, `utils/embedding_queue.py` (if unused), `utils/text_chunker.py`, the Qdrant settings and the qdrant/langchain dependencies.
-- [ ] **Task 6: rag_service without LangChain.** Same signatures and stream protocol. Sources carry `page`. The grounding score switches on the outside-book rule.
-- [ ] **Task 7: evaluation harness.** `scripts/rag_eval/`: synthetic question set from a sample text, recall@5, MRR, faithfulness / citation judge (`SMALL_LLM`). Record "not run: no keys" in §8 until keys exist.
+- [x] **Task 1: OpenAI-compatible AI clients.** `llm_service` rewrite (`chat_completion`, `chat_completion_stream`, `resolve_model(task, plan)`, token usage recording, reasoning-tag filter, temperature fallback for reasoning models), `embedding_service` rewrite (batching, concurrency limit, optional `dimensions`), `services/reranker.py`. Settings `SMALL_LLM_*`, `BIG_LLM_*`, `RERANK_*`; remove Azure/LangChain LLM settings. Tests use a fake HTTP transport.
+- [x] **Task 2: chunks table and vector store.** `db/schema/0004_chunks.sql` (dimension templated by `db/migrate.py`); `vector_store`: `upsert_chunks`, `search_dense`, `search_keyword`, `delete_document`, `copy_document`, `count`, `first_chunks`. Real-Postgres tests.
+- [x] **Task 3: chunker.** Structure- and page-aware, maths/table safe, overlap, contextual header, content hash. Unit tests.
+- [x] **Task 4: retrieval pipeline.** Rewrite, hybrid with RRF, rerank, neighbour merge, grounding, Deep decomposition, plus `search_passages` / `passages_text` for the study tools. Tests with fakes.
+- [x] **Task 5: ingestion and every caller moved off Qdrant.** document_service (embed and index, reindex, delete), book_service / institution_service (copy), graph_analytics, topic_outline, self_check, study_modes and the auth endpoint. Delete `qdrant_service.py`, `utils/embedding_queue.py` (if unused), `utils/text_chunker.py`, the Qdrant settings and the qdrant/langchain dependencies.
+- [x] **Task 6: rag_service without LangChain.** Same signatures and stream protocol. Sources carry `page`. The grounding score switches on the outside-book rule.
+- [x] **Task 7: evaluation harness.** `scripts/rag_eval/`: synthetic question set from a sample text, recall@5, MRR, faithfulness / citation judge (`SMALL_LLM`). Record "not run: no keys" in §8 until keys exist.

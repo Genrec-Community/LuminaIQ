@@ -123,8 +123,9 @@ def test_overlapping_text_is_not_repeated_when_merging(fakes):
 
 def test_grounding(fakes, monkeypatch):
     monkeypatch.setattr(r.settings, "RAG_MIN_SIMILARITY", 0.4)
-    fakes["dense"]["*"] = [hit(1, "weak match", score=0.2)]
-    assert run(r.retrieve("p", "q")).grounded is False
+    fakes["dense"]["*"] = [hit(1, "weak match", score=0.25), hit(9, "unrelated", score=0.05)]
+    weak = run(r.retrieve("p", "q"))
+    assert weak.grounded is False and [p.text for p in weak.passages] == ["weak match"]   # unrelated dropped
     fakes["dense"]["*"] = [hit(1, "strong match", score=0.7)]
     assert run(r.retrieve("p", "q")).grounded is True
     fakes["dense"]["*"] = []
@@ -155,3 +156,20 @@ def test_search_passages_shape_for_study_tools(fakes):
     out = run(r.search_passages("p", ["cell division"], per_query=5))
     assert out[0]["text"] == "Cells divide." and out[0]["page"] == 2 and out[0]["document_id"] == "d1"
     assert "score" in out[0] and "chunk_id" in out[0]
+
+
+def test_neighbours_from_different_sections_stay_separate(fakes):
+    def h(i, text, heading, page, score):
+        return Hit(chunk_id=i, document_id="d1", chunk_index=i, page=page, heading=heading, content=text, score=score)
+    fakes["dense"]["*"] = [h(1, "Respiration releases energy.", "Ch 2 Respiration", 3, 0.9),
+                           h(0, "Photosynthesis makes food.", "Ch 1 Plants", 1, 0.4),
+                           h(2, "The heart pumps blood.", "Ch 3 Circulation", 4, 0.3)]
+    res = run(r.retrieve("p", "respiration energy", top_n=3))
+    assert res.passages[0].text == "Respiration releases energy." and res.passages[0].page == 3
+    assert len(res.passages) == 3
+
+
+def test_merge_stops_after_a_few_chunks(fakes):
+    fakes["dense"]["*"] = [hit(i, f"Part {i}.", score=0.9 - i / 100) for i in range(6)]
+    res = run(r.retrieve("p", "q", top_n=6))
+    assert max(len(p.chunk_ids) for p in res.passages) <= r.MAX_MERGE

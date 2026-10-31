@@ -21,6 +21,7 @@ from typing import List, Optional, Tuple
 CHARS_PER_TOKEN = 4          # close enough for sizing; exact counts aren't needed
 DEFAULT_TARGET_TOKENS = 500
 DEFAULT_OVERLAP_TOKENS = 75
+MIN_SECTION_TOKENS = 8      # about one short sentence
 
 
 @dataclass
@@ -205,7 +206,9 @@ def chunk_document(text: str, title: str, target_tokens: int = DEFAULT_TARGET_TO
     size = 0
     for p in pieces:
         t = _tokens(p.text)
-        new_section = p.starts_section and current and size >= target_tokens // 4
+        # A new chapter/section starts a new chunk (so citations name the right page and
+        # heading), unless the current chunk is only a few words
+        new_section = p.starts_section and current and size >= MIN_SECTION_TOKENS
         if current and (size + t > target_tokens or new_section):
             groups.append(current)
             # Overlap: repeat the tail of this chunk (same section only), then the new piece

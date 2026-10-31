@@ -272,6 +272,16 @@ Not done yet: per-level styling beyond text size; ESLint only covers `.ts/.tsx`,
 
 **Done when:** Qdrant is gone from code and config, follow-up questions retrieve the right passages, reranking switches on just by adding its key, and the eval harness runs.
 
+**Status (2026-10-31): done.** `services/llm_service.py` (plain `openai` client, `SMALL_LLM_*` / `BIG_LLM_*`,
+`resolve_model`), `embedding_service.py`, `reranker.py`, `chunking.py`, `vector_store.py`, `indexing.py`,
+`retrieval.py`, `rag_service.py`; schema `0004_chunks.sql` (dimension templated by `db/migrate.py`).
+Qdrant, LangChain and Azure-specific LLM code are gone. PDF text keeps page breaks (`\f`) so citations carry pages,
+and the reader opens the cited page first. `scripts/fake_openai.py` is an OpenAI-compatible stand-in for local work
+without keys. Verified end to end with it (upload → worker indexing → chat; follow-up rewritten; pages 1/3/4 with a
+blank page 2). Builder's calls: a new section starts a new chunk once the current one has ~8 tokens; neighbour merging
+stays within a section (max 3 chunks); when the book doesn't cover a question, passages below half the similarity
+threshold are dropped so no irrelevant citations show.
+
 ### Phase 4: Cost reduction
 1. **Model routing** (owner decision 7): `SMALL_LLM` / `BIG_LLM`, chosen in one `resolve_model(task, user)` function. Free users always get `SMALL_LLM`.
    Per-plan monthly token caps act as a safety net on top of the per-feature limits.
@@ -383,6 +393,13 @@ The owner will provide the real `.env`. Keep `.env.example` complete and up to d
 
 ## 8. Results log
 Record load-test numbers (Phase 1), RAG eval baselines and results (Phase 3), and cache hit rates (Phase 4) here, with the date and commit.
+
+### 2026-10-31 · Phase 3 RAG eval (`uv run python -m scripts.rag_eval`)
+**Not run with real models yet: no keys in this environment.** The harness was smoke-tested against
+`scripts/fake_openai.py` (3 questions: recall@5 100%, MRR 0.61, off-book precision 100%; meaningless for quality).
+To record a baseline: set `SMALL_LLM_*` / `EMBEDDING_*` (and optionally `RERANK_*`), upload a real book, then
+`make --n 40` and `run --judge`, and add the table here with the date, commit and model names. Tune
+`RAG_MIN_SIMILARITY` for your embedding model using the in-book grounded rate and off-book precision.
 
 ### 2026-10-31 · Phase 1 load test (`backend/scripts/loadtest/locustfile.py`)
 Non-AI paths (projects, book, documents, chat history, settings, XP, bookmarks), each simulated user with its own

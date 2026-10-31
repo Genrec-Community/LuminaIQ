@@ -1232,6 +1232,7 @@ const ProjectView = () => {
             documentId,
             title: doc ? doc.filename : (source.doc_name || 'Document'),
             passage: source.chunk_text || '',
+            page: source.page || null,   // where the passage came from: the reader looks there first
         });
     };
     openSourceRef.current = handleOpenSource;
@@ -1297,6 +1298,7 @@ const ProjectView = () => {
                             documentId={activePDF.documentId}
                             title={activePDF.title}
                             passage={activePDF.passage}
+                            page={activePDF.page}
                             onClose={() => setActivePDF(null)}
                         />
                     </Suspense>

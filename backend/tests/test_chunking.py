@@ -82,3 +82,10 @@ def test_content_hash_depends_on_text_and_model():
     b = chunk_document(PARA, "Bio", model="m1")[0]
     c = chunk_document(PARA, "Bio", model="m2")[0]
     assert a.content_hash == b.content_hash != c.content_hash
+
+
+def test_short_chapters_still_get_their_own_chunk_and_page():
+    text = ("Chapter 1 Plants\n\nPhotosynthesis is how green plants make food from sunlight, water and air.\n\f\n"
+            "\n\f\nChapter 2 Respiration\n\nRespiration releases energy from glucose inside the mitochondria.")
+    chunks = chunk_document(text, "Bio")
+    assert [(c.page, c.heading) for c in chunks] == [(1, "Chapter 1 Plants"), (3, "Chapter 2 Respiration")]

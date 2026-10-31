@@ -29,6 +29,7 @@ from utils.logger import logger
 
 RRF_K = 60            # standard Reciprocal Rank Fusion constant
 CANDIDATES = 30       # per search, before fusion and rerank
+MAX_MERGE = 3         # chunks joined into one passage at most
 
 
 @dataclass
@@ -166,14 +167,17 @@ async def _merge(entries: List[tuple]) -> List[Passage]:
         run_ = [h]
         used.add(h.chunk_id)
         doc = by_doc[h.document_id]
+        # Only neighbours from the same section, a few at a time: merging across
+        # chapters would mix topics and give the passage the wrong page
+        same = lambda e: e[0].chunk_id not in used and e[0].heading == h.heading and len(run_) < MAX_MERGE
         nxt = h.chunk_index + 1
-        while nxt in doc and doc[nxt][0].chunk_id not in used:
+        while nxt in doc and same(doc[nxt]):
             run_.append(doc[nxt][0])
             used.add(doc[nxt][0].chunk_id)
             sim = max(sim, doc[nxt][2])
             nxt += 1
         prev = h.chunk_index - 1
-        while prev in doc and doc[prev][0].chunk_id not in used:
+        while prev in doc and same(doc[prev]):
             run_.insert(0, doc[prev][0])
             used.add(doc[prev][0].chunk_id)
             sim = max(sim, doc[prev][2])
@@ -214,6 +218,10 @@ async def retrieve(project_id: str, question: str, history: Optional[List[Dict[s
     best = max((p.similarity for p in passages), default=0.0)
     keyword_only = passages and best == 0.0
     grounded = bool(passages) and (best >= settings.RAG_MIN_SIMILARITY or keyword_only)
+    if not grounded:
+        # The book doesn't really cover it: keep only passages that are at least half-relevant,
+        # so the student isn't shown citations that have nothing to do with the question
+        passages = [p for p in passages if p.similarity >= settings.RAG_MIN_SIMILARITY / 2]
     return RetrievalResult(query=query, passages=passages, grounded=grounded,
                            best_similarity=best, sub_queries=sub_queries)
 
