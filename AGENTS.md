@@ -373,3 +373,18 @@ The owner will provide the real `.env`. Keep `.env.example` complete and up to d
 
 ## 8. Results log
 Record load-test numbers (Phase 1), RAG eval baselines and results (Phase 3), and cache hit rates (Phase 4) here, with the date and commit.
+
+### 2026-10-31 · Phase 1 load test (`backend/scripts/loadtest/locustfile.py`)
+Non-AI paths (projects, book, documents, chat history, settings, XP, bookmarks), each simulated user with its own
+account. One 4-CPU / 15 GB machine running Postgres, the app *and* Locust together, so treat the numbers as a floor.
+
+| Setup | Users | Req/s | p50 | p95 | p99 | Failures |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 uvicorn process | 50 | 60 | 4 ms | 17 ms | 180 ms | 0 / 2,651 |
+| 1 uvicorn process | 200 | 223 | 4 ms | 44 ms | 130 ms | 0 / 9,814 |
+| gunicorn, 4 workers | 200 | 235 | 3 ms | 22 ms | 180 ms | 0 / 10,331 |
+| gunicorn, 4 workers (old `max_requests=1000`) | 500 | 540 | 6 ms | 53 ms | 140 ms | 29 / 24,324 (worker recycling cut connections) |
+| gunicorn, 4 workers (`GUNICORN_MAX_REQUESTS=20000`) | 500 | 535 | 4 ms | 39 ms | 130 ms | **0 / 23,568** |
+
+AI-backed endpoints (chat, generation) are bound by the model provider's latency and rate limits, not by this
+server. Re-run with real keys once the LLM/embedding provider is set (Phase 3), and on the AWS instance type you choose.

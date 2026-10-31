@@ -246,6 +246,7 @@ class Settings(BaseSettings):
     # Gunicorn workers for production
     # Recommended: (2 * CPU cores) + 1. Azure 1-core = 3 workers.
     GUNICORN_WORKERS: int = 3
+    GUNICORN_MAX_REQUESTS: int = 20000   # requests before a worker is recycled
 
     # Webhook secret
     WEBHOOK_SECRET: str = "supersecretwebhook"
