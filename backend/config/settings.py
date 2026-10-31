@@ -1,6 +1,6 @@
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, DotEnvSettingsSource, EnvSettingsSource
 from pydantic import Field, field_validator
-from typing import Optional, List, Union, Any
+from typing import Any, ClassVar, Dict, List, Optional, Union
 
 
 class CustomDotEnvSettingsSource(DotEnvSettingsSource):
@@ -264,6 +264,25 @@ class Settings(BaseSettings):
     VECTOR_DATABASE_URL: str = Field(default="")
     # Optional: hot cache, rate limits and progress pub/sub. Empty = off.
     REDIS_URL: str = Field(default="")
+
+    # Placeholder values that must never reach production
+    DEFAULT_SECRETS: ClassVar[Dict[str, str]] = {
+        "SECRET_KEY": "supersecretkey",
+        "WEBHOOK_SECRET": "supersecretwebhook",
+        "MAIN_API_WEBHOOK_SECRET": "supersecretwebhook",
+    }
+
+    def validate_production(self) -> None:
+        """Refuse to start in production while any secret still has its placeholder value."""
+        if self.ENVIRONMENT != "production":
+            return
+        weak = [name for name, default in self.DEFAULT_SECRETS.items()
+                if not getattr(self, name) or getattr(self, name) == default]
+        if weak:
+            raise RuntimeError(
+                "Refusing to start in production with default secrets: " + ", ".join(weak)
+                + ". Set them in the environment."
+            )
 
     @classmethod
     def settings_customise_sources(

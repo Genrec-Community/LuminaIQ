@@ -6,18 +6,13 @@ app_root = os.path.dirname(os.path.abspath(__file__))
 if app_root not in sys.path:
     sys.path.insert(0, app_root)
 
-print(f"DEBUG: CWD is {os.getcwd()}", flush=True)
-print(f"DEBUG: __file__ is {__file__}", flush=True)
-print(f"DEBUG: app_root is {app_root}", flush=True)
-print(f"DEBUG: sys.path is {sys.path}", flush=True)
-print(f"DEBUG: Contents of app_root: {os.listdir(app_root)}", flush=True)
-
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from api.v1.api import api_router
 from config.settings import settings
 from utils.logger import setup_uvicorn_log_filter
+from utils.request_id import RequestIdMiddleware
 import asyncio
 
 app = FastAPI(
@@ -48,6 +43,7 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup_event():
     """Initialize on startup"""
+    settings.validate_production()
     # Apply log filter to reduce noisy HTTP logs
     setup_uvicorn_log_filter()
     if settings.INDRA_OCR_URL:
@@ -96,12 +92,9 @@ class RequestTimeoutMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(RequestTimeoutMiddleware)
+# Outermost, so the id is set before anything else logs
+app.add_middleware(RequestIdMiddleware)
 
-
-@app.middleware("http")
-async def log_all_requests(request: Request, call_next):
-    print(f"INCOMING → {request.method} {request.url}")
-    return await call_next(request)
 
 
 # Handle CORS preflight requests to prevent hanging
@@ -116,6 +109,17 @@ app.include_router(api_router, prefix="/api/v1")
 @app.api_route("/", methods=["GET", "HEAD"])
 async def root():
     return {"message": "Welcome to Lumina IQ API"}
+
+
+@app.get("/ready")
+async def ready():
+    """Readiness: 200 when Supabase (and the app Postgres / Redis, if configured) answer, else 503."""
+    from fastapi.responses import JSONResponse
+    from utils import readiness
+
+    ok, checks = await readiness.check()
+    return JSONResponse(status_code=200 if ok else 503,
+                        content={"status": "ready" if ok else "not ready", "checks": checks})
 
 
 @app.api_route("/health", methods=["GET", "HEAD"])
