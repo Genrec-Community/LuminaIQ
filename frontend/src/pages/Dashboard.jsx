@@ -7,7 +7,8 @@ import {
     Tag, ChevronDown, ChevronUp, Check, Download, Settings as SettingsIcon
 } from 'lucide-react';
 import { createProject, uploadDocument, getProjects, deleteProject, getPublicBooks, importBook, getLearningPlan } from '../api';
-import MemoryCurve from '../components/MemoryCurve';
+import SchoolHome from '../components/SchoolHome';
+import { useTools } from '../context/ToolsContext';
 import Logo from '../components/brand/Logo';
 
 import { useAuth } from '../context/AuthContext';
@@ -30,6 +31,7 @@ const Dashboard = () => {
     const { user, logout } = useAuth();
     const toast = useToast();
     const { settings } = useSettings();
+    const tools = useTools();
     const { plan: myPlan } = usePlan();
     // Finish a "sign in, then go back to X" flow (e.g. Google sign-in from /pricing)
     useEffect(() => {
@@ -459,29 +461,46 @@ const Dashboard = () => {
             </header>
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10">
-                <TodayHero
-                    loading={booksLoading}
-                    onContinue={continueProject ? () => navigate(`/project/${continueProject.id}`) : openNewProjectModal}
-                    continueLabel={continueProject ? `Continue: ${continueProject.name}` : 'Add your first book'}
-                    onCram={continueProject ? () => {
-                        try { sessionStorage.setItem(`lumina_tab_${continueProject.id}`, 'cram'); } catch { /* ignore */ }
-                        navigate(`/project/${continueProject.id}`);
-                    } : null}
-                />
-
-                {continueProject && (
-                    <div className="mb-10 lumina-settle">
-                        <MemoryCurve
-                            profile={memory?.profile}
-                            height={200}
-                            action={
-                                <button type="button" className="lumina-curve__cta" onClick={() => openTab(fading ? 'path' : 'power')}>
-                                    {fading ? `Bring back ${fading} fading topic${fading === 1 ? '' : 's'}` : 'Lock it in with a 10-minute Power Hour'}
-                                    <ArrowRight className="h-4 w-4" />
-                                </button>
-                            }
+                {tools.isSchool ? (
+                    <SchoolHome
+                        name={displayName(settings, user)}
+                        bookName={continueProject?.name}
+                        onOpen={(tool) => {
+                            try { sessionStorage.setItem(`lumina_tab_${continueProject.id}`, tool); } catch { /* ignore */ }
+                            navigate(`/project/${continueProject.id}`);
+                        }}
+                        onAddBook={openNewProjectModal}
+                    />
+                ) : (
+                    <>
+                        <TodayHero
+                            loading={booksLoading}
+                            onContinue={continueProject ? () => navigate(`/project/${continueProject.id}`) : openNewProjectModal}
+                            continueLabel={continueProject ? `Continue: ${continueProject.name}` : 'Add your first book'}
+                            onCram={continueProject && tools.has('cram') ? () => {
+                                try { sessionStorage.setItem(`lumina_tab_${continueProject.id}`, 'cram'); } catch { /* ignore */ }
+                                navigate(`/project/${continueProject.id}`);
+                            } : null}
                         />
-                    </div>
+
+                        {continueProject && (
+                            <button
+                                type="button"
+                                onClick={() => openTab(fading && tools.has('path') ? 'path' : 'power')}
+                                className="mb-10 flex w-full items-center justify-between gap-4 rounded-2xl border border-[#E6D5CC] bg-white px-5 py-4 text-left transition-colors hover:border-[#1E5C42]"
+                            >
+                                <span>
+                                    <span className="block font-semibold text-[#163628]">
+                                        {fading ? `${fading} topic${fading === 1 ? ' is' : 's are'} fading` : 'Keep it fresh'}
+                                    </span>
+                                    <span className="block text-sm text-[#5E5046]">
+                                        {fading ? 'A quick review now saves re-learning later.' : 'Lock in what you learned with a 10-minute Power Hour.'}
+                                    </span>
+                                </span>
+                                <ArrowRight className="h-5 w-5 shrink-0 text-[#1E5C42]" />
+                            </button>
+                        )}
+                    </>
                 )}
 
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
@@ -501,14 +520,14 @@ const Dashboard = () => {
                                 className="h-12 pl-12 pr-4 bg-white border border-[#163628]/10 rounded-full focus:ring-2 focus:ring-[#D3EE6A] focus:border-[#163628] outline-none w-full md:w-64"
                             />
                         </div>
-                        <button
+                        {tools.has('bookstore') && <button
                             id="tour-bookstore"
                             onClick={() => navigate('/bookstore')}
                             className="btn btn--soft w-full md:w-auto"
                         >
                             <Globe className="h-5 w-5" />
                             <span>Book Store</span>
-                        </button>
+                        </button>}
                         <button
                             onClick={() => navigate('/institution')}
                             className="btn btn--light w-full md:w-auto"

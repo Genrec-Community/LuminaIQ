@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ArrowRight, Bell, Check, CalendarDays } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
+import { useTools } from '../../context/ToolsContext';
 import { onboardedKey } from '../../components/Onboarding';
 import { AI_CHARACTERS, USER_AVATARS } from '../../utils/persona';
 import { tap, notify, scheduleStudyReminder } from '../device';
@@ -17,12 +18,13 @@ import { tap, notify, scheduleStudyReminder } from '../device';
  *  - it ends with a plan they chose and one clear next step: add the first book
  */
 
+// The learner's level: it sets answer style and which tools they see
 const GOALS = [
-    { id: 'school', emoji: '📚', label: 'School exams', age: 'teen' },
-    { id: 'college', emoji: '🎓', label: 'College or university', age: 'young' },
-    { id: 'competitive', emoji: '🎯', label: 'A competitive exam', hint: 'JEE, NEET, UPSC, CAT…', age: 'young' },
-    { id: 'work', emoji: '💼', label: 'Work or a certification', age: 'adult' },
-    { id: 'curious', emoji: '🌱', label: 'Learning for myself', age: 'mature' },
+    { id: 'school', emoji: '🎒', label: 'Class 5–10', hint: 'School', age: 'teen' },
+    { id: 'higher_secondary', emoji: '📐', label: 'Class 11–12', hint: 'Boards, JEE, NEET, CUET', age: 'teen' },
+    { id: 'ugpg', emoji: '🎓', label: 'UG / PG', hint: 'College or university', age: 'young' },
+    { id: 'research', emoji: '🔬', label: 'PhD / Research', age: 'adult' },
+    { id: 'general', emoji: '🌱', label: 'Learning for myself', age: 'mature' },
 ];
 
 const WHEN = [
@@ -80,6 +82,7 @@ const Setup = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
     const { settings, updateSettings } = useSettings();
+    const tools = useTools();
     const firstName = (settings.studentName || user?.full_name || '').trim().split(' ')[0] || '';
     const [step, setStep] = useState(0);
     const dir = React.useRef(1);
@@ -106,7 +109,11 @@ const Setup = () => {
 
     const save = (extra = {}) => {
         const g = GOALS.find((x) => x.id === f.goal);
+        // School students' level comes from their class; everyone else's from this answer
+        const levelPart = g && !tools.locked ? { studyLevel: g.id } : {};
+        if (levelPart.studyLevel) tools.chooseLevel(g.id).catch(() => {});
         updateSettings({
+            ...levelPart,
             studentName: f.name.trim() || settings.studentName,
             nickname: f.name.trim() || settings.nickname,
             userAvatar: f.avatar,
@@ -169,7 +176,7 @@ const Setup = () => {
 
         // 1 — goal
         <div key="goal">
-            <Title sub="We'll shape questions and tone around it.">{f.name.trim() ? `Nice to meet you, ${f.name.trim()}! ` : ''}What are you studying for?</Title>
+            <Title sub="Answers, tools and difficulty are made for this.">{f.name.trim() ? `Nice to meet you, ${f.name.trim()}! ` : ''}What are you studying?</Title>
             <div className="space-y-2.5">
                 {GOALS.map((g) => (
                     <Option key={g.id} active={f.goal === g.id} onClick={() => auto(() => set('goal', g.id))}>

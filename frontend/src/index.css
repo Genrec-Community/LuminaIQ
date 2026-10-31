@@ -456,3 +456,9 @@ article mark.lumina-cite {
 @media (prefers-reduced-motion: reduce) {
   .lumina-progress-sheen, .lumina-step-now, .lumina-book-breathe, .lumina-progress-done { animation: none; }
 }
+
+/* Class 5-10 learners (data-level is set by ToolsContext): slightly larger text
+   everywhere, since sizes are rem-based. */
+html[data-level="school"] {
+    font-size: 17.5px;
+}

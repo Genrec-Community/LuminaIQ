@@ -37,7 +37,9 @@ import ChangePasswordForm from '../components/ChangePasswordForm';
 import DeleteAccountForm from '../components/DeleteAccountForm';
 import { useGamification } from '../context/GamificationContext';
 import { useAuth } from '../context/AuthContext';
-import { AI_CHARACTERS, USER_AVATARS, AI_AVATARS, AGE_GROUPS, getCharacter, displayName } from '../utils/persona';
+import { AI_CHARACTERS, USER_AVATARS, AI_AVATARS, getCharacter, displayName } from '../utils/persona';
+import { useTools } from '../context/ToolsContext';
+import { LEVEL_OPTIONS } from '../components/LevelPicker';
 import { onboardedKey } from '../components/Onboarding';
 import { THEMES, FONT_STYLES, ACCENT_PRESETS, resolveThemeId } from '../utils/themes';
 
@@ -110,6 +112,7 @@ const TextInput = ({ value, onChange, label, description, icon: Icon, placeholde
 const Settings = () => {
     const navigate = useNavigate();
     const { settings, updateSetting, updateSettings, resetSettings } = useSettings();
+    const tools = useTools();
     const { data: gamificationData } = useGamification();
     const { user } = useAuth();
     const [searchParams] = useSearchParams();
@@ -299,14 +302,27 @@ const Settings = () => {
                     placeholder="e.g. Captain, Doc, Pri..."
                 />
                 <ChoiceGrid label="Your Avatar" value={settings.userAvatar || '🦊'} options={USER_AVATARS} onPick={(v) => updateSetting('userAvatar', v)} />
-                <SelectOption
-                    value={settings.ageGroup || ''}
-                    onChange={(v) => updateSetting('ageGroup', v)}
-                    label="About You"
-                    description="Your AI adapts its language to you"
-                    icon={User}
-                    options={[{ value: '', label: 'Prefer not to say' }, ...Object.entries(AGE_GROUPS).map(([value, g]) => ({ value, label: g.label }))]}
-                />
+                {tools.locked ? (
+                    <div className="flex items-center gap-3.5 p-4 bg-white rounded-2xl border border-[#E6D5CC]/80">
+                        <div className="h-10 w-10 bg-[#FDF6F0] rounded-xl flex items-center justify-center shrink-0">
+                            <GraduationCap className="h-5 w-5 text-[#1E5C42]" />
+                        </div>
+                        <div>
+                            <p className="font-semibold text-[#163628] text-sm">What you&apos;re studying: {tools.level_label}</p>
+                            <p className="text-xs text-[#5E5046] mt-0.5">Set by your class. Ask your teacher to change it.</p>
+                        </div>
+                    </div>
+                ) : (
+                    <SelectOption
+                        value={tools.level || ''}
+                        onChange={(v) => { if (v) tools.chooseLevel(v).catch(() => {}); }}
+                        label="What you're studying"
+                        description="Answers, tools and difficulty are made for this"
+                        icon={GraduationCap}
+                        options={[...(tools.level ? [] : [{ value: '', label: 'Choose…' }]),
+                            ...LEVEL_OPTIONS.map((o) => ({ value: o.key, label: `${o.label} · ${o.hint}` }))]}
+                    />
+                )}
                 <TextInput
                     value={settings.examName}
                     onChange={(v) => updateSetting('examName', v)}
@@ -339,18 +355,6 @@ const Settings = () => {
                     description="What are you studying for?"
                     icon={Target}
                     placeholder="e.g., Pass my biology exam, Master JavaScript..."
-                />
-                <SelectOption
-                    value={settings.selfLevel || 'intermediate'}
-                    onChange={(v) => updateSetting('selfLevel', v)}
-                    label="Your Level"
-                    description="How would you rate your current knowledge?"
-                    icon={GraduationCap}
-                    options={[
-                        { value: 'beginner', label: 'Beginner — Just starting out' },
-                        { value: 'intermediate', label: 'Intermediate — Know the basics' },
-                        { value: 'advanced', label: 'Advanced — Looking to master' },
-                    ]}
                 />
                 <SelectOption
                     value={settings.learningStyle || 'balanced'}
