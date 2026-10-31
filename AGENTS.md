@@ -80,10 +80,22 @@ Anti-goals (a failure even if it "works"):
 3. **Docker Compose for local development.** It runs the backend (web + worker) plus Postgres with pgvector, and Redis (optional).
    The backend also runs directly with `uv run run.py`. The frontend, the OCR setup and the Render config stay as they are.
 4. **Qdrant is replaced by pgvector** in a **separate Postgres** (`VECTOR_DATABASE_URL`):
-   Docker in development, **AWS RDS** in production. Existing vectors are copied over by a one-time script, without re-embedding.
+   Docker in development, **AWS RDS** in production. **Fresh start: no data migration.** Don't write migration or
+   backward-compatibility code for old vectors, old chunks or old data. Remove Qdrant code completely.
 5. **Redis is optional.** Everything must work without it.
 6. **OCR stays as it is now.**
-7. **AI provider:** any **OpenAI-compatible API**. Keep the existing provider abstraction (`services/llm_service.py`).
+7. **AI provider:** any **OpenAI-compatible API**, with **two models**:
+   - **`BIG_LLM`:** interactive live demos (Visual Lab simulations), Deep mode answers, Deep-mode multi-step retrieval,
+     and image input for paid users.
+   - **`SMALL_LLM`:** everything else (normal chat, quizzes, flashcards, notes, mindmaps, query rewriting, memory
+     extraction, summaries, moderation), and **every request from free users**, Deep mode included.
+
+   Each model has its own `*_MODEL`, `*_BASE_URL` and `*_API_KEY`, so they can come from different providers.
+   These replace `LLM_LIGHT_MODEL` / `LLM_DEEP_*` / `LLM_TIER_MODELS`. All routing lives in **one** function
+   (`resolve_model(task, user)`). **Embeddings come from an API only** (no self-hosted models).
+7a. **RAG:** use current best practice. The owner will judge answer quality later.
+   **Reranking is optional**: it switches on automatically when its API key is set (`RERANK_API_KEY`, `RERANK_BASE_URL`,
+   `RERANK_MODEL`) and is skipped otherwise. Citations stay.
 8. **Learner levels:** `school` (Class 5–10), `higher_secondary` (Class 11–12), `ugpg` (UG/PG), `research` (PhD/Research), `general`.
    - Individual users pick their level at sign-up (onboarding).
    - **Institution students get their level from their class and can't change it.** A Class 8 student stays in Class 5–10.
@@ -96,7 +108,17 @@ Anti-goals (a failure even if it "works"):
 11. **Outside-the-book answers:** when the book doesn't cover a question (text or photo), answer from the model's own
     knowledge with a clear **"Not from your book"** label. Institution admins can turn this off per class.
 12. **Image input:** students photograph a question or diagram in chat and get it explained, using the book first and then general knowledge (rule 11).
-13. **Memory:** per student, across all books (three layers, Phase 5).
+13. **Memory:** per student, three layers (Phase 5).
+    - **Automatic memory** (the AI noting facts from chats) is for **Class 11 and above only**. Class 5–10 memory comes only from quiz and mastery data.
+    - **Memory across books:** the user decides, with a setting.
+    - **Teachers** see a student's progress (mastery, stuck topics, mistakes) but **never their chats or memory notes**.
+    - **Chats** stay until the student deletes them. Memory notes unused for **6 months** fade out.
+13a. **Cost:**
+    - Quizzes and flashcards for shared-library and class books come from a **shared pool** per book + topic + level.
+      Each student gets a random selection with shuffled options, and the pool grows only when a student runs out.
+    - **Cached chat answers** apply only to **first questions on shared books**, served in a neutral voice.
+      Personal books and follow-ups always get fresh, in-character answers.
+    - Every AI call is tracked (tokens, cost, cache hit, latency) in our own table and admin dashboard, with **optional Langfuse** turned on by settings.
 14. **Child safety:** stricter guardrails for the `school` level now. Parental consent is a later item.
 15. **Remove `MemoryCurve` and similar landing-style decoration from the app.** Keep it on the landing page.
 16. **Order of work:** Phase 0 → 7 in §5.
@@ -111,7 +133,11 @@ Anti-goals (a failure even if it "works"):
 - **Drop LangChain from the chat path.** Direct calls are simpler, easier to cache and easier to order for provider prompt caching.
   Keep `langchain-text-splitters` only if still useful for chunking.
 - **The chat stream becomes JSON events** (`token`, `sources`, `meta`, `done`, `error`). The frontend parser and the Android build are updated together.
-- **Existing users** pick their level once, on their next visit (a blocking one-question modal). Old `ageGroup`/`selfLevel` values pre-select a suggestion.
+- **Any user without a level** (e.g. accounts created before this work) picks one in a blocking one-question modal. No other legacy handling.
+- **Deep mode multi-step retrieval:** splits a complex question into 2–4 sub-questions, searches for each, then answers with `BIG_LLM`. Normal chat uses a single search.
+- **Study content is generated on demand and cached.** Pre-generation (via the provider's batch API where available) applies only to shared-library and class books and is off by default (`PREGENERATE_SHARED=false`).
+- **Citations open the book at the cited page**, with the passage highlighted (`DocumentReader`).
+- **Memory across books defaults to on.** The setting lets the user turn it off.
 - **The `general` level** gets plain-language answers with the `ugpg` toolset by default.
 - **Gamification design:** see Phase 7.
 - **Android** keeps working through every phase. Login is unchanged because Supabase stays.
@@ -190,7 +216,7 @@ Each phase ends in a working, deployable state. Within a phase, write a plan (`w
    - Step-by-step answers rendered as revealable steps.
    Advanced levels keep the current dense layout.
 10. **Child safety (`school`):**
-    - System-prompt guardrails, plus input moderation (an OpenAI-compatible moderation endpoint if configured, otherwise a light-model classifier).
+    - System-prompt guardrails, plus input moderation (an OpenAI-compatible moderation endpoint if configured, otherwise a `SMALL_LLM` classifier).
     - Off-topic and unsafe requests get a gentle redirect. The tutor never asks for personal details.
     - Distress gets a caring reply with the Tele-MANAS helpline (14416).
     - Store only counts of flagged events, not the content.
@@ -200,49 +226,53 @@ Each phase ends in a working, deployable state. Within a phase, write a plan (`w
 
 **Done when:** an admin can change a level's tools and see the effect immediately, an institution admin can restrict a class, a Class 8 student sees the simple home screen and simple answers, and backend tests cover the effective-tools rules.
 
-### Phase 3: RAG quality
-1. **Vector store abstraction** `services/vector_store.py` (`upsert`, `search_dense`, `search_keyword`, `delete_document`, `copy_document`, `count`),
-   with `PgVectorStore` and the old Qdrant behind `VECTOR_BACKEND=qdrant|pgvector` during migration. Replace every direct `qdrant_service.` call.
-   Today they're in `document_service`, `book_service`, `rag_service`, `retrieval`, `institution_service`, `graph_analytics_service`,
-   `topic_outline_service`, `self_check`, `study_modes`, and the auth endpoint.
+### Phase 3: RAG quality (pgvector, fresh start)
+1. **Vector store** `services/vector_store.py` (`upsert`, `search_dense`, `search_keyword`, `delete_document`, `copy_document`, `count`), backed by pgvector.
+   - Replace every `qdrant_service.` call, then **delete** `qdrant_service.py`, the Qdrant settings and the `qdrant-client` / `langchain-qdrant` dependencies.
+   - Today those calls are in `document_service`, `book_service`, `rag_service`, `retrieval`, `institution_service`, `graph_analytics_service`,
+     `topic_outline_service`, `self_check`, `study_modes`, and the auth endpoint.
 2. **Schema (`pg_migrations/001_chunks.sql`):**
    - `chunks(id, project_id, document_id, chunk_index, page, heading, content, content_hash, embedding vector(1536), tsv tsvector GENERATED, metadata jsonb)`
    - indexes: HNSW (`vector_cosine_ops`) on `embedding`, GIN on `tsv`, btree on `(project_id, document_id)`
    - one table for all projects (no collection per project)
-   - shared-library and class-book copies become `INSERT ... SELECT`
-3. **Migration script** `scripts/migrate_qdrant_to_pgvector.py`: copies points with their vectors. Resumable, with a dry-run mode and a count check per document.
-4. **Retrieval pipeline**, shared by chat and every study tool:
-   1. **Query rewriting:** the light model turns the latest message plus recent history into a standalone search query. This fixes the follow-up bug.
-      Skip it for first-turn questions.
-   2. **Hybrid search:** pgvector dense top-k plus Postgres full-text top-k, fused with Reciprocal Rank Fusion.
-   3. **Rerank (optional, `RERANK_ENABLED`):** light-model or cross-encoder rerank of the top ~20 down to the final 5–8.
-   4. **Diversity:** drop near-duplicate chunks and merge neighbouring chunks from the same page.
-   5. **Grounding check:** if the best scores fall below a threshold, mark the answer outside-book (owner decision 11) instead of forcing citations.
-5. **Chunking:** token-based (~400–600 tokens, ~15% overlap). Keep headings and page numbers. Never split inside `$...$` / `$$...$$` or tables.
-   Store `content_hash` so identical chunks are never embedded twice.
-6. **Prompt:** level-aware (Phase 2). Citations as now (`[1](1)`). The static parts come first so provider prompt caching works (Phase 4).
-7. **Evaluation:** `backend/scripts/rag_eval/` with a golden set (at least 50 Q&A pairs over 2–3 sample books, including follow-ups and maths) and these metrics:
-   - retrieval recall@5 and MRR
-   - answer faithfulness and citation correctness (LLM judge)
-   - outside-book precision
+   - shared-library and class-book copies become `INSERT ... SELECT` (no re-embedding)
+3. **Ingestion and chunking (best practice):**
+   - Structure-aware splitting: by heading and section first, then token-based (~400–600 tokens, ~15% overlap).
+   - Never split inside `$...$` / `$$...$$`, tables or lists.
+   - Keep the page number and heading path on every chunk. Prepend a short context line ("Book › Chapter › Section") to each chunk before embedding (contextual chunk headers).
+   - Store `content_hash` so identical text is never embedded twice.
+4. **Retrieval pipeline**, one module shared by chat and every study tool:
+   1. **Query rewriting** (`SMALL_LLM`): turn the latest message plus recent history into a standalone search query. This fixes the follow-up bug.
+      Skip it for first-turn questions that already stand alone.
+   2. **Hybrid search:** pgvector dense top-k (~30) plus Postgres full-text top-k (~30), fused with Reciprocal Rank Fusion.
+   3. **Rerank (optional):** when `RERANK_API_KEY` is set, call an OpenAI-style/Cohere-style rerank endpoint on the fused top ~30 and keep the best 5–8.
+      Without a key, take the top RRF results. Reranker failures fall back silently to RRF order.
+   4. **Diversity:** drop near-duplicates and merge adjacent chunks from the same page into one passage.
+   5. **Grounding check:** if relevance is below a threshold, answer as outside-book (owner decision 11) instead of forcing citations.
+   6. **Deep mode:** split the question into 2–4 sub-questions, retrieve for each, then answer with `BIG_LLM`.
+5. **Prompt:** level-aware (Phase 2). Citations `[1](1)` map to passages with page numbers, and clicking one opens the book at that page.
+   The static parts come first so provider prompt caching works (Phase 4).
+6. **Evaluation harness** `backend/scripts/rag_eval/`: the metrics (retrieval recall@5, MRR, faithfulness and citation correctness by LLM judge, outside-book precision)
+   and a small synthetic question set generated from a sample book. It's ready for the owner to add real books later.
+   Run it before and after RAG changes and record the results in §8.
 
-   Store a baseline before changing anything. **Every RAG change must not regress the baseline.** Record the results here.
-
-**Done when:** Qdrant is off in compose, the migration script has moved real data, and eval scores beat the baseline, especially on follow-ups.
+**Done when:** Qdrant is gone from code and config, follow-up questions retrieve the right passages, reranking switches on just by adding its key, and the eval harness runs.
 
 ### Phase 4: Cost reduction
-1. **Model routing:** light model for query rewriting, classification, memory extraction, flashcards and tags. Main model for chat and explanations. Deep model only in Deep mode.
-   All settings driven (`LLM_LIGHT_MODEL`, `LLM_DEEP_MODEL`, `LLM_TIER_MODELS` already exist).
+1. **Model routing** (owner decision 7): `SMALL_LLM` / `BIG_LLM`, chosen in one `resolve_model(task, user)` function. Free users always get `SMALL_LLM`.
+   Per-plan monthly token caps act as a safety net on top of the per-feature limits.
 2. **Cache layers:**
    - **Generated study content** (quizzes, flashcards, notes, mindmaps, lessons): keyed by `(content_hash of source chunks, tool, level, prompt_version)` and persisted.
-     Shared-library books (`services/book_library.py`) and class books then **generate once for everyone**. This is the biggest saving.
-   - **Exact answer cache** for history-independent questions: `hash(level, project, doc set, normalised question, model, prompt_version)`.
-   - **Semantic answer cache:** pgvector similarity ≥ ~0.95 within the same project and level, first-turn questions only. Store a TTL and the prompt version.
+     Shared-library books (`services/book_library.py`) and class books use a **shared pool** (owner decision 13a). This is the biggest saving.
+   - **Answer cache** (owner decision 13a): first questions on shared books only, in a neutral voice.
+     Exact match on `hash(book, level, normalised question, prompt_version)`, then semantic match (pgvector similarity ≥ ~0.95). Store a TTL and the prompt version.
    - **Embedding cache:** chunk `content_hash` and query-text hash, so we never re-embed the same text.
    - **Hot cache** in Redis when available. Postgres is the source of truth.
 3. **Prompt caching:** fixed prompt order (static system → level → profile/memory → retrieved context → history → question) so OpenAI-compatible providers' automatic prefix caching works.
 4. **Token budgets:** a context builder with hard budgets per part (retrieved context, memory, history). Summarise long history (Phase 5) instead of sending raw turns.
-5. **Usage telemetry:** record tokens and estimated cost per request (user, feature, model, cache hit) in the app Postgres. Add a cost dashboard on the platform admin page with cost per user, per feature, and cache hit rate.
+5. **Usage telemetry:** record tokens, estimated cost and latency per AI call (user, feature, model, cache hit) in the app Postgres.
+   Add a cost dashboard on the platform admin page with cost per user, per feature and per model, plus the cache hit rate.
+   **Optional Langfuse** tracing turns on when `LANGFUSE_*` keys are set.
 
 **Done when:** the dashboard shows the cache hit rate, and generating study tools for a shared book a second time costs nothing.
 
@@ -252,9 +282,13 @@ Each phase ends in a working, deployable state. Within a phase, write a plan (`w
    (`learning_engine.py`, `learning_service.py`, quiz results, `003_adaptive_learning.sql` and `013_learning_engine.sql` tables).
    Wrong answers are tagged with the misconception when one can be identified.
 3. **Layer 3: conversation memory.**
-   - A rolling **summary per project chat**, refreshed by the light model every ~10 turns. The summary plus the last ~6 turns go to the model.
-   - **Long-term memory facts** (`user_memories`: user_id, kind, content, source, updated_at): extracted asynchronously after chats, deduplicated, capped per user.
-     School-level users never get personal or sensitive details stored.
+   - A rolling **summary per project chat**, refreshed by `SMALL_LLM` every ~10 turns. The summary plus the last ~6 turns go to the model.
+   - **Long-term memory facts** (`user_memories`: user_id, kind, content, source, last_used_at, updated_at):
+     - extracted by `SMALL_LLM` in batches (every ~10 messages), deduplicated and capped per user
+     - **Class 11 and above only**: Class 5–10 gets layers 1–2 and the chat summary, never automatic facts
+     - pruned after 6 months unused
+   - **Memory across books** is a user setting (default on). When it's off, memory facts and the learner model are used only within the book they came from.
+   - **Teachers never see** chats or memory facts, only the learner model (mastery, stuck topics, mistakes).
 4. **Context builder** (`services/context_builder.py`) assembles profile + learner model + relevant memories + summary + recent turns within a token budget.
    It's used by chat and by every generator, so quizzes target weak topics and notes match the student's level.
 5. **App state continuity:** save and restore the last book, last view, in-progress quiz and lesson position on the server, so a student resumes on any device (web or Android).
@@ -272,7 +306,7 @@ Each phase ends in a working, deployable state. Within a phase, write a plan (`w
 3. **Image input in chat** (tool `image_input`, metered feature `image` in `services/plans.py`):
    - **Frontend:** an attach/camera button. Resize to ≤1600px and compress to JPEG on the client, show a preview, and use the camera on Android.
    - **Storage:** a Supabase storage bucket `chat-images`, private and owner-only.
-   - **Backend:** an OpenAI-compatible vision call (`LLM_VISION_MODEL`, falling back to the main model):
+   - **Backend:** an OpenAI-compatible vision call (`BIG_LLM` for paid users, `SMALL_LLM` for free users; both must be vision-capable, and if one isn't, the feature is hidden for that group):
      1. Extract the question and describe the diagram.
      2. Use that as the retrieval query against the book.
      3. Answer at the student's level. If the book doesn't cover it, answer from general knowledge with the "Not from your book" label (if the class allows it).
@@ -298,7 +332,7 @@ Each phase ends in a working, deployable state. Within a phase, write a plan (`w
    - `ugpg` and `general`: quiet progress stats
    - `research`: milestones only, no confetti
 5. **Teacher view:** in the institution dashboard, which students are **stuck** (falling mastery, repeated mistakes, inactive), not just XP rankings.
-6. Rework the existing `gamification_service.py`, `GamificationContext.jsx`, `GamificationPanel.jsx` and `XPToast.jsx` rather than starting a parallel system. Migrate existing XP and badges without loss.
+6. Rework the existing `gamification_service.py`, `GamificationContext.jsx`, `GamificationPanel.jsx` and `XPToast.jsx` rather than starting a parallel system. No legacy XP migration is needed (fresh start).
 
 **Done when:** XP correlates with mastery gains in tests, farming is capped, and each level shows its own style.
 
@@ -308,11 +342,14 @@ Each phase ends in a working, deployable state. Within a phase, write a plan (`w
 
 | Setting | Purpose | Default |
 | --- | --- | --- |
-| `VECTOR_DATABASE_URL` | App Postgres (pgvector, jobs, caches, telemetry). Docker in dev, RDS in prod. | required after Phase 3 |
-| `VECTOR_BACKEND` | `pgvector` or `qdrant` (migration only) | `pgvector` |
+| `VECTOR_DATABASE_URL` | App Postgres (pgvector, jobs, caches, telemetry). Docker in dev, RDS in prod. | required |
+| `SMALL_LLM_MODEL` / `SMALL_LLM_BASE_URL` / `SMALL_LLM_API_KEY` | Small model (most tasks, all free users) | required |
+| `BIG_LLM_MODEL` / `BIG_LLM_BASE_URL` / `BIG_LLM_API_KEY` | Big model (Visual Lab, Deep mode, paid image input) | falls back to small |
+| `EMBEDDING_*` | Embedding API (existing settings) | required |
 | `REDIS_URL` | Optional hot cache, rate limits, progress pub/sub | empty (off) |
-| `LLM_VISION_MODEL` | Model for image input | main model |
-| `RERANK_ENABLED` | Rerank retrieved chunks | `false` |
+| `RERANK_API_KEY` / `RERANK_BASE_URL` / `RERANK_MODEL` | Reranking, on only when the key is set | empty (off) |
+| `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` / `LANGFUSE_HOST` | Optional AI-call tracing | empty (off) |
+| `PREGENERATE_SHARED` | Pre-generate study content for shared/class books | `false` |
 | `SEMANTIC_CACHE_THRESHOLD` | Similarity for the semantic answer cache | `0.95` |
 | `MODERATION_ENABLED` | Input moderation for the school level | `true` |
 | `RATE_LIMIT_*` | Per-user / per-IP limits | sensible defaults |
