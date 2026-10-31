@@ -42,26 +42,44 @@ def test_request_id_is_in_log_records(client):
         request_id_var.reset(token)
 
 
-def test_ready_ok_when_supabase_answers(client):
+def _stub(monkeypatch, database="ok", auth="ok"):
+    from utils import readiness
+
+    async def ok(value):
+        if isinstance(value, Exception):
+            raise value
+        return value
+
+    monkeypatch.setattr(readiness, "_database", lambda: ok(database))
+    monkeypatch.setattr(readiness, "_supabase_auth", lambda: ok(auth))
+
+
+def test_ready_ok_when_dependencies_answer(client, monkeypatch):
+    _stub(monkeypatch)
     res = client.get("/ready")
     assert res.status_code == 200
     body = res.json()
     assert body["status"] == "ready"
-    assert body["checks"]["supabase"] == "ok"
-    # Optional services that aren't configured are reported, not failed
-    assert body["checks"]["vector_db"] == "not configured"
-    assert body["checks"]["redis"] == "not configured"
+    assert body["checks"] == {"database": "ok", "supabase_auth": "ok", "redis": "not configured"}
 
 
-def test_ready_503_when_supabase_fails(client, monkeypatch):
-    class Broken(FakeClient):
-        def table(self, name):
-            raise RuntimeError("down")
-
-    monkeypatch.setattr(SupabaseClient, "_instance", Broken())
+def test_ready_503_when_database_fails(client, monkeypatch):
+    _stub(monkeypatch, database=RuntimeError("down"))
     res = client.get("/ready")
     assert res.status_code == 503
-    assert res.json()["checks"]["supabase"].startswith("error")
+    assert res.json()["checks"]["database"] == "error: RuntimeError"
+
+
+def test_ready_503_when_database_not_configured(client, monkeypatch):
+    from utils import readiness
+
+    real_database_check = readiness._database
+    monkeypatch.setattr(readiness.settings, "DATABASE_URL", "")
+    _stub(monkeypatch)
+    monkeypatch.setattr(readiness, "_database", real_database_check)
+    res = client.get("/ready")
+    assert res.status_code == 503
+    assert res.json()["checks"]["database"] == "error: RuntimeError"
 
 
 def test_validate_production_rejects_default_secrets():

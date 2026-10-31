@@ -44,6 +44,12 @@ app.add_middleware(
 async def startup_event():
     """Initialize on startup"""
     settings.validate_production()
+    if settings.RUN_MIGRATIONS and settings.DATABASE_URL:
+        # Bring the database schema up to date (safe when several instances start at once)
+        from db.migrate import migrate
+        from utils.logger import logger
+        applied = await asyncio.to_thread(migrate)
+        logger.info("Database schema " + (f"updated: {', '.join(applied)}" if applied else "up to date"))
     # Apply log filter to reduce noisy HTTP logs
     setup_uvicorn_log_filter()
     if settings.INDRA_OCR_URL:

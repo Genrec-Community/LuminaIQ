@@ -1,6 +1,6 @@
 """Readiness: can this process reach what it depends on right now?
 
-Supabase is required. The app Postgres and Redis are checked only when configured.
+The database and Supabase (sign-in) are required; Redis is checked only when configured.
 """
 import asyncio
 from typing import Dict, Tuple
@@ -10,26 +10,24 @@ from config.settings import settings
 TIMEOUT = 3.0
 
 
-async def _supabase() -> str:
-    from db.client import async_db, get_supabase_client
+async def _database() -> str:
+    if not settings.DATABASE_URL:
+        raise RuntimeError("DATABASE_URL is not set")
+    import psycopg
 
-    client = get_supabase_client()
-    await asyncio.wait_for(
-        async_db(lambda: client.table("projects").select("id").limit(1).execute()), TIMEOUT
-    )
+    conn = await asyncio.wait_for(psycopg.AsyncConnection.connect(settings.DATABASE_URL), TIMEOUT)
+    async with conn:
+        await conn.execute("SELECT 1")
     return "ok"
 
 
-async def _vector_db() -> str:
-    if not settings.VECTOR_DATABASE_URL:
-        return "not configured"
-    import asyncpg
+async def _supabase_auth() -> str:
+    import httpx
 
-    conn = await asyncio.wait_for(asyncpg.connect(settings.VECTOR_DATABASE_URL), TIMEOUT)
-    try:
-        await conn.fetchval("SELECT 1")
-    finally:
-        await conn.close()
+    async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+        res = await client.get(f"{settings.SUPABASE_URL}/auth/v1/health",
+                               headers={"apikey": settings.SUPABASE_KEY or settings.SUPABASE_SERVICE_KEY})
+    res.raise_for_status()
     return "ok"
 
 
@@ -47,8 +45,8 @@ async def _redis() -> str:
 
 
 async def check() -> Tuple[bool, Dict[str, str]]:
-    names = ("supabase", "vector_db", "redis")
-    results = await asyncio.gather(_supabase(), _vector_db(), _redis(), return_exceptions=True)
+    names = ("database", "supabase_auth", "redis")
+    results = await asyncio.gather(_database(), _supabase_auth(), _redis(), return_exceptions=True)
     checks = {
         name: (f"error: {type(r).__name__}" if isinstance(r, BaseException) else r)
         for name, r in zip(names, results)

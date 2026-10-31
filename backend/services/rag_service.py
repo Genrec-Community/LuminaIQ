@@ -4,7 +4,6 @@ import asyncio
 from services.embedding_service import embedding_service
 from services.qdrant_service import qdrant_service
 from services.llm_service import llm_service
-from supabase import create_client, Client
 from config.settings import settings
 from utils.logger import logger
 
@@ -57,9 +56,8 @@ class RAGService:
     _background_tasks: set = set()
 
     def __init__(self):
-        self.client: Client = create_client(
-            settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY
-        )
+        from db.client import get_supabase_client
+        self.client = get_supabase_client()
 
         # Chat clients per model: the model depends on the user's plan
         # (LLM_TIER_MODELS) and on Deep mode, see llm_service.resolve_model

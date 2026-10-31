@@ -30,8 +30,33 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
                 detail={"code": "school_inactive", "state": access.get("state"),
                         "message": access.get("message") or "Your school's Lumina IQ access is paused."},
             )
+    await _remember_user(user_id, payload.get("email"))
     await _remember_plan(user_id)
     return {"id": user_id, "email": payload.get("email"), "managed": bool(payload.get("mgd"))}
+
+
+# Users recorded in app_users recently (per process), so it's one write per user per hour
+_SEEN_TTL = 3600.0
+_seen: dict = {}
+
+
+async def _remember_user(user_id: str, email: Optional[str]) -> None:
+    """Keep app_users (id, email) current: Supabase owns the accounts, but SQL joins on email."""
+    import time
+    now = time.monotonic()
+    if _seen.get(user_id, 0) > now:
+        return
+    try:
+        from datetime import datetime, timezone
+        from db.client import async_db, get_supabase_client
+        client = get_supabase_client()
+        row = {"id": user_id, "last_seen_at": datetime.now(timezone.utc).isoformat()}
+        if email:
+            row["email"] = email.lower()
+        await async_db(lambda: client.table("app_users").upsert(row).execute())
+        _seen[user_id] = now + _SEEN_TTL
+    except Exception:
+        pass  # never block a request over this
 
 
 async def _remember_plan(user_id: str) -> None:

@@ -41,8 +41,13 @@ Anti-goals (a failure even if it "works"):
 - **Tests:** `cd backend && uv run pytest`. `tests/fake_supabase.py` fakes Supabase. Add tests for every
   backend change. RAG changes must also pass the eval in §6 (Phase 3).
 - **Migrations:**
-  - Supabase (main DB): `backend/migrations/NNN_name.sql`, applied in order. The next is `016_`.
-  - App Postgres (vectors, jobs, caches): `backend/pg_migrations/NNN_name.sql`, applied by a small runner at startup.
+  - One database (`DATABASE_URL`): `backend/db/schema/NNNN_name.sql`, applied in order on startup by `db/migrate.py`
+    (or `uv run python -m db.migrate`). `0001_init.sql` is the fresh-start schema; the next file is `0002_`.
+    Never edit an applied file; add a new one.
+  - `backend/db/supabase_auth.sql` is the only SQL that runs in Supabase (the Google sign-up allowlist on `auth.users`).
+- **Database access:** services call `get_supabase_client().table(...)` / `.rpc(...)` as before. That now goes to our
+  Postgres through `db/pg.py` (same call shape as supabase-py). `.auth` and `.storage` still go to Supabase.
+  New code may use the same builder; anything it can't express goes in a SQL function (called with `.rpc`).
 - **Style:** small focused modules, and plain comments that say *why*. Every new feature works when optional parts are off
   (no Redis, no cloud OCR, no vision model) and degrades gracefully.
 - **Never** commit secrets or `.env` files. Never put AI model identifiers in commit messages or code comments.
@@ -54,7 +59,7 @@ Anti-goals (a failure even if it "works"):
 | Area | Today | Problem |
 | --- | --- | --- |
 | Hosting | Render **free** plan, one uvicorn process (`startup.sh`) | No horizontal scale. Restarts lose state. |
-| Main DB / auth / files | Supabase, via the service key (`db/client.py`), so access rules are bypassed | Every endpoint must check access itself, and some don't (see §5 Phase 0). |
+| Main DB / auth / files | Supabase for everything, via the service key, so access rules were bypassed | Now: data in our own Postgres (`DATABASE_URL`), Supabase only for sign-in and files. Endpoints check ownership in `api/access.py`. |
 | Vectors | Qdrant, one collection per project (`services/qdrant_service.py`) | Separate server. No keyword search alongside. |
 | RAG chat | `services/rag_service.py`: LangChain `create_retrieval_chain`, pure dense top-5 | Follow-ups ("explain that more") search with the raw text and retrieve junk. No rerank, no hybrid, no eval. |
 | Study-tool retrieval | `services/retrieval.py`: vector, falling back to keyword over stored text | Reasonable. Make it share the new hybrid search. |
@@ -76,11 +81,12 @@ Anti-goals (a failure even if it "works"):
 ### Owner decisions
 1. **Scale target:** design for horizontal scaling. Production will be **AWS EC2 with autoscaling** (the owner handles hosting).
    We build software that is stateless per process and configured by environment variables.
-2. **Supabase stays** for auth, file storage and the main database. Moving off Supabase is a later project. Don't start it.
+2. **Supabase is only for sign-in (and, for now, file storage).** All data lives in our own Postgres (`DATABASE_URL`):
+   Docker in development, AWS RDS in production. Fresh start, no data copied from Supabase. Moving files to S3 is a later project.
 3. **Docker Compose is for local development only.** It runs the backend (web + worker) plus Postgres with pgvector, and Redis (optional).
    Production never runs the compose file or its Postgres: it deploys the backend image and uses RDS.
    The backend also runs directly with `uv run run.py`. The frontend, the OCR setup and the Render config stay as they are.
-4. **Qdrant is replaced by pgvector** in a **separate Postgres** (`VECTOR_DATABASE_URL`):
+4. **Qdrant is replaced by pgvector** in the **same Postgres** (`DATABASE_URL`):
    Docker in development, **AWS RDS** in production. **Fresh start: no data migration.** Don't write migration or
    backward-compatibility code for old vectors, old chunks or old data. Remove Qdrant code completely.
 5. **Redis is optional.** Everything must work without it.
@@ -126,10 +132,9 @@ Anti-goals (a failure even if it "works"):
 
 ### Builder's calls (reviewable)
 - **One Docker image, two commands:** `web` (`uv run run.py`, with gunicorn + uvicorn workers in production) and `worker` (`uv run worker.py`).
-- **The app Postgres also holds** the job queue, LLM cache and usage telemetry tables. It's our own DB, reached with plain SQL.
-  The name `VECTOR_DATABASE_URL` is kept as agreed, even though the DB holds more than vectors.
+- **One Postgres holds everything:** app tables, vectors, the job queue, LLM cache and usage telemetry.
 - **Job queue on Postgres** (`SELECT ... FOR UPDATE SKIP LOCKED`). Redis, when set, is used only for the hot cache, rate limits and progress pub/sub.
-- **Driver:** `asyncpg` with a pool, plain SQL, migrations as numbered SQL files (matches the existing style). No ORM.
+- **Driver:** `psycopg` 3 with a connection pool (`db/pg.py`), migrations as numbered SQL files. No ORM.
 - **uv for Python deps:** `backend/pyproject.toml` + `uv.lock` is the source of truth. `requirements.txt` is exported from it so the existing Dockerfile and Render keep working.
 - **Drop LangChain from the chat path.** Direct calls are simpler, easier to cache and easier to order for provider prompt caching.
   Keep `langchain-text-splitters` only if still useful for chunking.
@@ -141,7 +146,7 @@ Anti-goals (a failure even if it "works"):
 - **Memory across books defaults to on.** The setting lets the user turn it off.
 - **The `general` level** gets plain-language answers with the `ugpg` toolset by default.
 - **Gamification design:** see Phase 7.
-- **Android** keeps working through every phase. Login is unchanged because Supabase stays.
+- **Android** keeps working through every phase. Login is unchanged because Supabase still handles sign-in.
 
 ---
 
@@ -155,11 +160,11 @@ Each phase ends in a working, deployable state. Within a phase, write a plan (`w
    - Confirmed hole: `api/v1/endpoints/chat.py` (`/history/{project_id}`, `/message`, `/stream`, `/summary`) never checks ownership.
    - Sweep every endpoint file and add a test per endpoint proving that user B gets 403/404 on user A's resources.
 2. **Docker Compose** at the repo root: `web`, `worker`, `postgres` (image `pgvector/pgvector:pg16`), `redis` (in a compose **profile**, so it's off by default).
-   Add `.env.example` covering every setting in `config/settings.py`, plus `VECTOR_DATABASE_URL` and `REDIS_URL` (optional).
+   Add `.env.example` covering every setting in `config/settings.py`, plus `DATABASE_URL` and `REDIS_URL` (optional).
 3. **uv migration:** `pyproject.toml` + `uv.lock`, and `uv run run.py` works. Update the Dockerfile to install with uv. Keep a working `requirements.txt` export.
 4. **Production hygiene:**
    - Remove the `DEBUG` prints in `main.py` and the per-request `print` middleware. Use structured logging with a request id.
-   - Split `/health` (liveness) from `/ready` (checks Supabase, app Postgres, Redis if set).
+   - Split `/health` (liveness) from `/ready` (checks the database, Supabase sign-in, Redis if set).
    - Fail fast at startup in production if `SECRET_KEY` / webhook secrets are still the defaults.
 5. **Remove the dead files** `main_backup.py`, `fix_db_calls.py`, `fix_execute.py` and `measure_time.py` once confirmed unused.
 
@@ -175,7 +180,7 @@ Each phase ends in a working, deployable state. Within a phase, write a plan (`w
 3. **Rate limits:** per user and per IP, on chat, uploads and generation. Redis token bucket when available, otherwise a Postgres-backed fallback.
    This is separate from plan quotas in `usage_service`.
 4. **Concurrency:** gunicorn + uvicorn workers in production (`run.py` already supports `GUNICORN=1`).
-   Make the thread-pool size for `async_db` configurable, and pool connections to the app Postgres.
+   Make the thread-pool size for `async_db` configurable (the Postgres pool size is `DB_POOL_SIZE`).
    Remove N+1 queries (e.g. the per-chunk document-name lookups in `rag_service.py`).
 5. **Load test:** a `k6` or `locust` script in `backend/scripts/loadtest/` covering login → open book → chat stream → quiz.
    Record p95 latency and errors at 50/200/500 virtual users in this file.
@@ -183,7 +188,7 @@ Each phase ends in a working, deployable state. Within a phase, write a plan (`w
 **Done when:** two web processes and one worker run together under compose, a restart loses no jobs, and the load-test numbers are recorded.
 
 ### Phase 2: Learner levels, tool control and a simpler UI
-1. **Data (Supabase migration `016_levels_and_tools.sql`):**
+1. **Data (`db/schema/NNNN_levels_and_tools.sql`):**
    - user setting `studyLevel` (one of the 5 levels)
    - `institution_classes.level`, `institution_classes.hint_mode`, `institution_classes.allow_outside_book`
    - `level_tool_policies(level, tool, enabled)`: platform defaults
@@ -232,7 +237,7 @@ Each phase ends in a working, deployable state. Within a phase, write a plan (`w
    - Replace every `qdrant_service.` call, then **delete** `qdrant_service.py`, the Qdrant settings and the `qdrant-client` / `langchain-qdrant` dependencies.
    - Today those calls are in `document_service`, `book_service`, `rag_service`, `retrieval`, `institution_service`, `graph_analytics_service`,
      `topic_outline_service`, `self_check`, `study_modes`, and the auth endpoint.
-2. **Schema (`pg_migrations/001_chunks.sql`):**
+2. **Schema (`db/schema/NNNN_chunks.sql`):**
    - `chunks(id, project_id, document_id, chunk_index, page, heading, content, content_hash, embedding vector(1536), tsv tsvector GENERATED, metadata jsonb)`
    - indexes: HNSW (`vector_cosine_ops`) on `embedding`, GIN on `tsv`, btree on `(project_id, document_id)`
    - one table for all projects (no collection per project)
@@ -271,7 +276,7 @@ Each phase ends in a working, deployable state. Within a phase, write a plan (`w
    - **Hot cache** in Redis when available. Postgres is the source of truth.
 3. **Prompt caching:** fixed prompt order (static system → level → profile/memory → retrieved context → history → question) so OpenAI-compatible providers' automatic prefix caching works.
 4. **Token budgets:** a context builder with hard budgets per part (retrieved context, memory, history). Summarise long history (Phase 5) instead of sending raw turns.
-5. **Usage telemetry:** record tokens, estimated cost and latency per AI call (user, feature, model, cache hit) in the app Postgres.
+5. **Usage telemetry:** record tokens, estimated cost and latency per AI call (user, feature, model, cache hit) in the database.
    Add a cost dashboard on the platform admin page with cost per user, per feature and per model, plus the cache hit rate.
    **Optional Langfuse** tracing turns on when `LANGFUSE_*` keys are set.
 
@@ -343,7 +348,8 @@ Each phase ends in a working, deployable state. Within a phase, write a plan (`w
 
 | Setting | Purpose | Default |
 | --- | --- | --- |
-| `VECTOR_DATABASE_URL` | App Postgres (pgvector, jobs, caches, telemetry). Docker in dev, RDS in prod. | required |
+| `DATABASE_URL` | The app database (all tables, pgvector, jobs, caches, telemetry). Docker in dev, RDS in prod. | required |
+| `DB_POOL_SIZE` / `RUN_MIGRATIONS` | Connections per process / apply `db/schema` on startup | `10` / `true` |
 | `SMALL_LLM_MODEL` / `SMALL_LLM_BASE_URL` / `SMALL_LLM_API_KEY` | Small model (most tasks, all free users) | required |
 | `BIG_LLM_MODEL` / `BIG_LLM_BASE_URL` / `BIG_LLM_API_KEY` | Big model (Visual Lab, Deep mode, paid image input) | falls back to small |
 | `EMBEDDING_*` | Embedding API (existing settings) | required |

@@ -258,10 +258,12 @@ class Settings(BaseSettings):
     BOOK_IMPORT_TEXTS_BUCKET: str = "texts"   # Supabase bucket for extracted .txt files
 
     # ─────────────────────────────────────────────────────────
-    # App Postgres (pgvector, job queue, caches) and optional Redis
+    # App database (all tables, pgvector, job queue, caches) and optional Redis
     # ─────────────────────────────────────────────────────────
     # Docker Postgres in development, AWS RDS in production. Empty = not configured yet.
-    VECTOR_DATABASE_URL: str = Field(default="")
+    DATABASE_URL: str = Field(default="")
+    DB_POOL_SIZE: int = 10          # connections per process
+    RUN_MIGRATIONS: bool = True     # apply db/schema on startup
     # Optional: hot cache, rate limits and progress pub/sub. Empty = off.
     REDIS_URL: str = Field(default="")
 

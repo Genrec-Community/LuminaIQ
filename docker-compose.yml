@@ -1,11 +1,12 @@
 # DEVELOPMENT ONLY. Production runs the backend image (backend/Dockerfile) on AWS
-# and uses RDS for Postgres via VECTOR_DATABASE_URL. This Postgres container,
+# and uses RDS for Postgres via DATABASE_URL. This Postgres container,
 # the code mount and live reload are never used in production.
 #
 # Local development stack.
 #   docker compose up                    backend + Postgres (pgvector)
 #   docker compose --profile redis up    ...plus Redis (optional)
-# Copy .env.example to .env first and fill in Supabase, LLM and embedding keys.
+# Copy .env.example to .env first and fill in Supabase (sign-in + files), LLM and
+# embedding keys. The schema is created on startup (db/schema, see db/migrate.py).
 
 name: luminaiq
 
@@ -17,7 +18,7 @@ services:
         required: false
     environment:
       # Point at the containers below unless .env says otherwise
-      VECTOR_DATABASE_URL: ${VECTOR_DATABASE_URL:-postgresql://lumina:lumina@postgres:5432/lumina}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://lumina:lumina@postgres:5432/lumina}
       PORT: 8000
     ports:
       - "8000:8000"

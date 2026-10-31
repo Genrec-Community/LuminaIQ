@@ -28,8 +28,6 @@ anyio==4.12.0
     #   watchfiles
 async-timeout==5.0.1 ; python_full_version < '3.11.3'
     # via redis
-asyncpg==0.32.0
-    # via luminaiq-backend
 attrs==25.4.0
     # via
     #   aiohttp
@@ -278,6 +276,12 @@ protobuf==6.33.1
     #   grpcio-tools
     #   luminaiq-backend
     #   qdrant-client
+psycopg==3.3.6
+    # via luminaiq-backend
+psycopg-binary==3.3.6 ; implementation_name != 'pypy'
+    # via psycopg
+psycopg-pool==3.3.3
+    # via luminaiq-backend
 pyasn1==0.6.1
     # via
     #   luminaiq-backend
@@ -463,6 +467,8 @@ typing-extensions==4.15.0
     #   langchain-core
     #   luminaiq-backend
     #   openai
+    #   psycopg
+    #   psycopg-pool
     #   pydantic
     #   pydantic-core
     #   python-docx
@@ -480,6 +486,8 @@ typing-inspection==0.4.2
     #   luminaiq-backend
     #   pydantic
     #   pydantic-settings
+tzdata==2026.6 ; sys_platform == 'win32'
+    # via psycopg
 urllib3==1.26.20
     # via
     #   luminaiq-backend
