@@ -234,6 +234,12 @@ Each phase ends in a working, deployable state. Within a phase, write a plan (`w
 
 **Done when:** an admin can change a level's tools and see the effect immediately, an institution admin can restrict a class, a Class 8 student sees the simple home screen and simple answers, and backend tests cover the effective-tools rules.
 
+**Status (2026-10-31): done.** Backend: `services/levels.py`, `services/tools_catalog.py`, `services/prompts/levels.py`,
+`services/safety.py`, `utils/tools.py`, schema `0003`. Frontend: `context/ToolsContext.jsx`, `LevelPicker`, `LevelGate`,
+`SchoolHome`, `pages/PlatformLevel.jsx`, `components/institution/ClassSettings.jsx`. Checked in a browser with Playwright
+(onboarding → level saved → school home; level gate; hidden tools; Hints toggle; admin and class pages).
+Not done yet: per-level styling beyond text size; ESLint only covers `.ts/.tsx`, so `.jsx` files aren't linted.
+
 ### Phase 3: RAG quality (pgvector, fresh start)
 1. **Vector store** `services/vector_store.py` (`upsert`, `search_dense`, `search_keyword`, `delete_document`, `copy_document`, `count`), backed by pgvector.
    - Replace every `qdrant_service.` call, then **delete** `qdrant_service.py`, the Qdrant settings and the `qdrant-client` / `langchain-qdrant` dependencies.

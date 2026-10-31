@@ -138,9 +138,12 @@ const Onboarding = ({ onDone, fullScreen = false }) => {
                     <div className="text-xs text-[#5E5046]">Set by your class. Answers and tools are made for this level.</div>
                 </div>
             ) : (
-                <Field label="What are you studying?" hint="Answers, tools and difficulty are made for this. You can change it in Settings.">
+                <div>
+                    {/* Not a <label>: it holds several buttons */}
+                    <span className="block text-sm font-semibold text-[#163628] mb-1.5">What are you studying?</span>
                     <LevelPicker value={level} onChange={setLevel} />
-                </Field>
+                    <span className="block text-xs text-[#5E5046] mt-1">Answers, tools and difficulty are made for this. You can change it in Settings.</span>
+                </div>
             )}
         </div>,
 

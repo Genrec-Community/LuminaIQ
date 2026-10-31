@@ -9,6 +9,7 @@ import {
     publishBookToClass, getPublishableBooks, removeInstitutionMember, startSeatsCheckout, verifyPayment,
     apiErrorText,
 } from '../api';
+import ClassSettings from '../components/institution/ClassSettings';
 import StudentsPanel from '../components/institution/StudentsPanel';
 import { emitPlanChanged } from '../utils/plan';
 import { openCheckout } from '../utils/razorpay';
@@ -423,6 +424,7 @@ const ClassView = ({ classId, role, back }) => {
                         </div>
                         {msg && <p className="mt-2 text-sm text-[#5E5046]">{msg}</p>}
                     </Card>
+                    {role === 'admin' && <Card><ClassSettings classId={classId} /></Card>}
                     {data.class_weak_topics.length > 0 && (
                         <Card>
                             <h2 className="text-lg font-bold text-[#163628] mb-2">Where the class struggles</h2>

@@ -1,6 +1,6 @@
 # Phase 2: Learner Levels, Tool Control and a Simpler App — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans. Steps use checkbox (`- [x]`) syntax.
 
 **Goal:** Every learner has a level (Class 5–10 … PhD). The level decides the answer style and which tools they see. The platform admin sets tools per level, and institution admins narrow them per class.
 
@@ -40,7 +40,7 @@
 ### Task 1: Schema, catalog and effective policy
 **Files:** `db/schema/0003_levels_and_tools.sql`, `services/tools_catalog.py`, `services/levels.py`. Test: `tests/test_levels.py` (real Postgres).
 - `effective_for(user_id) -> dict` returns `{level, level_label, locked, needs_level, tools: [..], hint_mode, hints_default, outside_book, class_id}`.
-- [ ] Tests:
+- [x] Tests:
   - `test_defaults_per_level`
   - `test_platform_override`
   - `test_class_narrows_tools`
@@ -52,7 +52,7 @@
 
 ### Task 2: APIs and enforcement
 **Files:** `api/v1/endpoints/levels.py` (`GET /levels/catalog`, `GET /levels/me`, `PUT /levels/me`), `platform.py` (`GET /platform/levels`, `PUT /platform/levels/{level}`), `institutions.py` (`GET/PUT /institutions/classes/{class_id}/settings`, admin only), `utils/tools.py: require_tool(key)`, applied to chat (and `deep` when `deep=true`), quiz, qa, notes, flashcards, mindmap, cram, lab, power, knowledge, path.
-- [ ] Tests:
+- [x] Tests:
   - `test_me_endpoint_shapes`
   - `test_locked_student_cannot_change_level`
   - `test_disabled_tool_returns_403`
@@ -62,7 +62,7 @@
 ### Task 3: Level-aware answers, hints, outside-book, safety
 **Files:** `services/prompts/levels.py`, `services/safety.py`, `api/v1/endpoints/chat.py` (`ChatRequest.hints: Optional[bool]`), `services/rag_service.py` (outside-book rule replaces "I couldn't find…" when allowed), `api/v1/endpoints/lessons.py`.
 - `safety.screen(text, level) -> Optional[str]` returns a canned caring reply for distress at the school level. Optional moderation API when `MODERATION_BASE_URL`/`MODERATION_API_KEY` are set. Only counts go to `safety_events`.
-- [ ] Tests:
+- [x] Tests:
   - `test_level_block_in_system_prompt`
   - `test_hints_resolution`
   - `test_outside_book_rule_toggles`
@@ -78,4 +78,4 @@
 - Chat menu: hints toggle when `hint_mode === 'student_choice'`.
 - School level: a simple home with 4 big cards, larger text and fewer nav items.
 - Remove `MemoryCurve` from the Dashboard, AdaptivePlan and mobile Home.
-- [ ] Verify: `npm run build` and `npm run lint` (no new errors). Click through in a browser (Playwright screenshots).
+- [x] Verify: `npm run build` and `npm run lint` (no new errors). Click through in a browser (Playwright screenshots).
