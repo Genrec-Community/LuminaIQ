@@ -61,6 +61,10 @@ class Settings(BaseSettings):
     RERANK_API_KEY: str = Field(default="")
     RERANK_BASE_URL: str = Field(default="https://api.cohere.com/v2")
     RERANK_MODEL: str = Field(default="rerank-v3.5")
+    # Below this cosine similarity the book "doesn't cover" a question (the outside-book
+    # rule applies). Depends on the embedding model; 0.3 suits text-embedding-3-*.
+    RAG_MIN_SIMILARITY: float = 0.30
+    RAG_TOP_PASSAGES: int = 6        # passages given to the model per answer
 
     # ── Razorpay (payments) ── fill these in Render; empty = payments disabled
     RAZORPAY_KEY_ID: str = Field(default="")            # rzp_test_... / rzp_live_...
