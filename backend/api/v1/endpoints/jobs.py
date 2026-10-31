@@ -1,242 +1,99 @@
 """
-Background Jobs API
+Background jobs API, backed by the durable Postgres queue (utils/job_queue.py).
 
-Provides endpoints for async AI processing:
-- Submit heavy AI tasks (MCQ, notes, mindmaps, flashcards)
-- Poll for job status
-- Get job results
-
-These endpoints NEVER block - they return immediately with a job_id
+Users can see their own jobs (book processing, imports). Submitting jobs
+directly is limited to kinds in USER_JOB_KINDS; none are open yet, because the
+generation tools run as normal requests.
 """
 
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import Optional, Dict, Any, List
-from datetime import datetime
-import asyncio
 
 from api.deps import get_current_user
-from utils.background_jobs import job_manager, JobStatus
-from utils.cache import content_cache
-import logging
-from services.usage_service import usage, metered
-
-logger = logging.getLogger(__name__)
+from db.client import async_db, get_supabase_client
+from utils import job_queue as q
 
 router = APIRouter()
 
+# Job kinds a user may submit through this API (each needs a handler in services/jobs.py)
+USER_JOB_KINDS: set = set()
 
-# Request/Response models
+# Queue status -> the names this API always used
+_STATUS = {"queued": "pending", "running": "processing", "done": "completed", "failed": "failed"}
+
+
 class JobSubmitRequest(BaseModel):
-    """Request to submit a background job"""
     job_type: str
     metadata: Dict[str, Any] = {}
 
 
 class JobSubmitResponse(BaseModel):
-    """Response after submitting a job"""
     job_id: str
     status: str
     created_at: str
 
 
 class JobStatusResponse(BaseModel):
-    """Response with job status"""
     job_id: str
     job_type: str
     status: str
     progress: int
-    result: Optional[Dict[str, Any]] = None
+    result: Optional[Any] = None
     error: Optional[str] = None
     created_at: str
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
 
 
-# Job type to handler mapping
-JOB_HANDLERS = {}
-
-
-def register_job_handler(job_type: str):
-    """Decorator to register a job handler"""
-    def decorator(func):
-        JOB_HANDLERS[job_type] = func
-        return func
-    return decorator
-
-
-# Submit a new background job
-@router.post("/submit", response_model=JobSubmitResponse)
-async def submit_job(
-    request: JobSubmitRequest,
-    current_user: dict = Depends(get_current_user)
-):
-    """
-    Submit a heavy AI task to run in background.
-    
-    Returns immediately with job_id - never blocks.
-    Use /status/{job_id} to check progress.
-    """
-    job_type = request.job_type
-    
-    # Check if handler exists
-    if job_type not in JOB_HANDLERS:
-        # Check if it's a direct generation request
-        if job_type == "generate_mcq":
-            job_type = "generate_mcq"
-        elif job_type == "generate_notes":
-            job_type = "generate_notes"
-        elif job_type == "generate_mindmap":
-            job_type = "generate_mindmap"
-        elif job_type == "generate_flashcards":
-            job_type = "generate_flashcards"
-        else:
-            raise HTTPException(400, f"Unknown job type: {job_type}")
-    
-    # Plan limits: background generations count like the direct endpoints
-    metered(current_user, job_type)
-    if job_type == "generate_mcq":
-        n = (request.metadata or {}).get("num_questions") or 1
-        await usage.consume(current_user["id"], "questions", max(1, int(n)))
-    elif job_type in ("generate_notes", "generate_mindmap", "generate_flashcards"):
-        await usage.consume(current_user["id"], "tools")
-
-    # Create job
-    job = job_manager.create_job(
-        job_type=job_type,
-        user_id=current_user.get("id"),
-        metadata=request.metadata
-    )
-    
-    # Schedule background processing
-    asyncio.create_task(process_job_async(job.id))
-    
-    logger.info(f"Submitted background job {job.id} of type {job_type}")
-    
-    return JobSubmitResponse(
-        job_id=job.id,
-        status=job.status.value,
-        created_at=job.created_at.isoformat()
-    )
-
-
-async def process_job_async(job_id: str):
-    """Process a job in background"""
-    try:
-        job = job_manager.get_job(job_id)
-        if not job:
-            logger.error(f"Job {job_id} not found")
-            return
-        
-        job.status = JobStatus.PROCESSING
-        job.started_at = datetime.utcnow()
-        
-        handler = JOB_HANDLERS.get(job.job_type)
-        if not handler:
-            job.status = JobStatus.FAILED
-            job.error = f"No handler for job type: {job.job_type}"
-            return
-        
-        # Execute the handler
-        result = await handler(job, current_user=None)  # Will get user from job metadata
-        
-        job.result = result
-        job.status = JobStatus.COMPLETED
-        job.completed_at = datetime.utcnow()
-        job.progress = 100
-        
-        # Cache result for quick retrieval
-        cache_key = f"job_result:{job_id}"
-        await content_cache.set(cache_key, result, ttl=3600)
-        
-        logger.info(f"Job {job_id} completed successfully")
-        
-    except Exception as e:
-        logger.error(f"Job {job_id} failed: {str(e)}")
-        job = job_manager.get_job(job_id)
-        if job:
-            job.status = JobStatus.FAILED
-            job.error = str(e)
-            job.completed_at = datetime.utcnow()
-
-
-# Get job status
-@router.get("/status/{job_id}", response_model=JobStatusResponse)
-async def get_job_status(
-    job_id: str,
-    current_user: dict = Depends(get_current_user)
-):
-    """Get the status of a background job"""
-    job = job_manager.get_job(job_id)
-    
-    if not job:
-        raise HTTPException(404, "Job not found")
-    
-    # Check if user owns this job
-    if job.user_id and job.user_id != current_user.get("id"):
-        raise HTTPException(403, "Not authorized to view this job")
-    
+def _response(job: Dict[str, Any]) -> JobStatusResponse:
+    status = _STATUS.get(job["status"], job["status"])
     return JobStatusResponse(
-        job_id=job.id,
-        job_type=job.job_type,
-        status=job.status.value,
-        progress=job.progress,
-        result=job.result,
-        error=job.error,
-        created_at=job.created_at.isoformat(),
-        started_at=job.started_at.isoformat() if job.started_at else None,
-        completed_at=job.completed_at.isoformat() if job.completed_at else None
+        job_id=job["id"], job_type=job["kind"], status=status,
+        progress=100 if job["status"] in ("done", "failed") else 0,
+        result=job.get("result"), error=job.get("error") if job["status"] == "failed" else None,
+        created_at=job["created_at"],
+        started_at=job.get("heartbeat_at") if job["attempts"] else None,
+        completed_at=job.get("finished_at"),
     )
 
 
-# Get user's jobs
+async def _own_job(job_id: str, user_id: str) -> Dict[str, Any]:
+    pg = get_supabase_client().pg
+    job = await async_db(lambda: q.get(pg, job_id))
+    if not job or job.get("user_id") != user_id:
+        raise HTTPException(404, "Job not found")
+    return job
+
+
+@router.post("/submit", response_model=JobSubmitResponse)
+async def submit_job(request: JobSubmitRequest, current_user: dict = Depends(get_current_user)):
+    if request.job_type not in USER_JOB_KINDS:
+        raise HTTPException(400, f"Unknown job type: {request.job_type}")
+    from services.jobs import enqueue
+
+    job = await enqueue(request.job_type, request.metadata, user_id=current_user["id"])
+    return JobSubmitResponse(job_id=job["id"], status=_STATUS[job["status"]], created_at=job["created_at"])
+
+
+@router.get("/status/{job_id}", response_model=JobStatusResponse)
+async def get_job_status(job_id: str, current_user: dict = Depends(get_current_user)):
+    return _response(await _own_job(job_id, current_user["id"]))
+
+
 @router.get("/my-jobs", response_model=List[JobStatusResponse])
-async def get_my_jobs(
-    limit: int = 10,
-    current_user: dict = Depends(get_current_user)
-):
-    """Get all background jobs for the current user"""
-    user_id = current_user.get("id")
-    jobs = job_manager.get_user_jobs(user_id, limit)
-    
-    return [
-        JobStatusResponse(
-            job_id=job.id,
-            job_type=job.job_type,
-            status=job.status.value,
-            progress=job.progress,
-            result=job.result,
-            error=job.error,
-            created_at=job.created_at.isoformat(),
-            started_at=job.started_at.isoformat() if job.started_at else None,
-            completed_at=job.completed_at.isoformat() if job.completed_at else None
-        )
-        for job in jobs
-    ]
+async def get_my_jobs(limit: int = 10, current_user: dict = Depends(get_current_user)):
+    pg = get_supabase_client().pg
+    jobs = await async_db(lambda: q.list_for_user(pg, current_user["id"], max(1, min(limit, 50))))
+    return [_response(j) for j in jobs]
 
 
-# Quick status check - lightweight endpoint
 @router.get("/status/{job_id}/poll")
-async def poll_job_status(
-    job_id: str,
-    current_user: dict = Depends(get_current_user)
-):
-    """
-    Lightweight polling endpoint for job status.
-    Returns minimal info for frequent polling.
-    """
-    job = job_manager.get_job(job_id)
-    
-    if not job:
-        return {"status": "not_found"}
-    
-    # Check if user owns this job
-    if job.user_id and job.user_id != current_user.get("id"):
-        return {"status": "forbidden"}
-    
-    return {
-        "job_id": job.id,
-        "status": job.status.value,
-        "progress": job.progress,
-        "completed": job.status in [JobStatus.COMPLETED, JobStatus.FAILED]
-    }
+async def poll_job_status(job_id: str, current_user: dict = Depends(get_current_user)):
+    """Lightweight polling: minimal fields."""
+    job = await _own_job(job_id, current_user["id"])
+    status = _STATUS.get(job["status"], job["status"])
+    return {"job_id": job["id"], "status": status,
+            "progress": 100 if job["status"] in ("done", "failed") else 0,
+            "completed": job["status"] in ("done", "failed")}

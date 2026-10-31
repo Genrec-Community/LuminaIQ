@@ -264,6 +264,13 @@ class Settings(BaseSettings):
     DATABASE_URL: str = Field(default="")
     DB_POOL_SIZE: int = 10          # connections per process
     RUN_MIGRATIONS: bool = True     # apply db/schema on startup
+
+    # Background jobs. WORKER_INLINE runs a worker inside each web process (dev, single box);
+    # set it to false when separate `uv run worker.py` processes do the work.
+    WORKER_INLINE: bool = True
+    WORKER_CONCURRENCY: int = 2       # jobs at once per worker (book processing is heavy)
+    JOB_POLL_SECONDS: float = 1.0
+    JOB_STALE_SECONDS: float = 300.0  # a running job with no heartbeat for this long is retried
     # Optional: hot cache, rate limits and progress pub/sub. Empty = off.
     REDIS_URL: str = Field(default="")
 

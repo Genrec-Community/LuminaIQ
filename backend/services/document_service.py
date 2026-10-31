@@ -552,8 +552,6 @@ class DocumentService:
     # Index self-healing
     # ──────────────────────────────────────────────────────────────────────────
 
-    # Document IDs currently being re-indexed (prevents duplicate background jobs)
-    _reindexing: set = set()
     # Strong refs to background tasks so they aren't garbage-collected mid-run
     _background_tasks: set = set()
     # document_id -> time of last failed re-index (avoid retrying on every request)
@@ -600,9 +598,6 @@ class DocumentService:
 
         reindexing = []
         for doc in docs.data or []:
-            if doc["id"] in self._reindexing:
-                reindexing.append(doc["id"])
-                continue
             failed_at = self._reindex_failed_at.get(doc["id"])
             if failed_at and time.time() - failed_at < self.REINDEX_RETRY_SECONDS:
                 continue
@@ -620,11 +615,13 @@ class DocumentService:
                 f"[Reindex] Document {doc['filename']} ({doc['id']}) is marked "
                 f"completed but has no vectors in {collection_name} — re-indexing"
             )
-            self._reindexing.add(doc["id"])
             reindexing.append(doc["id"])
-            task = asyncio.create_task(self._reindex_from_storage(doc))
-            self._background_tasks.add(task)
-            task.add_done_callback(self._background_tasks.discard)
+            try:
+                from services.jobs import enqueue
+                await enqueue("reindex_document", {"document": doc},
+                              dedupe_key=f"reindex_document:{doc['id']}")
+            except Exception as e:
+                logger.warning(f"[Reindex] could not queue {doc['id']}: {e}")
 
         return reindexing
 
@@ -684,8 +681,6 @@ class DocumentService:
                 f"[Reindex] Failed for {filename}: {e} — will retry after "
                 f"{self.REINDEX_RETRY_SECONDS // 60} minutes"
             )
-        finally:
-            self._reindexing.discard(document_id)
 
     # ──────────────────────────────────────────────────────────────────────────
     # Database helpers

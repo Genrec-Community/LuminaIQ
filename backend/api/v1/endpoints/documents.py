@@ -91,8 +91,7 @@ async def _start_processing(
     document = response.data[0]
     document_id = document["id"]
 
-    # 4. Start CONCURRENT background processing
-    # asyncio.create_task = truly parallel (vs Starlette BackgroundTasks which are serial)
+    # 4. Queue background processing
     book_meta = None
     if is_public:
         book_meta = {
@@ -105,27 +104,12 @@ async def _start_processing(
             "user_id": current_user.get("id"),
         }
 
-    task = asyncio.create_task(
-        document_service.process_document(
-            document_id=document_id,
-            project_id=project_id,
-            file_path=temp_path,
-            filename=filename,
-            user_id=current_user.get("id"),
-            book_meta=book_meta,
-        )
+    # Processing runs on a worker (services/jobs.py); this request returns at once
+    from services.jobs import queue_document_processing
+    await queue_document_processing(
+        document_id=document_id, project_id=project_id, temp_path=temp_path,
+        filename=filename, user_id=current_user.get("id") or "", book_meta=book_meta,
     )
-
-    # Ensure background task errors are always logged (not silently swallowed)
-    def _log_task_exception(t):
-        if t.cancelled():
-            logger.warning(f"Background processing cancelled for {filename}")
-        elif t.exception():
-            logger.error(
-                f"Background processing FAILED for {filename}: {t.exception()}"
-            )
-
-    task.add_done_callback(_log_task_exception)
 
     logger.info(
         f"Document {filename} upload started, processing in background "
@@ -477,12 +461,11 @@ async def retry_document(
     await async_db(lambda: client.table("documents")
                    .update({"upload_status": "pending", "error_message": None})
                    .eq("id", document_id).execute())
-    task = asyncio.create_task(document_service.process_document(
-        document_id=document_id, project_id=project_id, file_path=temp_path,
+    from services.jobs import queue_document_processing
+    await queue_document_processing(
+        document_id=document_id, project_id=project_id, temp_path=temp_path,
         filename=doc["filename"], user_id=current_user["id"],
-    ))
-    document_service._background_tasks.add(task)
-    task.add_done_callback(document_service._background_tasks.discard)
+    )
     return {"status": "pending", "document_id": document_id}
 
 

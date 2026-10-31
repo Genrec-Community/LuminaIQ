@@ -321,15 +321,11 @@ class BookService:
         )
 
         # ── Background: text copy + vector clone + topics ──────────────────
-        asyncio.create_task(
-            self._background_clone(
-                book=book,
-                document_id=document_id,
-                project_id=project_id,
-                doc_filename=doc_data["filename"],
-                source_text_path=source_text_path,
-            )
-        )
+        from services.jobs import enqueue
+        await enqueue("book_clone", {
+            "book": book, "document_id": document_id, "project_id": project_id,
+            "doc_filename": doc_data["filename"], "source_text_path": source_text_path,
+        }, user_id=user_id, dedupe_key=f"book_clone:{document_id}")
 
         return document
 
@@ -346,7 +342,7 @@ class BookService:
         source_text_path: str,
     ):
         """
-        Runs in asyncio.create_task after the import endpoint has already
+        Runs as a background job (services/jobs.py) after the import endpoint has already
         returned 200 to the frontend.
 
         Steps:

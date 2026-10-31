@@ -50,6 +50,15 @@ async def startup_event():
         from utils.logger import logger
         applied = await asyncio.to_thread(migrate)
         logger.info("Database schema " + (f"updated: {', '.join(applied)}" if applied else "up to date"))
+    if settings.WORKER_INLINE and settings.DATABASE_URL:
+        # Run queued background jobs in this process too (see utils/worker.py)
+        from db.client import get_supabase_client
+        from utils.worker import Worker
+        import services.jobs  # noqa: F401  (registers the handlers)
+        app.state.worker = Worker(get_supabase_client().pg, concurrency=settings.WORKER_CONCURRENCY,
+                                  poll_seconds=settings.JOB_POLL_SECONDS,
+                                  stale_seconds=settings.JOB_STALE_SECONDS)
+        app.state.worker_task = asyncio.create_task(app.state.worker.run_forever())
     # Apply log filter to reduce noisy HTTP logs
     setup_uvicorn_log_filter()
     if settings.INDRA_OCR_URL:
@@ -67,6 +76,9 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     """Clean up resources on shutdown"""
+    worker = getattr(app.state, "worker", None)
+    if worker:
+        await worker.stop()   # let running jobs finish; queued ones wait for the next process
     try:
         from services.embedding_service import embedding_service
         embedding_service.shutdown()
