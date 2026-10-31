@@ -173,23 +173,18 @@ def test_school_students_cannot_buy_personal_plans(db, monkeypatch):
 # ------------------------------------------------------- model per plan
 
 def test_model_follows_plan(monkeypatch):
+    """Two models (owner decision 7): free users always small; paid plans get the big one for Deep work."""
     from services import llm_service as llm
     from services.usage_service import current_plan
 
-    monkeypatch.setattr(llm, "_use_azure", lambda: False)
-    monkeypatch.setattr(llm.settings, "LLM_MODEL", "base")
-    monkeypatch.setattr(llm.settings, "LLM_LIGHT_MODEL", "light")
-    monkeypatch.setattr(llm.settings, "LLM_DEEP_MODEL", "deep")
-    monkeypatch.setattr(llm.settings, "LLM_TIER_MODELS", "free=small, topper=big ,bad")
-    assert llm.tier_models() == {"free": "small", "topper": "big"}
-    assert llm.resolve_model(plan="free") == "small"
-    assert llm.resolve_model(plan="topper") == "big"
-    assert llm.resolve_model(plan="scholar") == "base"            # not listed
-    assert llm.resolve_model(plan="scholar", light=True) == "light"
-    assert llm.resolve_model(plan="topper", deep=True) == "deep"
-    token = current_plan.set("free")
+    monkeypatch.setattr(llm.settings, "SMALL_LLM_MODEL", "small")
+    monkeypatch.setattr(llm.settings, "BIG_LLM_MODEL", "big")
+    assert llm.resolve_model("deep", plan="free").model == "small"
+    assert llm.resolve_model("deep", plan="topper").model == "big"
+    assert llm.resolve_model("chat", plan="topper").model == "small"
+    token = current_plan.set("scholar")
     try:
-        assert llm.resolve_model() == "small"                      # from the request
+        assert llm.resolve_model("lab").model == "big"               # plan from the request
     finally:
         current_plan.reset(token)
-    assert llm.resolve_model() == "base"                           # no signed-in user
+    assert llm.resolve_model("lab").model == "small"                 # no signed-in user

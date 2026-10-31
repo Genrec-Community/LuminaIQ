@@ -7,10 +7,7 @@ aiohappyeyeballs==2.6.1
     #   aiohttp
     #   luminaiq-backend
 aiohttp==3.13.2
-    # via
-    #   langchain-together
-    #   luminaiq-backend
-    #   together
+    # via luminaiq-backend
 aiosignal==1.4.0
     # via
     #   aiohttp
@@ -102,13 +99,6 @@ greenlet==3.3.0
     # via
     #   luminaiq-backend
     #   sqlalchemy
-grpcio==1.76.0
-    # via
-    #   grpcio-tools
-    #   luminaiq-backend
-    #   qdrant-client
-grpcio-tools==1.76.0
-    # via luminaiq-backend
 gunicorn==21.2.0
     # via luminaiq-backend
 h11==0.16.0
@@ -133,11 +123,9 @@ httptools==0.7.1
 httpx==0.27.0
     # via
     #   gotrue
-    #   langsmith
     #   luminaiq-backend
     #   openai
     #   postgrest
-    #   qdrant-client
     #   storage3
     #   supabase
     #   supabase-auth
@@ -161,39 +149,10 @@ jiter==0.12.0
     #   luminaiq-backend
     #   openai
 jsonpatch==1.33
-    # via
-    #   langchain-core
-    #   luminaiq-backend
+    # via luminaiq-backend
 jsonpointer==3.0.0
     # via
     #   jsonpatch
-    #   luminaiq-backend
-langchain==0.3.27
-    # via luminaiq-backend
-langchain-core==0.3.80
-    # via
-    #   langchain
-    #   langchain-openai
-    #   langchain-qdrant
-    #   langchain-text-splitters
-    #   langchain-together
-    #   luminaiq-backend
-langchain-openai==0.3.35
-    # via
-    #   langchain-together
-    #   luminaiq-backend
-langchain-qdrant==0.2.1
-    # via luminaiq-backend
-langchain-text-splitters==0.3.11
-    # via
-    #   langchain
-    #   luminaiq-backend
-langchain-together==0.3.1
-    # via luminaiq-backend
-langsmith==0.4.55
-    # via
-    #   langchain
-    #   langchain-core
     #   luminaiq-backend
 lxml==6.0.2
     # via
@@ -223,25 +182,17 @@ mypy-extensions==1.1.0
     #   luminaiq-backend
     #   typing-inspect
 numpy==2.3.5
-    # via
-    #   luminaiq-backend
-    #   qdrant-client
+    # via luminaiq-backend
 openai==2.9.0
-    # via
-    #   langchain-openai
-    #   luminaiq-backend
+    # via luminaiq-backend
 orjson==3.11.4
-    # via
-    #   langsmith
-    #   luminaiq-backend
+    # via luminaiq-backend
 ormsgpack==1.12.0
     # via luminaiq-backend
 packaging==25.0
     # via
     #   deprecation
     #   gunicorn
-    #   langchain-core
-    #   langsmith
     #   luminaiq-backend
     #   marshmallow
     #   pytesseract
@@ -258,10 +209,6 @@ pillow==11.3.0
     #   pytesseract
 platformdirs==4.5.0
     # via luminaiq-backend
-portalocker==2.10.1
-    # via
-    #   luminaiq-backend
-    #   qdrant-client
 postgrest==2.24.0
     # via
     #   luminaiq-backend
@@ -272,10 +219,7 @@ propcache==0.4.1
     #   luminaiq-backend
     #   yarl
 protobuf==6.33.1
-    # via
-    #   grpcio-tools
-    #   luminaiq-backend
-    #   qdrant-client
+    # via luminaiq-backend
 psycopg==3.3.6
     # via luminaiq-backend
 psycopg-binary==3.3.6 ; implementation_name != 'pypy'
@@ -295,19 +239,13 @@ pydantic==2.12.5
     # via
     #   fastapi
     #   gotrue
-    #   langchain
-    #   langchain-core
-    #   langchain-qdrant
-    #   langsmith
     #   luminaiq-backend
     #   openai
     #   postgrest
     #   pydantic-settings
-    #   qdrant-client
     #   realtime
     #   storage3
     #   supabase-auth
-    #   together
 pydantic-core==2.41.5
     # via
     #   luminaiq-backend
@@ -346,17 +284,8 @@ python-multipart==0.0.9
     # via luminaiq-backend
 pytokens==0.3.0
     # via luminaiq-backend
-pywin32==312 ; sys_platform == 'win32'
-    # via portalocker
 pyyaml==6.0.3
-    # via
-    #   langchain
-    #   langchain-core
-    #   luminaiq-backend
-qdrant-client==1.16.1
-    # via
-    #   langchain-qdrant
-    #   luminaiq-backend
+    # via luminaiq-backend
 realtime==2.24.0
     # via
     #   luminaiq-backend
@@ -369,17 +298,11 @@ regex==2025.11.3
     #   tiktoken
 requests==2.32.5
     # via
-    #   langchain
-    #   langchain-together
-    #   langsmith
     #   luminaiq-backend
     #   requests-toolbelt
     #   tiktoken
-    #   together
 requests-toolbelt==1.0.0
-    # via
-    #   langsmith
-    #   luminaiq-backend
+    # via luminaiq-backend
 rich==14.2.0
     # via luminaiq-backend
 rsa==4.9.1
@@ -387,9 +310,7 @@ rsa==4.9.1
     #   luminaiq-backend
     #   python-jose
 setuptools==80.9.0
-    # via
-    #   grpcio-tools
-    #   luminaiq-backend
+    # via luminaiq-backend
 six==1.17.0
     # via
     #   ecdsa
@@ -405,13 +326,9 @@ soupsieve==2.8
     #   beautifulsoup4
     #   luminaiq-backend
 sqlalchemy==2.0.44
-    # via
-    #   langchain
-    #   luminaiq-backend
+    # via luminaiq-backend
 sseclient-py==1.8.0
-    # via
-    #   luminaiq-backend
-    #   together
+    # via luminaiq-backend
 starlette==0.38.6
     # via
     #   fastapi
@@ -438,33 +355,21 @@ tabulate==0.9.0
     # via
     #   luminaiq-backend
     #   pymupdf4llm
-    #   together
 tenacity==9.1.2
-    # via
-    #   langchain-core
-    #   luminaiq-backend
+    # via luminaiq-backend
 tiktoken==0.12.0
-    # via
-    #   langchain-openai
-    #   luminaiq-backend
-together==0.2.11
     # via luminaiq-backend
 tqdm==4.67.1
     # via
     #   luminaiq-backend
     #   openai
-    #   together
 typer==0.9.4
-    # via
-    #   luminaiq-backend
-    #   together
+    # via luminaiq-backend
 typing-extensions==4.15.0
     # via
     #   aiosignal
     #   anyio
     #   fastapi
-    #   grpcio
-    #   langchain-core
     #   luminaiq-backend
     #   openai
     #   psycopg
@@ -491,12 +396,9 @@ tzdata==2026.6 ; sys_platform == 'win32'
 urllib3==1.26.20
     # via
     #   luminaiq-backend
-    #   qdrant-client
     #   requests
 uuid-utils==0.12.0
-    # via
-    #   langsmith
-    #   luminaiq-backend
+    # via luminaiq-backend
 uvicorn==0.27.0
     # via luminaiq-backend
 watchfiles==1.1.1
@@ -517,6 +419,4 @@ yarl==1.22.0
     #   storage3
     #   supabase-functions
 zstandard==0.25.0
-    # via
-    #   langsmith
-    #   luminaiq-backend
+    # via luminaiq-backend

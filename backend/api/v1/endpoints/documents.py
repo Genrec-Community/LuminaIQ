@@ -14,12 +14,9 @@ from fastapi import (
 from pydantic import BaseModel
 from utils.rate_limit import rate_limit
 from services.document_service import document_service
-from services.embedding_service import embedding_service
-from services.qdrant_service import qdrant_service
 from models.schemas import DocumentUploadResponse, DocumentList
 from config.settings import settings
 from api.deps import get_current_user
-from utils.embedding_queue import get_embedding_queue
 from utils.logger import logger
 from db.client import async_db, get_supabase_client
 from services.usage_service import usage, metered
@@ -541,34 +538,27 @@ async def delete_document(
 
 @router.get("/queue/status")
 async def get_queue_status(current_user: dict = Depends(get_current_user)):
-    """
-    Get embedding queue status and current concurrency limits.
-
-    Returns:
-        - queued: Number of documents waiting
-        - processing: Currently processing
-        - limits: Currently active concurrency limits
-    """
-    try:
-        queue = get_embedding_queue()
-        return queue.get_queue_stats()
-    except Exception as e:
-        raise HTTPException(500, str(e))
+    """Your books waiting to be processed or being processed now (background job queue)."""
+    pg = get_supabase_client().pg
+    rows = await async_db(lambda: pg.fetch(
+        """SELECT status, count(*) AS n FROM jobs
+           WHERE user_id = %s AND kind = 'process_document' AND status IN ('queued', 'running')
+           GROUP BY status""", (current_user["id"],)))
+    counts = {r["status"]: r["n"] for r in rows}
+    return {"queued": counts.get("queued", 0), "processing": counts.get("running", 0)}
 
 
 @router.get("/queue/{document_id}")
-async def get_document_queue_status(
-    document_id: str, current_user: dict = Depends(get_current_user)
-):
-    """Get queue status for a specific document."""
-    try:
-        queue = get_embedding_queue()
-        doc_status = queue.get_document_status(document_id)
-        if not doc_status:
-            return {"status": "not_in_queue", "message": "Document not found in queue"}
-        return doc_status
-    except Exception as e:
-        raise HTTPException(500, str(e))
+async def get_document_queue_status(document_id: str, current_user: dict = Depends(get_current_user)):
+    """The processing job for one of your documents."""
+    pg = get_supabase_client().pg
+    rows = await async_db(lambda: pg.fetch(
+        """SELECT status, attempts, error, created_at, finished_at FROM jobs
+           WHERE kind = 'process_document' AND payload->>'document_id' = %s
+           ORDER BY created_at DESC LIMIT 1""", (document_id,)))
+    if not rows:
+        return {"status": "not_in_queue", "message": "Document not found in queue"}
+    return rows[0]
 
 
 @router.post("/{project_id}/search")

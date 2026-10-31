@@ -214,9 +214,9 @@ class TopicOutlineService:
         except Exception as e:
             logger.warning(f"Stored text unavailable for {document_id}: {e}")
 
-        # Fallback: first chunks from the vector store
-        from services.qdrant_service import qdrant_service
-        chunks = await qdrant_service.get_initial_chunks(f"project_{project_id}", document_id, limit=60)
+        # Fallback: the first passages of the search index
+        from services import vector_store
+        chunks = await vector_store.first_chunks(document_id, 60)
         return "\n".join(chunks)
 
     async def generate_outline(self, project_id: str, document_id: str) -> List[str]:

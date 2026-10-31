@@ -6,7 +6,6 @@ from uuid import uuid4
 from datetime import datetime
 from services.llm_service import llm_service
 from services.embedding_service import embedding_service
-from services.qdrant_service import qdrant_service
 
 class NotesService:
     def __init__(self):

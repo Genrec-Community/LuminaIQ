@@ -84,12 +84,6 @@ async def shutdown_event():
         embedding_service.shutdown()
     except Exception:
         pass
-    try:
-        from utils.embedding_queue import get_embedding_queue
-        queue = get_embedding_queue()
-        await queue.stop()
-    except Exception:
-        pass
 
 
 # Request timeout middleware — prevents a single stuck request from blocking others

@@ -26,7 +26,7 @@ from typing import Optional, List, Dict, Any
 from db.client import get_supabase_client, async_db
 from config.settings import settings
 from utils.logger import logger
-from utils.embedding_queue import EmbeddingQueue
+from utils.concurrency import doc_semaphore, llm_semaphore
 
 
 class BookService:
@@ -422,24 +422,13 @@ class BookService:
                 except Exception as e:
                     logger.warning(f"[BackgroundClone] Could not resolve source project: {e}")
 
-            # 4. Clone Qdrant vectors
+            # 4. Copy the book's passages and vectors (no re-embedding)
             vectors_cloned = 0
             if source_document_id and source_project_id:
                 try:
-                    from services.qdrant_service import qdrant_service
+                    from services import vector_store
 
-                    source_collection = f"project_{source_project_id}"
-                    target_collection = f"project_{project_id}"
-
-                    await qdrant_service.create_collection(target_collection)
-
-                    vectors_cloned = await qdrant_service.clone_document_vectors(
-                        source_collection=source_collection,
-                        target_collection=target_collection,
-                        source_document_id=source_document_id,
-                        target_document_id=document_id,
-                        target_document_name=doc_filename,
-                    )
+                    vectors_cloned = await vector_store.copy_document(source_document_id, project_id, document_id)
 
                     logger.info(
                         f"[BackgroundClone] Cloned {vectors_cloned} vectors for "
@@ -549,32 +538,22 @@ class BookService:
         text_content: str,
     ):
         """
-        Fallback: full embedding pipeline for imported book text.
-        Only triggered when source Qdrant vectors are missing.
+        Fallback: full indexing for imported book text.
+        Only triggered when the source book has no passages to copy.
         """
         from utils.progress_manager import get_progress_manager
-        from utils.text_chunker import TextChunker
-        from services.qdrant_service import qdrant_service
-        from services.embedding_service import embedding_service
+        from services.indexing import index_chunks, make_chunks
 
         progress = get_progress_manager()
-        doc_semaphore = EmbeddingQueue.get_doc_semaphore()
+        sem = doc_semaphore()
 
         try:
-            if doc_semaphore.locked():
+            if sem.locked():
                 await progress.emit(document_id, "queued", 0, "Waiting for processing slot...")
 
-            async with doc_semaphore:
+            async with sem:
                 await progress.emit(document_id, "chunking", 0, "Chunking book content...")
-
-                chunker = TextChunker(
-                    chunk_size=settings.CHUNK_SIZE,
-                    overlap=settings.CHUNK_OVERLAP,
-                )
-                loop = asyncio.get_running_loop()
-                chunks = await loop.run_in_executor(
-                    None, lambda: chunker.chunk_text(text_content)
-                )
+                chunks = await make_chunks(text_content, filename)
 
                 if not chunks:
                     await self._update_doc_status(document_id, "failed", "No content chunks")
@@ -582,20 +561,13 @@ class BookService:
 
                 await progress.emit(document_id, "chunking", 100, f"Generated {len(chunks)} chunks")
 
-                collection_name = f"project_{project_id}"
-                await qdrant_service.create_collection(collection_name)
                 await progress.emit(document_id, "embedding", 0, f"Embedding {len(chunks)} chunks...")
-
-                from services.document_service import document_service
-                await document_service._process_embeddings_direct(
-                    chunks, document_id, filename, collection_name
-                )
+                await index_chunks(project_id, document_id, chunks)
 
                 await progress.emit(document_id, "topics", 0, "Generating topics...")
-                llm_semaphore = EmbeddingQueue.get_llm_semaphore()
                 try:
                     from services.mcq_service import mcq_service
-                    async with llm_semaphore:
+                    async with llm_semaphore():
                         await mcq_service.generate_document_topics(project_id, document_id)
                     await progress.emit(document_id, "topics", 100, "Topics generated")
                 except Exception as te:

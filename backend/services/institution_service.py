@@ -447,12 +447,11 @@ class InstitutionService:
         await async_db(lambda: self.client.table("class_book_copies").insert({
             "class_book_id": book["id"], "user_id": user_id, "document_id": copy["id"],
         }).execute())
-        # Search index: copy the teacher's vectors (no embedding calls). If the
+        # Search index: copy the teacher's passages and vectors (no embedding calls). If the
         # source isn't indexed, the normal self-heal re-indexes the copy on first use.
         try:
-            from services.qdrant_service import qdrant_service
-            await qdrant_service.copy_document_vectors(
-                f"project_{src['project_id']}", src["id"], f"project_{project_id}", copy["id"], src["filename"])
+            from services import vector_store
+            await vector_store.copy_document(src["id"], project_id, copy["id"])
         except Exception as e:
             logger.warning(f"[Institution] vector copy failed for {copy['id']}: {e}")
         # Learning-path links between this book's topics

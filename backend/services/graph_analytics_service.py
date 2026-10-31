@@ -13,8 +13,6 @@ from datetime import datetime, timedelta
 from collections import Counter, defaultdict
 from db.client import get_supabase_client, async_db
 from services.llm_service import llm_service
-from services.embedding_service import embedding_service
-from services.qdrant_service import qdrant_service
 from utils.logger import logger
 from uuid import uuid4
 import json
@@ -144,14 +142,9 @@ class GraphAnalyticsService:
                 )
             
             # Search for relevant content
-            collection_name = f"project_{project_id}"
             try:
-                query_embedding = await embedding_service.generate_embedding(topic)
-                results = await qdrant_service.search(
-                    collection_name=collection_name,
-                    query_vector=query_embedding,
-                    limit=8
-                )
+                from services.retrieval import search_passages
+                results = await search_passages(project_id, [topic], per_query=8)
             except Exception as search_err:
                 # Embeddings/index unavailable: the stored-text path below takes over
                 logger.warning(f"Vector search failed for topic '{topic}': {search_err}")

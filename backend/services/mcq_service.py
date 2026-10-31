@@ -2,7 +2,6 @@ import json
 import asyncio
 from typing import List, Dict, Any, Union
 from services.embedding_service import embedding_service
-from services.qdrant_service import qdrant_service
 from services.llm_service import llm_service
 from db.client import get_supabase_client, async_db
 from config.settings import settings

@@ -73,20 +73,13 @@ async def _cache_put(project_id: str, topic: str, kind: str, content: Dict[str, 
 
 
 async def _topic_context(project_id: str, topic: str, document_ids: List[str], limit: int = 8) -> str:
-    """Book passages about a topic: vector search, falling back to the stored text."""
-    from services.embedding_service import embedding_service
+    """Book passages about a topic (hybrid search, falling back to the stored text)."""
     from services.graph_analytics_service import graph_analytics
-    from services.qdrant_service import qdrant_service
+    from services.retrieval import search_passages
 
     parts: List[str] = []
     try:
-        vector = await embedding_service.generate_embedding(topic)
-        hits = await qdrant_service.search(
-            collection_name=f"project_{project_id}",
-            query_vector=vector,
-            limit=limit,
-            filter_conditions={"document_ids": document_ids} if document_ids else None,
-        )
+        hits = await search_passages(project_id, [topic], per_query=limit, document_ids=document_ids or None)
         parts = [h["text"] for h in hits if h.get("text")]
     except Exception as e:
         logger.warning(f"Vector search failed for '{topic}', using stored text: {e}")

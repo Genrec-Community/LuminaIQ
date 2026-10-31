@@ -179,8 +179,9 @@ class Settings(BaseSettings):
         "jpg", "jpeg", "png", "bmp", "tiff", "tif", "gif", "webp",
     ]
 
-    CHUNK_SIZE: int = 800
-    CHUNK_OVERLAP: int = 80
+    # Passage size for search and citations (services/chunking.py)
+    CHUNK_TOKENS: int = 500
+    CHUNK_OVERLAP_TOKENS: int = 75
 
     # ─────────────────────────────────────────────────────────
     # Concurrency — all limits in one place for easy tuning
@@ -199,7 +200,6 @@ class Settings(BaseSettings):
 
     # Batch size for embedding API calls
     EMBEDDING_BATCH_SIZE: int = 50
-    EMBEDDING_DELAY_MS: int = 0  # 0 = no artificial delay (Azure has no rate limits)
 
     # Gunicorn workers for production
     # Recommended: (2 * CPU cores) + 1. Azure 1-core = 3 workers.
