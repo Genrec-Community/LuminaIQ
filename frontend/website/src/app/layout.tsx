@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   description: site.description,
   applicationName: site.name,
   alternates: { canonical: './' },
-  keywords: ['AI study companion', 'AI quiz generator', 'flashcards from PDF', 'spaced repetition', 'chat with PDF', 'study notes', 'mind maps'],
+  keywords: ['AI study companion', 'AI quiz generator', 'flashcards from PDF', 'spaced repetition', 'chat with PDF', 'study notes', 'mind maps', 'how to study', 'last minute revision', 'exam preparation', 'study app for slow learners', 'fast study', 'exam tonight study plan'],
   openGraph: { type: 'website', siteName: site.name, locale: 'en_US', images: [{ url: '/og.png', width: 1200, height: 630, alt: 'Lumina IQ: read it once, remember it for the exam' }] },
   twitter: { card: 'summary_large_image' },
   // Preview builds on Vercel stay out of search results; production is indexable.

@@ -3,6 +3,22 @@ import { site } from '@/data/site';
 import { FinaleLink } from './FinaleLink';
 import { Mark } from './Logo';
 
+// Free study guides (frontend/src/content/blog, built as static pages by scripts/build-seo.mjs).
+// Plain links: /blog/ belongs to the app's build, not this site, so it needs a full page load.
+const guides = [
+  { href: '/blog/how-to-study-effectively/', label: 'How to study' },
+  { href: '/blog/what-to-study-for-exam/', label: 'What to study first' },
+  { href: '/blog/best-time-to-study/', label: 'When to study' },
+  { href: '/blog/last-minute-revision-tips/', label: 'Last minute revision' },
+  { href: '/blog/exam-in-2-days-rush-plan/', label: 'Exam in 2 days' },
+  { href: '/blog/study-the-night-before-exam/', label: 'Night before the exam' },
+  { href: '/blog/slow-learner-study-tips/', label: 'Tips for slow learners' },
+  { href: '/blog/how-to-study-fast/', label: 'Study fast' },
+  { href: '/blog/easy-ways-to-learn/', label: 'Easy ways to learn' },
+  { href: '/blog/how-to-memorize-for-exams/', label: 'Memorize for exams' },
+  { href: '/blog/', label: 'All study guides' },
+];
+
 export function Footer() {
   const year = 2026;
   return (
@@ -57,6 +73,14 @@ export function Footer() {
               <li><a href={site.appUrl}>Create an account</a></li>
               <li><a href={site.loginUrl}>Log in</a></li>
               <li><a href={`https://www.youtube.com/watch?v=${site.youtubeId}`} rel="noopener" target="_blank">Watch the walkthrough</a></li>
+            </ul>
+          </nav>
+          <nav aria-label="Study guides" className="finale__guides">
+            <h2 className="finale__h">Study guides</h2>
+            <ul>
+              {guides.map((g) => (
+                <li key={g.href}><a href={g.href}>{g.label}</a></li>
+              ))}
             </ul>
           </nav>
         </div>

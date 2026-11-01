@@ -125,6 +125,27 @@ function markdown(md) {
     return { html: out.join('\n'), toc };
 }
 
+// "## Frequently asked questions" with "### Question" + answer paragraphs -> FAQPage entries
+function faqFrom(md) {
+    const m = md.replace(/\r/g, '').match(/^## Frequently asked questions\s*\n([\s\S]*?)(?=^## |(?![\s\S]))/m);
+    if (!m) return [];
+    return m[1].split(/^### /m).slice(1).map((block) => {
+        const [q, ...rest] = block.split('\n');
+        const a = rest.join(' ').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/[*`]/g, '').replace(/\s+/g, ' ').trim();
+        return { q: q.trim(), a };
+    }).filter((f) => f.q && f.a);
+}
+
+// Articles that share the most keywords come first in "Keep reading"
+const kw = (a) => new Set(String(a.keywords || '').toLowerCase().split(/[,\s]+/).filter((w) => w.length > 3));
+function relatedTo(a, all) {
+    const mine = kw(a);
+    return all.filter((x) => x.slug !== a.slug)
+        .map((x) => ({ x, score: [...kw(x)].filter((w) => mine.has(w)).length }))
+        .sort((p, q) => q.score - p.score || q.x.date.localeCompare(p.x.date))
+        .slice(0, 3).map((r) => r.x);
+}
+
 const words = (s) => s.replace(/[#*`|>[\]()_-]/g, ' ').split(/\s+/).filter(Boolean).length;
 const fmtDate = (d) => new Date(d + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 const jsonLd = (obj) => `<script type="application/ld+json">${JSON.stringify(obj).replace(/</g, '\\u003c')}</script>`;
@@ -220,12 +241,12 @@ ${extraHead}
 <a class="skip" href="#main">Skip to content</a>
 <header class="site"><div class="wrap">
   <a class="logo" href="/" aria-label="${BRAND} home"><i><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg></i><span>Lumina IQ</span></a>
-  <nav class="top"><a href="/blog/">Blog</a><a class="hide-sm" href="/pricing">Pricing</a><a class="btn" href="/login">Start free</a></nav>
+  <nav class="top"><a href="/blog/">Blog</a><a class="hide-sm" href="/pricing/">Pricing</a><a class="btn" href="/login">Start free</a></nav>
 </div></header>
 ${body}
 <footer class="site"><div class="wrap">
   <span>© ${new Date().getFullYear()} ${BRAND}. Built for students, by students.</span>
-  <span><a href="/">Home</a> · <a href="/blog/">Blog</a> · <a href="/pricing">Pricing</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></span>
+  <span><a href="/">Home</a> · <a href="/blog/">Blog</a> · <a href="/pricing/">Pricing</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></span>
 </div></footer>
 </body>
 </html>
@@ -251,14 +272,14 @@ const articles = readdirSync(CONTENT).filter((f) => f.endsWith('.md')).map((file
     const { meta, body } = parseFrontmatter(readFileSync(join(CONTENT, file), 'utf8'));
     for (const k of ['title', 'description', 'date']) if (!meta[k]) throw new Error(`${file}: missing "${k}"`);
     const { html, toc } = markdown(body);
-    return { ...meta, slug: meta.slug || file.replace(/\.md$/, ''), html, toc, minutes: Math.max(1, Math.round(words(body) / 220)) };
+    return { ...meta, slug: meta.slug || file.replace(/\.md$/, ''), html, toc, faq: faqFrom(body), minutes: Math.max(1, Math.round(words(body) / 220)) };
 }).sort((a, b) => b.date.localeCompare(a.date));
 
 const publisher = { '@type': 'Organization', name: BRAND, url: SITE, logo: { '@type': 'ImageObject', url: `${SITE}/android-chrome-512x512.png` } };
 
 for (const a of articles) {
     const path = `/blog/${a.slug}/`;
-    const related = articles.filter((x) => x.slug !== a.slug).slice(0, 3);
+    const related = relatedTo(a, articles);
     const toc = a.toc.length > 3
         ? `<nav class="toc" aria-label="On this page"><strong>On this page</strong><ol>${a.toc.map((t) => `<li><a href="#${t.id}">${inline(t.text)}</a></li>`).join('')}</ol></nav>`
         : '';
@@ -280,6 +301,10 @@ for (const a of articles) {
             ],
         },
     ];
+    if (a.faq.length) ld.push({
+        '@context': 'https://schema.org', '@type': 'FAQPage',
+        mainEntity: a.faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })),
+    });
     const body = `<main id="main" class="wrap">
 <div class="crumbs"><a href="/">Home</a> / <a href="/blog/">Blog</a></div>
 <article>
@@ -306,14 +331,14 @@ const blogLd = {
     blogPost: articles.map((a) => ({ '@type': 'BlogPosting', headline: a.title, url: `${SITE}/blog/${a.slug}/`, datePublished: a.date })),
 };
 writeFileSync(join(OUT, 'blog', 'index.html'), shell({
-    title: `Study Tips for Exams, Learning Fast and Remembering More | ${BRAND} Blog`,
-    description: 'Practical, no-fluff guides for students: how to study for exams, learn faster, focus, plan your revision and remember what you read.',
+    title: `Study Tips: How to Study, Last Minute Revision, Exam Prep | ${BRAND}`,
+    description: 'Free study guides for students: how to study, what and when to study, last minute revision, rush exam plans, tips for slow learners and learning fast.',
     path: '/blog/',
-    keywords: 'study tips, how to study for exams, learn fast, exam preparation, revision tips, study plan',
+    keywords: 'study tips, how to study, what to study, when to study, last minute revision, rush exam, exam preparation, slow learner, fast study, easy learning, study plan',
     extraHead: jsonLd(blogLd),
     body: `<main id="main" class="wrap blog-wrap">
 <section class="blog-hero"><h1>Study smarter, not longer</h1>
-<p>Honest, practical guides for students who have exams coming and not enough time. How to study, how to learn fast, and how to actually remember it.</p></section>
+<p>Honest, practical guides for students who have exams coming and not enough time. How to study, what to study first, when to study, last minute revision, and how to actually remember it, whether you learn fast or slow.</p></section>
 <h2>Latest guides</h2>
 <div class="cards">${articles.map(card).join('')}</div>
 ${CTA}

@@ -36,3 +36,24 @@ Checked on 27 Oct 2026 against the production build (`audit.mjs` crawl of all 5 
 5. **Comparison pages** ("LuminaIQ vs Quizlet", "vs NotebookLM", "vs Knowt") match high-intent searches; keep them factual.
 6. **Earn links**: Product Hunt launch, university study-skills pages, the GenrecAI site linking to the marketing site rather than the app.
 7. **Add the YouTube video's upload date** to enable `VideoObject` rich results for the walkthrough.
+
+## Study-search guides (1 Nov 2026)
+
+Recommendation 4 started: nine new guides in `frontend/src/content/blog` target the searches students make, built as static pages by `frontend/scripts/build-seo.mjs`:
+
+| Guide | Main searches |
+|---|---|
+| `/blog/slow-learner-study-tips/` | slow learner, study tips for slow learners |
+| `/blog/last-minute-revision-tips/` | last minute revision, last minute exam preparation |
+| `/blog/exam-in-2-days-rush-plan/` | rush exam, exam in 2 days / 3 days |
+| `/blog/what-to-study-for-exam/` | what to study, important topics for exam |
+| `/blog/best-time-to-study/` | when to study, best time to study, morning or night |
+| `/blog/how-to-study-effectively/` | how to study, study techniques |
+| `/blog/easy-ways-to-learn/` | easy learn, easy way to learn |
+| `/blog/how-to-study-fast/` | fast study, study fast for exams |
+| `/blog/how-to-memorize-for-exams/` | how to memorize fast, memorization techniques |
+
+- A `## Frequently asked questions` section with `###` questions now emits `FAQPage` JSON-LD for that article.
+- "Keep reading" picks the three articles that share the most keywords, so guides link to their closest topics.
+- The site footer links every guide, so each marketing page passes links to them.
+- Next: submit `https://luminaiq.fun/sitemap.xml` in Google Search Console and Bing Webmaster Tools, then request indexing for the new guides.

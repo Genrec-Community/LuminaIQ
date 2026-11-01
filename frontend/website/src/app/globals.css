@@ -846,6 +846,8 @@ html.motion .step.is-lit { opacity: 1; }
 .finale nav:nth-of-type(1) { grid-column: 6 / 8; }
 .finale nav:nth-of-type(2) { grid-column: 8 / 10; }
 .finale nav:nth-of-type(3) { grid-column: 10 / 13; }
+.finale nav.finale__guides { grid-column: 1 / -1; }
+.finale .finale__guides ul { display: flex; flex-wrap: wrap; gap: 0.15rem 1.75rem; }
 .finale__h { font-size: var(--t-xs); font-weight: 600; color: var(--c-on-fg-muted); margin-bottom: 0.9rem; }
 .finale ul { list-style: none; padding: 0; display: grid; gap: 0.15rem; }
 .finale ul a { display: inline-block; padding-block: 0.3rem; font-size: var(--t-s); background: linear-gradient(var(--c-accent), var(--c-accent)) left 85% / 0% 1px no-repeat; transition: background-size 0.4s var(--ease-out); }
