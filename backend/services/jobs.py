@@ -163,7 +163,7 @@ async def handle_refresh_memory(job: Dict[str, Any]) -> Dict[str, Any]:
     """Fold older chat turns into the rolling summary and update the student's memory facts."""
     from services import memory
     p = job["payload"]
-    return await memory.refresh(p["project_id"], p["user_id"], p.get("level") or "general")
+    return await memory.refresh(p["thread_id"], p["user_id"], p.get("level") or "general")
 
 
 @handler("tag_mistakes")

@@ -83,6 +83,8 @@ class ChatRequest(BaseModel):
     deep: bool = False
     # Hints-first for this message (the chat-menu toggle); the class setting can override it
     hints: Optional[bool] = None
+    # Which of the book's chats this message belongs to (None = the latest chat, or a new one)
+    thread_id: Optional[str] = None
 
 
 class SourceInfo(BaseModel):
@@ -94,6 +96,7 @@ class SourceInfo(BaseModel):
 class ChatResponse(BaseModel):
     answer: str
     sources: List[SourceInfo]
+    thread_id: Optional[str] = None
 
 
 # Summary Schema (separate from ChatRequest since it doesn't need message)

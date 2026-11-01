@@ -30,6 +30,7 @@ def env(pg_client, monkeypatch):
     user = str(uuid.uuid4())
     pid = pg_client.table("projects").insert({"user_id": user, "name": "Physics"}).execute().data[0]["id"]
     other = pg_client.table("projects").insert({"user_id": user, "name": "Chem"}).execute().data[0]["id"]
+    tid = pg_client.table("chat_threads").insert({"project_id": pid, "user_id": user}).execute().data[0]["id"]
     state = {"settings": {}, "llm": [], "facts_reply": '{"add": [], "update": [], "delete": []}'}
 
     async def get_settings(uid):
@@ -56,42 +57,43 @@ def env(pg_client, monkeypatch):
             content = f"turn {i}"
             if i == fact_at:
                 content = "KEY: my board exam is on 12 March and I mix up speed and velocity"
-            rows.append({"project_id": pid, "role": role, "content": content,
+            rows.append({"project_id": pid, "thread_id": tid, "role": role, "content": content,
                          "created_at": (t0 + timedelta(minutes=i)).isoformat()})
         pg_client.table("chat_messages").insert(rows).execute()
 
-    return {"pg": pg_client, "user": user, "pid": pid, "other": other, "state": state, "add_turns": add_turns}
+    return {"pg": pg_client, "user": user, "pid": pid, "tid": tid, "other": other, "state": state,
+            "add_turns": add_turns}
 
 
 def test_hundred_turn_chat_remembers_turn_three(env):
     # The job runs every ~10 messages as the chat grows
     for start in range(0, 100, 10):
         env["add_turns"](10, start=start, fact_at=3 if start == 0 else None)
-        run(memory.refresh(env["pid"], env["user"], "higher_secondary"))
-    summary, recent = run(memory.chat_context(env["pid"]))
+        run(memory.refresh(env["tid"], env["user"], "higher_secondary"))
+    summary, recent = run(memory.chat_context(env["tid"]))
     assert "12 March" in summary and "speed and velocity" in summary
     assert memory.KEEP_RECENT <= len(recent) <= memory.MAX_RECENT
     assert recent[-1]["content"] == "turn 99"
     # no gap: the first recent turn comes straight after the summarised ones
-    row = env["pg"].fetch("SELECT covered_count FROM chat_summaries WHERE project_id = %s", (env["pid"],))[0]
+    row = env["pg"].fetch("SELECT covered_count FROM chat_summaries WHERE thread_id = %s", (env["tid"],))[0]
     assert recent[0]["content"] == f"turn {row['covered_count']}"
 
 
 def test_short_chats_are_not_summarised(env):
     env["add_turns"](12)
-    assert run(memory.refresh(env["pid"], env["user"], "ugpg")) == {"summarised": 0}
-    assert run(memory.maybe_refresh(env["pid"], env["user"], "ugpg")) is False
-    summary, recent = run(memory.chat_context(env["pid"]))
+    assert run(memory.refresh(env["tid"], env["user"], "ugpg")) == {"summarised": 0}
+    assert run(memory.maybe_refresh(env["tid"], env["user"], "ugpg")) is False
+    summary, recent = run(memory.chat_context(env["tid"]))
     assert summary == "" and len(recent) == 12
 
 
 def test_facts_are_extracted_for_class_11_and_up_only(env):
     env["state"]["facts_reply"] = json.dumps({"add": [{"kind": "goal", "content": "Board exam on 12 March"}]})
-    env["add_turns"](20)
-    run(memory.refresh(env["pid"], env["user"], "school"))
+    env["add_turns"](20, fact_at=0)
+    run(memory.refresh(env["tid"], env["user"], "school"))
     assert run(memory.list_memories(env["user"])) == []          # Class 5-10: no automatic facts
     env["pg"].fetch("DELETE FROM chat_summaries")
-    run(memory.refresh(env["pid"], env["user"], "higher_secondary"))
+    run(memory.refresh(env["tid"], env["user"], "higher_secondary"))
     facts = run(memory.list_memories(env["user"]))
     assert [(f["kind"], f["content"], f["source"]) for f in facts] == [("goal", "Board exam on 12 March", "chat")]
 
@@ -99,8 +101,8 @@ def test_facts_are_extracted_for_class_11_and_up_only(env):
 def test_auto_memory_can_be_switched_off(env):
     env["state"]["settings"] = {"autoMemory": False}
     env["state"]["facts_reply"] = json.dumps({"add": [{"kind": "fact", "content": "Likes cricket"}]})
-    env["add_turns"](20)
-    run(memory.refresh(env["pid"], env["user"], "ugpg"))
+    env["add_turns"](20, fact_at=0)
+    run(memory.refresh(env["tid"], env["user"], "ugpg"))
     assert run(memory.list_memories(env["user"])) == []
 
 
@@ -110,8 +112,8 @@ def test_facts_dedupe_update_and_delete(env):
     env["state"]["facts_reply"] = json.dumps({
         "add": [{"kind": "interest", "content": "likes cricket examples!"}, {"kind": "fact", "content": "Uses NCERT"}],
         "update": [{"id": b["id"], "content": "Exam moved to June"}], "delete": [a["id"], "not-an-id"]})
-    env["add_turns"](20)
-    run(memory.refresh(env["pid"], env["user"], "ugpg"))
+    env["add_turns"](20, fact_at=0)
+    run(memory.refresh(env["tid"], env["user"], "ugpg"))
     assert sorted(f["content"] for f in run(memory.list_memories(env["user"]))) == ["Exam moved to June", "Uses NCERT"]
 
 
@@ -143,7 +145,7 @@ def test_clear_all_and_pruning(env):
     assert housekeeping(env["pg"])["memories"] == 1
     assert [f["content"] for f in run(memory.list_memories(env["user"]))] == ["fresh fact"]
     env["add_turns"](20)
-    run(memory.refresh(env["pid"], env["user"], "ugpg"))
+    run(memory.refresh(env["tid"], env["user"], "ugpg"))
     assert run(memory.clear_all(env["user"])) == {"memories": 1, "summaries": 1}
     assert env["pg"].fetch("SELECT count(*) AS n FROM chat_messages WHERE project_id = %s", (env["pid"],))[0]["n"] == 20
 
@@ -152,3 +154,28 @@ def test_settings_defaults(env):
     assert run(memory.settings_for(env["user"])) == {"across_books": True, "auto": True}
     env["state"]["settings"] = {"memoryAcrossBooks": False}
     assert run(memory.settings_for(env["user"]))["across_books"] is False
+
+
+def test_no_model_call_for_notes_when_nothing_personal_was_said(env):
+    env["state"]["facts_reply"] = json.dumps({"add": [{"kind": "fact", "content": "should not be asked"}]})
+    env["add_turns"](20)    # "turn N" messages: plain chatter, nothing about the student
+    run(memory.refresh(env["tid"], env["user"], "ugpg"))
+    assert not any(c.startswith("You maintain a short list") for c in env["state"]["llm"])
+    assert run(memory.list_memories(env["user"])) == []
+
+
+def test_worth_noting():
+    yes = ["My exam is in March", "I prefer short answers", "I'm preparing for NEET", "explain like I'm five"]
+    no = ["What is inertia?", "Explain Newton's third law", "and the second one?", "summarise chapter 4"]
+    assert all(memory.worth_noting([{"content": t}]) for t in yes)
+    assert not any(memory.worth_noting([{"content": t}]) for t in no)
+
+
+
+def test_each_chat_has_its_own_summary(env):
+    env["add_turns"](20, fact_at=3)
+    run(memory.refresh(env["tid"], env["user"], "ugpg"))
+    other = env["pg"].table("chat_threads").insert({"project_id": env["pid"], "user_id": env["user"]}).execute().data[0]["id"]
+    summary, recent = run(memory.chat_context(other))
+    assert summary == "" and recent == []
+    assert "12 March" in run(memory.chat_context(env["tid"]))[0]

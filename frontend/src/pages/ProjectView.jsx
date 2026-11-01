@@ -50,6 +50,7 @@ import {
     getDocuments,
     getDocumentUrl,
     getChatHistory, // Imported
+    createChatThread,
     chatMessage,
     chatMessageStream, // Imported
     generateMCQ,
@@ -104,6 +105,7 @@ const LessonView = lazy(() => import('../components/LessonView'));
 import useFocusTimer from '../hooks/useFocusTimer';
 import { LAST_PROJECT_KEY } from '../utils/dailyProgress';
 import { saveResume, loadResume } from '../utils/resume';
+import ChatThreads from '../components/chat/ChatThreads';
 import { aiName } from '../utils/persona';
 import usePlan from '../hooks/usePlan';
 import { emitLimit, emitPlanChanged } from '../utils/plan';
@@ -379,6 +381,13 @@ const ProjectView = () => {
 
     // Session cache keys
     const chatCacheKey = `lumina_chat_${projectId}`;
+    // Which of the book's chats is open (like ChatGPT's "New chat"); null = the latest one
+    const [threadId, setThreadIdState] = useState(() => sessionStorage.getItem(`lumina_thread_${projectId}`) || null);
+    const [threadsVersion, setThreadsVersion] = useState(0);
+    const setThreadId = (id) => {
+        setThreadIdState(id);
+        try { if (id) sessionStorage.setItem(`lumina_thread_${projectId}`, id); } catch { /* ignore */ }
+    };
 
     // Persist activeTab to sessionStorage
     useEffect(() => {
@@ -862,12 +871,41 @@ const ProjectView = () => {
         }
     };
 
-    const handleNewSession = () => {
+    // "New chat": a fresh, empty conversation about the same book (the old one stays in the list)
+    const handleNewSession = async (force = false) => {
+        if (loading && !force) return;
+        const onlyWelcome = messages.every((m) => m.role !== 'user');
+        if (!force && threadId && onlyWelcome) return;   // already in an empty chat
+        try {
+            const thread = await createChatThread(projectId);
+            setThreadId(thread.id);
+        } catch {
+            toast.error("Couldn't start a new chat. Please try again.");
+            return;
+        }
         setMessages([welcomeMessage(settings)]);
+        stampedCountRef.current = 1;
         setInputMessage('');
         setActiveCommand(null);
         setShowCommandPicker(false);
         sessionStorage.removeItem(chatCacheKey);
+        setThreadsVersion((v) => v + 1);
+    };
+
+    // Open an earlier chat from the list
+    const handleSelectThread = async (id) => {
+        if (loading) return;
+        setThreadId(id);
+        try {
+            const history = await getChatHistory(projectId, id);
+            const restored = [welcomeMessage(settings),
+                ...history.map((m) => ({ role: m.role, content: m.content, timestamp: m.created_at || undefined }))];
+            stampedCountRef.current = restored.length;
+            setMessages(restored);
+            stickToBottomRef.current = true;
+        } catch {
+            toast.error("Couldn't open that chat. Please try again.");
+        }
     };
 
     // --- @ Command: Input change handler ---
@@ -1112,8 +1150,9 @@ const ProjectView = () => {
                     // Track chat activity for heatmap
                     recordActivity(projectId, 'chat');
                     setLoading(false);
+                    setThreadsVersion((v) => v + 1);   // the chat list shows the new title and order
                 },
-                { deep: deepMode, hints: hintsOn }
+                { deep: deepMode, hints: hintsOn, threadId, onThread: (id) => { if (id && id !== threadId) setThreadId(id); } }
             );
         } catch (error) {
             console.error("Chat error", error);
@@ -1668,6 +1707,16 @@ const ProjectView = () => {
                     {/* Chat View */}
                     {activeTab === 'chat' && (
                         <div className="h-full flex flex-col relative">
+                            <ChatThreads
+                                projectId={projectId}
+                                threadId={threadId}
+                                version={threadsVersion}
+                                isDark={isDark}
+                                onSelect={handleSelectThread}
+                                onNew={() => handleNewSession()}
+                                onAdopt={(id) => setThreadId(id)}
+                                onDeleted={() => handleNewSession(true)}
+                            />
                             <div className="relative flex-1 min-h-0 flex flex-col">
                             <div
                                 ref={chatScrollRef}

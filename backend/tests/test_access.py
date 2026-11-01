@@ -132,8 +132,16 @@ def owner_client(db):
     app.dependency_overrides.clear()
 
 
-def test_owner_reaches_own_chat_history(owner_client, db):
-    db.tables["chat_messages"] = [{"id": "m1", "project_id": PA, "role": "user", "content": "hello"}]
+def test_owner_reaches_own_chat_history(owner_client, db, monkeypatch):
+    from services import chat_threads
+
+    async def threads(project_id, user_id):
+        return [{"id": "t1", "project_id": project_id}]
+
+    async def messages(thread_id):
+        return [{"role": "user", "content": "hello", "created_at": None}]
+    monkeypatch.setattr(chat_threads, "list_threads", threads)
+    monkeypatch.setattr(chat_threads, "messages", messages)
     res = owner_client.get(f"/api/v1/chat/history/{PA}")
     assert res.status_code == 200
     assert res.json()[0]["content"] == "hello"

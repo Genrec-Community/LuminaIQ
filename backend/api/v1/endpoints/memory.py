@@ -8,7 +8,7 @@ read or change their memory; there is no teacher or admin route to it.
 - DELETE /memory/{id}          - forget one fact
 - DELETE /memory               - forget everything (facts and chat summaries; chats stay)
 - PUT    /memory/settings      - {across_books?, auto?}
-- DELETE /memory/summaries/{project_id} - forget one chat's summary
+- DELETE /memory/summaries/{thread_id} - forget one chat's summary
 """
 
 from typing import Optional
@@ -16,7 +16,6 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from api.access import assert_project_owner
 from api.deps import get_current_user
 from db.client import async_db, get_supabase_client
 from services import levels, memory
@@ -50,8 +49,9 @@ class MemorySettings(BaseModel):
 async def _summaries(user_id: str):
     pg = get_supabase_client().pg
     return await async_db(lambda: pg.fetch(
-        """SELECT s.project_id::text, p.name AS project_name, s.summary, s.covered_count, s.updated_at
-           FROM chat_summaries s JOIN projects p ON p.id = s.project_id
+        """SELECT s.thread_id::text, s.project_id::text, p.name AS project_name, t.title AS thread_title,
+                  s.summary, s.covered_count, s.updated_at
+           FROM chat_summaries s JOIN projects p ON p.id = s.project_id JOIN chat_threads t ON t.id = s.thread_id
            WHERE s.user_id = %s AND p.user_id = %s ORDER BY s.updated_at DESC""", (user_id, user_id)))
 
 
@@ -106,10 +106,11 @@ async def save_settings(body: MemorySettings, current_user: dict = Depends(get_c
     return await memory.settings_for(uid)
 
 
-@router.delete("/summaries/{project_id}")
-async def forget_summary(project_id: str, current_user: dict = Depends(get_current_user)):
-    await assert_project_owner(project_id, current_user["id"])
+@router.delete("/summaries/{thread_id}")
+async def forget_summary(thread_id: str, current_user: dict = Depends(get_current_user)):
+    from services import chat_threads
+    thread = await chat_threads.get(thread_id, current_user["id"])
     pg = get_supabase_client().pg
-    await async_db(lambda: pg.fetch("DELETE FROM chat_summaries WHERE project_id = %s AND user_id = %s",
-                                    (project_id, current_user["id"])))
+    await async_db(lambda: pg.fetch("DELETE FROM chat_summaries WHERE thread_id = %s AND user_id = %s",
+                                    (thread["id"], current_user["id"])))
     return {"deleted": True}

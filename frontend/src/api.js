@@ -323,10 +323,16 @@ export const getQueueStatus = async () => {
     return response.data;
 };
 
-export const getChatHistory = async (projectId) => {
-    const response = await api.get(`/chat/history/${projectId}`);
+export const getChatHistory = async (projectId, threadId = null) => {
+    const response = await api.get(`/chat/history/${projectId}`, { params: threadId ? { thread_id: threadId } : {} });
     return response.data;
 };
+
+// --- Several chats per book ("New chat") ---
+export const listChatThreads = async (projectId) => (await api.get(`/chat/threads/${projectId}`)).data.threads || [];
+export const createChatThread = async (projectId) => (await api.post('/chat/threads', { project_id: projectId })).data;
+export const renameChatThread = async (threadId, title) => (await api.patch(`/chat/threads/${threadId}`, { title })).data;
+export const deleteChatThread = async (threadId) => (await api.delete(`/chat/threads/${threadId}`)).data;
 
 
 export const chatMessage = async (projectId, message, history = []) => {
@@ -370,6 +376,8 @@ export const chatMessageStream = async (projectId, message, history = [], select
                     session_history: history,
                     selected_documents: selectedDocuments,
                     deep: !!options.deep,
+                    // Which of the book's chats this goes to (none: the latest chat)
+                    ...(options.threadId ? { thread_id: options.threadId } : {}),
                     // Hints-first toggle (undefined = use the level/class default)
                     ...(typeof options.hints === 'boolean' ? { hints: options.hints } : {}),
                 })
@@ -395,6 +403,9 @@ export const chatMessageStream = async (projectId, message, history = [], select
                 }
                 throw new Error((typeof detail === 'string' ? detail : detail?.message) || `HTTP error ${response.status}`);
             }
+
+            const threadHeader = response.headers.get('X-Thread-Id');
+            if (threadHeader && options.onThread) options.onThread(threadHeader);
 
             // Check for null body
             if (!response.body) {

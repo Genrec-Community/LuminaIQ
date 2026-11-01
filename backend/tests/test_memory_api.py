@@ -116,15 +116,17 @@ def test_chat_prompt_carries_summary_weak_topics_and_memories(world, monkeypatch
                                       "attempts": 5, "correct": 1, "stability_days": 30, "last_seen": now,
                                       "updated_at": now}).execute()
     pg.table("user_memories").insert({"user_id": a, "kind": "interest", "content": "Likes cricket examples"}).execute()
-    pg.table("chat_summaries").insert({"project_id": pa, "user_id": a, "summary": "Earlier they asked about friction.",
+    tid = pg.table("chat_threads").insert({"project_id": pa, "user_id": a, "title": "Motion"}).execute().data[0]["id"]
+    pg.table("chat_summaries").insert({"thread_id": tid, "project_id": pa, "user_id": a,
+                                       "summary": "Earlier they asked about friction.",
                                        "covered_until": "2026-01-01T00:00:00+00:00", "covered_count": 40}).execute()
-    pg.table("chat_messages").insert({"project_id": pa, "role": "user", "content": "recent turn"}).execute()
+    pg.table("chat_messages").insert({"project_id": pa, "thread_id": tid, "role": "user", "content": "recent turn"}).execute()
 
     async def ctx(user_id):
         return "Student name: Asha"
     monkeypatch.setattr(chat, "get_user_context_string", ctx)
     req = SimpleNamespace(project_id=pa, message="explain velocity with an example", hints=None,
-                          system_prompt=None, selected_documents=None, deep=False)
+                          system_prompt=None, selected_documents=None, deep=False, thread_id=None)
 
     async def go():
         history, user_context, save_task, eff = await chat._prepare_chat(req, a)

@@ -5,7 +5,9 @@ from fastapi.responses import StreamingResponse
 from services.rag_service import rag_service
 from services.user_data_service import user_data
 from models.schemas import ChatRequest, ChatResponse, ChatMessage, SummaryRequest
-from typing import Any, List
+from typing import Any, List, Optional
+
+from pydantic import BaseModel, Field
 from api.deps import get_current_user
 from db.client import get_supabase_client, async_db
 from utils.logger import logger
@@ -13,7 +15,7 @@ import asyncio
 import json
 from services.usage_service import usage, metered
 from config.settings import settings as app_settings
-from services import answer_cache, context_builder, learner_model, levels, memory, safety, shared_content
+from services import answer_cache, chat_threads, context_builder, learner_model, levels, memory, safety, shared_content
 from services.telemetry import meter
 from services.prompts.levels import build_level_block, resolve_hints
 
@@ -126,27 +128,51 @@ async def get_user_context_string(user_id: str) -> str:
 
 @router.get("/history/{project_id}", response_model=List[ChatMessage])
 async def get_chat_history(
-    project_id: str, current_user: dict = Depends(get_current_user)
+    project_id: str, thread_id: Optional[str] = None, current_user: dict = Depends(get_current_user)
 ):
-    """
-    Get chat history for a project (non-blocking DB)
-    """
-    try:
-        client = get_supabase_client()
-        response = await async_db(
-            lambda: client.table("chat_messages")
-            .select("*")
-            .eq("project_id", project_id)
-            .order("created_at", desc=False)
-            .execute()
-        )
+    """Messages of one of the book's chats (default: the most recent chat)."""
+    if thread_id:
+        thread = await chat_threads.resolve(project_id, current_user["id"], thread_id)
+    else:
+        latest = await chat_threads.list_threads(project_id, current_user["id"])
+        if not latest:
+            return []
+        thread = latest[0]
+    rows = await chat_threads.messages(thread["id"])
+    return [ChatMessage(role=m["role"], content=m["content"],
+                        created_at=str(m["created_at"]) if m.get("created_at") else None) for m in rows]
 
-        return [
-            ChatMessage(role=msg["role"], content=msg["content"], created_at=msg.get("created_at"))
-            for msg in response.data
-        ]
-    except Exception as e:
-        raise HTTPException(500, str(e))
+
+class ThreadCreate(BaseModel):
+    project_id: str
+    title: Optional[str] = None
+
+
+class ThreadRename(BaseModel):
+    title: str = Field(..., min_length=1, max_length=120)
+
+
+@router.get("/threads/{project_id}")
+async def list_threads(project_id: str, current_user: dict = Depends(get_current_user)):
+    """The book's chats, most recent first (like ChatGPT's sidebar)."""
+    return {"threads": await chat_threads.list_threads(project_id, current_user["id"])}
+
+
+@router.post("/threads")
+async def new_thread(body: ThreadCreate, current_user: dict = Depends(get_current_user)):
+    """Start a new, empty chat for this book."""
+    return await chat_threads.create(body.project_id, current_user["id"], body.title)
+
+
+@router.patch("/threads/{thread_id}")
+async def rename_thread(thread_id: str, body: ThreadRename, current_user: dict = Depends(get_current_user)):
+    return await chat_threads.rename(thread_id, current_user["id"], body.title)
+
+
+@router.delete("/threads/{thread_id}")
+async def delete_thread(thread_id: str, current_user: dict = Depends(get_current_user)):
+    await chat_threads.delete(thread_id, current_user["id"])
+    return {"deleted": True}
 
 
 # Without a chat summary yet, only the most recent turns go to the model: answers stay
@@ -154,7 +180,7 @@ async def get_chat_history(
 CHAT_HISTORY_LIMIT = 12
 
 
-async def _load_memory(request: ChatRequest, user_id: str):
+async def _load_memory(request: ChatRequest, user_id: str, thread_id: str):
     """
     (chat summary, recent turns, learner snapshot, memory facts, across-books setting).
     Long chats come back as a summary plus the recent turns (services/memory.py).
@@ -163,7 +189,7 @@ async def _load_memory(request: ChatRequest, user_id: str):
     try:
         prefs = await memory.settings_for(user_id)
         (summary, history), snap, facts = await asyncio.gather(
-            memory.chat_context(request.project_id),
+            memory.chat_context(thread_id),
             learner_model.snapshot(user_id, request.project_id, prefs["across_books"]),
             memory.for_prompt(user_id, request.project_id, request.message, prefs["across_books"]),
         )
@@ -173,7 +199,7 @@ async def _load_memory(request: ChatRequest, user_id: str):
     res = await async_db(
         lambda: client.table("chat_messages")
         .select("role, content")
-        .eq("project_id", request.project_id)
+        .eq("thread_id", thread_id)
         .order("created_at", desc=True)
         .limit(CHAT_HISTORY_LIMIT)
         .execute()
@@ -186,11 +212,14 @@ async def _prepare_chat(request: ChatRequest, user_id: str):
     Load the chat so far, what we know about the student and their profile in parallel,
     and start saving the new user message in the background. Returns
     (history, user_context, save_task, level info); await save_task before saving the reply
-    so the two stay in order.
+    so the two stay in order. request.thread_id is set to the chat the message went to.
     """
     client = get_supabase_client()
+    thread = await chat_threads.resolve(request.project_id, user_id, request.thread_id)
+    request.thread_id = thread["id"]
     (summary, history, snap, facts), user_context, eff = await asyncio.gather(
-        _load_memory(request, user_id), get_user_context_string(user_id), levels.effective_for(user_id)
+        _load_memory(request, user_id, thread["id"]), get_user_context_string(user_id),
+        levels.effective_for(user_id)
     )
     # The answer style for their level, school safety rules, hints-first and outside-book
     level_block = build_level_block(eff, resolve_hints(eff, request.hints))
@@ -199,17 +228,19 @@ async def _prepare_chat(request: ChatRequest, user_id: str):
     # Prompt order (stable first, for provider prefix caching): profile, what we know, level rules
     known = context_builder.learner_block(snap, facts, summary, app_settings.CONTEXT_BUDGET_MEMORY)
     user_context = "\n\n".join(p for p in (user_context, known, level_block) if p)
-    save_task = asyncio.create_task(async_db(
-        lambda: client.table("chat_messages").insert(
-            {"project_id": request.project_id, "role": "user", "content": request.message}
-        ).execute()
-    ))
+    async def save_question():
+        await async_db(lambda: client.table("chat_messages").insert(
+            {"project_id": request.project_id, "thread_id": thread["id"], "role": "user", "content": request.message}
+        ).execute())
+        await chat_threads.touch(thread, request.message)
+
+    save_task = asyncio.create_task(save_question())
     return history, user_context, save_task, eff
 
 
 def _after_reply(request: ChatRequest, user_id: str, eff) -> None:
     """Refresh the chat summary and memory facts in the background once enough turns piled up."""
-    task = asyncio.create_task(memory.maybe_refresh(request.project_id, user_id, eff.get("level") or "general"))
+    task = asyncio.create_task(memory.maybe_refresh(request.thread_id, user_id, eff.get("level") or "general"))
     _background.add(task)
     task.add_done_callback(_background.discard)
 
@@ -234,7 +265,8 @@ async def _answer_cache_plan(request: ChatRequest, history, eff):
 async def _save_reply(request: ChatRequest, save_task, answer: str, sources=None) -> None:
     await save_task
     await async_db(lambda: get_supabase_client().table("chat_messages").insert(
-        {"project_id": request.project_id, "role": "assistant", "content": answer, "sources": sources or []}
+        {"project_id": request.project_id, "thread_id": request.thread_id, "role": "assistant",
+         "content": answer, "sources": sources or []}
     ).execute())
 
 
@@ -258,14 +290,14 @@ async def chat_message(
         safe_reply = await safety.screen(request.message, eff["level"], current_user["id"])
         if safe_reply:
             await _save_reply(request, save_task, safe_reply)
-            return {"answer": safe_reply, "sources": []}
+            return {"answer": safe_reply, "sources": [], "thread_id": request.thread_id}
 
         plan = await _answer_cache_plan(request, chat_history_dicts, eff)
         if plan:
             hit = await answer_cache.lookup(plan[0], plan[1], request.message)
             if hit:
                 await _save_reply(request, save_task, hit["answer"], hit["sources"])
-                return {"answer": hit["answer"], "sources": hit["sources"]}
+                return {"answer": hit["answer"], "sources": hit["sources"], "thread_id": request.thread_id}
             # A cached answer is shared by every student of this book: neutral voice, level style only
             user_context_str = build_level_block(eff, False)
 
@@ -289,6 +321,7 @@ async def chat_message(
             lambda: client.table("chat_messages").insert(
                 {
                     "project_id": request.project_id,
+                    "thread_id": request.thread_id,
                     "role": "assistant",
                     "content": result["answer"],
                     "sources": result["sources"],
@@ -297,7 +330,7 @@ async def chat_message(
         )
         _after_reply(request, current_user["id"], eff)
 
-        return result
+        return {**result, "thread_id": request.thread_id}
 
     except Exception as e:
         raise HTTPException(500, str(e))
@@ -329,7 +362,7 @@ async def chat_stream(
                 except Exception as save_err:
                     logger.error(f"Failed to save safety reply: {save_err}")
             return StreamingResponse(caring_reply(), media_type="text/event-stream",
-                                     headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"})
+                                     headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no", "X-Thread-Id": request.thread_id or ""})
 
         plan = await _answer_cache_plan(request, chat_history_dicts, eff)
         hit = await answer_cache.lookup(plan[0], plan[1], request.message) if plan else None
@@ -344,7 +377,7 @@ async def chat_stream(
                 except Exception as save_err:
                     logger.error(f"Failed to save cached reply: {save_err}")
             return StreamingResponse(cached_reply(), media_type="text/event-stream",
-                                     headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"})
+                                     headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no", "X-Thread-Id": request.thread_id or ""})
         if plan:
             # A cached answer is shared by every student of this book: neutral voice, level style only
             user_context_str = build_level_block(eff, False)
@@ -385,6 +418,7 @@ async def chat_stream(
                     lambda: get_supabase_client().table("chat_messages").insert(
                         {
                             "project_id": request.project_id,
+                            "thread_id": request.thread_id,
                             "role": "assistant",
                             "content": full_answer,
                             "sources": sources,
@@ -399,7 +433,7 @@ async def chat_stream(
             stream_and_save(),
             media_type="text/event-stream",
             # Deliver tokens as they're generated instead of letting proxies buffer them
-            headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"},
+            headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no", "X-Thread-Id": request.thread_id or ""},
         )
     except Exception as e:
         raise HTTPException(500, str(e))

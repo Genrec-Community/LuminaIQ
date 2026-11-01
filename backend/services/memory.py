@@ -2,7 +2,7 @@
 Conversation memory (AGENTS.md Phase 5, layer 3).
 
 Rolling chat summary: every ~10 messages a background job folds the older part of a
-project's chat into one short summary (small model). The model then gets the summary
+chat (one thread of a book's chats) into one short summary (small model). The model then gets the summary
 plus the recent turns, so a 100-turn chat still "remembers" turn 3 without sending it.
 
 Long-term memory facts (user_memories): in the same job, the small model notes stable
@@ -60,41 +60,38 @@ def auto_memory_allowed(level: Optional[str]) -> bool:
 
 # --------------------------------------------------------------------------- chat summary
 
-async def chat_context(project_id: str) -> Tuple[str, List[Dict[str, str]]]:
-    """(summary of earlier turns, recent turns oldest-first) for one project's chat."""
+async def chat_context(thread_id: str) -> Tuple[str, List[Dict[str, str]]]:
+    """(summary of earlier turns, recent turns oldest-first) for one chat."""
     pg = _pg()
     rows = await _db(lambda: pg.fetch(
-        "SELECT summary, covered_until FROM chat_summaries WHERE project_id = %s", (project_id,)))
+        "SELECT summary, covered_until FROM chat_summaries WHERE thread_id = %s", (thread_id,)))
     summary = rows[0]["summary"] if rows else ""
     cutoff = rows[0]["covered_until"] if rows else None
+    latest = "SELECT role, content FROM chat_messages WHERE thread_id = %s ORDER BY created_at DESC LIMIT %s"
     if cutoff:
         recent = await _db(lambda: pg.fetch(
-            """SELECT role, content FROM chat_messages WHERE project_id = %s AND created_at > %s
-               ORDER BY created_at DESC LIMIT %s""", (project_id, cutoff, MAX_RECENT)))
+            """SELECT role, content FROM chat_messages WHERE thread_id = %s AND created_at > %s
+               ORDER BY created_at DESC LIMIT %s""", (thread_id, cutoff, MAX_RECENT)))
         if len(recent) < KEEP_RECENT:
-            recent = await _db(lambda: pg.fetch(
-                "SELECT role, content FROM chat_messages WHERE project_id = %s ORDER BY created_at DESC LIMIT %s",
-                (project_id, KEEP_RECENT)))
+            recent = await _db(lambda: pg.fetch(latest, (thread_id, KEEP_RECENT)))
     else:
-        recent = await _db(lambda: pg.fetch(
-            "SELECT role, content FROM chat_messages WHERE project_id = %s ORDER BY created_at DESC LIMIT %s",
-            (project_id, MAX_RECENT)))
+        recent = await _db(lambda: pg.fetch(latest, (thread_id, MAX_RECENT)))
     return summary, [{"role": r["role"], "content": r["content"]} for r in reversed(recent)]
 
 
-async def maybe_refresh(project_id: str, user_id: str, level: str) -> bool:
-    """Queue a summary/memory refresh when enough new messages have piled up."""
+async def maybe_refresh(thread_id: str, user_id: str, level: str) -> bool:
+    """Queue a summary/memory refresh when enough new messages have piled up in this chat."""
     pg = _pg()
     try:
         rows = await _db(lambda: pg.fetch(
-            """SELECT count(*) AS n FROM chat_messages m WHERE m.project_id = %s AND m.created_at >
-                 COALESCE((SELECT covered_until FROM chat_summaries WHERE project_id = %s), '-infinity')""",
-            (project_id, project_id)))
+            """SELECT count(*) AS n FROM chat_messages m WHERE m.thread_id = %s AND m.created_at >
+                 COALESCE((SELECT covered_until FROM chat_summaries WHERE thread_id = %s), '-infinity')""",
+            (thread_id, thread_id)))
         if int(rows[0]["n"]) < SUMMARY_EVERY + KEEP_RECENT:
             return False
         from services.jobs import enqueue
-        await enqueue("refresh_memory", {"project_id": project_id, "user_id": user_id, "level": level},
-                      user_id=user_id, dedupe_key=f"refresh_memory:{project_id}")
+        await enqueue("refresh_memory", {"thread_id": thread_id, "user_id": user_id, "level": level},
+                      user_id=user_id, dedupe_key=f"refresh_memory:{thread_id}")
         return True
     except Exception as e:
         logger.debug(f"[Memory] refresh not queued: {e}")
@@ -135,20 +132,24 @@ def _json_obj(text: str) -> Dict[str, Any]:
         return {}
 
 
-async def refresh(project_id: str, user_id: str, level: str) -> Dict[str, Any]:
-    """Fold older turns into the summary and update memory facts (the refresh_memory job)."""
+async def refresh(thread_id: str, user_id: str, level: str) -> Dict[str, Any]:
+    """Fold older turns of one chat into its summary and update memory facts (the refresh_memory job)."""
     from services.llm_service import llm_service
 
     pg = _pg()
+    thread = await _db(lambda: pg.fetch("SELECT project_id FROM chat_threads WHERE id = %s", (thread_id,)))
+    if not thread:
+        return {"summarised": 0}
+    project_id = str(thread[0]["project_id"])
     rows = await _db(lambda: pg.fetch(
-        "SELECT summary, covered_until, covered_count FROM chat_summaries WHERE project_id = %s", (project_id,)))
+        "SELECT summary, covered_until, covered_count FROM chat_summaries WHERE thread_id = %s", (thread_id,)))
     prev = rows[0]["summary"] if rows else ""
     cutoff = rows[0]["covered_until"] if rows else None
     count = int(rows[0]["covered_count"]) if rows else 0
     new = await _db(lambda: pg.fetch(
         """SELECT role, content, created_at FROM chat_messages
-           WHERE project_id = %s AND created_at > COALESCE(%s, '-infinity'::timestamptz)
-           ORDER BY created_at""", (project_id, cutoff)))
+           WHERE thread_id = %s AND created_at > COALESCE(%s, '-infinity'::timestamptz)
+           ORDER BY created_at""", (thread_id, cutoff)))
     older = new[:-KEEP_RECENT]
     if len(older) < SUMMARY_EVERY:
         return {"summarised": 0}
@@ -159,16 +160,16 @@ async def refresh(project_id: str, user_id: str, level: str) -> Dict[str, Any]:
         temperature=0.2, max_tokens=600, task="memory")
     summary = (summary or prev).strip()[:4000]
     await _db(lambda: pg.fetch(
-        """INSERT INTO chat_summaries (project_id, user_id, summary, covered_until, covered_count, updated_at)
-           VALUES (%s, %s, %s, %s, %s, now())
-           ON CONFLICT (project_id) DO UPDATE SET summary = EXCLUDED.summary, covered_until = EXCLUDED.covered_until,
+        """INSERT INTO chat_summaries (thread_id, project_id, user_id, summary, covered_until, covered_count, updated_at)
+           VALUES (%s, %s, %s, %s, %s, %s, now())
+           ON CONFLICT (thread_id) DO UPDATE SET summary = EXCLUDED.summary, covered_until = EXCLUDED.covered_until,
              covered_count = EXCLUDED.covered_count, updated_at = now()""",
-        (project_id, user_id, summary, older[-1]["created_at"], count + len(older))))
+        (thread_id, project_id, user_id, summary, older[-1]["created_at"], count + len(older))))
 
     facts = {"added": 0, "updated": 0, "deleted": 0}
     prefs = await settings_for(user_id)
     student_lines = [m for m in older if m["role"] == "user"]
-    if auto_memory_allowed(level) and prefs["auto"] and student_lines:
+    if auto_memory_allowed(level) and prefs["auto"] and worth_noting(student_lines):
         facts = await _extract_facts(user_id, project_id, student_lines)
     return {"summarised": len(older), **facts}
 
@@ -202,6 +203,21 @@ async def _extract_facts(user_id: str, project_id: str, messages: List[Dict[str,
             deleted += 1
     await _enforce_cap(user_id)
     return {"added": added, "updated": updated, "deleted": deleted}
+
+
+# Words that suggest a student said something about themselves worth remembering. Plain
+# questions about the book ("what is inertia?") have none, so no model call is made for them.
+_PERSONAL = re.compile(
+    r"\b(i am|i'm|im|i have|i've|my|mine|me|i prefer|i like|i love|i hate|i want|i need|i find|i struggle|"
+    r"i always|i never|i get confused|i keep|i can't|i cant|i don't understand|i dont understand|"
+    r"exam|exams|test on|board|neet|jee|cuet|gate|upsc|deadline|semester|thesis|interview|"
+    r"prefer|please always|please don't|explain like|in hindi|in tamil|in simple)\b",
+    re.IGNORECASE)
+
+
+def worth_noting(messages: List[Dict[str, Any]]) -> bool:
+    """True when the student's messages might hold a fact about them (cheap check before a model call)."""
+    return any(_PERSONAL.search(m.get("content") or "") for m in messages)
 
 
 def _norm(text: str) -> str:
@@ -253,7 +269,7 @@ async def clear_all(user_id: str) -> Dict[str, int]:
     pg = _pg()
     facts = await _db(lambda: pg.fetch("DELETE FROM user_memories WHERE user_id = %s RETURNING id", (user_id,)))
     summaries = await _db(lambda: pg.fetch(
-        "DELETE FROM chat_summaries WHERE user_id = %s RETURNING project_id", (user_id,)))
+        "DELETE FROM chat_summaries WHERE user_id = %s RETURNING thread_id", (user_id,)))
     return {"memories": len(facts), "summaries": len(summaries)}
 
 

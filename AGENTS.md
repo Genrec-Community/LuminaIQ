@@ -42,7 +42,7 @@ Anti-goals (a failure even if it "works"):
   backend change. RAG changes must also pass the eval in §6 (Phase 3).
 - **Migrations:**
   - One database (`DATABASE_URL`): `backend/db/schema/NNNN_name.sql`, applied in order on startup by `db/migrate.py`
-    (or `uv run python -m db.migrate`). `0001_init.sql` is the fresh-start schema; the latest is `0006_memory.sql`, so the next file is `0007_`.
+    (or `uv run python -m db.migrate`). `0001_init.sql` is the fresh-start schema; the latest is `0007_chat_threads.sql`, so the next file is `0008_`.
     Never edit an applied file; add a new one.
   - `backend/db/supabase_auth.sql` is the only SQL that runs in Supabase (the Google sign-up allowlist on `auth.users`).
 - **Database access:** services call `get_supabase_client().table(...)` / `.rpc(...)` as before. That now goes to our
@@ -358,6 +358,15 @@ Builder's calls:
 - The quiz screen scores in the browser; it now also sends the answers to `/mcq/submit` so the learner model learns
   which answers were wrong. `/mcq/submit` now checks the test belongs to the caller.
 - A quiz started with no topic targets the student's weakest topic.
+- Memory notes are only extracted when the student's messages contain something personal (a cheap word check,
+  `memory.worth_noting`); plain questions about the book never trigger the note-taking call.
+
+**Follow-up (2026-11-01): several chats per book**, like ChatGPT's "New chat" (`services/chat_threads.py`,
+`components/chat/ChatThreads.jsx`, schema `0007_chat_threads.sql`). Each message belongs to a thread; summaries are per
+thread. A message without `thread_id` goes to the book's latest chat, so the Android shell and the tutor panel keep
+working; streamed answers return the chat in an `X-Thread-Id` header. New chats are titled from their first question
+(no model call). Messages saved before threads existed became one "Earlier chat" per book (checked on a real database).
+Deleting a chat deletes its messages and summary.
 
 ### Phase 6: LaTeX and image input
 1. **Rendering:**
