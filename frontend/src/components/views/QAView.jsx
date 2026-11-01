@@ -216,14 +216,14 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
             {/* ========== LIST VIEW: Show saved Q&A sessions ========== */}
             {!qaLoading && viewMode === 'list' && (
                 <div className="animate-in fade-in slide-in-from-bottom-4">
-                    <div className="flex items-center justify-between mb-8">
+                    <div className="flex flex-wrap items-center justify-between gap-3 mb-5 md:mb-8">
                         <div>
-                            <h2 className="text-2xl font-bold text-[#163628]">Q&A Sessions</h2>
-                            <p className="text-[#5E5046]">Generate study questions and reveal answers</p>
+                            <h2 className="text-xl sm:text-2xl font-bold text-[#163628]">Q&A Sessions</h2>
+                            <p className="hidden sm:block text-[#5E5046]">Generate study questions and reveal answers</p>
                         </div>
                         <button
                             onClick={() => setViewMode('form')}
-                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#1E5C42] to-[#163628] text-white rounded-lg hover:opacity-90 transition-opacity shadow-sm"
+                            className="flex items-center gap-2 whitespace-nowrap px-4 py-2.5 bg-gradient-to-r from-[#1E5C42] to-[#163628] text-white rounded-lg hover:opacity-90 transition-opacity shadow-sm"
                         >
                             <Plus className="h-4 w-4" />
                             New Q&A

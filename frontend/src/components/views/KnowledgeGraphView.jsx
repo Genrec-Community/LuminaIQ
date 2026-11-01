@@ -483,12 +483,9 @@ const KnowledgeGraphView = ({ projectId, zenMode }) => {
             if (node.data('type') === 'book') {
                 node.stop();
                 node.animate({
-                    style: {
-                        'width': 95, 'height': 95,
-                        'shadow-blur': 80,
-                        'shadow-color': '#FFA500',
-                        'background-gradient-stop-colors': '#FFFFFF #FFD700 #FF0000'
-                    },
+                    // Only size animates: this cytoscape version has no shadow props, and
+                    // animating an unknown property throws (it broke the whole graph view)
+                    style: { 'width': 95, 'height': 95 },
                     duration: 300,
                     easing: 'ease-out'
                 });
@@ -508,11 +505,7 @@ const KnowledgeGraphView = ({ projectId, zenMode }) => {
         const pulseSun = (node, scaleUp = true) => {
             if (node.removed() || node.hasClass('hover')) return;
             node.animate({
-                style: {
-                    'width': scaleUp ? 85 : 80,
-                    'height': scaleUp ? 85 : 80,
-                    'shadow-blur': scaleUp ? 60 : 40,
-                },
+                style: { 'width': scaleUp ? 85 : 80, 'height': scaleUp ? 85 : 80 },
                 duration: 2000,
                 easing: 'ease-in-out-sine',
                 complete: () => pulseSun(node, !scaleUp)
@@ -527,10 +520,6 @@ const KnowledgeGraphView = ({ projectId, zenMode }) => {
 
             if (node.data('type') === 'book') {
                 node.stop();
-                node.style({
-                    'shadow-color': '#FF0000',
-                    'background-gradient-stop-colors': '#FFFFFF #FFA500 #8B0000'
-                });
                 pulseSun(node);
             } else {
                 node.stop();

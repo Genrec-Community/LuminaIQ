@@ -26,3 +26,12 @@ export const isAppShell = () => {
         return false;
     }
 };
+
+/** A phone-sized screen (the layouts switch at 768px). */
+export const isPhoneScreen = () => {
+    try {
+        return window.matchMedia('(max-width: 767px)').matches;
+    } catch {
+        return false;
+    }
+};

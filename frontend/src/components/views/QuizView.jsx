@@ -645,7 +645,7 @@ const QuizView = ({
 
             {unfinished && !mcqTest && !mcqLoading && (
                 <div className="mx-4 mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[#1E5C42]/30 bg-[#1E5C42]/5 p-4">
-                    <p className="min-w-0 flex-1 text-sm text-[#163628]">
+                    <p className="basis-full sm:basis-auto min-w-0 sm:flex-1 text-sm text-[#163628]">
                         You have an unfinished quiz{unfinished.topic ? <> on <span className="font-semibold">{unfinished.topic}</span></> : null}
                         {unfinished.total ? ` (${Object.keys(unfinished.answers || {}).length} of ${unfinished.total} answered)` : ''}.
                     </p>
@@ -709,15 +709,15 @@ const QuizView = ({
                 {/* ==================== SAVED QUIZZES LIST ==================== */}
                 {showSavedList && !mcqTest && !evalTest && !cameFromPath && (
                     <div className="animate-in fade-in slide-in-from-bottom-4">
-                        <div className="flex items-center justify-between mb-8">
+                        <div className="flex flex-wrap items-center justify-between gap-3 mb-5 md:mb-8">
                             <div>
-                                <h2 className="text-2xl font-bold text-[#163628]">Quizzes</h2>
-                                <p className="text-[#5E5046]">Test your knowledge with AI-generated quizzes</p>
+                                <h2 className="text-xl sm:text-2xl font-bold text-[#163628]">Quizzes</h2>
+                                <p className="hidden sm:block text-[#5E5046]">Test your knowledge with AI-generated quizzes</p>
                             </div>
                             {savedQuizzes.length > 0 && (
                                 <button
                                     onClick={() => setShowSavedList(false)}
-                                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#1E5C42] to-[#163628] text-white rounded-lg hover:opacity-90 transition-opacity shadow-sm"
+                                    className="flex items-center gap-2 whitespace-nowrap px-4 py-2.5 bg-gradient-to-r from-[#1E5C42] to-[#163628] text-white rounded-lg hover:opacity-90 transition-opacity shadow-sm"
                                 >
                                     <Plus className="h-4 w-4" />
                                     New Quiz

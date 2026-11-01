@@ -48,7 +48,7 @@ const GamificationPanel = ({ onClose }) => {
 
     if (!data) {
         return (
-            <div className="w-[420px] bg-white rounded-2xl shadow-2xl border border-[#E6D5CC] p-8 flex flex-col items-center gap-3">
+            <div className="w-full max-w-[420px] bg-white rounded-2xl shadow-2xl border border-[#E6D5CC] p-8 flex flex-col items-center gap-3">
                 <div className="h-10 w-10 border-3 border-[#1E5C42] border-t-transparent rounded-full animate-spin" />
                 <p className="text-sm text-[#5E5046]">Loading progress...</p>
             </div>
@@ -68,7 +68,7 @@ const GamificationPanel = ({ onClose }) => {
     ];
 
     return (
-        <div className="w-[420px] max-h-[85vh] bg-white rounded-2xl shadow-2xl border border-[#E6D5CC] flex flex-col overflow-hidden">
+        <div className="w-full max-w-[420px] max-h-[85vh] bg-white rounded-2xl shadow-2xl border border-[#E6D5CC] flex flex-col overflow-hidden">
             {/* Header with gradient */}
             <div className="relative overflow-hidden shrink-0">
                 <div className="bg-gradient-to-br from-[#1E5C42] via-[#163628] to-[#5E5046] px-5 pt-4 pb-4">

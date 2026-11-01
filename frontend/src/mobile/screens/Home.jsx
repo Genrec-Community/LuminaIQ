@@ -56,7 +56,12 @@ const Home = () => {
     }, []);
 
     const goal = settings.dailyStudyGoal || 30;
-    const quests = dailyQuests(progress, goal);
+    // The adaptive goal (sized to level, pace and exam) leads; it replaces the fixed "answer 10" quest
+    const adaptive = g?.daily_goal;
+    const quests = [
+        ...(adaptive ? [{ id: 'adaptive', emoji: '🎯', label: `Answer ${adaptive.target} questions`, value: adaptive.progress, target: adaptive.target }] : []),
+        ...dailyQuests(progress, goal).filter((q) => !(adaptive && q.id === 'answered')),
+    ];
     const questDone = quests.filter((q) => q.value >= q.target).length;
     const streak = g?.streak_days ?? g?.stats?.streak_days ?? 0;
     const name = displayName(settings, user);
@@ -125,10 +130,10 @@ const Home = () => {
 
                 {/* Daily goal */}
                 <div className="m-card flex items-center gap-4 p-4">
-                    <Ring value={progress.minutes / goal} size={76} stroke={8}>
+                    <Ring value={adaptive ? adaptive.progress / (adaptive.target || 1) : progress.minutes / goal} size={76} stroke={8}>
                         <div className="text-center leading-none">
-                            <p className="text-[18px] font-extrabold">{Math.min(progress.minutes, goal)}</p>
-                            <p className="text-[10px] font-semibold" style={{ color: 'var(--m-muted)' }}>/{goal} min</p>
+                            <p className="text-[18px] font-extrabold">{adaptive ? adaptive.progress : Math.min(progress.minutes, goal)}</p>
+                            <p className="text-[10px] font-semibold" style={{ color: 'var(--m-muted)' }}>{adaptive ? `/${adaptive.target} Qs` : `/${goal} min`}</p>
                         </div>
                     </Ring>
                     <div className="min-w-0 flex-1">

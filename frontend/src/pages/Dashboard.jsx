@@ -25,7 +25,7 @@ import { LAST_PROJECT_KEY } from '../utils/dailyProgress';
 import { loadResume } from '../utils/resume';
 import { takeAfterLogin } from '../utils/afterLogin';
 import usePlan from '../hooks/usePlan';
-import { isNativeApp } from '../utils/platform';
+import { isNativeApp, isPhoneScreen } from '../utils/platform';
 
 const Dashboard = () => {
     const navigate = useNavigate();
@@ -419,7 +419,8 @@ const Dashboard = () => {
             <Joyride
                 onEvent={handleJoyrideCallback}
                 continuous
-                run={run}
+                // No coach-mark tours on phones: small screens get one clear next step instead
+                run={run && !isPhoneScreen()}
                 steps={steps}
                 options={TOUR_OPTIONS}
             />

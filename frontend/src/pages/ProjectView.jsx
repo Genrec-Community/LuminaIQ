@@ -22,6 +22,7 @@ import {
     RefreshCw,
     Trash2,
     Menu,
+    MoreHorizontal,
     Calendar,
     Brain,
     Target,
@@ -52,6 +53,7 @@ import {
     getDocumentUrl,
     getChatHistory, // Imported
     createChatThread,
+    getProjects,
     chatMessage,
     chatMessageStream, // Imported
     generateMCQ,
@@ -106,17 +108,21 @@ import useFocusTimer from '../hooks/useFocusTimer';
 import { LAST_PROJECT_KEY } from '../utils/dailyProgress';
 import { saveResume, loadResume } from '../utils/resume';
 import ChatThreads from '../components/chat/ChatThreads';
+import { getCachedProjects } from '../utils/projectCache';
 import { shrinkImage, visibleText } from '../utils/image';
 import { aiName } from '../utils/persona';
 import usePlan from '../hooks/usePlan';
 import { emitLimit, emitPlanChanged } from '../utils/plan';
-import { isNativeApp, isAppShell } from '../utils/platform';
+import { isNativeApp, isAppShell, isPhoneScreen } from '../utils/platform';
 
 // Inside the phone app: no sidebar or tour; a back button and tool chips instead
 const APP_SHELL = isAppShell();
+// Tool chips on phones (app and phone browser): the everyday tools first, all labelled,
+// so switching tools never depends on finding the menu
 const APP_TOOLS = [
-    ['power', 'Power Hour'], ['cram', 'Exam Tonight'], ['chat', 'Ask'], ['quiz', 'Quiz'], ['flashcards', 'Flashcards'],
-    ['notes', 'Notes'], ['mindmap', 'Mind map'], ['path', 'Path'], ['qa', 'Q&A'], ['lab', 'Visual Lab'], ['knowledge', 'Graph'],
+    ['chat', 'Ask'], ['quiz', 'Quiz'], ['flashcards', 'Flashcards'], ['power', 'Power Hour'], ['cram', 'Exam Tonight'],
+    ['notes', 'Notes'], ['path', 'Path'], ['mindmap', 'Mind map'], ['qa', 'Q&A'], ['lab', 'Visual Lab'],
+    ['knowledge', 'Graph'], ['analytics', 'Progress'],
 ];
 
 
@@ -196,7 +202,7 @@ const chatDayLabel = (iso) => {
 };
 const welcomeMessage = (settings) => ({
     role: 'system',
-    content: `Hi! I'm ${aiName(settings)} ${settings.aiAvatar || '✨'} Ask me anything about your documents — or try "explain like I'm 12", "quiz me", or "give me a memory trick".`,
+    content: `Hi! I'm ${aiName(settings)} ${settings.aiAvatar || '✨'} Ask me anything about your book.`,
 });
 
 const ViewLoader = () => (
@@ -390,6 +396,12 @@ const ProjectView = () => {
         try { if (id) sessionStorage.setItem(`lumina_thread_${projectId}`, id); } catch { /* ignore */ }
     };
 
+    // Keep the open tool's chip in view on phones
+    useEffect(() => {
+        const chip = toolChipsRef.current?.querySelector(`[data-tool="${activeTab}"]`);
+        if (chip?.scrollIntoView) chip.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    }, [activeTab]);
+
     // Persist activeTab to sessionStorage
     useEffect(() => {
         if (resumeReadyRef.current) {
@@ -414,6 +426,8 @@ const ProjectView = () => {
     const [inputMessage, setInputMessage] = useState('');
     // A photo of a question or diagram waiting to be sent (shrunk data URL)
     const [pendingPhoto, setPendingPhoto] = useState(null);
+    // Phones: photo, hints and Deep live behind one "+" so the message box gets the width
+    const [showChatExtras, setShowChatExtras] = useState(false);
     const photoInputRef = useRef(null);
     const pickPhoto = async (e) => {
         const file = e.target.files?.[0];
@@ -462,6 +476,22 @@ const ProjectView = () => {
         return () => window.removeEventListener('beforeunload', warn);
     }, [uploadsInFlight]);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    // Phone header: one labelled "More" menu instead of a row of unlabelled icons
+    const [showMoreMenu, setShowMoreMenu] = useState(false);
+    const toolChipsRef = useRef(null);
+    const [bookName, setBookName] = useState(() => {
+        try { return (getCachedProjects() || []).find((p) => p.id === projectId)?.name || ''; } catch { return ''; }
+    });
+    useEffect(() => {
+        if (bookName) return undefined;
+        let alive = true;
+        getProjects().then((list) => {
+            const found = (Array.isArray(list) ? list : list?.projects || []).find((p) => p.id === projectId);
+            if (alive && found?.name) setBookName(found.name);
+        }).catch(() => {});
+        return () => { alive = false; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [projectId]);
     const [isLeftCollapsed, setIsLeftCollapsed] = useState(false);
     const [showRightSidebarUpload, setShowRightSidebarUpload] = useState(false);
     const [isMobileDocsOpen, setIsMobileDocsOpen] = useState(false);
@@ -1364,7 +1394,7 @@ const ProjectView = () => {
             <Joyride
                 onEvent={handleJoyrideCallback}
                 continuous
-                run={run && !APP_SHELL}
+                run={run && !APP_SHELL && !isPhoneScreen()}
                 steps={steps}
                 options={TOUR_OPTIONS}
             />
@@ -1511,6 +1541,9 @@ const ProjectView = () => {
                             {/* Left: Tab name + Summary */}
                             <div className="flex items-center gap-2 min-w-0 shrink-0">
                                 <h2 className={`text-base font-bold whitespace-nowrap ${isDark ? 'text-[#E9EFD6]' : 'text-[#163628]'}`}>
+                                    {/* Phones: the tool is shown by its chip, so the header names the book */}
+                                    {bookName && <span className="sm:hidden block max-w-[52vw] truncate">{bookName}</span>}
+                                    <span className={bookName ? 'hidden sm:inline' : ''}>
                                     {activeTab === 'cram' && 'Exam Tonight'}
                                     {activeTab === 'lab' && 'Visual Lab'}
                                     {activeTab === 'power' && 'Power Hour'}
@@ -1524,6 +1557,7 @@ const ProjectView = () => {
                                     {activeTab === 'study' && 'Study'}
                                     {activeTab === 'analytics' && 'Analytics'}
                                     {activeTab === 'knowledge' && 'Knowledge Graph'}
+                                </span>
                                 </h2>
 
                                 {/* Summary Dropdown - compact pill */}
@@ -1558,21 +1592,21 @@ const ProjectView = () => {
                                     </button>
                                     <button
                                         onClick={() => setShowAITutor(!showAITutor)}
-                                        className={`p-2.5 rounded-lg transition-colors ${showAITutor ? 'bg-[#1E5C42] text-white' : 'text-[#5E5046] hover:text-[#163628] hover:bg-[#E6D5CC]/30'}`}
+                                        className={`hidden sm:inline-flex p-2.5 rounded-lg transition-colors ${showAITutor ? 'bg-[#1E5C42] text-white' : 'text-[#5E5046] hover:text-[#163628] hover:bg-[#E6D5CC]/30'}`}
                                         title="AI Tutor"
                                     >
                                         <Brain className="h-5 w-5" />
                                     </button>
                                     <button
                                         onClick={() => setShowPomodoro(!showPomodoro)}
-                                        className={`p-2.5 rounded-lg transition-colors ${showPomodoro ? 'bg-[#1E5C42] text-white' : 'text-[#5E5046] hover:text-[#163628] hover:bg-[#E6D5CC]/30'}`}
+                                        className={`hidden sm:inline-flex p-2.5 rounded-lg transition-colors ${showPomodoro ? 'bg-[#1E5C42] text-white' : 'text-[#5E5046] hover:text-[#163628] hover:bg-[#E6D5CC]/30'}`}
                                         title="Pomodoro Timer"
                                     >
                                         <Timer className="h-5 w-5" />
                                     </button>
                                     <button
                                         onClick={() => setShowBookmarks(!showBookmarks)}
-                                        className={`p-2.5 rounded-lg transition-colors ${showBookmarks ? 'bg-[#1E5C42] text-white' : 'text-[#5E5046] hover:text-[#163628] hover:bg-[#E6D5CC]/30'}`}
+                                        className={`hidden sm:inline-flex p-2.5 rounded-lg transition-colors ${showBookmarks ? 'bg-[#1E5C42] text-white' : 'text-[#5E5046] hover:text-[#163628] hover:bg-[#E6D5CC]/30'}`}
                                         title="Bookmarks & Highlights"
                                     >
                                         <Bookmark className="h-5 w-5" />
@@ -1620,10 +1654,10 @@ const ProjectView = () => {
                                     )}
                                 </button>
 
-                                {/* Documents Sidebar Toggle (Mobile) */}
+                                {/* Documents Sidebar Toggle (tablet) */}
                                 <button
                                     onClick={() => setIsMobileDocsOpen(!isMobileDocsOpen)}
-                                    className={`md:hidden p-2.5 rounded-lg transition-colors ${isMobileDocsOpen ? 'bg-[#1E5C42] text-white' : 'text-[#5E5046] hover:text-[#163628] hover:bg-[#E6D5CC]/30'}`}
+                                    className={`hidden sm:inline-flex md:hidden p-2.5 rounded-lg transition-colors ${isMobileDocsOpen ? 'bg-[#1E5C42] text-white' : 'text-[#5E5046] hover:text-[#163628] hover:bg-[#E6D5CC]/30'}`}
                                     title="Documents"
                                 >
                                     <PanelRight className="h-5 w-5" />
@@ -1632,23 +1666,54 @@ const ProjectView = () => {
                                 {/* Exit */}
                                 {!APP_SHELL && <button
                                     onClick={() => navigate('/dashboard')}
-                                    className="p-2.5 rounded-lg text-[#5E5046]/50 hover:bg-red-50 hover:text-red-500 transition-colors ml-0.5"
+                                    className="hidden sm:inline-flex p-2.5 rounded-lg text-[#5E5046]/50 hover:bg-red-50 hover:text-red-500 transition-colors ml-0.5"
                                     title="Back to Dashboard"
                                 >
                                     <LogOut className="h-5 w-5" />
                                 </button>}
+
+                                {/* Phones: everything else, with words */}
+                                <div className="relative sm:hidden">
+                                    <button onClick={() => setShowMoreMenu((v) => !v)} aria-expanded={showMoreMenu} aria-haspopup="menu"
+                                        aria-label="More options"
+                                        className={`flex h-11 w-11 items-center justify-center rounded-xl transition-colors ${showMoreMenu ? 'bg-[#1E5C42] text-white' : 'text-[#5E5046] hover:bg-[#E6D5CC]/30'}`}>
+                                        <MoreHorizontal className="h-6 w-6" />
+                                    </button>
+                                    {showMoreMenu && (
+                                        <>
+                                            <div className="fixed inset-0 z-40" onClick={() => setShowMoreMenu(false)} aria-hidden="true" />
+                                            <div role="menu" className={`absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-2xl border py-1.5 shadow-2xl ${isDark ? 'border-[#293E34] bg-[#182C21]' : 'border-[#E6D5CC] bg-white'}`}>
+                                                {[
+                                                    { label: 'Your progress', hint: gamificationData ? `${gamificationData.total_xp?.toLocaleString()} XP` : '', icon: Trophy, on: () => setShowGamification(true) },
+                                                    { label: 'Your documents', hint: `${documents.length}`, icon: PanelRight, on: () => setIsMobileDocsOpen(true) },
+                                                    ...(documents.length ? [{ label: 'Book summary', icon: FileText, on: () => toggleSummary() }] : []),
+                                                    { label: 'Focus timer', icon: Timer, on: () => setShowPomodoro(true) },
+                                                    { label: 'Bookmarks', icon: Bookmark, on: () => setShowBookmarks(true) },
+                                                    ...(tools.has('companion') ? [{ label: 'Tutor sidekick', icon: Brain, on: () => setShowAITutor(true) }] : []),
+                                                    ...(!APP_SHELL ? [{ label: 'Back to your books', icon: LogOut, on: () => navigate('/dashboard') }] : []),
+                                                ].map(({ label, hint, icon: Icon, on }) => (
+                                                    <button key={label} role="menuitem" onClick={() => { setShowMoreMenu(false); on(); }}
+                                                        className={`flex w-full items-center gap-3 px-4 py-3 text-left text-[15px] ${isDark ? 'text-[#E9EFD6] active:bg-[#20382B]' : 'text-[#163628] active:bg-[#FDF6F0]'}`}>
+                                                        <Icon className="h-5 w-5 text-[#1E5C42]" />
+                                                        <span className="flex-1">{label}</span>
+                                                        {hint ? <span className="text-xs text-[#5E5046] tabular-nums">{hint}</span> : null}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
                             </div>
                         </div>
-                        {APP_SHELL && (
-                            <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 pt-1.5" style={{ scrollbarWidth: 'none' }}>
-                                {APP_TOOLS.filter(([id]) => tools.has(id)).map(([id, label]) => (
-                                    <button key={id} onClick={() => setActiveTab(id)}
-                                        className={`shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${activeTab === id ? 'bg-[#1E5C42] text-white' : isDark ? 'bg-[#20382B] text-[#B7C2B4]' : 'bg-[#F3E8DF] text-[#396D53]'}`}>
-                                        {id === 'chat' ? `Ask ${aiName(settings)}` : label}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
+                        <div ref={toolChipsRef} role="tablist" aria-label="Study tools"
+                            className={`-mx-3 flex gap-2 overflow-x-auto px-3 pb-2 pt-1.5 ${APP_SHELL ? '' : 'md:hidden'}`} style={{ scrollbarWidth: 'none' }}>
+                            {APP_TOOLS.filter(([id]) => tools.has(id)).map(([id, label]) => (
+                                <button key={id} role="tab" aria-selected={activeTab === id} data-tool={id} onClick={() => setActiveTab(id)}
+                                    className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${activeTab === id ? 'bg-[#1E5C42] text-white' : isDark ? 'bg-[#20382B] text-[#B7C2B4]' : 'bg-[#F3E8DF] text-[#396D53]'}`}>
+                                    {id === 'chat' ? `Ask ${aiName(settings)}` : label}
+                                </button>
+                            ))}
+                        </div>
 
                         {/* Summary Content Area - positioned below header */}
                         {showSummary && (
@@ -1827,6 +1892,19 @@ const ProjectView = () => {
                                     </div>
                                     </React.Fragment>
                                 ))}
+                                {!messages.some((m) => m.role === 'user') && !loading && (
+                                    <div className="flex flex-wrap gap-2 px-1" aria-label="Try asking">
+                                        {(hintsOn ? ['Help me solve a problem step by step', 'Quiz me on this chapter', 'What should I learn first?']
+                                            : ['Explain the main idea simply', 'Quiz me on this chapter', 'Give me a memory trick', 'What should I learn first?'])
+                                            .map((q) => (
+                                                <button key={q} type="button"
+                                                    onClick={() => { askRef.current = q; setInputMessage(q); }}
+                                                    className="rounded-full border border-[#E6D5CC] bg-white px-4 py-2.5 text-sm font-medium text-[#163628] active:bg-[#FDF6F0] hover:border-[#1E5C42]/50">
+                                                    {q}
+                                                </button>
+                                            ))}
+                                    </div>
+                                )}
                                 <div ref={messagesEndRef} />
                                 {(() => {
                                     // The book being prepared, with live progress
@@ -1908,10 +1986,73 @@ const ProjectView = () => {
                                                 className="rounded-full p-1.5 text-[#5E5046] hover:bg-[#FDF6F0]"><X className="h-4 w-4" /></button>
                                         </div>
                                     )}
+                                    {(hintsOn || deepMode) && (
+                                        <div className="mb-2 flex flex-wrap gap-2 sm:hidden">
+                                            {hintsOn && (
+                                                <button type="button" onClick={() => hintsForced === null && setHintsChoice(false)} disabled={hintsForced !== null}
+                                                    className="flex items-center gap-1.5 rounded-full bg-[#D3EE6A] px-3 py-1.5 text-xs font-semibold text-[#163628]">
+                                                    <Lightbulb className="h-3.5 w-3.5" /> Hints first{hintsForced === null && <X className="h-3.5 w-3.5" />}
+                                                </button>
+                                            )}
+                                            {deepMode && (
+                                                <button type="button" onClick={toggleDeep}
+                                                    className="flex items-center gap-1.5 rounded-full bg-[#163628] px-3 py-1.5 text-xs font-semibold text-white">
+                                                    <Brain className="h-3.5 w-3.5" /> Deep answer <X className="h-3.5 w-3.5" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
                                     <form onSubmit={handleSendMessage} className="flex gap-2 md:gap-3 items-center">
+                                        {tools.has('image') && <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={pickPhoto} />}
+                                        {/* Phones: one "+" with labelled options */}
+                                        {(tools.has('image') || hintsForced !== false || tools.has('deep')) && (
+                                            <div className="relative sm:hidden">
+                                                <button type="button" onClick={() => setShowChatExtras((v) => !v)} aria-expanded={showChatExtras}
+                                                    aria-label="More ways to ask" disabled={loading}
+                                                    className={`flex h-12 w-12 items-center justify-center rounded-full text-2xl font-light transition-colors ${showChatExtras || pendingPhoto ? 'bg-[#163628] text-white' : 'bg-[#FDF6F0] text-[#163628]'}`}>
+                                                    <Plus className={`h-6 w-6 transition-transform ${showChatExtras ? 'rotate-45' : ''}`} />
+                                                </button>
+                                                {showChatExtras && (
+                                                    <>
+                                                        <div className="fixed inset-0 z-40" onClick={() => setShowChatExtras(false)} aria-hidden="true" />
+                                                        <div role="menu" className={`absolute bottom-full left-0 z-50 mb-2 w-72 overflow-hidden rounded-2xl border py-1.5 shadow-2xl ${isDark ? 'border-[#293E34] bg-[#182C21]' : 'border-[#E6D5CC] bg-white'}`}>
+                                                            {tools.has('image') && (
+                                                                <button type="button" role="menuitem" onClick={() => { setShowChatExtras(false); photoInputRef.current?.click(); }}
+                                                                    className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-[#FDF6F0]">
+                                                                    <Camera className="h-5 w-5 text-[#1E5C42]" />
+                                                                    <span><span className={`block text-[15px] ${isDark ? 'text-[#E9EFD6]' : 'text-[#163628]'}`}>Ask about a photo</span>
+                                                                        <span className="block text-xs text-[#5E5046]">A question or diagram from your book</span></span>
+                                                                </button>
+                                                            )}
+                                                            {hintsForced !== false && (
+                                                                <button type="button" role="menuitemcheckbox" aria-checked={hintsOn} disabled={hintsForced !== null}
+                                                                    onClick={() => { setShowChatExtras(false); if (hintsForced === null) setHintsChoice(!hintsOn); }}
+                                                                    className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-[#FDF6F0] disabled:opacity-70">
+                                                                    <Lightbulb className="h-5 w-5 text-[#1E5C42]" />
+                                                                    <span className="flex-1"><span className={`block text-[15px] ${isDark ? 'text-[#E9EFD6]' : 'text-[#163628]'}`}>Hints first</span>
+                                                                        <span className="block text-xs text-[#5E5046]">{hintsForced ? 'Set by your teacher' : 'A hint before the full answer'}</span></span>
+                                                                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${hintsOn ? 'bg-[#D3EE6A] text-[#163628]' : 'bg-[#F3E8DF] text-[#5E5046]'}`}>{hintsOn ? 'ON' : 'OFF'}</span>
+                                                                </button>
+                                                            )}
+                                                            {tools.has('deep') && (!isNativeApp() || deepLeft > 0) && (
+                                                                <button type="button" role="menuitemcheckbox" aria-checked={deepMode}
+                                                                    onClick={() => { setShowChatExtras(false); toggleDeep(); }}
+                                                                    className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-[#FDF6F0]">
+                                                                    <Brain className="h-5 w-5 text-[#1E5C42]" />
+                                                                    <span className="flex-1"><span className={`block text-[15px] ${isDark ? 'text-[#E9EFD6]' : 'text-[#163628]'}`}>Deep answer</span>
+                                                                        <span className="block text-xs text-[#5E5046]">{deepUnlimited || !deepMode ? 'For tricky questions' : `${deepLeft} left this month`}</span></span>
+                                                                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${deepMode ? 'bg-[#163628] text-white' : 'bg-[#F3E8DF] text-[#5E5046]'}`}>{deepMode ? 'ON' : 'OFF'}</span>
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
+                                        )}
+                                        {/* Wider screens: the same options as buttons */}
+                                        <div className="hidden sm:flex gap-2 md:gap-3 items-center">
                                         {tools.has('image') && (
                                             <>
-                                                <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={pickPhoto} />
                                                 <button type="button" onClick={() => photoInputRef.current?.click()} disabled={loading}
                                                     title="Ask about a photo of a question or diagram" aria-label="Add a photo"
                                                     className={`shrink-0 flex items-center gap-1 rounded-full px-3 py-2.5 text-xs font-semibold transition-colors ${pendingPhoto
@@ -1950,19 +2091,23 @@ const ProjectView = () => {
                                             <Brain className="h-4 w-4" />
                                             <span className="hidden sm:inline">Deep{deepMode && !deepUnlimited ? ` · ${deepLeft}` : ''}</span>
                                         </button>}
+                                        </div>
                                         <div className="flex-1 relative">
                                             <input
                                                 type="text"
                                                 value={inputMessage}
                                                 onChange={handleInputChange}
-                                                placeholder="Ask a question or type @ for AI tools..."
-                                                className="w-full pl-4 md:pl-6 pr-12 py-3 bg-[#FDF6F0] border-none rounded-full focus:ring-2 focus:ring-[#1E5C42] outline-none text-[#163628] placeholder-[#5E5046] text-sm md:text-base"
+                                                placeholder="Ask anything, or @ for tools"
+                                                aria-label={`Message ${aiName(settings)}`}
+                                                enterKeyHint="send"
+                                                className="w-full pl-4 md:pl-6 pr-14 py-3.5 bg-[#FDF6F0] border-none rounded-full focus:ring-2 focus:ring-[#1E5C42] outline-none text-[#163628] placeholder-[#5E5046] text-base"
                                                 disabled={loading || toolLoading}
                                             />
                                             <button
                                                 type="submit"
                                                 disabled={loading || toolLoading || (!inputMessage.trim() && !pendingPhoto)}
-                                                className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 bg-[#1E5C42] text-white rounded-full hover:bg-[#163628] transition-colors disabled:opacity-50"
+                                                aria-label="Send"
+                                                className="absolute right-1.5 top-1/2 transform -translate-y-1/2 flex h-10 w-10 items-center justify-center bg-[#1E5C42] text-white rounded-full hover:bg-[#163628] transition-colors disabled:opacity-50"
                                             >
                                                 <Send className="h-4 w-4" />
                                             </button>
@@ -2313,14 +2458,14 @@ const ProjectView = () => {
                                         const readyDocs = documents.filter(d => d.upload_status === 'completed' || d.upload_status === 'ready');
                                         setSelectedDocuments(readyDocs.map(d => d.id));
                                     }}
-                                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#1E5C42]/10 text-[#1E5C42] hover:bg-[#1E5C42]/20 transition-colors"
+                                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 md:py-1.5 rounded-lg text-sm md:text-xs font-semibold bg-[#1E5C42]/10 text-[#1E5C42] hover:bg-[#1E5C42]/20 transition-colors"
                                 >
                                     <Eye className="h-3 w-3" />
                                     Select All
                                 </button>
                                 <button
                                     onClick={() => setSelectedDocuments([])}
-                                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#FDF6F0] text-[#5E5046] hover:bg-[#E6D5CC]/50 transition-colors"
+                                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 md:py-1.5 rounded-lg text-sm md:text-xs font-semibold bg-[#FDF6F0] text-[#5E5046] hover:bg-[#E6D5CC]/50 transition-colors"
                                 >
                                     <EyeOff className="h-3 w-3" />
                                     Deselect All
@@ -2518,10 +2663,11 @@ const ProjectView = () => {
                                                         e.stopPropagation();
                                                         requestDelete(doc);
                                                     }}
-                                                    className="p-1.5 rounded-lg hover:bg-red-50 hover:text-red-500 text-[#5E5046] transition-all"
+                                                    className="p-2.5 md:p-1.5 rounded-lg hover:bg-red-50 hover:text-red-500 text-[#5E5046] transition-all"
                                                     title="Delete document"
+                                                    aria-label={`Delete ${doc.filename}`}
                                                 >
-                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                    <Trash2 className="h-4 w-4 md:h-3.5 md:w-3.5" />
                                                 </button>
                                             </div>
                                         </div>
@@ -2626,7 +2772,7 @@ const ProjectView = () => {
 
             {/* Gamification Panel — Floating Popup */}
             {showGamification && (
-                <div className="fixed top-14 right-4 left-4 md:left-auto md:w-96 z-50 animate-in slide-in-from-top-2 duration-200">
+                <div className="fixed top-14 right-3 left-3 md:left-auto md:right-4 md:w-[420px] z-50 animate-in slide-in-from-top-2 duration-200">
                     <GamificationPanel onClose={() => setShowGamification(false)} />
                 </div>
             )}

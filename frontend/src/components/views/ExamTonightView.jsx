@@ -285,7 +285,7 @@ const RevisionSheet = ({ timeline, cards, onBack, onRestart }) => {
                     </div>
                 </div>
                 <div id="cram-revision-sheet" className="rounded-3xl border border-[#E6D5CC] bg-white p-5 md:p-8">
-                    <h2 className="text-2xl font-bold text-[#163628]">Rapid revision sheet</h2>
+                    <h2 className="text-xl sm:text-2xl font-bold text-[#163628]">Rapid revision sheet</h2>
                     <p className="text-sm text-[#5E5046] mb-4">Read this top to bottom right before the exam. Topics are in the order they build on each other.</p>
                     <div className="grid gap-4 md:grid-cols-2">
                         {topics.map((e, n) => {

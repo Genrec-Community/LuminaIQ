@@ -452,6 +452,23 @@ Builder's calls:
 - Streaks count learning days (any XP), not app opens.
 - A goal created by a background check uses the learner's real level; it stays fixed for the day.
 
+### Follow-up (2026-11-01): phone UX pass (phone browsers and the app shell)
+Audited every main screen at 390×844 with Playwright (overflow, tap targets, text size, page errors), then:
+- **Book page header on phones:** book name + Search + one labelled "More" menu (progress, documents, summary, focus
+  timer, bookmarks, tutor, back). The progress panel was unreachable on phones before; it now opens and fits.
+- **Tools are always visible:** the labelled tool-chip row (everyday tools first) is used in phone browsers too, not
+  only in the app shell; the open tool's chip scrolls into view.
+- **Chat:** starter suggestions (adapt to hints mode); Photo / Hints first / Deep answer behind one "+" with labels and
+  ON/OFF state, shown as removable pills when on; wider 16px input (no iOS zoom); "Your chats (n)" instead of a second
+  "New chat" label; shorter welcome.
+- **Tool pages:** compact headers that wrap instead of squeezing; button labels never break; stacked empty-state actions.
+- **Settings on phones:** a list of sections with one-line descriptions, each opening on its own page with a back
+  button (replaces a 10-item sideways tab bar).
+- **App shell home:** the adaptive daily goal leads (ring shows questions); bigger tap targets (checklist close, Skip,
+  document delete/select); tab labels 11.5px.
+- No coach-mark tours on phone-size screens (one clear next step instead). Dark-mode colours for the new menus.
+- Fixed: the Knowledge Graph view crashed (it animated style properties this cytoscape version doesn't have).
+
 ---
 
 ## 6. Configuration (new settings)

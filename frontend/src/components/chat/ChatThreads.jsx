@@ -42,6 +42,9 @@ const ChatThreads = ({ projectId, threadId, version, onSelect, onNew, onAdopt, o
     }, [open]);
 
     const current = threads.find((t) => t.id === threadId);
+    const pastCount = threads.filter((t) => t.message_count > 0).length;
+    // An empty current chat isn't named yet: the button opens the list of chats instead
+    const pickerLabel = current && current.message_count > 0 ? current.title : `Your chats${pastCount ? ` (${pastCount})` : ''}`;
     const visible = threads.filter((t) => t.message_count > 0 || t.id === threadId);
     const text = isDark ? 'text-[#E9EFD6]' : 'text-[#163628]';
     const panel = isDark ? 'bg-[#182C21] border-[#293E34]' : 'bg-white border-[#E6D5CC]';
@@ -65,14 +68,14 @@ const ChatThreads = ({ projectId, threadId, version, onSelect, onNew, onAdopt, o
     return (
         <div ref={boxRef} className="relative flex items-center gap-2 px-2 pt-3 md:px-6">
             <button onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-haspopup="listbox"
-                aria-label={`Your chats. Open: ${current?.title || 'New chat'}`}
-                className={`flex min-w-0 max-w-[60vw] items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-semibold md:max-w-md ${panel} ${text}`}>
+                aria-label={`Your chats. Open: ${pickerLabel}`}
+                className={`flex min-h-[40px] min-w-0 max-w-[60vw] items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-semibold md:max-w-md ${panel} ${text}`}>
                 <MessageSquare className="h-4 w-4 shrink-0 text-[#1E5C42]" />
-                <span className="truncate">{current?.title || 'New chat'}</span>
+                <span className="truncate">{pickerLabel}</span>
                 <ChevronDown className="h-4 w-4 shrink-0" />
             </button>
             <button onClick={() => { setOpen(false); onNew(); }}
-                className="flex shrink-0 items-center gap-1 rounded-xl bg-[#1E5C42] px-3 py-1.5 text-sm font-semibold text-white">
+                className="flex min-h-[40px] shrink-0 items-center gap-1 rounded-xl bg-[#1E5C42] px-3 py-2 text-sm font-semibold text-white">
                 <Plus className="h-4 w-4" /> New chat
             </button>
 

@@ -54,7 +54,7 @@ export const TabBar = ({ onAdd, overlay = false }) => {
                             style={{ color }}
                         >
                             <Icon className="h-6 w-6" strokeWidth={active ? 2.4 : 1.9} fill={active && t.label === 'Learn' ? 'currentColor' : 'none'} />
-                            <span className={`text-[10.5px] ${active ? 'font-bold' : 'font-medium'}`}>{t.label}</span>
+                            <span className={`text-[11.5px] ${active ? 'font-bold' : 'font-medium'}`}>{t.label}</span>
                             {active && !overlay && (
                                 <motion.span layoutId="m-tab-dot" className="absolute -top-1 h-1 w-6 rounded-full" style={{ background: 'var(--m-accent)' }} />
                             )}

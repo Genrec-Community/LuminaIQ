@@ -260,8 +260,8 @@ const StudyDashboard = ({ projectId, availableTopics }) => {
             {/* Header */}
             <div className="flex justify-between items-center">
                 <div>
-                    <h2 className="text-2xl font-bold text-[#163628]">Study Dashboard</h2>
-                    <p className="text-[#5E5046]">Track your learning progress</p>
+                    <h2 className="text-xl sm:text-2xl font-bold text-[#163628]">Study Dashboard</h2>
+                    <p className="hidden sm:block text-[#5E5046]">Track your learning progress</p>
                 </div>
                 <button
                     onClick={loadDashboard}

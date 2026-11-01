@@ -401,22 +401,22 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
     return (
         <div className="h-full overflow-y-auto custom-scrollbar p-4 md:p-8">
             <div className="max-w-6xl mx-auto">
-                <div className="flex items-center justify-between mb-8">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-5 md:mb-8">
                     <div>
-                        <h2 className="text-2xl font-bold text-[#163628]">Flashcards</h2>
-                        <p className="text-[#5E5046]">Create and study flashcard sets</p>
+                        <h2 className="text-xl sm:text-2xl font-bold text-[#163628]">Flashcards</h2>
+                        <p className="hidden sm:block text-[#5E5046]">Create and study flashcard sets</p>
                     </div>
                     <div className="flex gap-2">
                         <button
                             onClick={() => setShowAIModal(true)}
-                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#1E5C42] to-[#163628] text-white rounded-lg hover:opacity-90 transition-opacity shadow-sm"
+                            className="flex items-center gap-2 whitespace-nowrap px-4 py-2.5 bg-gradient-to-r from-[#1E5C42] to-[#163628] text-white rounded-lg hover:opacity-90 transition-opacity shadow-sm"
                         >
                             <Sparkles className="h-4 w-4" />
                             AI Generate
                         </button>
                         <button
                             onClick={() => setShowCreateModal(true)}
-                            className="flex items-center gap-2 px-4 py-2 border border-[#E6D5CC] text-[#163628] rounded-lg hover:bg-[#FDF6F0] transition-colors"
+                            className="flex items-center gap-2 whitespace-nowrap px-4 py-2.5 border border-[#E6D5CC] text-[#163628] rounded-lg hover:bg-[#FDF6F0] transition-colors"
                         >
                             <Plus className="h-4 w-4" />
                             Manual
@@ -429,17 +429,17 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
                         <Layers className="h-16 w-16 text-[#E6D5CC] mx-auto mb-4" />
                         <h3 className="text-xl font-bold text-[#163628] mb-2">No Flashcard Sets Yet</h3>
                         <p className="text-[#5E5046] mb-6">Create your first flashcard set to start studying</p>
-                        <div className="flex gap-3 justify-center">
+                        <div className="flex flex-col sm:flex-row gap-3 justify-center items-stretch sm:items-center max-w-xs sm:max-w-none mx-auto">
                             <button
                                 onClick={() => setShowAIModal(true)}
-                                className="px-6 py-3 bg-gradient-to-r from-[#1E5C42] to-[#163628] text-white rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2"
+                                className="px-6 py-3 bg-gradient-to-r from-[#1E5C42] to-[#163628] text-white rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2 whitespace-nowrap"
                             >
                                 <Sparkles className="h-5 w-5" />
                                 Generate with AI
                             </button>
                             <button
                                 onClick={() => setShowCreateModal(true)}
-                                className="px-6 py-3 border border-[#E6D5CC] rounded-lg hover:bg-[#FDF6F0] transition-colors"
+                                className="px-6 py-3 border border-[#E6D5CC] rounded-lg hover:bg-[#FDF6F0] transition-colors whitespace-nowrap"
                             >
                                 Create Manually
                             </button>
