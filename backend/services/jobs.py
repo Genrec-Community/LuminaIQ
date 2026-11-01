@@ -154,3 +154,20 @@ async def handle_pregenerate_shared(job: Dict[str, Any]) -> Dict[str, Any]:
         except Exception as e:
             logger.warning(f"[Jobs] pre-generation for '{topic}' failed: {e}")
     return {"topics": len(topics), "generated": generated}
+
+
+# --------------------------------------------------------------------------- memory (Phase 5)
+
+@handler("refresh_memory")
+async def handle_refresh_memory(job: Dict[str, Any]) -> Dict[str, Any]:
+    """Fold older chat turns into the rolling summary and update the student's memory facts."""
+    from services import memory
+    p = job["payload"]
+    return await memory.refresh(p["project_id"], p["user_id"], p.get("level") or "general")
+
+
+@handler("tag_mistakes")
+async def handle_tag_mistakes(job: Dict[str, Any]) -> Dict[str, Any]:
+    """Name the misconception behind each wrong quiz answer (one small-model call)."""
+    from services import learner_model
+    return {"tagged": await learner_model.tag_mistakes(job["payload"].get("ids") or [])}

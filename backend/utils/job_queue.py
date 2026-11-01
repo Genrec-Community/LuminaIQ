@@ -112,4 +112,10 @@ def housekeeping(pg, finished_job_days: int = 14) -> Dict[str, int]:
         counts["answers"] = len(pg.fetch("DELETE FROM answer_cache WHERE expires_at < now() RETURNING id"))
     except Exception:
         pass   # table missing on an old schema: nothing to clean
+    try:
+        # Memory facts nobody has used for 6 months fade out (owner decision 13)
+        counts["memories"] = len(pg.fetch(
+            "DELETE FROM user_memories WHERE last_used_at < now() - interval '6 months' RETURNING id"))
+    except Exception:
+        pass
     return counts

@@ -123,6 +123,17 @@ class MCQService:
         """
         from services import shared_content
 
+        if not topic and user_id:
+            # No topic chosen: practise what the student finds hardest (learner model)
+            try:
+                from services import learner_model
+                weak = await learner_model.weak_topics(user_id, project_id, limit=1)
+                if weak:
+                    topic = weak[0][0]
+                    logger.info(f"Quiz without a topic: targeting weakest topic '{topic}'")
+            except Exception as e:
+                logger.debug(f"Weak topics unavailable: {e}")
+
         scope = await shared_content.scope_for(project_id, selected_documents)
 
         async def make(n: int) -> List[Dict[str, Any]]:
@@ -280,7 +291,7 @@ Respond ONLY with the valid JSON array. Do not add any markdown formatting (like
             return []
 
     async def submit_test(
-        self, test_id: str, answers: Dict[int, str]
+        self, test_id: str, answers: Dict[int, str], user_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """Evaluate submitted test answers"""
         try:
@@ -320,6 +331,8 @@ Respond ONLY with the valid JSON array. Do not add any markdown formatting (like
                 )
 
             percentage = (score / total * 100) if total > 0 else 0
+            if user_id:
+                await self._remember_answers(user_id, test, questions, feedback)
 
             return {
                 "score": score,
@@ -332,6 +345,27 @@ Respond ONLY with the valid JSON array. Do not add any markdown formatting (like
             logger.error(f"Error submitting test: {str(e)}")
             raise
 
+
+    @staticmethod
+    async def _remember_answers(user_id: str, test: Dict[str, Any], questions: List[Dict[str, Any]],
+                                feedback: List[Dict[str, Any]]) -> None:
+        """Wrong answers feed the learner model (with misconceptions); right ones fix old mistakes."""
+        from services import learner_model
+
+        def text(q, letter):
+            return next((o.get("text", "") for o in q.get("options") or [] if o.get("option") == letter), letter or "")
+
+        wrong = [{"question": q["question"], "wrong_answer": text(q, f["user_answer"]),
+                  "correct_answer": text(q, f["correct_answer"])}
+                 for q, f in zip(questions, feedback) if f["user_answer"] and not f["is_correct"]]
+        right = [q["question"] for q, f in zip(questions, feedback) if f["is_correct"]]
+        topic = test.get("chapter_name") or ""
+        try:
+            await learner_model.mark_fixed(user_id, test["project_id"], right)
+            if wrong:
+                await learner_model.record_mistakes(user_id, test["project_id"], topic, wrong)
+        except Exception as e:
+            logger.warning(f"Learner model not updated from quiz: {e}")
 
     async def get_saved_tests(self, project_id: str) -> List[Dict[str, Any]]:
         """Get all saved MCQ tests for a project"""

@@ -5,6 +5,7 @@ from api.v1.endpoints import (
     auth,
     books,
     chat,
+    memory,
     documents,
     mcq,
     evaluation,
@@ -51,6 +52,7 @@ api_router.include_router(study_modes.router, prefix="/learning", tags=["study-m
 api_router.include_router(lessons.router, prefix="/learning", tags=["lessons"], dependencies=_GUARD)
 api_router.include_router(knowledge_graph.router, prefix="/knowledge-graph", tags=["knowledge-graph"], dependencies=_GUARD)
 api_router.include_router(user_data.router, prefix="/user-data", tags=["user-data"], dependencies=_GUARD)
+api_router.include_router(memory.router, prefix="/memory", tags=["memory"], dependencies=_GUARD)
 api_router.include_router(flashcards.router, prefix="/flashcards", tags=["flashcards"], dependencies=_GUARD)
 api_router.include_router(mindmaps.router, prefix="/mindmaps", tags=["mindmaps"], dependencies=_GUARD)
 api_router.include_router(progress.router, prefix="/progress", tags=["progress"])

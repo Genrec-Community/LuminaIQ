@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { HelpCircle, FileText, LogOut, CheckSquare, X, ChevronDown, Loader2, BookMarked, Brain, Zap, Sparkles, ArrowLeft, Target, Trophy, AlertTriangle, Clock, Trash2, Eye, Plus } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { generateMCQ, generateSubjectiveTest, submitEvaluation, submitSubjectiveTest, generateNotes, recordPerformance, createCardsFromQuiz, getSuggestedTopic, getPerformance, getSavedQuizzes, getSavedQuiz, deleteSavedQuiz } from '../../api';
+import { generateMCQ, generateSubjectiveTest, submitEvaluation, submitSubjectiveTest, generateNotes, recordPerformance, createCardsFromQuiz, getSuggestedTopic, getPerformance, getSavedQuizzes, getSavedQuiz, deleteSavedQuiz, submitMCQAnswers } from '../../api';
+import { saveResume, loadResume } from '../../utils/resume';
 import { useToast } from '../../context/ToastContext';
 import { recordActivity } from '../../utils/studyActivity';
 import { useSettings } from '../../context/SettingsContext';
@@ -226,7 +227,7 @@ const QuizView = ({
         }
     };
 
-    const handleViewSavedQuiz = async (testId) => {
+    const handleViewSavedQuiz = async (testId, restore = null) => {
         try {
             setMcqLoading(true);
             setShowSavedList(false);
@@ -239,10 +240,10 @@ const QuizView = ({
             setMcqTopic(data.chapter_name || '');
             setMcqTopicSelection(data.chapter_name || '');
             setQuizMode('mcq');
-            setMcqUserAnswers({});
+            setMcqUserAnswers(restore?.answers || {});
             setMcqSubmitted(false);
             setMcqScore(null);
-            setCurrentQuestionIndex(0);
+            setCurrentQuestionIndex(Math.min(restore?.index || 0, Math.max(0, (data.questions || []).length - 1)));
             setPerformanceSaved(false);
             setCardsCreated(null);
         } catch (error) {
@@ -305,12 +306,30 @@ const QuizView = ({
         }
     };
 
+    // An unfinished quiz (from this or another device) can be picked up where it was left
+    const [unfinished, setUnfinished] = useState(null);
+    useEffect(() => {
+        let alive = true;
+        loadResume().then((state) => { if (alive) setUnfinished(state[`quiz:${projectId}`] || null); });
+        return () => { alive = false; };
+    }, [projectId]);
+    useEffect(() => {
+        if (quizMode !== 'mcq' || !mcqTest?.test_id || mcqSubmitted || !Object.keys(mcqUserAnswers).length) return;
+        saveResume({ [`quiz:${projectId}`]: { testId: mcqTest.test_id, topic: mcqTest.topic || '', answers: mcqUserAnswers,
+            index: currentQuestionIndex, total: mcqTest.questions?.length || 0 } });
+    }, [mcqUserAnswers, currentQuestionIndex, mcqTest, mcqSubmitted, quizMode, projectId]);
+
     const handleOptionSelect = (qIndex, option) => {
         if (mcqSubmitted) return;
         setMcqUserAnswers(prev => ({ ...prev, [qIndex]: option }));
     };
 
     const handleSubmitMCQ = async () => {
+        // The finished quiz no longer needs resuming; the server learns which answers were wrong
+        // (mistakes and misconceptions for the learner model) and which old mistakes are now fixed
+        saveResume({ [`quiz:${projectId}`]: null });
+        setUnfinished(null);
+        if (mcqTest?.test_id) submitMCQAnswers(mcqTest.test_id, mcqUserAnswers).catch(() => {});
         let score = 0;
         const feedbackData = [];
         
@@ -624,6 +643,19 @@ const QuizView = ({
     return (
         <div className="h-full flex flex-col relative w-full">
             {/* No 'Back to Chat' link: the sidebar is always one tap away */}
+
+            {unfinished && !mcqTest && !mcqLoading && (
+                <div className="mx-4 mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[#1E5C42]/30 bg-[#1E5C42]/5 p-4">
+                    <p className="min-w-0 flex-1 text-sm text-[#163628]">
+                        You have an unfinished quiz{unfinished.topic ? <> on <span className="font-semibold">{unfinished.topic}</span></> : null}
+                        {unfinished.total ? ` (${Object.keys(unfinished.answers || {}).length} of ${unfinished.total} answered)` : ''}.
+                    </p>
+                    <button onClick={() => { const u = unfinished; setUnfinished(null); handleViewSavedQuiz(u.testId, u); }}
+                        className="rounded-xl bg-[#1E5C42] px-4 py-2 text-sm font-semibold text-white">Resume</button>
+                    <button onClick={() => { setUnfinished(null); saveResume({ [`quiz:${projectId}`]: null }); }}
+                        className="rounded-xl px-3 py-2 text-sm font-semibold text-[#5E5046]">Dismiss</button>
+                </div>
+            )}
 
             {/* Full-screen Loading State for MCQ */}
             {mcqLoading && (

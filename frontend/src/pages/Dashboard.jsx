@@ -22,6 +22,7 @@ import { useSettings } from '../context/SettingsContext';
 import TodayHero from '../components/TodayHero';
 import { displayName } from '../utils/persona';
 import { LAST_PROJECT_KEY } from '../utils/dailyProgress';
+import { loadResume } from '../utils/resume';
 import { takeAfterLogin } from '../utils/afterLogin';
 import usePlan from '../hooks/usePlan';
 import { isNativeApp } from '../utils/platform';
@@ -46,6 +47,9 @@ const Dashboard = () => {
     const [dragActive, setDragActive] = useState(false);
     const [uploadStatus, setUploadStatus] = useState({}); // { fileName: 'pending' | 'uploading' | 'success' | 'error' }
     const [projects, setProjects] = useState(() => getCachedProjects() || []);
+    // "Continue" opens the book last used on any device: refresh from the server once
+    const [, setResumeTick] = useState(0);
+    useEffect(() => { loadResume().then(() => setResumeTick((t) => t + 1)); }, []);
     const [isLoadingProjects, setIsLoadingProjects] = useState(true);
     const [fetchError, setFetchError] = useState(false);
     const [isSlowLoad, setIsSlowLoad] = useState(false);

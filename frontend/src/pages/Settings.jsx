@@ -29,10 +29,12 @@ import {
     Zap,
     Trophy,
     Type,
-    KeyRound
+    KeyRound,
+    Library
 } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
 import PlanUsage from '../components/PlanUsage';
+import MemorySettings from '../components/MemorySettings';
 import ChangePasswordForm from '../components/ChangePasswordForm';
 import DeleteAccountForm from '../components/DeleteAccountForm';
 import { useGamification } from '../context/GamificationContext';
@@ -137,6 +139,7 @@ const Settings = () => {
         { id: 'focus', label: 'Focus', icon: Maximize2 },
         { id: 'ai', label: 'AI & Quiz', icon: Brain },
         { id: 'appearance', label: 'Display', icon: Sun },
+        { id: 'memory', label: 'Memory', icon: Brain },
         { id: 'notifications', label: 'Alerts', icon: Bell },
         { id: 'plan', label: 'Plan', icon: Crown },
         { id: 'account', label: 'Account', icon: KeyRound },
@@ -904,6 +907,14 @@ const Settings = () => {
     );
 
 
+    const renderMemory = () => (
+        <div className="space-y-5">
+            <SectionHeader icon={Brain} title="What Lumina remembers about you" subtitle="See, edit or delete it any time" />
+            <MemorySettings colors={{ paper, border, muted, heading, inputBg }} settings={settings}
+                updateSetting={updateSetting} Toggle={ToggleSwitch} icons={{ books: Library, brain: Brain }} />
+        </div>
+    );
+
     const renderPlan = () => (
         <div className="space-y-5">
             <SectionHeader icon={Crown} title="Plan & usage" subtitle="What your plan includes and how much you've used" />
@@ -984,6 +995,7 @@ const Settings = () => {
             case 'ai': return renderAI();
             case 'appearance': return renderAppearance();
             case 'notifications': return renderNotifications();
+            case 'memory': return renderMemory();
             case 'plan': return renderPlan();
             case 'account': return renderAccount();
             default: return renderProfile();

@@ -103,6 +103,7 @@ const VisualLabView = lazy(() => import('../components/views/VisualLabView'));
 const LessonView = lazy(() => import('../components/LessonView'));
 import useFocusTimer from '../hooks/useFocusTimer';
 import { LAST_PROJECT_KEY } from '../utils/dailyProgress';
+import { saveResume, loadResume } from '../utils/resume';
 import { aiName } from '../utils/persona';
 import usePlan from '../hooks/usePlan';
 import { emitLimit, emitPlanChanged } from '../utils/plan';
@@ -260,6 +261,25 @@ const ProjectView = () => {
     useEffect(() => {
         try { localStorage.setItem(LAST_PROJECT_KEY, projectId); } catch { /* ignore */ }
     }, [projectId]);
+    // Another device may know which view this book was left on (only when this tab has no memory of it).
+    // Until that answer arrives, the default view isn't saved, so it can't overwrite the real one.
+    const resumeReadyRef = useRef(false);
+    useEffect(() => {
+        resumeReadyRef.current = false;
+        if (searchParams.get('tool') || sessionStorage.getItem(`lumina_tab_${projectId}`)) {
+            resumeReadyRef.current = true;
+            return undefined;
+        }
+        let alive = true;
+        loadResume().then((state) => {
+            if (!alive) return;
+            const view = state[`view:${projectId}`];
+            resumeReadyRef.current = true;
+            if (view && view !== 'general') setActiveTab(view);
+        });
+        return () => { alive = false; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [projectId]);
     const [messages, setMessages] = useState([]);
     const messagesEndRef = useRef(null);
 
@@ -362,7 +382,10 @@ const ProjectView = () => {
 
     // Persist activeTab to sessionStorage
     useEffect(() => {
-        sessionStorage.setItem(`lumina_tab_${projectId}`, activeTab);
+        if (resumeReadyRef.current) {
+            sessionStorage.setItem(`lumina_tab_${projectId}`, activeTab);
+            saveResume({ lastProject: projectId, [`view:${projectId}`]: activeTab });
+        }
         // Dismiss mindmap/flashcard overlays when switching tabs
         setMindmapTopic(null);
         setMindmapDocs([]);

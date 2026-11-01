@@ -129,6 +129,59 @@ async def save_settings(
         raise HTTPException(500, str(e))
 
 
+# ============== Where the student left off (Phase 5) ==============
+# One JSON object per user: last book and view, in-progress quiz, lesson position, so a
+# student resumes on any device. PATCH merges keys; a null value removes a key.
+
+APP_STATE_MAX_BYTES = 64 * 1024
+
+
+class AppStatePatch(BaseModel):
+    state: Dict[str, Any]
+
+
+@router.get("/state")
+async def get_app_state(current_user: dict = Depends(get_current_user)):
+    from db.client import async_db, get_supabase_client
+    pg = get_supabase_client().pg
+    rows = await async_db(lambda: pg.fetch("SELECT state, updated_at FROM app_state WHERE user_id = %s",
+                                           (current_user["id"],)))
+    return {"state": rows[0]["state"] if rows else {}, "updated_at": rows[0]["updated_at"] if rows else None}
+
+
+@router.patch("/state")
+async def patch_app_state(body: AppStatePatch, current_user: dict = Depends(get_current_user)):
+    import json as _json
+    from db.client import async_db, get_supabase_client
+    if len(body.state) > 50 or any(len(k) > 120 for k in body.state):
+        raise HTTPException(400, "Too many or too long keys.")
+    pg = get_supabase_client().pg
+    uid = current_user["id"]
+    sets = {k: v for k, v in body.state.items() if v is not None}
+    drops = [k for k, v in body.state.items() if v is None]
+
+    def run():
+        with pg.pool.connection() as conn:
+            with conn.transaction():
+                row = conn.execute("SELECT state FROM app_state WHERE user_id = %s FOR UPDATE", (uid,)).fetchone()
+                state = dict(row["state"]) if row else {}
+                state.update(sets)
+                for k in drops:
+                    state.pop(k, None)
+                raw = _json.dumps(state)
+                if len(raw.encode()) > APP_STATE_MAX_BYTES:
+                    return None
+                conn.execute(
+                    """INSERT INTO app_state (user_id, state, updated_at) VALUES (%s, %s::jsonb, now())
+                       ON CONFLICT (user_id) DO UPDATE SET state = EXCLUDED.state, updated_at = now()""", (uid, raw))
+                return state
+
+    state = await async_db(run)
+    if state is None:
+        raise HTTPException(413, "Saved state is too large.")
+    return {"state": state}
+
+
 # ============== Bookmarks ==============
 
 @router.get("/bookmarks/{project_id}")

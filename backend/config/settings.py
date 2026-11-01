@@ -81,6 +81,7 @@ class Settings(BaseSettings):
     CONTEXT_BUDGET_EXCERPTS: int = 6000
     CONTEXT_BUDGET_HISTORY: int = 2500
     CONTEXT_BUDGET_PROFILE: int = 1200
+    CONTEXT_BUDGET_MEMORY: int = 900     # learner model + memory facts + chat summary
     # Cached answers to first questions on shared books
     ANSWER_CACHE_ENABLED: bool = True
     ANSWER_CACHE_TTL_DAYS: int = 30

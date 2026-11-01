@@ -49,8 +49,8 @@ class DocumentUploadResponse(BaseModel):
     id: str
     project_id: str
     filename: str
-    file_type: str
-    file_size: int
+    file_type: Optional[str] = None
+    file_size: Optional[int] = None
     upload_status: str
     created_at: Optional[datetime] = None
 

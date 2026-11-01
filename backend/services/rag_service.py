@@ -22,7 +22,7 @@ from services import context_builder, retrieval, vector_store
 from services.llm_service import llm_service
 from utils.logger import logger
 
-HISTORY_TURNS = 12
+HISTORY_TURNS = 16      # turns after the chat summary (services/memory.py); the token budget still applies
 
 BASE_PROMPT = """You are Lumina IQ, a study companion that turns a student's own books into clear understanding.
 

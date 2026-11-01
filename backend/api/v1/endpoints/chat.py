@@ -13,7 +13,7 @@ import asyncio
 import json
 from services.usage_service import usage, metered
 from config.settings import settings as app_settings
-from services import answer_cache, context_builder, levels, safety, shared_content
+from services import answer_cache, context_builder, learner_model, levels, memory, safety, shared_content
 from services.telemetry import meter
 from services.prompts.levels import build_level_block, resolve_hints
 
@@ -149,45 +149,72 @@ async def get_chat_history(
         raise HTTPException(500, str(e))
 
 
-# Only the most recent turns go to the model: answers stay grounded in the
-# book, and requests don't grow slower and costlier as a chat gets longer.
+# Without a chat summary yet, only the most recent turns go to the model: answers stay
+# grounded in the book, and requests don't grow slower and costlier as a chat gets longer.
 CHAT_HISTORY_LIMIT = 12
+
+
+async def _load_memory(request: ChatRequest, user_id: str):
+    """
+    (chat summary, recent turns, learner snapshot, memory facts, across-books setting).
+    Long chats come back as a summary plus the recent turns (services/memory.py).
+    """
+    client = get_supabase_client()
+    try:
+        prefs = await memory.settings_for(user_id)
+        (summary, history), snap, facts = await asyncio.gather(
+            memory.chat_context(request.project_id),
+            learner_model.snapshot(user_id, request.project_id, prefs["across_books"]),
+            memory.for_prompt(user_id, request.project_id, request.message, prefs["across_books"]),
+        )
+        return summary, history, snap, facts
+    except Exception as e:
+        logger.debug(f"Memory unavailable, using recent turns only: {e}")
+    res = await async_db(
+        lambda: client.table("chat_messages")
+        .select("role, content")
+        .eq("project_id", request.project_id)
+        .order("created_at", desc=True)
+        .limit(CHAT_HISTORY_LIMIT)
+        .execute()
+    )
+    return "", [{"role": m["role"], "content": m["content"]} for m in reversed(res.data or [])], None, []
 
 
 async def _prepare_chat(request: ChatRequest, user_id: str):
     """
-    Load recent history and the student's profile in parallel, and start
-    saving the new user message in the background. Returns
+    Load the chat so far, what we know about the student and their profile in parallel,
+    and start saving the new user message in the background. Returns
     (history, user_context, save_task, level info); await save_task before saving the reply
     so the two stay in order.
     """
     client = get_supabase_client()
-
-    async def load_history():
-        res = await async_db(
-            lambda: client.table("chat_messages")
-            .select("role, content")
-            .eq("project_id", request.project_id)
-            .order("created_at", desc=True)
-            .limit(CHAT_HISTORY_LIMIT)
-            .execute()
-        )
-        return [{"role": m["role"], "content": m["content"]} for m in reversed(res.data or [])]
-
-    history, user_context, eff = await asyncio.gather(
-        load_history(), get_user_context_string(user_id), levels.effective_for(user_id)
+    (summary, history, snap, facts), user_context, eff = await asyncio.gather(
+        _load_memory(request, user_id), get_user_context_string(user_id), levels.effective_for(user_id)
     )
     # The answer style for their level, school safety rules, hints-first and outside-book
     level_block = build_level_block(eff, resolve_hints(eff, request.hints))
     # The profile has a budget; the level rules (including school safety) are never trimmed
     user_context = context_builder.trim(user_context, app_settings.CONTEXT_BUDGET_PROFILE)
-    user_context = f"{user_context}\n\n{level_block}" if user_context else level_block
+    # Prompt order (stable first, for provider prefix caching): profile, what we know, level rules
+    known = context_builder.learner_block(snap, facts, summary, app_settings.CONTEXT_BUDGET_MEMORY)
+    user_context = "\n\n".join(p for p in (user_context, known, level_block) if p)
     save_task = asyncio.create_task(async_db(
         lambda: client.table("chat_messages").insert(
             {"project_id": request.project_id, "role": "user", "content": request.message}
         ).execute()
     ))
     return history, user_context, save_task, eff
+
+
+def _after_reply(request: ChatRequest, user_id: str, eff) -> None:
+    """Refresh the chat summary and memory facts in the background once enough turns piled up."""
+    task = asyncio.create_task(memory.maybe_refresh(request.project_id, user_id, eff.get("level") or "general"))
+    _background.add(task)
+    task.add_done_callback(_background.discard)
+
+
+_background: set = set()
 
 
 async def _answer_cache_plan(request: ChatRequest, history, eff):
@@ -268,6 +295,7 @@ async def chat_message(
                 }
             ).execute()
         )
+        _after_reply(request, current_user["id"], eff)
 
         return result
 
@@ -363,6 +391,7 @@ async def chat_stream(
                         }
                     ).execute()
                 )
+                _after_reply(request, current_user["id"], eff)
             except Exception as save_err:
                 logger.error(f"Failed to save assistant message: {save_err}")
 

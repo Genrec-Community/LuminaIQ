@@ -42,7 +42,7 @@ Anti-goals (a failure even if it "works"):
   backend change. RAG changes must also pass the eval in §6 (Phase 3).
 - **Migrations:**
   - One database (`DATABASE_URL`): `backend/db/schema/NNNN_name.sql`, applied in order on startup by `db/migrate.py`
-    (or `uv run python -m db.migrate`). `0001_init.sql` is the fresh-start schema; the latest is `0005_cost.sql`, so the next file is `0006_`.
+    (or `uv run python -m db.migrate`). `0001_init.sql` is the fresh-start schema; the latest is `0006_memory.sql`, so the next file is `0007_`.
     Never edit an applied file; add a new one.
   - `backend/db/supabase_auth.sql` is the only SQL that runs in Supabase (the Google sign-up allowlist on `auth.users`).
 - **Database access:** services call `get_supabase_client().table(...)` / `.rpc(...)` as before. That now goes to our
@@ -65,7 +65,7 @@ Anti-goals (a failure even if it "works"):
 | Study-tool retrieval | `services/retrieval.py`: vector, falling back to keyword over stored text | Reasonable. Make it share the new hybrid search. |
 | Cache | `utils/cache.py`: in-process dict | Not shared across processes. Lost on restart. Only the project summary is persisted. |
 | Background work | `utils/background_jobs.py`, `utils/progress_manager.py`, `utils/embedding_queue.py`: in-memory | Jobs and progress are lost on restart and invisible to other processes. |
-| Memory | Last 12 messages of the project chat + static profile from settings | No cross-session or cross-book memory. Long chats forget everything. |
+| Memory | Last 12 messages of the project chat + static profile from settings | No cross-session or cross-book memory. Long chats forget everything. (Fixed in Phase 5.) |
 | Levels | `ageGroup` (teen/young/adult/mature) + `selfLevel` (beginner/intermediate/advanced) | Doesn't map to school standards. Barely changes answers. |
 | Tool access | `services/plans.py` + `usage_service.metered()` gate by **plan** only | No per-level or per-class control. |
 | Maths | `react-markdown` + `remark-gfm` only | LaTeX shows as raw `$...$`. |
@@ -338,6 +338,27 @@ Builder's calls:
 
 **Done when:** a student's weak topics from a quiz shape the next chat and quiz, a 100-turn chat still remembers turn 3 through the summary, and memories can be viewed and deleted.
 
+**Status (2026-11-01): done.** `services/learner_model.py` (weak/strong topics from `topic_mastery`, open mistakes in
+`learner_mistakes`, misconceptions tagged by the `tag_mistakes` job, mistakes marked fixed when answered right),
+`services/memory.py` (rolling `chat_summaries` and `user_memories` facts, refreshed by the `refresh_memory` job every
+~10 messages; facts only for `higher_secondary` and above incl. `general`; deduplicated, capped at 60, pruned by
+worker housekeeping after 6 months unused), `context_builder.learner_block()` (`CONTEXT_BUDGET_MEMORY`), chat
+integration, `api/v1/endpoints/memory.py`, `/user-data/state`; schema `0006_memory.sql`. Frontend: Settings → Memory
+(`components/MemorySettings.jsx`), `utils/resume.js` (last book, view per book, unfinished quiz with a Resume banner).
+Checked in a browser with Playwright (notes added/edited/deleted, phone layout, unfinished quiz resumed on a "new
+device" at the right question) and end to end (chat turns → summary job ran on the worker).
+Builder's calls:
+- Recent turns = everything after the summary's cut-off (at most 16, never fewer than 6), so there's no gap.
+- Memory notes are picked by word overlap with the question, then recency (no embeddings at 60 short notes).
+- Prompt order: profile, what we know about the student, then the level rules. Cached shared answers (Phase 4) never
+  include memory: they keep the neutral voice.
+- `memoryAcrossBooks` and `autoMemory` live in user settings (the Settings page saves the whole settings object, so
+  the toggles go through it). With across-books off, notes and mistakes from other books aren't used; notes the
+  student typed in themselves apply everywhere.
+- The quiz screen scores in the browser; it now also sends the answers to `/mcq/submit` so the learner model learns
+  which answers were wrong. `/mcq/submit` now checks the test belongs to the caller.
+- A quiz started with no topic targets the student's weakest topic.
+
 ### Phase 6: LaTeX and image input
 1. **Rendering:**
    - One shared `<Markdown>` component (`remark-gfm` + `remark-math` + `rehype-katex`, KaTeX CSS) replaces every direct `ReactMarkdown` use. There are 9 files today.
@@ -397,7 +418,7 @@ Builder's calls:
 | `ANSWER_CACHE_ENABLED` / `ANSWER_CACHE_TTL_DAYS` | First-question answer cache on shared books | `true` / `30` |
 | `SHARED_CONTENT_ENABLED` | Shared quiz/flashcard pools, notes and mindmaps for shared books | `true` |
 | `SMALL_LLM_PRICE_*` / `BIG_LLM_PRICE_*` / `EMBEDDING_PRICE_INPUT` / `RERANK_PRICE_PER_CALL` | USD per 1M tokens (per call for rerank), for cost estimates | `0` (unknown) |
-| `CONTEXT_BUDGET_EXCERPTS` / `_HISTORY` / `_PROFILE` | Token budgets per prompt part | `6000` / `2500` / `1200` |
+| `CONTEXT_BUDGET_EXCERPTS` / `_HISTORY` / `_PROFILE` / `_MEMORY` | Token budgets per prompt part | `6000` / `2500` / `1200` / `900` |
 | `MODERATION_ENABLED` | Input moderation for the school level | `true` |
 | `RATE_LIMIT_*` | Per-user / per-IP limits | sensible defaults |
 

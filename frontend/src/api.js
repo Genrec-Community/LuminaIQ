@@ -880,6 +880,19 @@ export const saveUserSettings = async (settings) => {
     return response.data;
 };
 
+// --- Memory: "What Lumina remembers about you" ---
+export const submitMCQAnswers = async (testId, answers) => (await api.post('/mcq/submit', { test_id: testId, answers })).data;
+export const getMemory = async () => (await api.get('/memory')).data;
+export const addMemory = async (content, kind = 'fact') => (await api.post('/memory', { content, kind })).data;
+export const editMemory = async (id, content) => (await api.patch(`/memory/${id}`, { content })).data;
+export const deleteMemory = async (id) => (await api.delete(`/memory/${id}`)).data;
+export const clearMemory = async () => (await api.delete('/memory')).data;
+export const deleteChatSummary = async (projectId) => (await api.delete(`/memory/summaries/${projectId}`)).data;
+
+// --- Where the student left off (any device) ---
+export const getAppState = async () => (await api.get('/user-data/state')).data.state || {};
+export const patchAppState = async (state) => (await api.patch('/user-data/state', { state })).data.state;
+
 // --- Bookmarks ---
 export const getBookmarks = async (projectId) => {
     const response = await api.get(`/user-data/bookmarks/${projectId}`);
