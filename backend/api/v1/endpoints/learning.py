@@ -48,6 +48,7 @@ from api.deps import get_current_user
 from utils.logger import logger
 import json
 from services.usage_service import usage, metered
+from services.prompts.levels import MATH_RULE
 
 router = APIRouter()
 
@@ -814,7 +815,7 @@ OUTPUT FORMAT - Return ONLY valid JSON, no markdown:
   ]
 }}"""
 
-        messages = [{"role": "user", "content": prompt}]
+        messages = [{"role": "user", "content": f"{prompt}\n\n{MATH_RULE}"}]
         response = await llm_service.chat_completion(
             messages, temperature=0.3, max_tokens=2000, light=True
         )
@@ -944,7 +945,7 @@ OUTPUT FORMAT - Return ONLY valid JSON array, no markdown:
   {{"front": "How does Y work?", "back": "Y works by..."}}
 ]"""
 
-        messages = [{"role": "user", "content": prompt}]
+        messages = [{"role": "user", "content": f"{prompt}\n\n{MATH_RULE}"}]
         response = await llm_service.chat_completion(
             messages, temperature=0.4, max_tokens=3000, light=True
         )

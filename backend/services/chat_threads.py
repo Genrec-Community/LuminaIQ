@@ -113,5 +113,5 @@ async def delete(thread_id: str, user_id: str) -> None:
 async def messages(thread_id: str) -> List[Dict[str, Any]]:
     pg = _pg()
     return await _db(lambda: pg.fetch(
-        "SELECT role, content, sources, created_at FROM chat_messages WHERE thread_id = %s ORDER BY created_at",
+        "SELECT role, content, sources, created_at, image_path FROM chat_messages WHERE thread_id = %s ORDER BY created_at",
         (thread_id,)))

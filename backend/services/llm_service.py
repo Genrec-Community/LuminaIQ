@@ -153,6 +153,13 @@ def resolve_model(task: str = "chat", plan: Optional[str] = None) -> ModelConfig
     return small_config()
 
 
+def vision_config(plan: Optional[str] = None) -> Optional[ModelConfig]:
+    """The model that reads photos for this plan, or None when that model can't see images."""
+    cfg = resolve_model("vision", plan)
+    able = settings.BIG_LLM_VISION if cfg.role == "big" else settings.SMALL_LLM_VISION
+    return cfg if able else None
+
+
 _clients: Dict[tuple, openai.AsyncOpenAI] = {}
 
 
@@ -257,6 +264,27 @@ class LLMService:
             await _record_usage(cfg, getattr(resp, "usage", None), _ms(started))
             text = strip_reasoning((resp.choices[0].message.content if resp.choices else "") or "")
         return text
+
+    async def vision_completion(self, prompt: str, image_data_url: str, max_tokens: int = 800,
+                                plan: Optional[str] = None) -> str:
+        """One reply about an image (OpenAI-style image_url content part)."""
+        cfg = vision_config(plan)
+        if cfg is None:
+            raise RuntimeError("No image-capable model is configured for this plan")
+        client = client_for(cfg)
+        messages = [{"role": "user", "content": [
+            {"type": "text", "text": prompt},
+            {"type": "image_url", "image_url": {"url": image_data_url}},
+        ]}]
+        kwargs = self._kwargs(cfg, messages, 0.1, max_tokens)
+        started = time.perf_counter()
+        try:
+            resp = await _create(client, kwargs)
+        except Exception:
+            await _record_usage(cfg, None, _ms(started), ok=False)
+            raise
+        await _record_usage(cfg, getattr(resp, "usage", None), _ms(started))
+        return strip_reasoning((resp.choices[0].message.content if resp.choices else "") or "")
 
     async def chat_completion_stream(self, messages: List[Dict[str, str]], temperature: float = 0.7,
                                      max_tokens: int = 4000, deep: bool = False,

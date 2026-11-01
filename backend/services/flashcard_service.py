@@ -256,39 +256,17 @@ Generate exactly {num_cards} high-quality flashcards. Return ONLY the JSON array
 
     def _parse_flashcards_response(self, response: str, num_cards: int) -> List[Dict[str, str]]:
         """Parse LLM response into flashcard data with multiple fallback strategies."""
-        # Strategy 1: Direct JSON array extraction
+        # Strategy 1: the JSON array, parsed so LaTeX keeps its backslashes
+        from utils.json_latex import extract
         try:
-            # Clean markdown fences
-            text = response.strip()
-            if text.startswith("```json"):
-                text = text[7:]
-            if text.startswith("```"):
-                text = text[3:]
-            if text.endswith("```"):
-                text = text[:-3]
-            text = text.strip()
-            
-            # Try direct parse
-            parsed = json.loads(text)
-            if isinstance(parsed, list) and len(parsed) > 0:
+            parsed = extract(response, "[")
+            if isinstance(parsed, list):
                 valid = [c for c in parsed if isinstance(c, dict) and 'front' in c and 'back' in c]
                 if valid:
                     return valid[:num_cards]
-        except (json.JSONDecodeError, TypeError):
+        except (ValueError, TypeError):
             pass
-        
-        # Strategy 2: Regex extraction of JSON array
-        try:
-            json_match = re.search(r'\[[\s\S]*\]', response)
-            if json_match:
-                cards_data = json.loads(json_match.group())
-                if isinstance(cards_data, list):
-                    valid = [c for c in cards_data if isinstance(c, dict) and 'front' in c and 'back' in c]
-                    if valid:
-                        return valid[:num_cards]
-        except (json.JSONDecodeError, TypeError):
-            pass
-        
+
         # Strategy 3: Line-by-line parsing for non-JSON formats
         cards_data = []
         lines = response.split('\n')

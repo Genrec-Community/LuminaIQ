@@ -15,6 +15,7 @@ import asyncio
 import json
 from services.usage_service import usage, metered
 from config.settings import settings as app_settings
+from services import photo_questions
 from services import answer_cache, chat_threads, context_builder, learner_model, levels, memory, safety, shared_content
 from services.telemetry import meter
 from services.prompts.levels import build_level_block, resolve_hints
@@ -139,8 +140,11 @@ async def get_chat_history(
             return []
         thread = latest[0]
     rows = await chat_threads.messages(thread["id"])
-    return [ChatMessage(role=m["role"], content=m["content"],
-                        created_at=str(m["created_at"]) if m.get("created_at") else None) for m in rows]
+    urls = await asyncio.gather(*[photo_questions.signed_url(m.get("image_path")) for m in rows])
+    return [ChatMessage(role=m["role"], content=m["content"], image_url=url,
+                        sources=m.get("sources") if isinstance(m.get("sources"), list) else None,
+                        created_at=str(m["created_at"]) if m.get("created_at") else None)
+            for m, url in zip(rows, urls)]
 
 
 class ThreadCreate(BaseModel):
@@ -230,7 +234,8 @@ async def _prepare_chat(request: ChatRequest, user_id: str):
     user_context = "\n\n".join(p for p in (user_context, known, level_block) if p)
     async def save_question():
         await async_db(lambda: client.table("chat_messages").insert(
-            {"project_id": request.project_id, "thread_id": thread["id"], "role": "user", "content": request.message}
+            {"project_id": request.project_id, "thread_id": thread["id"], "role": "user", "content": request.message,
+             "image_path": getattr(request, "image_path", None)}
         ).execute())
         await chat_threads.touch(thread, request.message)
 
@@ -255,11 +260,49 @@ async def _answer_cache_plan(request: ChatRequest, history, eff):
     """
     if history or request.system_prompt or resolve_hints(eff, request.hints):
         return None
+    if photo_questions.PHOTO_MARKER in (getattr(request, "message", "") or ""):
+        return None   # photo questions are personal: never shared or served from the cache
     scope = await shared_content.scope_for(request.project_id, request.selected_documents)
     if not scope:
         return None
     return scope, answer_cache.scope_key(scope, eff.get("level") or "general", request.deep,
                                          eff.get("outside_book", True))
+
+
+async def _attach_photo(request: ChatRequest, current_user: dict) -> Optional[str]:
+    """
+    A photo with the message: read it (vision model), keep it for the thumbnail, and add its
+    transcript to request.message so the book is searched for it. Returns a reply to send
+    instead (an unsuitable photo for Class 5-10), else None.
+    """
+    request.image_path = None
+    if not request.image:
+        return None
+    from services.llm_service import vision_config
+    uid = current_user["id"]
+    await assert_tool(uid, "image")
+    plan = await usage.plan(uid)
+    if vision_config(plan) is None:
+        raise HTTPException(403, {"code": "tool_disabled", "tool": "image",
+                                  "message": "Photo questions aren't available on your plan yet."})
+    try:
+        photo = photo_questions.decode(request.image)
+    except photo_questions.PhotoError as e:
+        raise HTTPException(400, str(e))
+    request.image = None
+    await usage.consume(uid, "image")
+    eff = await levels.effective_for(uid)
+    try:
+        transcript, unsafe = await photo_questions.read_photo(photo, eff.get("level") or "general", plan)
+    except Exception as e:
+        logger.error(f"[Photo] reading failed: {e}")
+        raise HTTPException(502, "I couldn't read that photo just now. Please try again.")
+    if unsafe:
+        request.message = (request.message or "").strip() or "(photo)"
+        return photo_questions.UNSAFE_REPLY
+    request.image_path = await photo_questions.store(uid, photo)
+    request.message = photo_questions.with_photo(request.message, transcript)
+    return None
 
 
 async def _save_reply(request: ChatRequest, save_task, answer: str, sources=None) -> None:
@@ -282,12 +325,13 @@ async def chat_message(
         await assert_tool(current_user["id"], "deep")
     metered(current_user, feature)
     await usage.consume(current_user["id"], feature)
+    photo_reply = await _attach_photo(request, current_user)
     try:
         client = get_supabase_client()
         chat_history_dicts, user_context_str, save_task, eff = await _prepare_chat(
             request, current_user["id"]
         )
-        safe_reply = await safety.screen(request.message, eff["level"], current_user["id"])
+        safe_reply = photo_reply or await safety.screen(request.message, eff["level"], current_user["id"])
         if safe_reply:
             await _save_reply(request, save_task, safe_reply)
             return {"answer": safe_reply, "sources": [], "thread_id": request.thread_id}
@@ -348,11 +392,12 @@ async def chat_stream(
         await assert_tool(current_user["id"], "deep")
     metered(current_user, feature)
     await usage.consume(current_user["id"], feature)
+    photo_reply = await _attach_photo(request, current_user)
     try:
         chat_history_dicts, user_context_str, save_task, eff = await _prepare_chat(
             request, current_user["id"]
         )
-        safe_reply = await safety.screen(request.message, eff["level"], current_user["id"])
+        safe_reply = photo_reply or await safety.screen(request.message, eff["level"], current_user["id"])
         if safe_reply:
             async def caring_reply():
                 yield safe_reply

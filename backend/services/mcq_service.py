@@ -262,33 +262,20 @@ Respond ONLY with the valid JSON array. Do not add any markdown formatting (like
             return ""
 
     def _parse_mcq_response(self, response: str) -> List[Dict[str, Any]]:
-        """Parse LLM response to extract MCQ questions"""
+        """The questions in a model reply (LaTeX kept intact), or [] if it isn't usable."""
+        from utils.json_latex import extract
         try:
-            # Try to find JSON array in response
-            start = response.find("[")
-            end = response.rfind("]") + 1
-
-            if start == -1 or end == 0:
-                logger.warning("No JSON array found in response")
-                return []
-
-            json_str = response[start:end]
-            questions = json.loads(json_str)
-
-            # Validate structure
-            for q in questions:
-                if not all(
-                    key in q
-                    for key in ["question", "options", "correct_answer", "explanation"]
-                ):
-                    logger.warning("Invalid question structure")
-                    return []
-
-            return questions
-
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON parse error: {str(e)}")
+            questions = extract(response, "[")
+        except ValueError as e:
+            logger.warning(f"No usable JSON array in MCQ response: {e}")
             return []
+        if not isinstance(questions, list):
+            return []
+        for q in questions:
+            if not isinstance(q, dict) or not all(k in q for k in ("question", "options", "correct_answer", "explanation")):
+                logger.warning("Invalid question structure")
+                return []
+        return questions
 
     async def submit_test(
         self, test_id: str, answers: Dict[int, str], user_id: Optional[str] = None

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { HelpCircle, ChevronRight, ChevronDown, Loader2, FileText, AlignLeft, AlignCenter, AlignJustify, ArrowLeft, Trash2, Clock, Eye, Plus } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import Markdown from '../Markdown';
 import { generateSubjectiveTest, getSavedQATests, getSavedQATest, deleteSavedQATest } from '../../api';
 import { useToast } from '../../context/ToastContext';
 import { recordActivity } from '../../utils/studyActivity';
@@ -482,9 +481,9 @@ const QAView = ({ projectId, availableTopics, selectedDocuments, preSelectedTopi
                                 <div className="px-6 pb-6 pt-0 animate-in fade-in slide-in-from-top-2">
                                     <div className="pl-12">
                                         <div className="p-4 bg-[#FDF6F0] rounded-xl text-[#163628] leading-relaxed border border-[#E6D5CC] prose prose-sm max-w-none overflow-x-auto">
-                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                            <Markdown>
                                                 {pair.answer}
-                                            </ReactMarkdown>
+                                            </Markdown>
                                         </div>
                                     </div>
                                 </div>

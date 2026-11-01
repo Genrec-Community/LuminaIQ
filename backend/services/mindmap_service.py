@@ -107,7 +107,7 @@ Requirements:
 1. Central node: The main topic
 2. 4-7 main branches: Key concepts/themes directly related to the central topic
 3. 2-4 sub-branches per main branch: Specific details, examples, or subtopics
-4. Each label should be concise (2-6 words), descriptive, and educational
+4. Each label should be concise (2-6 words), descriptive, and educational; write any formula in labels as $...$ with escaped backslashes
 5. Use the document context to make labels specific and accurate, not generic
 
 Return ONLY a valid JSON object (no markdown, no explanation) with this exact structure:
@@ -148,7 +148,8 @@ Generate a comprehensive mindmap with at least 15-25 nodes total. Return ONLY th
                 response_text = response_text[:-3]
             response_text = response_text.strip()
             
-            mindmap_data = json.loads(response_text)
+            from utils.json_latex import extract
+            mindmap_data = extract(response_text, "{")
             
             # Validate structure
             if 'nodes' not in mindmap_data or 'edges' not in mindmap_data:

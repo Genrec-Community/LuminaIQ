@@ -42,7 +42,7 @@ Anti-goals (a failure even if it "works"):
   backend change. RAG changes must also pass the eval in §6 (Phase 3).
 - **Migrations:**
   - One database (`DATABASE_URL`): `backend/db/schema/NNNN_name.sql`, applied in order on startup by `db/migrate.py`
-    (or `uv run python -m db.migrate`). `0001_init.sql` is the fresh-start schema; the latest is `0007_chat_threads.sql`, so the next file is `0008_`.
+    (or `uv run python -m db.migrate`). `0001_init.sql` is the fresh-start schema; the latest is `0008_chat_images.sql`, so the next file is `0009_`.
     Never edit an applied file; add a new one.
   - `backend/db/supabase_auth.sql` is the only SQL that runs in Supabase (the Google sign-up allowlist on `auth.users`).
 - **Database access:** services call `get_supabase_client().table(...)` / `.rpc(...)` as before. That now goes to our
@@ -68,8 +68,8 @@ Anti-goals (a failure even if it "works"):
 | Memory | Last 12 messages of the project chat + static profile from settings | No cross-session or cross-book memory. Long chats forget everything. (Fixed in Phase 5.) |
 | Levels | `ageGroup` (teen/young/adult/mature) + `selfLevel` (beginner/intermediate/advanced) | Doesn't map to school standards. Barely changes answers. |
 | Tool access | `services/plans.py` + `usage_service.metered()` gate by **plan** only | No per-level or per-class control. |
-| Maths | `react-markdown` + `remark-gfm` only | LaTeX shows as raw `$...$`. |
-| Image input | None in chat | n/a |
+| Maths | `react-markdown` + `remark-gfm` only | LaTeX shows as raw `$...$`. (Fixed in Phase 6.) |
+| Image input | None in chat | n/a (Added in Phase 6.) |
 | Gamification | `services/gamification_service.py`: XP per action, badges, streak | Rewards activity, not learning. Easy to farm. Same for every age. |
 | App clutter | `MemoryCurve` (`.lumina-curve`) in Dashboard, AdaptivePlan, mobile Home | Landing-page decoration inside the app. |
 | Chat streaming | Plain text stream, sources appended as `__SOURCES__:<json>` | Fragile. No room for metadata like "outside the book". |
@@ -387,6 +387,26 @@ Deleting a chat deletes its messages and summary.
 
 **Done when:** physics and maths answers render cleanly on web and Android, and a photographed textbook question gets a correct, cited (or labelled) answer.
 
+**Status (2026-11-01): done.** Frontend: `components/Markdown.jsx` (remark-gfm + remark-math + rehype-katex, KaTeX CSS)
+replaces every `ReactMarkdown`; `utils/math.js` turns `\( \)` / `\[ \]` and one-line `$$…$$` into what KaTeX expects and
+holds back an unfinished formula while an answer streams; quiz options, flashcard sides, mindmap labels and Power Hour
+questions render maths inline; PDF export carries the rendered KaTeX. Backend: `utils/json_latex.py` keeps LaTeX intact
+when parsing model JSON (`\frac` would otherwise become a form feed + "rac"), used by quizzes, flashcards, mindmaps,
+cram cards and written-answer grading; one `MATH_RULE` in `services/prompts/levels.py` for every generator.
+Photo questions: `services/photo_questions.py`, `_attach_photo` in `api/v1/endpoints/chat.py`, `utils/image.js`
+(client shrink to ≤1600 px JPEG), schema `0008_chat_images.sql`. Checked in a browser with Playwright (formulas render
+as display/inline maths, no raw `$$`; photo → preview → answer; transcript hidden from the student; phone layout).
+Builder's calls:
+- Vision capability is declared per model (`SMALL_LLM_VISION`, `BIG_LLM_VISION`, default false); the photo button is
+  hidden (and the backend refuses) for a learner whose model can't read images. `GET /levels/me` drops `image` then.
+- Only the transcription uses the vision model; the answer is the normal tutor answer, with the transcript appended to
+  the student's message after a `[From the student's photo]` marker (the app shows only the student's own words).
+- Photo questions never use the shared answer cache. A bad photo doesn't use up the `image` quota.
+- Class 5–10: the vision step answers `UNSAFE` for unsuitable images (gentle redirect, nothing stored); the transcript
+  also goes through the normal safety screen.
+- If storage is unavailable the answer still works; only the thumbnail is missing when the chat is reopened.
+- Chat history now returns each answer's sources, so citations still work in a reopened chat.
+
 ### Phase 7: Intelligent gamification
 1. **XP for learning, not clicking.** XP sources:
    - `mastery_gain`: a topic's mastery goes up
@@ -428,6 +448,8 @@ Deleting a chat deletes its messages and summary.
 | `SHARED_CONTENT_ENABLED` | Shared quiz/flashcard pools, notes and mindmaps for shared books | `true` |
 | `SMALL_LLM_PRICE_*` / `BIG_LLM_PRICE_*` / `EMBEDDING_PRICE_INPUT` / `RERANK_PRICE_PER_CALL` | USD per 1M tokens (per call for rerank), for cost estimates | `0` (unknown) |
 | `CONTEXT_BUDGET_EXCERPTS` / `_HISTORY` / `_PROFILE` / `_MEMORY` | Token budgets per prompt part | `6000` / `2500` / `1200` / `900` |
+| `SMALL_LLM_VISION` / `BIG_LLM_VISION` | Whether each model can read images (photo questions) | `false` |
+| `CHAT_IMAGE_MAX_BYTES` / `CHAT_IMAGES_BUCKET` | Photo size limit / private storage bucket | `3000000` / `chat-images` |
 | `MODERATION_ENABLED` | Input moderation for the school level | `true` |
 | `RATE_LIMIT_*` | Per-user / per-IP limits | sensible defaults |
 

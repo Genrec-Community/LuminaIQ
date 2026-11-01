@@ -25,7 +25,22 @@ async def catalog():
 
 @router.get("/me")
 async def my_level(current_user: dict = Depends(get_current_user)):
-    return await levels.effective_for(current_user["id"])
+    eff = await levels.effective_for(current_user["id"])
+    return await with_photo_availability(eff, current_user["id"])
+
+
+async def with_photo_availability(eff: dict, user_id: str) -> dict:
+    """Photo questions need a model that can see images; hide the tool when this learner's can't."""
+    from services.llm_service import vision_config
+    from services.usage_service import usage
+    if "image" in eff.get("tools", []):
+        try:
+            plan = await usage.plan(user_id)
+        except Exception:
+            plan = "free"
+        if vision_config(plan) is None:
+            eff = {**eff, "tools": [t for t in eff["tools"] if t != "image"]}
+    return eff
 
 
 @router.put("/me")

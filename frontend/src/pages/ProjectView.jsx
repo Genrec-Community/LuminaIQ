@@ -44,6 +44,7 @@ import {
     Moon,
     FlaskConical,
     Lightbulb,
+    Camera,
 } from 'lucide-react';
 import {
     uploadDocument,
@@ -77,8 +78,7 @@ import { useTools } from '../context/ToolsContext';
 import { useGamification } from '../context/GamificationContext';
 import { recordActivity } from '../utils/studyActivity';
 import { supabase } from '../supabaseClient';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import Markdown from '../components/Markdown';
 import UploadZone from '../components/UploadZone';
 import ProcessingProgress from '../components/ProcessingProgress';
 import SidebarNav from '../components/SidebarNav';
@@ -106,6 +106,7 @@ import useFocusTimer from '../hooks/useFocusTimer';
 import { LAST_PROJECT_KEY } from '../utils/dailyProgress';
 import { saveResume, loadResume } from '../utils/resume';
 import ChatThreads from '../components/chat/ChatThreads';
+import { shrinkImage, visibleText } from '../utils/image';
 import { aiName } from '../utils/persona';
 import usePlan from '../hooks/usePlan';
 import { emitLimit, emitPlanChanged } from '../utils/plan';
@@ -121,9 +122,9 @@ const APP_TOOLS = [
 
 // One chat message's Markdown. Memoized so that while an answer streams in,
 // only that message re-renders, not the whole conversation.
-const ChatMarkdown = React.memo(({ content, role, sources, onOpenSource }) => (
-    <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+const ChatMarkdown = React.memo(({ content, role, sources, onOpenSource, streaming }) => (
+    <Markdown
+        streaming={streaming}
         components={{
             a: ({ node, ...props }) => {
                 // Inline citation links (e.g. href="1")
@@ -158,7 +159,7 @@ const ChatMarkdown = React.memo(({ content, role, sources, onOpenSource }) => (
         }}
     >
         {role === 'assistant' ? content.replace(/(?:&lt;|<|\[)?source\s+(\d+)(?:&gt;|>|\])?/gi, '[$1]($1)') : content}
-    </ReactMarkdown>
+    </Markdown>
 ));
 
 // Utility Components
@@ -405,10 +406,25 @@ const ProjectView = () => {
     // Persist chat messages to sessionStorage
     useEffect(() => {
         if (messages.length > 0) {
-            sessionStorage.setItem(chatCacheKey, JSON.stringify(messages));
+            // Photos stay out of the tab cache (they can be megabytes); stored ones reload from the server
+            const slim = messages.map((m) => (m.image?.startsWith('data:') ? { ...m, image: undefined } : m));
+            try { sessionStorage.setItem(chatCacheKey, JSON.stringify(slim)); } catch { /* storage full: skip */ }
         }
     }, [messages, chatCacheKey]);
     const [inputMessage, setInputMessage] = useState('');
+    // A photo of a question or diagram waiting to be sent (shrunk data URL)
+    const [pendingPhoto, setPendingPhoto] = useState(null);
+    const photoInputRef = useRef(null);
+    const pickPhoto = async (e) => {
+        const file = e.target.files?.[0];
+        e.target.value = '';
+        if (!file) return;
+        try {
+            setPendingPhoto(await shrinkImage(file));
+        } catch (err) {
+            toast.error(err.message || "That photo couldn't be used.");
+        }
+    };
     const [documents, setDocuments] = useState([]);
     const [selectedDocuments, setSelectedDocuments] = useState([]);
     const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
@@ -629,7 +645,7 @@ const ProjectView = () => {
                     if (Array.isArray(history) && history.length > 0) {
                         restored = [
                             welcomeMessage(settings),
-                            ...history.map(m => ({ role: m.role, content: m.content, timestamp: m.created_at || undefined })),
+                            ...history.map(m => ({ role: m.role, content: m.content, image: m.image_url || undefined, sources: m.sources || undefined, timestamp: m.created_at || undefined })),
                         ];
                     }
                 } catch (histErr) {
@@ -899,7 +915,7 @@ const ProjectView = () => {
         try {
             const history = await getChatHistory(projectId, id);
             const restored = [welcomeMessage(settings),
-                ...history.map((m) => ({ role: m.role, content: m.content, timestamp: m.created_at || undefined }))];
+                ...history.map((m) => ({ role: m.role, content: m.content, image: m.image_url || undefined, sources: m.sources || undefined, timestamp: m.created_at || undefined }))];
             stampedCountRef.current = restored.length;
             setMessages(restored);
             stickToBottomRef.current = true;
@@ -1082,16 +1098,18 @@ const ProjectView = () => {
 
     const handleSendMessage = async (e) => {
         e.preventDefault();
-        if (!inputMessage.trim() || loading) return;
+        if ((!inputMessage.trim() && !pendingPhoto) || loading) return;
 
         if (selectedDocuments.length === 0) {
             toast.warning('Please select at least one document from the sidebar to start chatting.');
             return;
         }
 
-        const userMsg = inputMessage;
+        const photo = pendingPhoto;
+        const userMsg = inputMessage.trim() || (photo ? 'Please explain this.' : '');
         // Add user message immediately
-        const newMessages = [...messages, { role: 'user', content: userMsg }];
+        const newMessages = [...messages, { role: 'user', content: userMsg, ...(photo ? { image: photo } : {}) }];
+        setPendingPhoto(null);
         stickToBottomRef.current = true; // sending always jumps to the latest message
         setMessages(newMessages);
         setInputMessage('');
@@ -1152,7 +1170,7 @@ const ProjectView = () => {
                     setLoading(false);
                     setThreadsVersion((v) => v + 1);   // the chat list shows the new title and order
                 },
-                { deep: deepMode, hints: hintsOn, threadId, onThread: (id) => { if (id && id !== threadId) setThreadId(id); } }
+                { deep: deepMode, hints: hintsOn, image: photo || undefined, threadId, onThread: (id) => { if (id && id !== threadId) setThreadId(id); } }
             );
         } catch (error) {
             console.error("Chat error", error);
@@ -1675,7 +1693,7 @@ const ProjectView = () => {
                                     </div>
                                 ) : (
                                     <div className="prose prose-sm max-w-none text-sm text-[#163628] max-h-[60vh] overflow-y-auto overflow-x-auto pr-2 custom-scrollbar">
-                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{summaryContent}</ReactMarkdown>
+                                        <Markdown>{summaryContent}</Markdown>
                                     </div>
                                 )}
                             </div>
@@ -1776,9 +1794,15 @@ const ProjectView = () => {
                                                 ? 'bg-[#1E5C42] text-white rounded-br-none'
                                                 : 'bg-[#FDF6F0] text-[#163628] rounded-bl-none'
                                                 }`}>
+                                                {msg.role === 'user' && msg.image && (
+                                                    <a href={msg.image} target="_blank" rel="noopener noreferrer" className="mb-2 block">
+                                                        <img src={msg.image} alt="Your photo" className="max-h-56 max-w-full rounded-xl border border-white/30 object-contain" />
+                                                    </a>
+                                                )}
                                                 {msg.content ? (
                                                     <div className={`chat-text leading-relaxed ${msg.role === 'assistant' ? 'prose prose-sm max-w-none overflow-x-auto prose-p:my-2 prose-headings:text-[#163628] prose-a:text-[#1E5C42]' : ''}`}>
-                                                        <ChatMarkdown content={msg.content} role={msg.role} sources={msg.sources} onOpenSource={openSourceStable} />
+                                                        <ChatMarkdown content={msg.role === 'user' ? visibleText(msg.content) : msg.content} role={msg.role} sources={msg.sources} onOpenSource={openSourceStable}
+                                                            streaming={loading && idx === messages.length - 1} />
                                                     </div>
                                                 ) : (
                                                     <Loader2 className="h-5 w-5 animate-spin text-[#5E5046]" />
@@ -1876,7 +1900,27 @@ const ProjectView = () => {
                                         />
                                     )}
 
+                                    {pendingPhoto && (
+                                        <div className="mb-2 flex items-center gap-3 rounded-2xl border border-[#E6D5CC] bg-white p-2 pr-3">
+                                            <img src={pendingPhoto} alt="Photo to send" className="h-14 w-14 rounded-lg object-cover" />
+                                            <p className="flex-1 text-xs text-[#5E5046]">Photo ready. Add a question (optional) and send.</p>
+                                            <button type="button" onClick={() => setPendingPhoto(null)} aria-label="Remove photo"
+                                                className="rounded-full p-1.5 text-[#5E5046] hover:bg-[#FDF6F0]"><X className="h-4 w-4" /></button>
+                                        </div>
+                                    )}
                                     <form onSubmit={handleSendMessage} className="flex gap-2 md:gap-3 items-center">
+                                        {tools.has('image') && (
+                                            <>
+                                                <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={pickPhoto} />
+                                                <button type="button" onClick={() => photoInputRef.current?.click()} disabled={loading}
+                                                    title="Ask about a photo of a question or diagram" aria-label="Add a photo"
+                                                    className={`shrink-0 flex items-center gap-1 rounded-full px-3 py-2.5 text-xs font-semibold transition-colors ${pendingPhoto
+                                                        ? 'bg-[#163628] text-white' : 'bg-[#FDF6F0] text-[#5E5046] hover:text-[#163628]'}`}>
+                                                    <Camera className="h-4 w-4" />
+                                                    <span className="hidden sm:inline">Photo</span>
+                                                </button>
+                                            </>
+                                        )}
                                         {hintsForced !== false && (
                                             <button
                                                 type="button"
@@ -1917,7 +1961,7 @@ const ProjectView = () => {
                                             />
                                             <button
                                                 type="submit"
-                                                disabled={loading || toolLoading || !inputMessage.trim()}
+                                                disabled={loading || toolLoading || (!inputMessage.trim() && !pendingPhoto)}
                                                 className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 bg-[#1E5C42] text-white rounded-full hover:bg-[#163628] transition-colors disabled:opacity-50"
                                             >
                                                 <Send className="h-4 w-4" />

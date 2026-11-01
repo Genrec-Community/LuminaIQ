@@ -12,7 +12,8 @@ without real keys. Not for production.
 - /v1/chat/completions: answers by quoting the first excerpt in the system prompt
   with a [1](1) citation; for query-rewrite prompts it returns the latest message.
   Supports stream=true.
-  Quiz, flashcard and mindmap prompts get valid JSON with fresh, numbered items.
+  Quiz, flashcard and mindmap prompts get valid JSON with fresh, numbered items. Messages with
+  an image part get a transcript of a fixed physics question; answers include LaTeX.
 - /v1/rerank: scores documents by word overlap with the query.
 """
 import hashlib
@@ -74,6 +75,9 @@ def _study_json(last: str):
 def _answer(messages):
     system = next((m["content"] for m in messages if m["role"] == "system"), "")
     last = messages[-1]["content"] if messages else ""
+    if isinstance(last, list):   # a photo question (OpenAI-style content parts)
+        return ("QUESTION: A $2\\,kg$ block is pushed with a force of $10\\,N$. What is its acceleration?\n"
+                "DIAGRAM: A block on a flat surface with an arrow labelled 10 N pointing right.")
     study = _study_json(last)
     if study:
         return study
@@ -83,7 +87,8 @@ def _answer(messages):
         return f"1. {last}"
     m = re.search(r"\[Excerpt 1[^\]]*\]\n(.+?)(?:\n\[Excerpt|\Z)", system, re.S)
     if m:
-        return f"From your book: {m.group(1).strip()[:200]} [1](1)"
+        return (f"From your book: {m.group(1).strip()[:200]} [1](1)\n\n"
+                "Formula: $v = u + at$, and kinetic energy is\n\n$$E_k = \\frac{1}{2}mv^2$$")
     return "I couldn't find this in your book."
 
 

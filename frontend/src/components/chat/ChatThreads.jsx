@@ -65,6 +65,7 @@ const ChatThreads = ({ projectId, threadId, version, onSelect, onNew, onAdopt, o
     return (
         <div ref={boxRef} className="relative flex items-center gap-2 px-2 pt-3 md:px-6">
             <button onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-haspopup="listbox"
+                aria-label={`Your chats. Open: ${current?.title || 'New chat'}`}
                 className={`flex min-w-0 max-w-[60vw] items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-semibold md:max-w-md ${panel} ${text}`}>
                 <MessageSquare className="h-4 w-4 shrink-0 text-[#1E5C42]" />
                 <span className="truncate">{current?.title || 'New chat'}</span>

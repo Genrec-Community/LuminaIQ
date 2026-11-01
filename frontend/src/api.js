@@ -376,6 +376,8 @@ export const chatMessageStream = async (projectId, message, history = [], select
                     session_history: history,
                     selected_documents: selectedDocuments,
                     deep: !!options.deep,
+                    // A photo of a question or diagram (shrunk data URL)
+                    ...(options.image ? { image: options.image } : {}),
                     // Which of the book's chats this goes to (none: the latest chat)
                     ...(options.threadId ? { thread_id: options.threadId } : {}),
                     // Hints-first toggle (undefined = use the level/class default)

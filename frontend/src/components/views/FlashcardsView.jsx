@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import Markdown from '../Markdown';
 import { Layers, Plus, Trash2, Edit2, Save, X, ChevronDown, Loader2, BookOpen, Sparkles, Shuffle, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 import { getFlashcardSets, createFlashcardSet, deleteFlashcardSet, generateFlashcardsWithAI, recordLearning } from '../../api';
@@ -330,7 +331,7 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
                                     style={{ backfaceVisibility: 'hidden' }}
                                 >
                                     <p className="text-xs text-[#5E5046] mb-4 uppercase tracking-wide font-semibold">Question</p>
-                                    <p className="text-lg md:text-xl text-center text-[#163628] leading-relaxed">{currentCard.front}</p>
+                                    <p className="text-lg md:text-xl text-center text-[#163628] leading-relaxed"><Markdown inline>{currentCard.front}</Markdown></p>
                                     <p className="text-xs text-[#5E5046] mt-6">Click or press Space to flip</p>
                                 </div>
                                 {/* Back */}
@@ -339,7 +340,7 @@ const FlashcardsView = ({ projectId, availableTopics, selectedDocuments }) => {
                                     style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
                                 >
                                     <p className="text-xs text-white/70 mb-4 uppercase tracking-wide font-semibold">Answer</p>
-                                    <p className="text-lg md:text-xl text-center text-white leading-relaxed">{currentCard.back}</p>
+                                    <p className="text-lg md:text-xl text-center text-white leading-relaxed"><Markdown inline>{currentCard.back}</Markdown></p>
                                     <p className="text-xs text-white/60 mt-6">Click or press Space to flip</p>
                                 </div>
                             </div>

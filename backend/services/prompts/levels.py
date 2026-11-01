@@ -42,6 +42,12 @@ LEVEL_STYLE: Dict[str, str] = {
     ),
 }
 
+# Every generator writes maths the same way, so the app's renderer (KaTeX) can show it
+MATH_RULE = (
+    "Write all maths in LaTeX: $...$ inline and $$...$$ on its own line (e.g. $v = u + at$, "
+    "$$E = \\frac{1}{2}mv^2$$). Inside JSON strings, escape each backslash (write \\\\frac)."
+)
+
 SCHOOL_SAFETY = (
     "=== SAFETY (the student is a child) ===\n"
     "- Stay on study topics. Gently steer any off-topic, adult or unsafe request back to learning.\n"

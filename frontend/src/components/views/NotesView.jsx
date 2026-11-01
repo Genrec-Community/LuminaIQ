@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { BookOpen, Copy, Loader2, ChevronDown, FileDown, Trash2, Clock, Eye, Plus, ArrowLeft } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import Markdown from '../Markdown';
 import { generateNotes, getSavedNotes, getSavedNote, deleteSavedNote } from '../../api';
 import { useToast } from '../../context/ToastContext';
 import { recordActivity } from '../../utils/studyActivity';
@@ -597,9 +596,9 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
                                 <span className="font-medium">Writing your notes...</span>
                             </div>
                         ) : (
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            <Markdown>
                                 {notesContent}
-                            </ReactMarkdown>
+                            </Markdown>
                         )}
                         {notesLoading && notesContent && (
                             <div className="mt-4 flex items-center gap-2 text-[#1E5C42] animate-pulse">

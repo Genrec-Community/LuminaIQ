@@ -28,8 +28,7 @@ import {
     startLearningSession,
     endLearningSession
 } from '../../api';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import Markdown from '../Markdown';
 import { recordActivity } from '../../utils/studyActivity';
 import { useSettings } from '../../context/SettingsContext';
 
@@ -1014,9 +1013,9 @@ const KnowledgeGraphView = ({ projectId, zenMode }) => {
                                     </div>
                                 ) : topicSummary ? (
                                     <div className="prose prose-sm prose-invert max-w-none overflow-x-auto text-white/80">
-                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                        <Markdown>
                                             {topicSummary.summary}
-                                        </ReactMarkdown>
+                                        </Markdown>
                                         {topicSummary.sources?.length > 0 && (
                                             <div className="mt-6 pt-4 border-t border-white/10">
                                                 <p className="text-[10px] uppercase tracking-wider font-bold text-[#FFD700] mb-3">Origin Systems</p>

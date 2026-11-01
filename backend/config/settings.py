@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     BIG_LLM_BASE_URL: str = Field(default="")
     BIG_LLM_API_KEY: str = Field(default="")
     BIG_LLM_REASONING_EFFORT: str = Field(default="")
+    # Can the model read images? Photo questions are shown only to learners whose model can
+    # (free users use the small model; paid users the big one when it's set).
+    SMALL_LLM_VISION: bool = Field(default=False)
+    BIG_LLM_VISION: bool = Field(default=False)
     LLM_TIMEOUT_SECONDS: float = 120.0
     # Older names, still read when the SMALL_LLM_* ones are empty
     LLM_API_KEY: str = Field(default="")
@@ -89,6 +93,9 @@ class Settings(BaseSettings):
     # Shared quiz/flashcard pools and notes for shared-library and class books
     SHARED_CONTENT_ENABLED: bool = True
     PREGENERATE_SHARED: bool = False
+    # Photo questions in chat: largest image accepted (after the app shrinks it) and where it's kept
+    CHAT_IMAGE_MAX_BYTES: int = 3_000_000
+    CHAT_IMAGES_BUCKET: str = Field(default="chat-images")
     # Optional AI-call tracing (Langfuse), on when both keys are set
     LANGFUSE_PUBLIC_KEY: str = Field(default="")
     LANGFUSE_SECRET_KEY: str = Field(default="")

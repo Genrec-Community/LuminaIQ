@@ -4,8 +4,7 @@ import {
     Loader2, RefreshCw, Star, TrendingUp, Calendar,
     BookMarked, RotateCcw, AlertCircle
 } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import Markdown from '../Markdown';
 import { 
     getLearningDashboard, 
     getDueCards, 
@@ -202,9 +201,9 @@ const StudyDashboard = ({ projectId, availableTopics }) => {
                     <div className="text-xs font-bold text-[#5E5046] uppercase mb-2">{currentCard.topic}</div>
                     
                     <div className="prose prose-lg max-w-none text-[#163628] mb-6 overflow-x-auto">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        <Markdown>
                             {currentCard.question}
-                        </ReactMarkdown>
+                        </Markdown>
                     </div>
 
                     {!showAnswer ? (
@@ -217,9 +216,9 @@ const StudyDashboard = ({ projectId, availableTopics }) => {
                     ) : (
                         <div className="space-y-4">
                             <div className="bg-[#FDF6F0] rounded-xl p-4 prose prose-sm max-w-none overflow-x-auto">
-                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                <Markdown>
                                     {currentCard.answer}
-                                </ReactMarkdown>
+                                </Markdown>
                             </div>
                             
                             <div className="text-center text-sm text-[#5E5046] mb-2">
@@ -454,7 +453,7 @@ const StudyDashboard = ({ projectId, availableTopics }) => {
                                     <div className="flex justify-between items-start">
                                         <div>
                                             <div className="text-xs font-bold text-[#5E5046] uppercase">{card.topic}</div>
-                                            <div className="text-[#163628] mt-1 line-clamp-2">{card.question}</div>
+                                            <div className="text-[#163628] mt-1 line-clamp-2"><Markdown inline>{card.question}</Markdown></div>
                                         </div>
                                         {card.overdue_days > 0 && (
                                             <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full">

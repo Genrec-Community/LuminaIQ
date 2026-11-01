@@ -403,7 +403,7 @@ Respond ONLY with the Markdown content."""
             config = self._get_note_config(note_type, topic)
 
             from services import shared_content
-            from services.prompts.levels import LEVEL_STYLE
+            from services.prompts.levels import LEVEL_STYLE, MATH_RULE
             from services.retrieval import search_passages
 
             async def make():
@@ -413,7 +413,7 @@ Respond ONLY with the Markdown content."""
                     return None
                 chunk_limit = 25 if "Comprehensive" in note_type or "Summary" in note_type else 20
                 context = "\n\n".join([hit["text"] for hit in all_hits[:chunk_limit]])
-                system = config["system_prompt"]
+                system = f'{config["system_prompt"]}\n\n{MATH_RULE}'
                 if level in LEVEL_STYLE:
                     system += f"\n\nThe readers:\n{LEVEL_STYLE[level]}\nWrite the notes at this level."
                 return await llm_service.chat_completion(

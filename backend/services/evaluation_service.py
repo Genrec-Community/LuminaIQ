@@ -8,6 +8,7 @@ import asyncio
 import json
 import re
 from models.schemas import SubjectiveQuestion, SubjectiveEvaluationResult
+from services.prompts.levels import MATH_RULE
 
 
 class EvaluationService:
@@ -108,7 +109,7 @@ Format your response as a **JSON array**:
 
 Respond ONLY with the valid JSON array."""
 
-            messages = [{"role": "user", "content": prompt}]
+            messages = [{"role": "user", "content": f"{prompt}\n\n{MATH_RULE}"}]
             response = await llm_service.chat_completion(
                 messages, temperature=0.7, max_tokens=max_tokens
             )
@@ -269,7 +270,7 @@ Provide output in **valid JSON**:
 
 Respond ONLY with JSON.
 """
-            messages = [{"role": "user", "content": prompt}]
+            messages = [{"role": "user", "content": f"{prompt}\n\n{MATH_RULE}"}]
             response = await llm_service.chat_completion(messages, temperature=0.3)
             result = self._parse_json_response(response)
             if not result:
@@ -310,7 +311,7 @@ Provide a comprehensive evaluation in JSON format:
 
 Be constructive and specific in your feedback. Respond ONLY with the JSON object."""
 
-            messages = [{"role": "user", "content": prompt}]
+            messages = [{"role": "user", "content": f"{prompt}\n\n{MATH_RULE}"}]
             response = await llm_service.chat_completion(
                 messages, temperature=0.3, max_tokens=1500
             )
@@ -398,7 +399,8 @@ Be constructive and specific in your feedback. Respond ONLY with the JSON object
 
             json_str = response[start:end]
             # strict=False allows control characters like newlines in strings
-            return json.loads(json_str, strict=False)
+            from utils.json_latex import loads as latex_loads
+            return latex_loads(json_str)
 
         except json.JSONDecodeError as e:
             logger.error(f"JSON parse error: {str(e)}")
@@ -448,7 +450,8 @@ Be constructive and specific in your feedback. Respond ONLY with the JSON object
                         # Found a complete object
                         obj_str = json_str[obj_start : i + 1]
                         try:
-                            obj = json.loads(obj_str, strict=False)
+                            from utils.json_latex import loads as latex_loads
+                            obj = latex_loads(obj_str)
                             objects.append(obj)
                         except:
                             pass

@@ -104,7 +104,8 @@ def _parse_json_object(text: str) -> Optional[Dict[str, Any]]:
     if start == -1 or end <= start:
         return None
     try:
-        data = json.loads(clean[start:end + 1])
+        from utils.json_latex import loads as latex_loads
+        data = latex_loads(clean[start:end + 1])
         return data if isinstance(data, dict) else None
     except json.JSONDecodeError:
         return None
