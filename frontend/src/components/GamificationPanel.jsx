@@ -174,58 +174,120 @@ const GamificationPanel = ({ onClose }) => {
 
 // ===================== Tab Renderers =====================
 
+/** Today's adaptive goal: answer N questions, starting with the weakest topic. */
+export const DailyGoalCard = ({ goal, compact = false }) => {
+    if (!goal) return null;
+    const pct = goal.target ? Math.round((100 * goal.progress) / goal.target) : 0;
+    const f = goal.focus || {};
+    return (
+        <div className="rounded-xl border border-[#E6D5CC] bg-[#FDF6F0] px-4 py-3">
+            <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-bold text-[#163628]">
+                    {goal.completed ? "Today's goal: done ✓" : `Today's goal: answer ${goal.target} questions`}
+                </p>
+                <span className="text-xs font-semibold tabular-nums text-[#5E5046]">{goal.progress}/{goal.target}</span>
+            </div>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#E6D5CC]" role="progressbar"
+                aria-valuemin={0} aria-valuemax={goal.target} aria-valuenow={goal.progress} aria-label="Daily goal progress">
+                <div className="h-full rounded-full bg-[#1E5C42] transition-all" style={{ width: `${Math.min(100, pct)}%` }} />
+            </div>
+            {!compact && !goal.completed && (f.topic || f.due_reviews) ? (
+                <p className="mt-1.5 text-[11px] text-[#5E5046]">
+                    {f.topic ? <>Start with <span className="font-semibold">{f.topic}</span>. </> : null}
+                    {f.due_reviews ? `${f.due_reviews} review${f.due_reviews === 1 ? '' : 's'} due.` : ''}
+                </p>
+            ) : null}
+        </div>
+    );
+};
+
+/** This week's class board (Class 5-10, when the class has it switched on). */
+const Leaderboard = () => {
+    const [board, setBoard] = useState(null);
+    React.useEffect(() => {
+        let alive = true;
+        import('../api').then(({ getLeaderboard }) => getLeaderboard()).then((b) => { if (alive) setBoard(b); }).catch(() => {});
+        return () => { alive = false; };
+    }, []);
+    if (!board?.enabled || !board.rows?.length) return null;
+    return (
+        <div>
+            <h4 className="text-[10px] font-bold text-[#5E5046] uppercase tracking-wider mb-2">Your class this week</h4>
+            <ol className="space-y-1">
+                {board.rows.map((r) => (
+                    <li key={`${r.rank}-${r.name}`} className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm ${r.me ? 'bg-amber-50 font-bold' : ''}`}>
+                        <span className="w-6 text-[#5E5046] tabular-nums">{r.rank}.</span>
+                        <span className="flex-1 text-[#163628]">{r.me ? `${r.name} (you)` : r.name}</span>
+                        <span className="tabular-nums text-[#1E5C42]">{r.xp} XP</span>
+                    </li>
+                ))}
+            </ol>
+        </div>
+    );
+};
+
 function renderOverview(stats, data, earnedBadgeIds, allBadges) {
     const streakDays = data.streak_days ?? 0;
+    const style = data.style || 'quiet';
+    const goal = data.daily_goal;
+    const days = goal?.focus?.days_to_exam;
+    const milestones = getNextMilestones(stats, data.total_xp, data.level, earnedBadgeIds, allBadges);
+    const Milestones = (
+        <div>
+            <h4 className="text-[10px] font-bold text-[#5E5046] uppercase tracking-wider mb-2">Next milestones</h4>
+            <div className="space-y-2">
+                {milestones.map((m, i) => <MilestoneRow key={i} milestone={m} />)}
+                {milestones.length === 0 && (
+                    <p className="py-3 text-center text-sm font-semibold text-[#163628]">Every milestone reached.</p>
+                )}
+            </div>
+        </div>
+    );
+
+    // Research: milestones only, no streaks or confetti
+    if (style === 'milestones') {
+        return <div className="space-y-4">{Milestones}</div>;
+    }
+
+    const Streak = (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
+            style={{ background: 'linear-gradient(135deg, #3a2208 0%, #5a3210 100%)', border: '1px solid rgba(200,162,136,0.25)' }}>
+            <span className="text-2xl" role="img" aria-label="flame">🔥</span>
+            <div className="flex-1">
+                <p className="text-white font-black text-lg leading-none">{streakDays} day{streakDays !== 1 ? 's' : ''} of learning</p>
+                <p className="text-amber-100/80 text-[11px] font-medium mt-0.5">
+                    {streakDays === 0 ? 'Learn something today to start a streak.'
+                        : data.freeze_available ? 'Miss a day? Your weekly freeze keeps the streak going.'
+                            : "This week's freeze is used. Keep going tomorrow!"}
+                </p>
+            </div>
+        </div>
+    );
+
     return (
         <div className="space-y-4">
-            {/* Streak Banner */}
-            <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
-                style={{ background: 'linear-gradient(135deg, #3a2208 0%, #5a3210 100%)', border: '1px solid rgba(200,162,136,0.25)' }}>
-                <span className="text-2xl" role="img" aria-label="flame">🔥</span>
-                <div className="flex-1">
-                    <p className="text-white font-black text-lg leading-none">{streakDays} Day{streakDays !== 1 ? 's' : ''}</p>
-                    <p className="text-[#1E5C42] text-[11px] font-medium mt-0.5">
-                        {streakDays === 0 ? 'Start your streak by studying today!' :
-                         streakDays === 1 ? 'Day 1 — keep it going tomorrow!' :
-                         streakDays < 7 ? 'Building momentum — keep it up!' :
-                         streakDays < 30 ? `${streakDays}-day warrior! Don't break the chain.` :
-                         `Legendary ${streakDays}-day streak! 🏆`}
-                    </p>
+            {style === 'exam' && days != null && (
+                <div className="rounded-xl bg-[#163628] px-4 py-3 text-white">
+                    <p className="text-2xl font-black leading-none">{days === 0 ? 'Exam today' : `${days} day${days === 1 ? '' : 's'}`}</p>
+                    <p className="mt-0.5 text-xs text-white/70">{days === 0 ? 'You’ve got this.' : 'to your exam'}</p>
                 </div>
-                <div className="text-right">
-                    <p className="text-[10px] text-[#1E5C42]/60 font-medium uppercase tracking-wider">Current Streak</p>
-                </div>
-            </div>
-
-            {/* Quick Stats Grid */}
+            )}
+            <DailyGoalCard goal={goal} />
+            {style !== 'quiet' && Streak}
             <div>
-                <h4 className="text-[10px] font-bold text-[#5E5046] uppercase tracking-wider mb-2">Activity Stats</h4>
-                <div className="grid grid-cols-3 gap-2">
-                    <StatCard icon={CheckCircle} label="Quizzes" value={stats.quizzes_completed || 0} color="blue" />
-                    <StatCard icon={Star} label="Perfect" value={stats.perfect_scores || 0} color="amber" />
-                    <StatCard icon={Target} label="Questions" value={stats.questions_answered || 0} color="emerald" />
-                    <StatCard icon={Timer} label="Pomodoros" value={stats.pomodoros_completed || 0} color="purple" />
-                    <StatCard icon={FileText} label="Notes" value={stats.notes_generated || 0} color="rose" />
-                    <StatCard icon={Brain} label="Reviews" value={stats.reviews_completed || 0} color="cyan" />
+                <h4 className="text-[10px] font-bold text-[#5E5046] uppercase tracking-wider mb-2">Learning</h4>
+                <div className="grid grid-cols-2 gap-2">
+                    <StatCard icon={TrendingUp} label="Mastery points" value={stats.mastery_points || 0} color="emerald" />
+                    <StatCard icon={CheckCircle} label="Mistakes fixed" value={stats.mistakes_fixed || 0} color="blue" />
+                    <StatCard icon={Brain} label="Reviews on time" value={stats.reviews_on_time || 0} color="cyan" />
+                    <StatCard icon={Target} label="Goals reached" value={stats.goals_met || 0} color="amber" />
                 </div>
+                {style === 'quiet' && streakDays > 0 && (
+                    <p className="mt-2 text-xs text-[#5E5046]">{streakDays}-day learning streak · best {data.best_streak}</p>
+                )}
             </div>
-
-            {/* Next Milestones */}
-            <div>
-                <h4 className="text-[10px] font-bold text-[#5E5046] uppercase tracking-wider mb-2">Next Milestones</h4>
-                <div className="space-y-2">
-                    {getNextMilestones(stats, data.total_xp, data.level, earnedBadgeIds, allBadges).map((m, i) => (
-                        <MilestoneRow key={i} milestone={m} />
-                    ))}
-                    {getNextMilestones(stats, data.total_xp, data.level, earnedBadgeIds, allBadges).length === 0 && (
-                        <div className="text-center py-4">
-                            <Trophy className="h-8 w-8 text-amber-400 mx-auto mb-2" />
-                            <p className="text-sm font-bold text-[#163628]">All milestones achieved!</p>
-                            <p className="text-xs text-[#5E5046]">You're a true scholar</p>
-                        </div>
-                    )}
-                </div>
-            </div>
+            {style === 'playful' && data.leaderboard && <Leaderboard />}
+            {style !== 'quiet' && Milestones}
         </div>
     );
 }
@@ -461,31 +523,24 @@ function groupByCategory(badges) {
     return groups;
 }
 
-function getNextMilestones(stats, totalXP, level, earnedIds, allBadges) {
-    const milestones = [];
-
+function getNextMilestones(stats, totalXP, level, earnedIds) {
     const milestoneMap = [
-        { id: 'first_quiz', stat: 'quizzes_completed', target: 1, icon: Rocket, title: 'Complete first quiz' },
-        { id: 'quizzes_10', stat: 'quizzes_completed', target: 10, icon: CheckCircle, title: 'Complete 10 quizzes' },
-        { id: 'quizzes_50', stat: 'quizzes_completed', target: 50, icon: Award, title: 'Complete 50 quizzes' },
-        { id: 'perfect_score', stat: 'perfect_scores', target: 1, icon: Star, title: 'Score 100% on a quiz' },
-        { id: 'questions_100', stat: 'questions_answered', target: 100, icon: Target, title: 'Answer 100 questions' },
-        { id: 'focus_10', stat: 'pomodoros_completed', target: 10, icon: Timer, title: 'Complete 10 Pomodoros' },
-        { id: 'notes_10', stat: 'notes_generated', target: 10, icon: FileText, title: 'Generate 10 notes' },
-        { id: 'reviews_50', stat: 'reviews_completed', target: 50, icon: Brain, title: 'Review 50 flashcards' },
-        { id: 'xp_1000', stat: null, target: 1000, icon: Zap, title: 'Earn 1,000 XP' },
+        { id: 'first_gain', stat: 'mastery_points', target: 1, icon: Rocket, title: 'Raise your mastery of a topic' },
+        { id: 'mastery_100', stat: 'mastery_points', target: 100, icon: TrendingUp, title: 'Gain 100 mastery points' },
+        { id: 'mistakes_10', stat: 'mistakes_fixed', target: 10, icon: CheckCircle, title: 'Fix 10 questions you got wrong' },
+        { id: 'goals_7', stat: 'goals_met', target: 7, icon: Target, title: 'Reach your daily goal 7 times' },
+        { id: 'reviews_50', stat: 'reviews_on_time', target: 50, icon: Brain, title: 'Do 50 reviews on time' },
+        { id: 'plan_10', stat: 'plan_steps', target: 10, icon: Map, title: 'Complete 10 learning-path topics' },
+        { id: 'mastery_500', stat: 'mastery_points', target: 500, icon: Award, title: 'Gain 500 mastery points' },
     ];
-
+    const out = [];
     for (const m of milestoneMap) {
         if (earnedIds.has(m.id)) continue;
-        const current = m.stat ? (stats[m.stat] || 0) : totalXP;
-        if (current < m.target) {
-            milestones.push({ ...m, current });
-        }
-        if (milestones.length >= 3) break;
+        const current = stats[m.stat] || 0;
+        if (current < m.target) out.push({ ...m, current });
+        if (out.length >= 3) break;
     }
-
-    return milestones;
+    return out;
 }
 
 export default GamificationPanel;

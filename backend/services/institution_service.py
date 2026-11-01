@@ -843,6 +843,13 @@ class InstitutionService:
             acts.setdefault(key(r), []).append(r)
 
         week_ago = (_now() - timedelta(days=7)).date().isoformat()
+        # Who needs help: from practice, mastery and mistakes only (never chats or memory)
+        from services.teacher_insights import stuck_signals
+        try:
+            stuck = await stuck_signals((cm["user_id"], cm.get("project_id")) for cm in cms)
+        except Exception as e:
+            logger.warning(f"[Institution] stuck signals unavailable: {e}")
+            stuck = {}
         rows, weak_counts = [], {}
         for cm in cms:
             uid, pid = cm["user_id"], cm.get("project_id")
@@ -866,6 +873,7 @@ class InstitutionService:
                 "mastered": mastered, "total_topics": len(all_topics),
                 "accuracy": round(100 * correct / (correct + wrong)) if correct + wrong else None,
                 "weak_topics": weak[:5], "active_days_7": active_days, "last_active": last_active,
+                "stuck": stuck.get((str(uid), str(pid)), []) if pid else [],
             })
         rows.sort(key=lambda r: (r["last_active"] or "", r["mastered"]), reverse=True)
         return {
@@ -873,6 +881,8 @@ class InstitutionService:
             "books": [{"id": b["id"], "title": b["title"], "document_id": b["source_document_id"]} for b in books],
             "students": rows,
             "class_weak_topics": sorted(weak_counts.items(), key=lambda kv: -kv[1])[:8],
+            "needs_help": [{"user_id": r["user_id"], "name": r["name"], "reasons": r["stuck"]}
+                           for r in rows if r["stuck"] and not r["disabled"]],
         }
 
     async def publishable_documents(self, user: dict) -> List[Dict[str, Any]]:

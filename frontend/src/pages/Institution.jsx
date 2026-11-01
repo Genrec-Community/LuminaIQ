@@ -436,6 +436,29 @@ const ClassView = ({ classId, role, back }) => {
                         </Card>
                     )}
                 </div>
+                <div className="space-y-4 min-w-0">
+                {(data.needs_help || []).length > 0 && (
+                    <Card>
+                        <h2 className="text-lg font-bold text-[#163628] mb-1">Needs help</h2>
+                        <p className="mb-3 text-xs text-[#5E5046]">From practice, mastery and mistakes over the last two weeks.</p>
+                        <ul className="divide-y divide-[#E6D5CC]">
+                            {data.needs_help.map((s) => (
+                                <li key={s.user_id} className="flex flex-wrap items-start gap-x-3 gap-y-1 py-2">
+                                    <span className="min-w-[8rem] font-semibold text-[#163628]">{s.name}</span>
+                                    <span className="flex flex-1 flex-wrap gap-1.5">
+                                        {s.reasons.map((r) => (
+                                            <span key={r.reason} className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                                                r.reason === 'inactive' ? 'bg-slate-100 text-slate-700'
+                                                    : r.reason === 'falling' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'}`}>
+                                                {r.detail}
+                                            </span>
+                                        ))}
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                    </Card>
+                )}
                 <Card className="overflow-x-auto">
                     <h2 className="text-lg font-bold text-[#163628] mb-3">Students</h2>
                     {data.students.length === 0 ? (
@@ -465,6 +488,7 @@ const ClassView = ({ classId, role, back }) => {
                         </table>
                     )}
                 </Card>
+                </div>
             </div>
         </div>
     );

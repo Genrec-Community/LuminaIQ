@@ -42,7 +42,7 @@ Anti-goals (a failure even if it "works"):
   backend change. RAG changes must also pass the eval in §6 (Phase 3).
 - **Migrations:**
   - One database (`DATABASE_URL`): `backend/db/schema/NNNN_name.sql`, applied in order on startup by `db/migrate.py`
-    (or `uv run python -m db.migrate`). `0001_init.sql` is the fresh-start schema; the latest is `0008_chat_images.sql`, so the next file is `0009_`.
+    (or `uv run python -m db.migrate`). `0001_init.sql` is the fresh-start schema; the latest is `0009_gamification.sql`, so the next file is `0010_`.
     Never edit an applied file; add a new one.
   - `backend/db/supabase_auth.sql` is the only SQL that runs in Supabase (the Google sign-up allowlist on `auth.users`).
 - **Database access:** services call `get_supabase_client().table(...)` / `.rpc(...)` as before. That now goes to our
@@ -70,7 +70,7 @@ Anti-goals (a failure even if it "works"):
 | Tool access | `services/plans.py` + `usage_service.metered()` gate by **plan** only | No per-level or per-class control. |
 | Maths | `react-markdown` + `remark-gfm` only | LaTeX shows as raw `$...$`. (Fixed in Phase 6.) |
 | Image input | None in chat | n/a (Added in Phase 6.) |
-| Gamification | `services/gamification_service.py`: XP per action, badges, streak | Rewards activity, not learning. Easy to farm. Same for every age. |
+| Gamification | `services/gamification_service.py`: XP per action, badges, streak | Rewards activity, not learning. Easy to farm. Same for every age. (Fixed in Phase 7.) |
 | App clutter | `MemoryCurve` (`.lumina-curve`) in Dashboard, AdaptivePlan, mobile Home | Landing-page decoration inside the app. |
 | Chat streaming | Plain text stream, sources appended as `__SOURCES__:<json>` | Fragile. No room for metadata like "outside the book". |
 
@@ -427,6 +427,30 @@ Builder's calls:
 6. Rework the existing `gamification_service.py`, `GamificationContext.jsx`, `GamificationPanel.jsx` and `XPToast.jsx` rather than starting a parallel system. No legacy XP migration is needed (fresh start).
 
 **Done when:** XP correlates with mastery gains in tests, farming is capped, and each level shows its own style.
+
+**Status (2026-11-01): done.** `services/gamification_service.py` reworked: an append-only `xp_events` ledger and one
+`award()` (daily cap per kind, dedupe keys, streak, badges, levels in one transaction). XP is granted only on the
+server where learning is measured: `mastery_gain` (`learning_engine.record`: XP = the rise in a topic's mastery, in
+points), `mistake_fixed` (`learner_model.mark_fixed`), `review_on_time` (`record_review` while the card was due),
+`exam_plan_step` (a learning-path topic completed the first time), `daily_goal`, and `comeback` (first learning after a
+3+ day break). The old `award-xp` endpoint grants nothing: it returns XP earned since the client's last sync, so the
+existing hooks show toasts only for real rewards. `services/daily_goal.py` (answer N questions; sized by level, the
+last week's pace and days to the exam; focus = weakest topic and due reviews; fixed for the day). Streaks count days
+with any XP, with one automatic freeze per week. `services/leaderboard.py` (weekly class board, first names,
+`leaderboard` tool), `services/teacher_insights.py` ("Needs help" in the class dashboard: inactive, mastery slipping,
+unfixed mistakes; learning data only). Schema `0009_gamification.sql`. Frontend: `GamificationContext` syncs instead
+of granting; `XPToast` celebrates only for `school`, calm for exam/quiet, milestones only for `research`;
+`GamificationPanel` per style (exam countdown, daily goal, streak with freeze, learning stats, class board); the
+adaptive goal on the dashboard and the school home; "Needs help" on the institution class page.
+Checked end to end and in a browser with Playwright (practice → XP and toast; chatting earns 0; the daily mastery cap
+held in the real flow; class board; teacher view; phone layout).
+Builder's calls:
+- Daily caps: mastery 150, mistakes fixed 90 (15 each), reviews 60 (4 each), goal 30, plan steps 50 (10 each),
+  comeback 20. Level thresholds were lowered (top level at 8,000 XP) because learning XP comes slower than click XP.
+- Badges are learning milestones only (mastery points, mistakes fixed, on-time reviews, goals, streaks, plan steps,
+  levels); the old activity badges (chats, notes, pomodoros) are gone.
+- Streaks count learning days (any XP), not app opens.
+- A goal created by a background check uses the learner's real level; it stays fixed for the day.
 
 ---
 

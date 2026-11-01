@@ -1,5 +1,6 @@
 import { MessageSquare, CheckSquare, Layers, Zap, Plus } from 'lucide-react';
 import { useTools } from '../context/ToolsContext';
+import { useGamification } from '../context/GamificationContext';
 
 /**
  * Home for Class 5-10 learners: four big, clear choices instead of a busy
@@ -14,6 +15,8 @@ const CARDS = [
 
 const SchoolHome = ({ name, bookName, onOpen, onAddBook }) => {
     const { has } = useTools();
+    const { data: progress } = useGamification();
+    const goal = progress?.daily_goal;
     const cards = CARDS.filter((c) => has(c.tool));
     return (
         <section className="mb-10" aria-labelledby="school-home-title">
@@ -35,9 +38,22 @@ const SchoolHome = ({ name, bookName, onOpen, onAddBook }) => {
                             <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl text-white" style={{ background: color }}>
                                 <Icon className="h-8 w-8" aria-hidden="true" />
                             </span>
-                            <span>
+                            <span className="min-w-0 flex-1">
                                 <span className="block text-xl font-bold text-[#163628]">{title}</span>
-                                <span className="block text-base text-[#5E5046]">{sub}</span>
+                                {tool === 'power' && goal ? (
+                                    <>
+                                        <span className="block text-base text-[#5E5046]">
+                                            {goal.completed ? 'Done for today! 🎉' : `Answer ${goal.target} questions${goal.focus?.topic ? ` about ${goal.focus.topic}` : ''}`}
+                                        </span>
+                                        <span className="mt-2 block h-2.5 overflow-hidden rounded-full bg-[#F2E6DB]" aria-hidden="true">
+                                            <span className="block h-full rounded-full bg-[#f59e0b]"
+                                                style={{ width: `${Math.min(100, (100 * goal.progress) / (goal.target || 1))}%` }} />
+                                        </span>
+                                        <span className="mt-1 block text-sm font-semibold text-[#5E5046]">{goal.progress} of {goal.target}</span>
+                                    </>
+                                ) : (
+                                    <span className="block text-base text-[#5E5046]">{sub}</span>
+                                )}
                             </span>
                         </button>
                     ))}

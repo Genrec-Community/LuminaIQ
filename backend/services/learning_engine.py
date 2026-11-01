@@ -605,9 +605,11 @@ class LearningEngine:
         states = await self.load_states(user_id, project_id, topics)
         now = _now()
         rows, logs = {}, []
+        mastery_before: Dict[str, float] = {}
         for e in events:
             t = e["topic"]
             before = states.get(t) or blank_state(t)
+            mastery_before.setdefault(t, effective_mastery(before, now))
             after = apply_event(before, e, now)
             states[t] = after
             logs.append({
@@ -634,6 +636,9 @@ class LearningEngine:
         except Exception as e:
             logger.error(f"[LearningEngine] could not save evidence: {e}")
             raise
+
+        await _reward_learning(user_id, project_id, {t: (mastery_before[t], effective_mastery(s, now))
+                                                     for t, s in rows.items()})
 
         return {"updated": {t: {"mastery": round(effective_mastery(s, now), 3),
                                 "status": status_label(effective_mastery(s, now), s["attempts"]),
@@ -694,6 +699,22 @@ class LearningEngine:
 
 
 _engine: Optional[LearningEngine] = None
+
+
+async def _reward_learning(user_id: str, project_id: str, changes: Dict[str, Tuple[float, float]]) -> None:
+    """XP for real progress: a topic's mastery rise in points (Phase 7), then today's goal check."""
+    from services import daily_goal
+    from services.gamification_service import gamification
+    for topic, (before, after) in changes.items():
+        gain = round((after - before) * 100)
+        if gain >= 1:
+            await gamification.award(user_id, "mastery_gain", xp=gain,
+                                     meta={"topic": topic, "project_id": project_id,
+                                           "from": round(before, 3), "to": round(after, 3)})
+    try:
+        await daily_goal.today(user_id)
+    except Exception:
+        pass   # the goal is checked again when the student next looks at it
 
 
 def get_learning_engine() -> LearningEngine:

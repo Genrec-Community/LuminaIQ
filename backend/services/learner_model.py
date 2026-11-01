@@ -123,10 +123,14 @@ async def mark_fixed(user_id: str, project_id: str, questions: List[str]) -> int
             """UPDATE learner_mistakes SET fixed_at = now()
                WHERE user_id = %s AND project_id = %s AND fixed_at IS NULL AND question = ANY(%s)
                RETURNING id""", (user_id, project_id, list(questions))))
-        return len(rows)
     except Exception as e:
         logger.debug(f"[LearnerModel] fix marking skipped: {e}")
         return 0
+    from services.gamification_service import gamification
+    for r in rows:
+        await gamification.award(user_id, "mistake_fixed", dedupe_key=f"fixed:{r['id']}",
+                                 meta={"project_id": project_id})
+    return len(rows)
 
 
 _TAG_PROMPT = (

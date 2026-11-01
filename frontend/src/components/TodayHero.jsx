@@ -39,12 +39,20 @@ const TodayHero = ({ onContinue, continueLabel, onCram, loading = false }) => {
     const goalPct = progress.minutes / goal;
     const streak = g?.streak_days ?? g?.stats?.streak_days ?? 0;
     const examDays = daysUntil(settings.examDate);
-    const quests = dailyQuests(progress, goal);
+    // The adaptive goal (Phase 7: sized to level, pace and exam) leads the quests
+    const adaptive = g?.daily_goal;
+    const quests = [
+        ...(adaptive ? [{ id: 'adaptive', label: `Answer ${adaptive.target} questions${adaptive.focus?.topic ? `, starting with ${adaptive.focus.topic}` : ''}`,
+            value: adaptive.progress, target: adaptive.target }] : []),
+        // the adaptive goal replaces the fixed "answer 10 questions" quest
+        ...dailyQuests(progress, goal).filter((q) => !(adaptive && q.id === 'answered')),
+    ];
     const questsDone = quests.filter((q) => q.value >= q.target).length;
+    const quietStyle = g?.style === 'milestones';
 
-    const companionLine = goalPct >= 1
-        ? `Daily goal smashed, ${name}! Anything extra today is pure bonus XP. 🎉`
-        : streak > 1
+    const companionLine = adaptive?.completed
+        ? `Today's goal reached, ${name}! Anything more is a bonus. 🎉`
+        : streak > 1 && !quietStyle
             ? `${streak}-day streak, ${name}! Let's not break the chain today. 🔥`
             : character.greet(name);
 

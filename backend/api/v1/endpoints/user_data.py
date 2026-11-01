@@ -69,16 +69,18 @@ class ClearSearchesRequest(BaseModel):
 
 
 class AwardXPRequest(BaseModel):
-    activity_type: str
+    activity_type: str = "activity"
     meta: Optional[Dict[str, Any]] = None
+    # The last time this device synced: XP earned since then comes back for the toasts
+    since: Optional[str] = None
 
 
 # ============== Gamification ==============
 
 @router.get("/gamification")
-async def get_gamification_data(current_user: dict = Depends(get_current_user)):
+async def get_gamification_data(since: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     try:
-        data = await gamification.get_gamification(current_user["id"])
+        data = await gamification.get_gamification(current_user["id"], since)
         return data
     except Exception as e:
         logger.error(f"Error getting gamification: {e}")
@@ -90,16 +92,28 @@ async def award_xp(
     request: AwardXPRequest,
     current_user: dict = Depends(get_current_user)
 ):
+    """
+    Sync after an activity. Grants nothing itself (Phase 7: XP comes only from learning the
+    server measured); returns the state plus any XP earned since `since`, for the toasts.
+    """
     try:
         result = await gamification.award_xp(
             user_id=current_user["id"],
             activity_type=request.activity_type,
             meta=request.meta,
+            since=request.since,
         )
         return result
     except Exception as e:
         logger.error(f"Error awarding XP: {e}")
         raise HTTPException(500, str(e))
+
+
+@router.get("/leaderboard")
+async def class_leaderboard(current_user: dict = Depends(get_current_user)):
+    """This week's learning XP in the student's class (school level, when the class has the leaderboard on)."""
+    from services.leaderboard import class_week
+    return await class_week(current_user["id"])
 
 
 # ============== Settings ==============
@@ -295,11 +309,18 @@ async def save_learning_progress(
     current_user: dict = Depends(get_current_user)
 ):
     try:
+        before = set(await user_data.get_learning_progress(current_user["id"], request.project_id) or [])
         topics = await user_data.save_learning_progress(
             user_id=current_user["id"],
             project_id=request.project_id,
             completed_topics=request.completed_topics,
         )
+        # A plan step completed for the first time earns XP once (untick/retick earns nothing)
+        from services.gamification_service import gamification
+        for topic in [t for t in (topics or []) if t not in before][:10]:
+            await gamification.award(current_user["id"], "exam_plan_step",
+                                     dedupe_key=f"plan:{request.project_id}:{topic}",
+                                     meta={"topic": topic, "project_id": request.project_id})
         return {"completed_topics": topics}
     except Exception as e:
         raise HTTPException(500, str(e))

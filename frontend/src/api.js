@@ -1015,18 +1015,23 @@ export const updateStreak = async (projectId) => {
 };
 
 // --- Gamification ---
-export const getGamification = async () => {
-    const response = await api.get('/user-data/gamification');
+export const getGamification = async (since = null) => {
+    const response = await api.get('/user-data/gamification', { params: since ? { since } : {} });
     return response.data;
 };
 
-export const awardXP = async (activityType, meta = null) => {
+// Sync after an activity: the server grants XP only for learning it measured; this returns
+// the state plus XP earned since `since` (for toasts)
+export const awardXP = async (activityType, meta = null, since = null) => {
     const response = await api.post('/user-data/gamification/award-xp', {
         activity_type: activityType,
         meta,
+        since,
     });
     return response.data;
 };
+
+export const getLeaderboard = async () => (await api.get('/user-data/leaderboard')).data;
 
 // ============== Flashcard API ==============
 
