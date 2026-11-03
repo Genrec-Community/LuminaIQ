@@ -1399,6 +1399,8 @@ export const getPlatformLevels = async () => (await api.get('/platform/levels'))
 
 export const getPlatformCosts = async (days = 30) => (await api.get('/platform/costs', { params: { days } })).data;
 
+export const getPlatformAnalytics = async (days = 30) => (await api.get('/platform/analytics', { params: { days } })).data;
+
 export const updatePlatformLevel = async (level, body) => (await api.put(`/platform/levels/${level}`, body)).data;
 
 export const getClassSettings = async (classId) => (await api.get(`/institutions/classes/${classId}/settings`)).data;

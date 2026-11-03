@@ -42,7 +42,7 @@ Anti-goals (a failure even if it "works"):
   backend change. RAG changes must also pass the eval in §6 (Phase 3).
 - **Migrations:**
   - One database (`DATABASE_URL`): `backend/db/schema/NNNN_name.sql`, applied in order on startup by `db/migrate.py`
-    (or `uv run python -m db.migrate`). `0001_init.sql` is the fresh-start schema; the latest is `0009_gamification.sql`, so the next file is `0010_`.
+    (or `uv run python -m db.migrate`). `0001_init.sql` is the fresh-start schema; the latest is `0010_analytics.sql`, so the next file is `0011_`.
     Never edit an applied file; add a new one.
   - `backend/db/supabase_auth.sql` is the only SQL that runs in Supabase (the Google sign-up allowlist on `auth.users`).
 - **Database access:** services call `get_supabase_client().table(...)` / `.rpc(...)` as before. That now goes to our
@@ -468,6 +468,27 @@ Audited every main screen at 390×844 with Playwright (overflow, tap targets, te
   document delete/select); tab labels 11.5px.
 - No coach-mark tours on phone-size screens (one clear next step instead). Dark-mode colours for the new menus.
 - Fixed: the Knowledge Graph view crashed (it animated style properties this cytoscape version doesn't have).
+
+### Follow-up (2026-11-03): platform analytics dashboard
+The admin console now opens on **Analytics** (`components/platform/Analytics.jsx`, `GET /platform/analytics?days=7|30|90`,
+`services/analytics_report.py`, schema `0010_analytics.sql`). Each number is compared with the previous period.
+- **Overview:** learners, sign-ups, active learners, questions, chats, books, revenue, AI spend (+ per active learner).
+- **Growth:** active today / 7 days / 30 days, stickiness, daily charts (sign-ups, actives, questions, chats, revenue,
+  AI spend) with hover/tap values, a table view and CSV download.
+- **Activation funnel** for the period's sign-ups: level → book → ready → chat → practice → came back → paid.
+- **Retention:** weekly sign-up cohorts × weeks 0–7.
+- **Engagement:** visit frequency, practice per tool, AI features used, most active learners.
+- **Learning:** accuracy, hints, mastery points, topics mastered, mistakes opened/fixed, daily-goal rate, review
+  backlog, by level, hardest topics, XP by reason.
+- **Revenue:** collected, personal MRR (yearly ÷ 12), school MRR (live paid seats × seat price), new payers, payments,
+  subscriptions (incl. cancelling), schools by status.
+- **Health:** job queue now, job failures and times, book-processing failures, AI error rate and p95 latency,
+  child-safety flag counts.
+Builder's calls:
+- "Active" = used the app that day: `user_active_days`, written by the auth dependency at most once an hour per
+  process (and again on a new day). Backfilled from earlier activity.
+- A sign-up is a user's first signed-in request (`app_users.created_at`).
+- Counts and learning data only: no chat text or memory notes appear on this page.
 
 ---
 

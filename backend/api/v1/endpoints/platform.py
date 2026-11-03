@@ -11,6 +11,7 @@ an email listed in PLATFORM_ADMIN_EMAILS.
 - POST /platform/institutions/{id}/trial          - mark as trial or paid
 - GET  /platform/institutions/{id}/audit          - what happened to this school
 - GET  /platform/costs?days=30                     - AI cost dashboard (per user, feature, model; cache hits)
+- GET  /platform/analytics?days=30                 - product analytics (growth, funnel, retention, learning, revenue, health)
 """
 
 from typing import Dict, Optional
@@ -137,4 +138,15 @@ async def ai_costs(days: int = 30, admin: dict = Depends(require_platform_admin)
     from services.cost_report import report
     from services.telemetry import telemetry
     await telemetry.flush()     # include this process's most recent calls
+    return await report(days)
+
+
+# ---- Product analytics (sign-up → learning → revenue, plus system health)
+
+@router.get("/analytics")
+async def analytics(days: int = 30, admin: dict = Depends(require_platform_admin)):
+    """The whole journey for the last `days` days: growth, activation, retention, learning, revenue, health."""
+    from services.analytics_report import report
+    from services.telemetry import telemetry
+    await telemetry.flush()
     return await report(days)

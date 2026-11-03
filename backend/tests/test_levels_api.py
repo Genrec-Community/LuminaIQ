@@ -129,3 +129,15 @@ def test_chat_prompt_carries_level_and_safety_short_circuits(env, monkeypatch):
     assert events == [{"category": "distress", "user_id": user["id"]}]
     saved = pg.table("chat_messages").select("role, content").eq("project_id", project["id"]).execute().data
     assert any(m["role"] == "assistant" and "14416" in m["content"] for m in saved)
+
+
+def test_analytics_is_platform_admin_only(env, monkeypatch):
+    client, pg, user = env
+    assert client.get("/api/v1/platform/analytics").status_code == 403
+    from config.settings import settings
+    monkeypatch.setattr(settings, "PLATFORM_ADMIN_EMAILS", user["email"])
+    res = client.get("/api/v1/platform/analytics?days=7")
+    assert res.status_code == 200
+    body = res.json()
+    assert body["days"] == 7 and len(body["daily"]) == 7
+    assert {"overview", "funnel", "retention", "engagement", "learning", "revenue", "health"} <= set(body)

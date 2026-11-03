@@ -43,9 +43,14 @@ _seen: dict = {}
 async def _remember_user(user_id: str, email: Optional[str]) -> None:
     """Keep app_users (id, email) current: Supabase owns the accounts, but SQL joins on email."""
     import time
+    from datetime import datetime as _dt
+    from services.usage_service import _tz
     now = time.monotonic()
-    if _seen.get(user_id, 0) > now:
+    key = (user_id, _dt.now(_tz()).date())   # a new day writes again, so active days stay exact
+    if _seen.get(key, 0) > now:
         return
+    if len(_seen) > 50000:
+        _seen.clear()
     try:
         from datetime import datetime, timezone
         from db.client import async_db, get_supabase_client
@@ -54,7 +59,21 @@ async def _remember_user(user_id: str, email: Optional[str]) -> None:
         if email:
             row["email"] = email.lower()
         await async_db(lambda: client.table("app_users").upsert(row).execute())
-        _seen[user_id] = now + _SEEN_TTL
+        _seen[key] = now + _SEEN_TTL
+        await _mark_active_day(client, user_id)
+    except Exception:
+        pass  # never block a request over this
+
+
+async def _mark_active_day(client, user_id: str) -> None:
+    """One row per user per local day, for active-user and retention numbers (admin analytics)."""
+    try:
+        from datetime import datetime
+        from db.client import async_db
+        from services.usage_service import _tz
+        day = datetime.now(_tz()).date()
+        await async_db(lambda: client.pg.fetch(
+            "INSERT INTO user_active_days (user_id, day) VALUES (%s, %s) ON CONFLICT DO NOTHING", (user_id, day)))
     except Exception:
         pass  # never block a request over this
 

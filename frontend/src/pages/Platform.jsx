@@ -6,6 +6,7 @@ import {
     getPlatformLevels,
 } from '../api';
 import AICosts from '../components/platform/AICosts';
+import Analytics from '../components/platform/Analytics';
 
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
 
@@ -132,11 +133,11 @@ const LevelsOverview = () => {
     );
 };
 
-/** Lumina IQ staff console: approve, pause and extend schools; set tools per level. */
+/** Lumina IQ staff console: analytics; approve, pause and extend schools; tools per level; AI costs. */
 const Platform = () => {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
-    const tab = ['levels', 'costs'].includes(searchParams.get('tab')) ? searchParams.get('tab') : 'schools';
+    const tab = ['schools', 'levels', 'costs'].includes(searchParams.get('tab')) ? searchParams.get('tab') : 'analytics';
     const [allowed, setAllowed] = useState(null);
     const [status, setStatus] = useState('pending');
     const [q, setQ] = useState('');
@@ -168,9 +169,9 @@ const Platform = () => {
                 {allowed === false && <p className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-800">This page is for Lumina IQ staff.</p>}
                 {allowed && (
                     <div role="tablist" className="mb-5 inline-flex max-w-full overflow-x-auto rounded-2xl border border-[#E6D5CC] bg-white p-1">
-                        {[['schools', 'Schools'], ['levels', 'Levels & tools'], ['costs', 'AI costs']].map(([id, label]) => (
+                        {[['analytics', 'Analytics'], ['schools', 'Schools'], ['levels', 'Levels & tools'], ['costs', 'AI costs']].map(([id, label]) => (
                             <button key={id} role="tab" aria-selected={tab === id}
-                                onClick={() => setSearchParams(id === 'schools' ? {} : { tab: id })}
+                                onClick={() => setSearchParams(id === 'analytics' ? {} : { tab: id })}
                                 className={`rounded-xl px-4 py-1.5 text-sm font-semibold ${tab === id ? 'bg-[#163628] text-white' : 'text-[#5E5046]'}`}>
                                 {label}
                             </button>
@@ -178,6 +179,7 @@ const Platform = () => {
                     </div>
                 )}
                 {allowed && tab === 'levels' && <LevelsOverview />}
+                {allowed && tab === 'analytics' && <Analytics />}
                 {allowed && tab === 'costs' && <AICosts />}
                 {allowed && tab === 'schools' && (
                     <>

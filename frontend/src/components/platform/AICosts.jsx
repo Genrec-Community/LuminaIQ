@@ -1,59 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { getPlatformCosts, apiErrorText } from '../../api';
-
-const usd = (n) => {
-    const v = Number(n || 0);
-    if (v === 0) return '$0';
-    return v < 0.01 ? `$${v.toFixed(4)}` : `$${v.toFixed(2)}`;
-};
-const num = (n) => Number(n || 0).toLocaleString();
-const pct = (r) => `${Math.round(Number(r || 0) * 100)}%`;
+import { Stat, Table, num, pct, usd } from './ui';
 
 const FEATURE_NAMES = {
     chat: 'Chat', deep: 'Deep answers', questions: 'Quizzes', flashcards: 'Flashcards', notes: 'Notes',
     mindmap: 'Mindmaps', visual: 'Visual Lab', cram: 'Exam Tonight', other: 'Other',
 };
 const featureName = (f) => FEATURE_NAMES[f] || (f?.startsWith('job:') ? `Background: ${f.slice(4)}` : f);
-
-const Stat = ({ label, value, hint }) => (
-    <div className="rounded-2xl border border-[#E6D5CC] bg-white p-4">
-        <div className="text-sm text-[#5E5046]">{label}</div>
-        <div className="mt-1 text-2xl font-bold tabular-nums">{value}</div>
-        {hint && <div className="mt-0.5 text-xs text-[#5E5046]">{hint}</div>}
-    </div>
-);
-
-const Table = ({ title, columns, rows, empty }) => (
-    <section className="mt-6">
-        <h3 className="mb-2 font-bold">{title}</h3>
-        <div className="overflow-x-auto rounded-2xl border border-[#E6D5CC] bg-white">
-            <table className="w-full min-w-[520px] text-sm">
-                <thead>
-                    <tr className="border-b border-[#E6D5CC] text-left text-[#5E5046]">
-                        {columns.map(([key, label, align]) => (
-                            <th key={key} className={`px-3 py-2 font-semibold ${align === 'right' ? 'text-right' : ''}`}>{label}</th>
-                        ))}
-                    </tr>
-                </thead>
-                <tbody>
-                    {rows.length === 0 && (
-                        <tr><td colSpan={columns.length} className="px-3 py-4 text-[#5E5046]">{empty}</td></tr>
-                    )}
-                    {rows.map((r, i) => (
-                        <tr key={i} className="border-b border-[#F3E9E2] last:border-0">
-                            {columns.map(([key, , align, fmt]) => (
-                                <td key={key} className={`px-3 py-2 ${align === 'right' ? 'text-right tabular-nums' : ''}`}>
-                                    {fmt ? fmt(r[key], r) : r[key]}
-                                </td>
-                            ))}
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
-    </section>
-);
 
 /** Spend per day, with what caching saved stacked on top. */
 const Daily = ({ daily }) => {
