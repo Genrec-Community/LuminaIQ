@@ -12,6 +12,7 @@ import json
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from jose import jwt, JWTError
+from api.access import assert_documents_in_project
 from config.settings import settings
 from utils.progress_manager import get_progress_manager
 from utils.logger import logger
@@ -58,7 +59,8 @@ async def stream_document_progress(
         };
     """
     # Authenticate via query param
-    await _verify_token(token)
+    user = await _verify_token(token)
+    await assert_documents_in_project([document_id], user["id"], None)
 
     progress_manager = get_progress_manager()
 

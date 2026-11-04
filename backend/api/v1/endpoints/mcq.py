@@ -7,6 +7,7 @@ from models.schemas import (
     MCQSubmitResponse,
 )
 from typing import Any, List, Dict
+from api.access import assert_row_access
 from api.deps import get_current_user
 from services.usage_service import usage, metered
 
@@ -42,6 +43,7 @@ async def get_saved_test(
     test_id: str, current_user: dict = Depends(get_current_user)
 ):
     """Get a specific saved MCQ test with full questions"""
+    await assert_row_access("mcq_tests", test_id, current_user["id"])
     try:
         test = await mcq_service.get_saved_test(test_id)
         return test
@@ -54,6 +56,7 @@ async def delete_saved_test(
     test_id: str, current_user: dict = Depends(get_current_user)
 ):
     """Delete a saved MCQ test"""
+    await assert_row_access("mcq_tests", test_id, current_user["id"])
     try:
         await mcq_service.delete_saved_test(test_id)
         return {"message": "Test deleted successfully"}
@@ -90,6 +93,7 @@ async def submit_mcq(
     """
     Submit MCQ answers and get evaluation
     """
+    await assert_row_access("mcq_tests", request.test_id, current_user["id"])
     try:
         result = await mcq_service.submit_test(
             test_id=request.test_id, answers=request.answers

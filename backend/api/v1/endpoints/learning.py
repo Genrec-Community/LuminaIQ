@@ -41,6 +41,7 @@ from services.learning_service import (
 )
 from services.knowledge_graph_service import knowledge_graph
 from services.llm_service import llm_service
+from api.access import assert_row_access
 from api.deps import get_current_user
 from utils.logger import logger
 import json
@@ -314,6 +315,7 @@ async def record_review(
     - 4: Correct answer with some hesitation
     - 5: Perfect recall, no hesitation
     """
+    await assert_row_access("review_cards", card_id, current_user["id"])
     try:
         result = await spaced_repetition.record_review(
             card_id=card_id, quality=request.quality
@@ -331,6 +333,7 @@ async def delete_review_card(
     card_id: str, current_user: dict = Depends(get_current_user)
 ):
     """Delete a review card."""
+    await assert_row_access("review_cards", card_id, current_user["id"])
     try:
         success = await spaced_repetition.delete_card(card_id)
 
