@@ -58,7 +58,7 @@ Anti-goals (a failure even if it "works"):
 
 | Area | Today | Problem |
 | --- | --- | --- |
-| Hosting | Render **free** plan, one uvicorn process (`startup.sh`) | No horizontal scale. Restarts lose state. |
+| Hosting | Azure Container Apps `luminaiq-api` (deployed from `main` by `azure.yml`); website on Azure Static Web Apps. (Render before 2026-10-30.) | Moving to AWS (owner decision 1). |
 | Main DB / auth / files | Supabase for everything, via the service key, so access rules were bypassed | Now: data in our own Postgres (`DATABASE_URL`), Supabase only for sign-in and files. Endpoints check ownership in `api/access.py`. |
 | Vectors | Qdrant, one collection per project (`services/qdrant_service.py`) | Separate server. No keyword search alongside. |
 | RAG chat | `services/rag_service.py`: LangChain `create_retrieval_chain`, pure dense top-5 | Follow-ups ("explain that more") search with the raw text and retrieve junk. No rerank, no hybrid, no eval. |
@@ -82,13 +82,16 @@ Anti-goals (a failure even if it "works"):
 1. **Scale target:** design for horizontal scaling. Production will be **AWS EC2 with autoscaling** (the owner handles hosting).
    We build software that is stateless per process and configured by environment variables.
 2. **Supabase is only for sign-in (and, for now, file storage).** All data lives in our own Postgres (`DATABASE_URL`):
-   Docker in development, AWS RDS in production. Fresh start, no data copied from Supabase. Moving files to S3 is a later project.
+   Docker in development, AWS RDS in production. Moving files to S3 is a later project.
+   **Updated 2026-11-05 (owner): the live data is migrated, not dropped.** Production already has real users, books,
+   paid plans and schools in Supabase. `backend/scripts/migrate_from_supabase.py` copies every table into RDS
+   (see `AWS_MIGRATION.md`). The software runs on AWS only.
 3. **Docker Compose is for local development only.** It runs the backend (web + worker) plus Postgres with pgvector, and Redis (optional).
    Production never runs the compose file or its Postgres: it deploys the backend image and uses RDS.
    The backend also runs directly with `uv run run.py`. The frontend, the OCR setup and the Render config stay as they are.
 4. **Qdrant is replaced by pgvector** in the **same Postgres** (`DATABASE_URL`):
-   Docker in development, **AWS RDS** in production. **Fresh start: no data migration.** Don't write migration or
-   backward-compatibility code for old vectors, old chunks or old data. Remove Qdrant code completely.
+   Docker in development, **AWS RDS** in production. Old vectors are not copied: the data migration queues a
+   `reindex_document` job per book and the worker rebuilds passages from the stored text. Remove Qdrant code completely.
 5. **Redis is optional.** Everything must work without it.
 6. **OCR stays as it is now.**
 7. **AI provider:** any **OpenAI-compatible API**, with **two models**:
@@ -497,6 +500,7 @@ Builder's calls:
 | Setting | Purpose | Default |
 | --- | --- | --- |
 | `DATABASE_URL` | The app database (all tables, pgvector, jobs, caches, telemetry). Docker in dev, RDS in prod. | required |
+| `SOURCE_DATABASE_URL` | Only for the one-off copy from Supabase (`scripts/migrate_from_supabase.py`) | empty |
 | `DB_POOL_SIZE` / `RUN_MIGRATIONS` | Connections per process / apply `db/schema` on startup | `10` / `true` |
 | `SMALL_LLM_MODEL` / `SMALL_LLM_BASE_URL` / `SMALL_LLM_API_KEY` | Small model (most tasks, all free users) | required |
 | `BIG_LLM_MODEL` / `BIG_LLM_BASE_URL` / `BIG_LLM_API_KEY` | Big model (Visual Lab, Deep mode, paid image input) | falls back to small |
