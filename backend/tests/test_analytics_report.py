@@ -54,7 +54,9 @@ def seeded(fresh_pg):
     t("app_users").insert([
         {"id": a, "email": "asha@example.com", "created_at": _ago(3)},
         {"id": b, "email": "ben@example.com", "created_at": _ago(40)},
-        {"id": c, "email": "cara@example.com", "created_at": _ago(0, 1)},
+        # "today" for the report is India's date: signing up an hour ago would be yesterday
+        # between 00:00 and 01:00 IST, and C would count as coming back another day
+        {"id": c, "email": "cara@example.com", "created_at": _ago()},
     ]).execute()
     t("user_active_days").insert([
         {"user_id": a, "day": (today - timedelta(days=3)).isoformat()},
