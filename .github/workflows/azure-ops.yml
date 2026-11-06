@@ -78,7 +78,17 @@ jobs:
           set -euo pipefail
           az extension add --name containerapp --upgrade --only-show-errors
           az provider register --namespace Microsoft.DBforPostgreSQL --wait --only-show-errors
-          if ! az postgres flexible-server show -n "$PG" -g "$RG" >/dev/null 2>&1; then
+          state() { az postgres flexible-server list -g "$RG" --query "[?name=='$PG'].state | [0]" -o tsv 2>/dev/null || true; }
+          # A failed create leaves a half-made server that Azure deletes on its own ("Dropping");
+          # wait for that to finish instead of mistaking it for a working server.
+          for _ in $(seq 1 60); do
+            s=$(state); [ "$s" = "Dropping" ] || break
+            echo "Waiting for a failed earlier attempt to be removed..."; sleep 20
+          done
+          s=$(state)
+          [ "$s" != "Dropping" ] || { echo "::error::$PG is still being removed by Azure; run create-db again in a few minutes"; exit 1; }
+          echo "Existing server state: ${s:-none}"
+          if [ -z "$s" ]; then
             PASS="$(openssl rand -base64 36 | tr -dc 'A-Za-z0-9' | head -c 32)Aa1"
             echo "::add-mask::$PASS"
             # Burstable B1ms is plenty for today's data (resize later without moving data). Free-credit
@@ -95,6 +105,7 @@ jobs:
                      --public-access 0.0.0.0 --backup-retention 7 --yes -o none; then
                   created="$sku in $loc"; break 2
                 fi
+                for _ in $(seq 1 45); do [ -z "$(state)" ] && break; echo "Waiting for Azure to remove the failed attempt..."; sleep 20; done
               done
             done
             [ -n "$created" ] || { echo "::error::No Postgres size could be created in any tried region"; exit 1; }
