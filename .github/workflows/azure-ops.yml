@@ -81,12 +81,24 @@ jobs:
           if ! az postgres flexible-server show -n "$PG" -g "$RG" >/dev/null 2>&1; then
             PASS="$(openssl rand -base64 36 | tr -dc 'A-Za-z0-9' | head -c 32)Aa1"
             echo "::add-mask::$PASS"
-            # Burstable B1ms: plenty for today's data; resize later without moving data.
-            # Public access limited by firewall: Azure services (the Container App) only.
-            az postgres flexible-server create -n "$PG" -g "$RG" -l "$LOCATION" \
-              --version 16 --tier Burstable --sku-name Standard_B1ms --storage-size 32 \
-              --admin-user "$PG_ADMIN" --admin-password "$PASS" \
-              --public-access 0.0.0.0 --backup-retention 7 --yes -o none
+            # Burstable B1ms is plenty for today's data (resize later without moving data). Free-credit
+            # subscriptions can't create every size in every region (SkuNotAvailable), so try the app's
+            # region first, then the nearest ones, and a size up. Public access is limited by firewall
+            # to Azure services (the Container App).
+            created=""
+            for loc in "$LOCATION" southindia southeastasia; do
+              for sku in Standard_B1ms Standard_B2s; do
+                echo "Trying $sku in $loc"
+                if az postgres flexible-server create -n "$PG" -g "$RG" -l "$loc" \
+                     --version 16 --tier Burstable --sku-name "$sku" --storage-size 32 \
+                     --admin-user "$PG_ADMIN" --admin-password "$PASS" \
+                     --public-access 0.0.0.0 --backup-retention 7 --yes -o none; then
+                  created="$sku in $loc"; break 2
+                fi
+              done
+            done
+            [ -n "$created" ] || { echo "::error::No Postgres size could be created in any tried region"; exit 1; }
+            echo "Created $created"
             URL="postgresql://$PG_ADMIN:$PASS@$PG.postgres.database.azure.com:5432/$PG_DB?sslmode=require"
             echo "::add-mask::$URL"
             # The Container App holds the connection string; nothing reads it until DATABASE_URL points at it.
