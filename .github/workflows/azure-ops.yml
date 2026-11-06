@@ -19,6 +19,14 @@ on:
         type: choice
         options: [inspect, create-db, migrate]
         default: inspect
+      location:
+        description: "create-db: Azure region (empty = try the defaults)"
+        type: string
+        default: ""
+      sku:
+        description: "create-db: size (empty = try Standard_B1ms then Standard_B2s)"
+        type: string
+        default: ""
       dry_run:
         description: "migrate: show the plan only"
         type: boolean
@@ -63,8 +71,13 @@ jobs:
           echo "## Subscription"; az account show --query "{name:name, state:state, quotaId:subscriptionPolicies.quotaId, spendingLimit:subscriptionPolicies.spendingLimit}" -o table
           echo "## Resources in $RG"; az resource list -g "$RG" --query "[].{name:name, type:type, location:location}" -o table
           echo "## Postgres flexible servers"; az postgres flexible-server list -g "$RG" --query "[].{name:name, state:state, version:version, sku:sku.name}" -o table 2>&1 | tail -5
-          echo "## Burstable SKUs offered in $LOCATION"
-          az postgres flexible-server list-skus -l "$LOCATION" --query "[0].supportedServerEditions[?name=='Burstable'].supportedServerSkus[].name" -o tsv 2>&1 | head -8
+          # Free-credit subscriptions can't create Postgres everywhere: show, per region, whether this
+          # subscription is restricted there and which small sizes it may create (no resources are made).
+          echo "## Postgres sizes this subscription may create, by region"
+          for loc in centralindia southindia westindia southeastasia eastasia japaneast koreacentral uaenorth eastus eastus2 westus2 westus3 northeurope westeurope uksouth australiaeast; do
+            out=$(az postgres flexible-server list-skus -l "$loc" -o json 2>&1) || { echo "$loc: $(echo "$out" | tail -1)"; continue; }
+            echo "$out" | jq -r --arg loc "$loc" '.[0] as $c | "\($loc): restricted=\($c.restricted // "-") reason=\($c.reason // "-") | " + ([$c.supportedServerEditions[]? | select(.name=="Burstable" or .name=="GeneralPurpose") | .name + "(" + (.status // "?") + "):" + ([.supportedServerSkus[]? | select(.name|test("B1ms|B2s$|D2ds_v5|D2s_v3")) | .name + "=" + (.status // "?")] | join(","))] | join(" "))'
+          done
           echo "## Setting names in BACKEND_ENV (values not shown)"
           printf '%s\n' "$BACKEND_ENV" | sed 's/\r$//' | grep -E '^[A-Za-z_][A-Za-z0-9_]*=' | cut -d= -f1 | sort
           echo "## Env var names on $APP"
@@ -78,7 +91,12 @@ jobs:
           set -euo pipefail
           az extension add --name containerapp --upgrade --only-show-errors
           az provider register --namespace Microsoft.DBforPostgreSQL --wait --only-show-errors
-          state() { az postgres flexible-server list -g "$RG" --query "[?name=='$PG'].state | [0]" -o tsv 2>/dev/null || true; }
+          state() {
+            # ARM keeps a failed server's name (and region) until it is fully deleted, so ask ARM too
+            local s; s=$(az postgres flexible-server list -g "$RG" --query "[?name=='$PG'].state | [0]" -o tsv 2>/dev/null || true)
+            [ -n "$s" ] || { az resource list -g "$RG" -n "$PG" --resource-type Microsoft.DBforPostgreSQL/flexibleServers --query "[0].name" -o tsv 2>/dev/null | grep -q . && s=Dropping; }
+            echo "$s"
+          }
           # A failed create leaves a half-made server that Azure deletes on its own ("Dropping");
           # wait for that to finish instead of mistaking it for a working server.
           for _ in $(seq 1 60); do
@@ -96,11 +114,14 @@ jobs:
             # region first, then the nearest ones, and a size up. Public access is limited by firewall
             # to Azure services (the Container App).
             created=""
-            for loc in "$LOCATION" southindia southeastasia; do
-              for sku in Standard_B1ms Standard_B2s; do
-                echo "Trying $sku in $loc"
+            # inspect lists which regions and sizes this subscription may use; pass them as inputs
+            LOCS="${{ inputs.location }}"; SKUS="${{ inputs.sku }}"
+            for loc in ${LOCS:-$LOCATION southeastasia}; do
+              for sku in ${SKUS:-Standard_B1ms Standard_B2s}; do
+                case "$sku" in Standard_B*) tier=Burstable ;; Standard_E*) tier=MemoryOptimized ;; *) tier=GeneralPurpose ;; esac
+                echo "Trying $sku ($tier) in $loc"
                 if az postgres flexible-server create -n "$PG" -g "$RG" -l "$loc" \
-                     --version 16 --tier Burstable --sku-name "$sku" --storage-size 32 \
+                     --version 16 --tier "$tier" --sku-name "$sku" --storage-size 32 \
                      --admin-user "$PG_ADMIN" --admin-password "$PASS" \
                      --public-access 0.0.0.0 --backup-retention 7 --yes -o none; then
                   created="$sku in $loc"; break 2
