@@ -138,8 +138,8 @@ jobs:
           fi
           # pgvector and uuid-ossp must be allow-listed on Azure before CREATE EXTENSION works
           az postgres flexible-server parameter set -g "$RG" -s "$PG" --name azure.extensions --value "VECTOR,UUID-OSSP" -o none
-          az postgres flexible-server db show -g "$RG" -s "$PG" -d "$PG_DB" >/dev/null 2>&1 || \
-            az postgres flexible-server db create -g "$RG" -s "$PG" -d "$PG_DB" -o none
+          az postgres flexible-server db show -g "$RG" -s "$PG" -n "$PG_DB" >/dev/null 2>&1 || \
+            az postgres flexible-server db create -g "$RG" -s "$PG" -n "$PG_DB" -o none
           az postgres flexible-server show -n "$PG" -g "$RG" --query "{name:name, state:state, version:version, sku:sku.name, host:fullyQualifiedDomainName}" -o table
           { echo "### Postgres"; echo "- Server \`$PG\` ready, database \`$PG_DB\`"; echo "- Connection string stored as the \`database-url\` secret on \`$APP\`"; } >> "$GITHUB_STEP_SUMMARY"
 
