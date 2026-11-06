@@ -105,7 +105,7 @@ jobs:
           SOURCE_DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           set -euo pipefail
-          [ -n "$SOURCE_DATABASE_URL" ] || { echo "::error::Add the SUPABASE_DB_URL repository secret first (see AZURE_MIGRATION.md)"; exit 1; }
+          [ -n "$SOURCE_DATABASE_URL" ] || { echo "::error::Add the SUPABASE_DB_URL repository secret first (see AZURE_DATABASE_MIGRATION.md)"; exit 1; }
           az extension add --name containerapp --upgrade --only-show-errors
           DATABASE_URL=$(az containerapp secret show -n "$APP" -g "$RG" --secret-name database-url --query value -o tsv)
           echo "::add-mask::$DATABASE_URL"
