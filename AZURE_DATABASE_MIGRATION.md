@@ -10,7 +10,7 @@ Supabase for now, so nobody re-registers and every file path keeps working.
 |---|---|---|
 | API | Container App `luminaiq-api` | Same app, new image (web + background worker in each replica) |
 | Website | Static Web App `luminaiq-web` | Same, new build |
-| App data | Supabase Postgres | **Azure Database for PostgreSQL 16 `luminaiq-db`** (pgvector), Central India |
+| App data | Supabase Postgres | **Azure Database for PostgreSQL 16 `luminaiq-db`** (pgvector), Southeast Asia (see below) |
 | Book search | Qdrant | pgvector in the same database, rebuilt from the stored text |
 | AI models | Azure Foundry, `LLM_*` / `LLM_DEEP_*` / `EMBEDDING_*` | Same keys: `LLM_*` is read as the small model, `LLM_DEEP_*` is mapped to `BIG_LLM_*` by `azure.yml` |
 | Sign-in, files | Supabase | Supabase (unchanged in this step) |
@@ -25,6 +25,15 @@ plans, 3 schools, 3 payments. The largest table, `topic_relations`, has ~7,000 r
 The subscription runs on free credits. Azure pauses a free-trial subscription when its credits run out or expire,
 which would take luminaiq.fun offline. **Upgrade it to pay-as-you-go before the credits expire** (Azure portal →
 Subscriptions → Upgrade); unused credits carry over and nothing that runs changes.
+
+## Region
+
+The server is in **Southeast Asia**, not Central India next to the API: on this free-credit subscription Central India
+refused both Burstable sizes (`SkuNotAvailable`), and South India, East US/US 2, West US 2 and West Europe are closed to
+it (`inspect` lists this per region). Every query crosses India ↔ Singapore, so expect a few tens of milliseconds more
+per query. To move it next to the API later: upgrade the subscription (or open a support request, issue type
+"Service and subscription limits", for Burstable in Central India), run `create-db` with `location=centralindia` under a
+new server name, and re-run `migrate` into it.
 
 ## What the migration does (`backend/scripts/migrate_from_supabase.py`)
 
@@ -52,7 +61,7 @@ Tested in `backend/tests/test_migrate_from_supabase.py` and rehearsed against a 
 ## Steps (GitHub → Actions → **Azure ops** → Run workflow)
 
 1. **`create-db`** (done 2026-11-06): creates `luminaiq-db` (Burstable B1ms, 32 GB, 7-day backups, firewall: Azure
-   services only), allow-lists `VECTOR` and `UUID-OSSP`, creates the `lumina` database, and stores its connection string
+   services only; region and size are inputs), allow-lists `VECTOR` and `UUID-OSSP`, creates the `lumina` database, and stores its connection string
    as the `database-url` secret on `luminaiq-api`. Nothing reads it until the new code is deployed.
 2. **Supabase connection string** as a repository secret: Supabase → Project Settings → Database → Connection string →
    **Session pooler**; add `?sslmode=require` and your database password. GitHub → Settings → Secrets and variables →
