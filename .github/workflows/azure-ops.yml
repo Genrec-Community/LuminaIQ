@@ -75,8 +75,8 @@ jobs:
           # subscription is restricted there and which small sizes it may create (no resources are made).
           echo "## Postgres sizes this subscription may create, by region"
           for loc in centralindia southindia westindia southeastasia eastasia japaneast koreacentral uaenorth eastus eastus2 westus2 westus3 northeurope westeurope uksouth australiaeast; do
-            out=$(az postgres flexible-server list-skus -l "$loc" -o json 2>&1) || { echo "$loc: $(echo "$out" | tail -1)"; continue; }
-            echo "$out" | jq -r --arg loc "$loc" '.[0] as $c | "\($loc): restricted=\($c.restricted // "-") reason=\($c.reason // "-") | " + ([$c.supportedServerEditions[]? | select(.name=="Burstable" or .name=="GeneralPurpose") | .name + "(" + (.status // "?") + "):" + ([.supportedServerSkus[]? | select(.name|test("B1ms|B2s$|D2ds_v5|D2s_v3")) | .name + "=" + (.status // "?")] | join(","))] | join(" "))'
+            out=$(az postgres flexible-server list-skus -l "$loc" -o json 2>/tmp/err) || { echo "$loc: $(tail -1 /tmp/err)"; continue; }
+            printf '%s' "$out" | jq -r --arg loc "$loc" '.[0] as $c | "\($loc): restricted=\($c.restricted // "-") reason=\($c.reason // "-") | " + ([$c.supportedServerEditions[]? | select(.name=="Burstable" or .name=="GeneralPurpose") | .name + "(" + (.status // "?") + "):" + ([.supportedServerSkus[]? | select(.name|test("B1ms|B2s$|D2ds_v5|D2s_v3")) | .name + "=" + (.status // "?")] | join(","))] | join(" "))' || echo "$loc: (could not read)"
           done
           echo "## Setting names in BACKEND_ENV (values not shown)"
           printf '%s\n' "$BACKEND_ENV" | sed 's/\r$//' | grep -E '^[A-Za-z_][A-Za-z0-9_]*=' | cut -d= -f1 | sort
