@@ -320,8 +320,32 @@ def _print_results(results: List[TableResult]) -> bool:
     return ok
 
 
+def end_stale_copies(target: str) -> None:
+    """An earlier copy that was cancelled can leave its connections open on the server, still
+    holding row locks (or the schema lock), so this copy would wait on them forever. End earlier
+    copies (they carry APP_NAME; older ones had no name, so also any session stuck in a
+    transaction or waiting on a lock for a while)."""
+    with psycopg.connect(target, autocommit=True, application_name=APP_NAME) as conn:
+        for _ in range(5):
+            ended = conn.execute(
+                """SELECT count(pg_terminate_backend(pid)) FROM pg_stat_activity
+                   WHERE datname = current_database() AND pid <> pg_backend_pid()
+                     AND (application_name = %s
+                          OR (state LIKE 'idle in transaction%%' AND state_change < now() - interval '30 seconds')
+                          OR (state = 'active' AND wait_event_type IN ('Lock', 'LWLock')
+                              AND query_start < now() - interval '1 minute')
+                          OR (state = 'idle' AND state_change < now() - interval '1 minute'
+                              AND pid IN (SELECT pid FROM pg_locks WHERE locktype = 'advisory')))""",
+                (APP_NAME,)).fetchone()[0]
+            if not ended:
+                return
+            print(f"Ended {ended} connection(s) left open by an earlier copy", flush=True)
+            time.sleep(3)
+
+
 def run(source: str, target: str, *, dry_run: bool = False, reindex: bool = True,
         source_schema: str = "public", auth_schema: str = "auth", apply_schema: bool = True) -> int:
+    end_stale_copies(target)
     if apply_schema:  # creates empty tables only (the app does the same on startup), also on a dry run
         from db.migrate import migrate
         applied = migrate(target)
@@ -330,24 +354,7 @@ def run(source: str, target: str, *, dry_run: bool = False, reindex: bool = True
     with psycopg.connect(source) as src, psycopg.connect(target, autocommit=True,
                                                          application_name=APP_NAME) as dst:
         src.read_only = True
-        # An earlier copy that was cancelled can leave its connection open on the server, still
-        # holding locks on the rows it was inserting, so this copy would wait on them forever.
-        # End earlier copies (they carry APP_NAME; older ones had no name, so also any session
-        # stuck in a transaction or waiting on a lock for a while), and never leave one ourselves.
         dst.execute("SET idle_in_transaction_session_timeout = '2min'")
-        for _ in range(5):
-            ended = dst.execute(
-                """SELECT count(pg_terminate_backend(pid)) FROM pg_stat_activity
-                   WHERE datname = current_database() AND pid <> pg_backend_pid()
-                     AND (application_name = %s
-                          OR (state LIKE 'idle in transaction%%' AND state_change < now() - interval '30 seconds')
-                          OR (state = 'active' AND wait_event_type = 'Lock'
-                              AND query_start < now() - interval '1 minute'))""",
-                (APP_NAME,)).fetchone()[0]
-            if not ended:
-                break
-            print(f"Ended {ended} connection(s) left open by an earlier copy")
-            time.sleep(3)
         plans, source_only = plan(src, dst, source_schema)
         counts = {p.name: src.execute(sql.SQL("SELECT count(*) FROM {}.{}").format(
             sql.Identifier(source_schema), sql.Identifier(p.name))).fetchone()[0] for p in plans}
