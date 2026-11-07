@@ -60,6 +60,10 @@ class Settings(BaseSettings):
     LLM_BASE_URL: str = Field(default="")
     LLM_MODEL: str = Field(default="")
     LLM_REASONING_EFFORT: str = Field(default="")
+    # Older names for the big model, still read when the BIG_LLM_* ones are empty
+    LLM_DEEP_MODEL: str = Field(default="")
+    LLM_DEEP_BASE_URL: str = Field(default="")
+    LLM_DEEP_API_KEY: str = Field(default="")
 
     # Optional reranker (Cohere/Jina-style /rerank). On only when the key is set.
     RERANK_API_KEY: str = Field(default="")

@@ -6,6 +6,10 @@
 #             and keep its connection string as the Container App secret "database-url"
 #   migrate   copy the live data from Supabase into it (scripts/migrate_from_supabase.py);
 #             needs the SUPABASE_DB_URL repository secret. dry_run=true writes no rows.
+#   move-account  copy the app database into another Azure account (AZURE_ACCOUNT_MOVE.md): creates the
+#             database there, stops the old API, copies everything with pg_dump/pg_restore and compares
+#             row counts. Needs NEW_AZURE_CREDENTIALS for the new account; AZURE_CREDENTIALS stays the
+#             old one until the move is done. dry_run=true only checks both sides.
 name: Azure ops
 
 on:
@@ -17,7 +21,7 @@ on:
       task:
         description: What to do
         type: choice
-        options: [inspect, create-db, migrate]
+        options: [inspect, create-db, migrate, move-account]
         default: inspect
       location:
         description: "create-db: Azure region (empty = try the defaults)"
@@ -28,9 +32,17 @@ on:
         type: string
         default: ""
       dry_run:
-        description: "migrate: show the plan only"
+        description: "migrate / move-account: show the plan only"
         type: boolean
         default: true
+      stop_old_api:
+        description: "move-account: stop the old API first so nothing changes during the copy"
+        type: boolean
+        default: true
+      overwrite_target:
+        description: "move-account: replace a new-account database that already has data"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -43,7 +55,8 @@ env:
   RG: ${{ vars.AZURE_RESOURCE_GROUP || 'luminaiq' }}
   LOCATION: ${{ vars.AZURE_LOCATION || 'centralindia' }}
   APP: luminaiq-api
-  PG: luminaiq-db
+  ENVIRONMENT: luminaiq-env
+  PG: ${{ vars.AZURE_PG_SERVER || 'luminaiq-db' }}
   PG_DB: lumina
   PG_ADMIN: luminaiq
   TASK: ${{ inputs.task || 'inspect' }}
@@ -87,60 +100,11 @@ jobs:
 
       - name: Create the Postgres server and database
         if: env.TASK == 'create-db'
+        env:
+          LOCS: ${{ inputs.location }}
+          SKUS: ${{ inputs.sku }}
         run: |
-          set -euo pipefail
-          az extension add --name containerapp --upgrade --only-show-errors
-          az provider register --namespace Microsoft.DBforPostgreSQL --wait --only-show-errors
-          state() {
-            # ARM keeps a failed server's name (and region) until it is fully deleted, so ask ARM too
-            local s; s=$(az postgres flexible-server list -g "$RG" --query "[?name=='$PG'].state | [0]" -o tsv 2>/dev/null || true)
-            [ -n "$s" ] || { az resource list -g "$RG" -n "$PG" --resource-type Microsoft.DBforPostgreSQL/flexibleServers --query "[0].name" -o tsv 2>/dev/null | grep -q . && s=Dropping; }
-            echo "$s"
-          }
-          # A failed create leaves a half-made server that Azure deletes on its own ("Dropping");
-          # wait for that to finish instead of mistaking it for a working server.
-          for _ in $(seq 1 60); do
-            s=$(state); [ "$s" = "Dropping" ] || break
-            echo "Waiting for a failed earlier attempt to be removed..."; sleep 20
-          done
-          s=$(state)
-          [ "$s" != "Dropping" ] || { echo "::error::$PG is still being removed by Azure; run create-db again in a few minutes"; exit 1; }
-          echo "Existing server state: ${s:-none}"
-          if [ -z "$s" ]; then
-            PASS="$(openssl rand -base64 36 | tr -dc 'A-Za-z0-9' | head -c 32)Aa1"
-            echo "::add-mask::$PASS"
-            # Burstable B1ms is plenty for today's data (resize later without moving data). Free-credit
-            # subscriptions can't create every size in every region (SkuNotAvailable), so try the app's
-            # region first, then the nearest ones, and a size up. Public access is limited by firewall
-            # to Azure services (the Container App).
-            created=""
-            # inspect lists which regions and sizes this subscription may use; pass them as inputs
-            LOCS="${{ inputs.location }}"; SKUS="${{ inputs.sku }}"
-            for loc in ${LOCS:-$LOCATION southeastasia}; do
-              for sku in ${SKUS:-Standard_B1ms Standard_B2s}; do
-                case "$sku" in Standard_B*) tier=Burstable ;; Standard_E*) tier=MemoryOptimized ;; *) tier=GeneralPurpose ;; esac
-                echo "Trying $sku ($tier) in $loc"
-                if az postgres flexible-server create -n "$PG" -g "$RG" -l "$loc" \
-                     --version 16 --tier "$tier" --sku-name "$sku" --storage-size 32 \
-                     --admin-user "$PG_ADMIN" --admin-password "$PASS" \
-                     --public-access 0.0.0.0 --backup-retention 7 --yes -o none; then
-                  created="$sku in $loc"; break 2
-                fi
-                for _ in $(seq 1 45); do [ -z "$(state)" ] && break; echo "Waiting for Azure to remove the failed attempt..."; sleep 20; done
-              done
-            done
-            [ -n "$created" ] || { echo "::error::No Postgres size could be created in any tried region"; exit 1; }
-            echo "Created $created"
-            URL="postgresql://$PG_ADMIN:$PASS@$PG.postgres.database.azure.com:5432/$PG_DB?sslmode=require"
-            echo "::add-mask::$URL"
-            # The Container App holds the connection string; nothing reads it until DATABASE_URL points at it.
-            az containerapp secret set -n "$APP" -g "$RG" --secrets "database-url=$URL" -o none
-          fi
-          # pgvector and uuid-ossp must be allow-listed on Azure before CREATE EXTENSION works
-          az postgres flexible-server parameter set -g "$RG" -s "$PG" --name azure.extensions --value "VECTOR,UUID-OSSP" -o none
-          az postgres flexible-server db show -g "$RG" -s "$PG" -n "$PG_DB" >/dev/null 2>&1 || \
-            az postgres flexible-server db create -g "$RG" -s "$PG" -n "$PG_DB" -o none
-          az postgres flexible-server show -n "$PG" -g "$RG" --query "{name:name, state:state, version:version, sku:sku.name, host:fullyQualifiedDomainName}" -o table
+          .github/scripts/azure-create-db.sh
           { echo "### Postgres"; echo "- Server \`$PG\` ready, database \`$PG_DB\`"; echo "- Connection string stored as the \`database-url\` secret on \`$APP\`"; } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Migrate the data from Supabase
@@ -153,6 +117,8 @@ jobs:
           az extension add --name containerapp --upgrade --only-show-errors
           DATABASE_URL=$(az containerapp secret show -n "$APP" -g "$RG" --secret-name database-url --query value -o tsv)
           echo "::add-mask::$DATABASE_URL"
+          # The server this app's database lives on (its name differs per account after a move)
+          PG=$(sed -E 's#^[^@]*@([^.:/]+)\..*#\1#' <<< "$DATABASE_URL")
           # Let this runner reach the server for the length of the copy
           IP=$(curl -s https://api.ipify.org)
           RULE="gha-${GITHUB_RUN_ID}"
@@ -204,3 +170,103 @@ jobs:
           PY
             exit "$status"
           fi
+
+      # ---------------------------------------------------------------- move-account (AZURE_ACCOUNT_MOVE.md)
+      # Signed in to the OLD account here (AZURE_CREDENTIALS).
+      - name: "Move: open the old database"
+        if: env.TASK == 'move-account'
+        env:
+          NEW_CREDS: ${{ secrets.NEW_AZURE_CREDENTIALS }}
+          STOP_OLD_API: ${{ inputs.stop_old_api && 'true' || 'false' }}
+        run: |
+          set -euo pipefail
+          [ -n "$NEW_CREDS" ] || { echo "::error::Add the NEW_AZURE_CREDENTIALS repository secret (the new account's service principal) first"; exit 1; }
+          az extension add --name containerapp --upgrade --only-show-errors
+          echo "Old account: $(az account show --query name -o tsv)"
+          OLD_URL=$(az containerapp secret show -n "$APP" -g "$RG" --secret-name database-url --query value -o tsv)
+          echo "::add-mask::$OLD_URL"
+          OLD_PG=$(sed -E 's#^[^@]*@([^.:/]+)\..*#\1#' <<< "$OLD_URL")
+          IP=$(curl -s https://api.ipify.org)
+          az postgres flexible-server firewall-rule create -g "$RG" -s "$OLD_PG" -n "gha-${GITHUB_RUN_ID}" --start-ip-address "$IP" --end-ip-address "$IP" -o none
+          { echo "OLD_URL=$OLD_URL"; echo "OLD_PG=$OLD_PG"; } >> "$GITHUB_ENV"
+          if [ "$DRY_RUN" = "false" ] && [ "$STOP_OLD_API" = "true" ]; then
+            # Nobody can change data while it is copied. To undo (move abandoned):
+            #   az containerapp ingress enable -n luminaiq-api -g luminaiq --type external --target-port 8000
+            az containerapp ingress disable -n "$APP" -g "$RG" -o none
+            echo "Old API stopped taking requests (ingress off)"
+          fi
+
+      - uses: azure/login@v2
+        if: env.TASK == 'move-account'
+        with:
+          creds: ${{ secrets.NEW_AZURE_CREDENTIALS }}
+
+      # Signed in to the NEW account from here on.
+      - name: "Move: create the database in the new account and copy"
+        if: env.TASK == 'move-account'
+        env:
+          LOCS: ${{ inputs.location }}
+          SKUS: ${{ inputs.sku }}
+          OVERWRITE: ${{ inputs.overwrite_target && 'true' || 'false' }}
+        run: |
+          set -euo pipefail
+          az extension add --name containerapp --upgrade --only-show-errors
+          SUB=$(az account show --query id -o tsv)
+          echo "New account: $(az account show --query name -o tsv)"
+          # Server names are global, so the new one can't reuse the old name
+          export PG="luminaiq-db-$(echo -n "$SUB" | sha1sum | cut -c1-8)"
+          command -v pg_dump >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client; }
+          pg_dump --version
+          # Row counts of every table, one "table count" line each, to compare the two sides
+          counts() {
+            psql "$1" -XAt -F' ' -c "SELECT table_name, (xpath('/row/c/text()', query_to_xml(format('SELECT count(*) AS c FROM %I.%I', table_schema, table_name), false, true, '')))[1]::text FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' ORDER BY 1"
+          }
+          echo "## Old database"; counts "$OLD_URL" | tee old_counts.txt | awk '{n+=$2} END {print NR " tables, " n " rows"}'
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "## New account (dry run: nothing created)"
+            az containerapp show -n "$APP" -g "$RG" --query name -o tsv 2>/dev/null || echo "$APP not there yet (will be created)"
+            az postgres flexible-server show -n "$PG" -g "$RG" --query "{name:name, state:state}" -o tsv 2>/dev/null || echo "$PG not there yet (will be created)"
+            exit 0
+          fi
+          .github/scripts/azure-create-db.sh
+          NEW_URL=$(az containerapp secret show -n "$APP" -g "$RG" --secret-name database-url --query value -o tsv)
+          echo "::add-mask::$NEW_URL"
+          IP=$(curl -s https://api.ipify.org)
+          RULE="gha-${GITHUB_RUN_ID}"
+          az postgres flexible-server firewall-rule create -g "$RG" -s "$PG" -n "$RULE" --start-ip-address "$IP" --end-ip-address "$IP" -o none
+          trap 'az postgres flexible-server firewall-rule delete -g "$RG" -s "$PG" -n "$RULE" --yes -o none || true' EXIT
+          tables=$(psql "$NEW_URL" -XAt -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public'")
+          clean=()
+          if [ "$tables" != "0" ]; then
+            [ "$OVERWRITE" = "true" ] || { echo "::error::The new database already has $tables tables. Re-run with overwrite_target only if nobody is using it yet."; exit 1; }
+            clean=(--clean --if-exists)
+          fi
+          # One consistent snapshot of the old database, restored as-is (schema, data, migration history)
+          pg_dump "$OLD_URL" -Fc --no-owner --no-privileges -f lumina.dump
+          ls -lh lumina.dump
+          status=0
+          pg_restore -d "$NEW_URL" --no-owner --no-privileges --no-comments "${clean[@]}" lumina.dump 2> restore.log || status=$?
+          if [ "$status" != 0 ]; then echo "pg_restore reported problems:"; tail -40 restore.log; fi
+          echo "## New database"; counts "$NEW_URL" > new_counts.txt
+          if diff old_counts.txt new_counts.txt > counts.diff; then
+            echo "Every table has the same number of rows on both sides ($(wc -l < new_counts.txt) tables)."
+          else
+            echo "::error::Row counts differ (old < > new):"; cat counts.diff; exit 1
+          fi
+          { echo "### Moved"; echo "- Database \`$PG\` in the new account, $(wc -l < new_counts.txt) tables, row counts match"
+            echo "- Next: replace AZURE_CREDENTIALS with the new account's, then run Deploy to Azure (AZURE_ACCOUNT_MOVE.md)"; } >> "$GITHUB_STEP_SUMMARY"
+
+      # Back to the old account to remove this runner's firewall opening there
+      - uses: azure/login@v2
+        if: always() && env.TASK == 'move-account' && env.OLD_PG != ''
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: "Move: close the old database again"
+        if: always() && env.TASK == 'move-account' && env.OLD_PG != ''
+        run: az postgres flexible-server firewall-rule delete -g "$RG" -s "$OLD_PG" -n "gha-${GITHUB_RUN_ID}" --yes -o none || true
+      - name: "Move failed: switch the old API back on"
+        if: failure() && env.TASK == 'move-account' && env.OLD_PG != '' && inputs.stop_old_api && inputs.dry_run == false
+        run: |
+          az extension add --name containerapp --upgrade --only-show-errors
+          az containerapp ingress enable -n "$APP" -g "$RG" --type external --target-port 8000 -o none
+          echo "::warning::The move failed; the old API is serving again, nothing was switched."
