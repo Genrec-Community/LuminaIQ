@@ -33,6 +33,7 @@ def models(monkeypatch):
     monkeypatch.setattr(settings, "SMALL_LLM_MODEL", "small-1")
     monkeypatch.setattr(settings, "BIG_LLM_MODEL", "big-1")
     monkeypatch.setattr(settings, "BIG_LLM_BASE_URL", "")
+    monkeypatch.setattr(settings, "LLM_DEEP_MODEL", "")
 
 
 # ---------------------------------------------------------------- routing
@@ -52,6 +53,15 @@ def test_paid_users_get_big_for_big_tasks_only(models):
 def test_big_falls_back_to_small_when_unset(models, monkeypatch):
     monkeypatch.setattr(settings, "BIG_LLM_MODEL", "")
     assert llm_mod.resolve_model("deep", plan="topper").model == "small-1"
+
+
+def test_old_deep_settings_still_give_the_big_model(models, monkeypatch):
+    monkeypatch.setattr(settings, "BIG_LLM_MODEL", "")
+    monkeypatch.setattr(settings, "LLM_DEEP_MODEL", "deep-legacy")
+    monkeypatch.setattr(settings, "LLM_DEEP_BASE_URL", "http://deep/v1")
+    cfg = llm_mod.resolve_model("deep", plan="topper")
+    assert (cfg.model, cfg.base_url) == ("deep-legacy", "http://deep/v1")
+    assert llm_mod.resolve_model("deep", plan="free").model == "small-1"
 
 
 def test_old_llm_settings_still_work(monkeypatch):

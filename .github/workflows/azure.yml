@@ -115,6 +115,12 @@ jobs:
           PASS=$(az acr credential show -n "$ACR" --query "passwords[0].value" -o tsv)
           echo "::add-mask::$PASS"
           if az containerapp show -n "$APP" -g "$RG" >/dev/null 2>&1; then
+            # In a new account, Azure ops (create-db / move-account) made a placeholder app to hold the
+            # database secret: point it at this registry and the API's port (no-ops on later deploys).
+            if [ "$(az containerapp show -n "$APP" -g "$RG" --query "properties.configuration.ingress.targetPort" -o tsv)" != "8000" ]; then
+              az containerapp registry set -n "$APP" -g "$RG" --server "$ACR.azurecr.io" --username "$USER" --password "$PASS" -o none
+              az containerapp ingress update -n "$APP" -g "$RG" --target-port 8000 --transport auto -o none
+            fi
             az containerapp secret set -n "$APP" -g "$RG" --secrets "${SECRETS[@]}" -o none
             az containerapp update -n "$APP" -g "$RG" --image "$IMAGE" \
               --min-replicas 1 --max-replicas 10 --cpu 1 --memory 2Gi \
