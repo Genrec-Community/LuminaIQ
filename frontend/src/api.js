@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { mindmapToTree } from './utils/mindmapTree';
 import { uploadToStorage, forgetPendingUpload } from './utils/resumableUpload';
 import { emitLimit, isLimitDetail } from './utils/plan';
 
@@ -1106,7 +1107,10 @@ export const generateMindmapLegacy = async (projectId, topic, selectedDocuments 
         topic,
         selected_documents: selectedDocuments
     });
-    return response.data;
+    // The endpoint returns the saved mindmap ({ id, data: { nodes, edges } }); the Learning Path
+    // view draws a tree and expects { success, mindmap }.
+    const mindmap = mindmapToTree(response.data?.data, topic);
+    return mindmap ? { success: true, mindmap, id: response.data?.id } : { success: false };
 };
 
 export const generateFlashcardsLegacy = async (projectId, topic, numCards = 8, selectedDocuments = []) => {

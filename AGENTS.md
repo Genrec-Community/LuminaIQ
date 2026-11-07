@@ -42,7 +42,7 @@ Anti-goals (a failure even if it "works"):
   backend change. RAG changes must also pass the eval in §6 (Phase 3).
 - **Migrations:**
   - One database (`DATABASE_URL`): `backend/db/schema/NNNN_name.sql`, applied in order on startup by `db/migrate.py`
-    (or `uv run python -m db.migrate`). `0001_init.sql` is the fresh-start schema; the latest is `0010_analytics.sql`, so the next file is `0011_`.
+    (or `uv run python -m db.migrate`). `0001_init.sql` is the fresh-start schema; the latest is `0011_document_file_type.sql`, so the next file is `0012_`.
     Never edit an applied file; add a new one.
   - `backend/db/supabase_auth.sql` is the only SQL that runs in Supabase (the Google sign-up allowlist on `auth.users`).
 - **Database access:** services call `get_supabase_client().table(...)` / `.rpc(...)` as before. That now goes to our
@@ -58,7 +58,7 @@ Anti-goals (a failure even if it "works"):
 
 | Area | Today | Problem |
 | --- | --- | --- |
-| Hosting | Render **free** plan, one uvicorn process (`startup.sh`) | No horizontal scale. Restarts lose state. |
+| Hosting | Azure Container Apps `luminaiq-api` (deployed from `main` by `azure.yml`); website on Azure Static Web Apps. (Render before 2026-10-30.) | Stays on Azure (owner decision 1); the app database moves to Azure Database for PostgreSQL. |
 | Main DB / auth / files | Supabase for everything, via the service key, so access rules were bypassed | Now: data in our own Postgres (`DATABASE_URL`), Supabase only for sign-in and files. Endpoints check ownership in `api/access.py`. |
 | Vectors | Qdrant, one collection per project (`services/qdrant_service.py`) | Separate server. No keyword search alongside. |
 | RAG chat | `services/rag_service.py`: LangChain `create_retrieval_chain`, pure dense top-5 | Follow-ups ("explain that more") search with the raw text and retrieve junk. No rerank, no hybrid, no eval. |
@@ -79,16 +79,21 @@ Anti-goals (a failure even if it "works"):
 ## 4. Decisions
 
 ### Owner decisions
-1. **Scale target:** design for horizontal scaling. Production will be **AWS EC2 with autoscaling** (the owner handles hosting).
-   We build software that is stateless per process and configured by environment variables.
+1. **Scale target:** design for horizontal scaling. We build software that is stateless per process and configured by environment variables.
+   **Hosting (owner, updated 2026-11-06): Azure.** The API runs on Azure Container Apps (`luminaiq-api`, autoscaling 1–10),
+   the website on Azure Static Web Apps (`luminaiq-web`), and the app database is Azure Database for PostgreSQL (`luminaiq-db`).
+   (An earlier plan said AWS EC2; the owner chose Azure, where production already runs.)
 2. **Supabase is only for sign-in (and, for now, file storage).** All data lives in our own Postgres (`DATABASE_URL`):
-   Docker in development, AWS RDS in production. Fresh start, no data copied from Supabase. Moving files to S3 is a later project.
+   Docker in development, Azure Database for PostgreSQL in production. Moving files off Supabase Storage is a later project.
+   **Updated 2026-11-05 (owner): the live data is migrated, not dropped.** Production already has real users, books,
+   paid plans and schools in Supabase. `backend/scripts/migrate_from_supabase.py` copies every table into the new
+   database (see `AZURE_DATABASE_MIGRATION.md`).
 3. **Docker Compose is for local development only.** It runs the backend (web + worker) plus Postgres with pgvector, and Redis (optional).
-   Production never runs the compose file or its Postgres: it deploys the backend image and uses RDS.
+   Production never runs the compose file or its Postgres: it deploys the backend image and uses Azure Database for PostgreSQL.
    The backend also runs directly with `uv run run.py`. The frontend, the OCR setup and the Render config stay as they are.
 4. **Qdrant is replaced by pgvector** in the **same Postgres** (`DATABASE_URL`):
-   Docker in development, **AWS RDS** in production. **Fresh start: no data migration.** Don't write migration or
-   backward-compatibility code for old vectors, old chunks or old data. Remove Qdrant code completely.
+   Docker in development, **Azure Database for PostgreSQL** in production. Old vectors are not copied: the data migration queues a
+   `reindex_document` job per book and the worker rebuilds passages from the stored text. Remove Qdrant code completely.
 5. **Redis is optional.** Everything must work without it.
 6. **OCR stays as it is now.**
 7. **AI provider:** any **OpenAI-compatible API**, with **two models**:
@@ -496,7 +501,8 @@ Builder's calls:
 
 | Setting | Purpose | Default |
 | --- | --- | --- |
-| `DATABASE_URL` | The app database (all tables, pgvector, jobs, caches, telemetry). Docker in dev, RDS in prod. | required |
+| `DATABASE_URL` | The app database (all tables, pgvector, jobs, caches, telemetry). Docker in dev, Azure Database for PostgreSQL in prod. | required |
+| `SOURCE_DATABASE_URL` | Only for the one-off copy from Supabase (`scripts/migrate_from_supabase.py`) | empty |
 | `DB_POOL_SIZE` / `RUN_MIGRATIONS` | Connections per process / apply `db/schema` on startup | `10` / `true` |
 | `SMALL_LLM_MODEL` / `SMALL_LLM_BASE_URL` / `SMALL_LLM_API_KEY` | Small model (most tasks, all free users) | required |
 | `BIG_LLM_MODEL` / `BIG_LLM_BASE_URL` / `BIG_LLM_API_KEY` | Big model (Visual Lab, Deep mode, paid image input) | falls back to small |
@@ -522,10 +528,10 @@ The owner will provide the real `.env`. Keep `.env.example` complete and up to d
 ## 7. Later (out of scope now)
 - **A separate native phone app** (owner decision, 2026-10-31). Don't invest in the Capacitor shell in `frontend/src/mobile/`
   beyond keeping it working; the web app must work well in phone browsers.
-- Moving auth, storage and the main DB off Supabase to AWS (owner decision 2).
+- Moving sign-in and file storage off Supabase (owner decision 2).
 - Parental consent flow for under-13 users.
 - Per-student tool exceptions inside a class.
-- AWS infrastructure as code (the owner hosts it; we only ship a container and env config).
+- Azure infrastructure as code (today `azure.yml` and `azure-ops.yml` create what they need with the Azure CLI).
 
 ## 8. Results log
 Record load-test numbers (Phase 1), RAG eval baselines and results (Phase 3), and cache hit rates (Phase 4) here, with the date and commit.
@@ -567,4 +573,4 @@ account. One 4-CPU / 15 GB machine running Postgres, the app *and* Locust togeth
 | gunicorn, 4 workers (`GUNICORN_MAX_REQUESTS=20000`) | 500 | 535 | 4 ms | 39 ms | 130 ms | **0 / 23,568** |
 
 AI-backed endpoints (chat, generation) are bound by the model provider's latency and rate limits, not by this
-server. Re-run with real keys once the LLM/embedding provider is set (Phase 3), and on the AWS instance type you choose.
+server. Re-run with real keys once the LLM/embedding provider is set (Phase 3), and on the production Container App size.
