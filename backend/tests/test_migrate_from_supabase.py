@@ -15,6 +15,7 @@ psycopg = pytest.importorskip("psycopg")
 U1, U2 = "11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"
 P1, P_GONE = "aaaaaaaa-0000-0000-0000-000000000001", "aaaaaaaa-0000-0000-0000-000000000099"
 D1, D_ORPHAN = "dddddddd-0000-0000-0000-000000000001", "dddddddd-0000-0000-0000-000000000009"
+DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
 SOURCE_DDL = """
 CREATE SCHEMA auth;
@@ -38,9 +39,10 @@ SOURCE_ROWS = f"""
 INSERT INTO auth.users VALUES ('{U1}', 'a@example.com', now() - interval '9 days', now()),
                               ('{U2}', 'b@example.com', now() - interval '3 days', NULL);
 INSERT INTO projects VALUES ('{P1}', now(), 'Biology', '{U1}', now());
-INSERT INTO documents (id, project_id, filename, upload_status, user_id, topics, text_storage_path)
-  VALUES ('{D1}', '{P1}', 'bio.pdf', 'completed', '{U1}', '["Cell"]', '{P1}/{D1}.txt'),
-         ('{D_ORPHAN}', '{P_GONE}', 'gone.pdf', 'completed', '{U1}', '[]', NULL);
+-- a Word upload: its MIME type is 71 characters long
+INSERT INTO documents (id, project_id, filename, file_type, upload_status, user_id, topics, text_storage_path)
+  VALUES ('{D1}', '{P1}', 'bio.docx', '{DOCX}', 'completed', '{U1}', '["Cell"]', '{P1}/{D1}.txt'),
+         ('{D_ORPHAN}', '{P_GONE}', 'gone.pdf', 'application/pdf', 'completed', '{U1}', '[]', NULL);
 INSERT INTO chat_messages VALUES (gen_random_uuid(), '{P1}', 'user', 'What is a cell?', NULL, now() - interval '1 min'),
                                  (gen_random_uuid(), '{P1}', 'assistant', 'A cell is...', '[]', now()),
                                  (gen_random_uuid(), '{P_GONE}', 'user', 'lost', NULL, now());
@@ -109,8 +111,8 @@ def test_copies_converts_and_requeues(source_url, target_url, capsys):
     plan, cancel = _q(target_url, "SELECT plan, cancel_at_period_end FROM user_plans")[0]
     assert (plan, cancel) == ("scholar", False)
 
-    # rows whose project no longer exists are skipped and reported
-    assert [r[0] for r in _q(target_url, "SELECT id::text FROM documents")] == [D1]
+    # rows whose project no longer exists are skipped and reported; Word uploads keep their type
+    assert _q(target_url, "SELECT id::text, file_type FROM documents") == [(D1, DOCX)]
     out = capsys.readouterr().out
     assert "parent row missing" in out
 

@@ -374,6 +374,9 @@ def run(source: str, target: str, *, dry_run: bool = False, reindex: bool = True
         ok = _print_results(results)
         if reindex:
             print(f"\nQueued {queue_reindex(dst)} books for re-indexing (the worker rebuilds their passages).")
+            jobs = dst.execute("SELECT status, count(*) FROM jobs WHERE kind = 'reindex_document' "
+                               "GROUP BY status ORDER BY status").fetchall()
+            print("Re-index jobs: " + (", ".join(f"{n} {s}" for s, n in jobs) or "none"))
     print("\nDone." if ok else "\nCounts don't add up: see the table above.")
     return 0 if ok else 1
 
