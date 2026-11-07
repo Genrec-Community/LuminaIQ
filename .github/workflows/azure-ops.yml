@@ -156,8 +156,8 @@ jobs:
           # Let this runner reach the server for the length of the copy
           IP=$(curl -s https://api.ipify.org)
           RULE="gha-${GITHUB_RUN_ID}"
-          az postgres flexible-server firewall-rule create -g "$RG" -n "$PG" -r "$RULE" --start-ip-address "$IP" --end-ip-address "$IP" -o none
-          trap 'az postgres flexible-server firewall-rule delete -g "$RG" -n "$PG" -r "$RULE" --yes -o none || true' EXIT
+          az postgres flexible-server firewall-rule create -g "$RG" -s "$PG" -n "$RULE" --start-ip-address "$IP" --end-ip-address "$IP" -o none
+          trap 'az postgres flexible-server firewall-rule delete -g "$RG" -s "$PG" -n "$RULE" --yes -o none || true' EXIT
           curl -LsSf https://astral.sh/uv/install.sh | sh
           export PATH="$HOME/.local/bin:$PATH"
           cd backend
