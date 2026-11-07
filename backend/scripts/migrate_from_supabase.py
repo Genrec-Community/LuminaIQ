@@ -32,6 +32,7 @@ import argparse
 import json
 import os
 import sys
+import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
@@ -46,6 +47,7 @@ SKIP_TABLES = {
     "document_chunks", "ai_calls", "answer_cache",
 }
 BATCH = 500
+APP_NAME = "lumina-supabase-copy"
 INDIA = "Asia/Kolkata"
 
 
@@ -325,8 +327,27 @@ def run(source: str, target: str, *, dry_run: bool = False, reindex: bool = True
         applied = migrate(target)
         print(f"Target schema: {', '.join(applied) if applied else 'already up to date'}")
 
-    with psycopg.connect(source) as src, psycopg.connect(target, autocommit=True) as dst:
+    with psycopg.connect(source) as src, psycopg.connect(target, autocommit=True,
+                                                         application_name=APP_NAME) as dst:
         src.read_only = True
+        # An earlier copy that was cancelled can leave its connection open on the server, still
+        # holding locks on the rows it was inserting, so this copy would wait on them forever.
+        # End earlier copies (they carry APP_NAME; older ones had no name, so also any session
+        # stuck in a transaction or waiting on a lock for a while), and never leave one ourselves.
+        dst.execute("SET idle_in_transaction_session_timeout = '2min'")
+        for _ in range(5):
+            ended = dst.execute(
+                """SELECT count(pg_terminate_backend(pid)) FROM pg_stat_activity
+                   WHERE datname = current_database() AND pid <> pg_backend_pid()
+                     AND (application_name = %s
+                          OR (state LIKE 'idle in transaction%%' AND state_change < now() - interval '30 seconds')
+                          OR (state = 'active' AND wait_event_type = 'Lock'
+                              AND query_start < now() - interval '1 minute'))""",
+                (APP_NAME,)).fetchone()[0]
+            if not ended:
+                break
+            print(f"Ended {ended} connection(s) left open by an earlier copy")
+            time.sleep(3)
         plans, source_only = plan(src, dst, source_schema)
         counts = {p.name: src.execute(sql.SQL("SELECT count(*) FROM {}.{}").format(
             sql.Identifier(source_schema), sql.Identifier(p.name))).fetchone()[0] for p in plans}
