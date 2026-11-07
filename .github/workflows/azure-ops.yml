@@ -163,6 +163,25 @@ jobs:
           cd backend
           uv sync --frozen --quiet
           export DATABASE_URL SOURCE_DATABASE_URL
+          # Vector columns must match the production embedding model (the schema reads EMBEDDING_DIMENSION)
+          EMBEDDING_DIMENSION=$(az containerapp secret show -n "$APP" -g "$RG" --secret-name embedding-dimension --query value -o tsv 2>/dev/null || true)
+          export EMBEDDING_DIMENSION="${EMBEDDING_DIMENSION:-1536}"
+          echo "Embedding dimension: $EMBEDDING_DIMENSION"
+          # A database prepared earlier with another size: resize its (still empty) vector columns
+          uv run python - <<'PY'
+          import os, psycopg
+          dim = int(os.environ["EMBEDDING_DIMENSION"])
+          with psycopg.connect(os.environ["DATABASE_URL"], autocommit=True) as c:
+              for table in ("chunks", "answer_cache"):
+                  row = c.execute("SELECT format_type(atttypid, atttypmod) FROM pg_attribute "
+                                  "WHERE attrelid = to_regclass(%s) AND attname = 'embedding'", (table,)).fetchone()
+                  if not row or row[0] == f"vector({dim})":
+                      continue
+                  if c.execute(f"SELECT count(*) FROM {table}").fetchone()[0]:
+                      raise SystemExit(f"{table}.embedding is {row[0]} with rows in it; expected vector({dim})")
+                  c.execute(f"ALTER TABLE {table} ALTER COLUMN embedding TYPE vector({dim})")
+                  print(f"{table}.embedding: {row[0]} -> vector({dim})")
+          PY
           export SUPABASE_URL=https://unused.example SUPABASE_SERVICE_KEY=unused SECRET_KEY=migration-only
           if [ "$DRY_RUN" = "true" ]; then
             uv run python -m scripts.migrate_from_supabase --dry-run
