@@ -94,9 +94,13 @@ async def search_dense(project_id: str, vector: Sequence[float], k: int = 30,
         with pg.pool.connection() as conn:
             with conn.transaction():
                 try:
-                    # pgvector >= 0.8: keep scanning the index until enough rows pass the filter
-                    conn.execute("SET LOCAL hnsw.iterative_scan = relaxed_order")
-                    conn.execute("SET LOCAL hnsw.ef_search = 100")
+                    # pgvector >= 0.8: keep scanning the index until enough rows pass the filter.
+                    # Older pgvector rejects these settings; the savepoint keeps that error from
+                    # aborting the outer transaction (the search would then fail too, and callers
+                    # would silently fall back to keyword-only search).
+                    with conn.transaction():
+                        conn.execute("SET LOCAL hnsw.iterative_scan = relaxed_order")
+                        conn.execute("SET LOCAL hnsw.ef_search = 100")
                 except Exception:
                     pass
                 cur = conn.execute(

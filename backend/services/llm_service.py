@@ -116,14 +116,16 @@ def small_config() -> ModelConfig:
 
 
 def big_config() -> Optional[ModelConfig]:
-    if not settings.BIG_LLM_MODEL:
+    # The old LLM_DEEP_* settings still work too (deployments not set up by azure.yml's mapping)
+    model = settings.BIG_LLM_MODEL or settings.LLM_DEEP_MODEL
+    if not model:
         return None
     small = small_config()
     return ModelConfig(
         role="big",
-        model=settings.BIG_LLM_MODEL,
-        base_url=settings.BIG_LLM_BASE_URL or small.base_url,
-        api_key=settings.BIG_LLM_API_KEY or small.api_key,
+        model=model,
+        base_url=settings.BIG_LLM_BASE_URL or settings.LLM_DEEP_BASE_URL or small.base_url,
+        api_key=settings.BIG_LLM_API_KEY or settings.LLM_DEEP_API_KEY or small.api_key,
         reasoning_effort=settings.BIG_LLM_REASONING_EFFORT,
     )
 

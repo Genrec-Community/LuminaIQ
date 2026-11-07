@@ -6,6 +6,7 @@ import { saveResume, loadResume } from '../../utils/resume';
 import { useToast } from '../../context/ToastContext';
 import { recordActivity } from '../../utils/studyActivity';
 import { useSettings } from '../../context/SettingsContext';
+import { useTools } from '../../context/ToolsContext';
 
 const QuizView = ({ 
     projectId, 
@@ -24,6 +25,14 @@ const QuizView = ({
 }) => {
     const toast = useToast();
     const { settings } = useSettings();
+    const { level: studyLevel } = useTools();
+    // First-quiz difficulty from the study level (Class 5-10 starts easy, research starts hard);
+    // the older self-assessed level still counts for accounts that set one.
+    const startingDifficulty = () => {
+        const byStudyLevel = { school: 'easy', higher_secondary: 'medium', ugpg: 'medium', general: 'medium', research: 'hard' };
+        const bySelfLevel = { beginner: 'easy', intermediate: 'medium', advanced: 'hard' };
+        return byStudyLevel[studyLevel] || bySelfLevel[settings.selfLevel] || 'medium';
+    };
     const [quizMode, setQuizMode] = useState('mcq'); // 'mcq' | 'subjective' | 'both'
     
     // Saved quizzes state
@@ -118,9 +127,8 @@ const QuizView = ({
             // > 80% average => hard (student is excelling)
             let computedDifficulty = 'medium';
             if (quizCount === 0) {
-                // No history — use self-assessed level from profile
-                const levelMap = { beginner: 'easy', intermediate: 'medium', advanced: 'hard' };
-                computedDifficulty = levelMap[settings.selfLevel] || 'medium';
+                // No history yet: start from the learner's level
+                computedDifficulty = startingDifficulty();
             } else if (avgScore < 50) {
                 computedDifficulty = 'easy';
             } else if (avgScore > 80) {
@@ -133,9 +141,8 @@ const QuizView = ({
             setMcqDifficulty(computedDifficulty);
         } catch (error) {
             console.log('Adaptive difficulty: no performance data, using medium', error);
-            // Fallback to self-assessed level
-            const levelMap = { beginner: 'easy', intermediate: 'medium', advanced: 'hard' };
-            const fallback = levelMap[settings.selfLevel] || 'medium';
+            // Fall back to the learner's level
+            const fallback = startingDifficulty();
             setAdaptiveComputed({ difficulty: fallback, avgScore: 0, quizCount: 0 });
             setMcqDifficulty(fallback);
         } finally {
