@@ -42,7 +42,7 @@ Anti-goals (a failure even if it "works"):
   backend change. RAG changes must also pass the eval in §6 (Phase 3).
 - **Migrations:**
   - One database (`DATABASE_URL`): `backend/db/schema/NNNN_name.sql`, applied in order on startup by `db/migrate.py`
-    (or `uv run python -m db.migrate`). `0001_init.sql` is the fresh-start schema; the latest is `0010_analytics.sql`, so the next file is `0011_`.
+    (or `uv run python -m db.migrate`). `0001_init.sql` is the fresh-start schema; the latest is `0011_document_file_type.sql`, so the next file is `0012_`.
     Never edit an applied file; add a new one.
   - `backend/db/supabase_auth.sql` is the only SQL that runs in Supabase (the Google sign-up allowlist on `auth.users`).
 - **Database access:** services call `get_supabase_client().table(...)` / `.rpc(...)` as before. That now goes to our
