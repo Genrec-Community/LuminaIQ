@@ -197,25 +197,25 @@ def copy_table(src: psycopg.Connection, dst: psycopg.Connection, p: TablePlan,
         cur.execute(select)
         batch: List[str] = []
 
-        def flush():
-            if not batch:
-                return
-            payload = "[" + ",".join(batch) + "]"
+        def insert_rows(rows: List[str]):
             try:
                 with dst.transaction():
-                    n = dst.execute(insert, (payload,)).rowcount
+                    n = dst.execute(insert, ("[" + ",".join(rows) + "]",)).rowcount
                 res.inserted += n
-                res.existing += len(batch) - n
-            except psycopg.Error:
-                # Find the bad rows one by one; the rest still go in.
-                for row in batch:
-                    try:
-                        with dst.transaction():
-                            n = dst.execute(insert, ("[" + row + "]",)).rowcount
-                        res.inserted += n
-                        res.existing += 1 - n
-                    except psycopg.Error as e:
-                        res.skipped[_reason(e)] += 1
+                res.existing += len(rows) - n
+            except psycopg.Error as e:
+                if len(rows) == 1:
+                    res.skipped[_reason(e)] += 1
+                    return
+                # Find the bad rows by halving, so the rest still go in. One row at a time
+                # costs a round trip each, which is slow when the database is far away.
+                mid = len(rows) // 2
+                insert_rows(rows[:mid])
+                insert_rows(rows[mid:])
+
+        def flush():
+            if batch:
+                insert_rows(batch)
             batch.clear()
 
         for (row,) in cur:
