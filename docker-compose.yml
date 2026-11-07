@@ -1,0 +1,82 @@
+# DEVELOPMENT ONLY. Production runs the backend image (backend/Dockerfile) on AWS
+# and uses RDS for Postgres via DATABASE_URL. This Postgres container,
+# the code mount and live reload are never used in production.
+#
+# Local development stack.
+#   docker compose up                    backend + worker + Postgres (pgvector)
+#   docker compose --profile redis up    ...plus Redis (optional)
+# Copy .env.example to .env first and fill in Supabase (sign-in + files), LLM and
+# embedding keys. The schema is created on startup (db/schema, see db/migrate.py).
+
+name: luminaiq
+
+services:
+  web:
+    build: ./backend
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Point at the containers below unless .env says otherwise
+      DATABASE_URL: ${DATABASE_URL:-postgresql://lumina:lumina@postgres:5432/lumina}
+      PORT: 8000
+      # Background jobs run in the worker service below
+      WORKER_INLINE: "false"
+    ports:
+      - "8000:8000"
+    volumes:
+      # Live code reload in development (run.py reloads when ENVIRONMENT=development)
+      - ./backend:/app
+      - /app/.venv
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build: ./backend
+    command: ["uv", "run", "--no-sync", "worker.py"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://lumina:lumina@postgres:5432/lumina}
+    volumes:
+      - ./backend:/app
+      - /app/.venv
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: lumina
+      POSTGRES_PASSWORD: lumina
+      POSTGRES_DB: lumina
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lumina -d lumina"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    profiles: ["redis"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  pgdata:

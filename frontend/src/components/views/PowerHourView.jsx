@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import Markdown from '../Markdown';
 import {
     Zap, Timer, Flame, SkipForward, ArrowRight, RotateCcw, Trophy, Loader2,
     BookOpen, Target, Sparkles, CheckCircle2, XCircle, Brain, FlaskConical,
@@ -497,7 +496,7 @@ const PowerHourView = ({ projectId, availableTopics = [], selectedDocuments = []
                                     </div>
                                 ) : (
                                     <div className="prose prose-lg max-w-none mt-4 text-[#163628] prose-strong:text-[#163628] prose-headings:text-[#163628]">
-                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{card.summary || "Couldn't load this lesson right now. You can still test yourself or skip."}</ReactMarkdown>
+                                        <Markdown>{card.summary || "Couldn't load this lesson right now. You can still test yourself or skip."}</Markdown>
                                     </div>
                                 )
                             )}
@@ -509,7 +508,7 @@ const PowerHourView = ({ projectId, availableTopics = [], selectedDocuments = []
                                     <p className="mt-6 text-[#5E5046]">No questions for this one — moving on counts as reviewed.</p>
                                 ) : (
                                     <div className="mt-5">
-                                        <p className="text-lg font-medium text-[#163628]">{q.question}</p>
+                                        <p className="text-lg font-medium text-[#163628]"><Markdown inline>{q.question}</Markdown></p>
                                         <div className="mt-4 grid gap-2.5">
                                             {q.options.map((o, i) => {
                                                 const isCorrect = o.option === q.correct_answer;
@@ -528,7 +527,7 @@ const PowerHourView = ({ projectId, availableTopics = [], selectedDocuments = []
                                                         <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${state === 'correct' ? 'bg-emerald-500 text-white' : state === 'wrong' ? 'bg-red-400 text-white' : 'bg-[#FDF6F0] text-[#5E5046]'}`}>
                                                             {state === 'correct' ? <CheckCircle2 className="h-4 w-4" /> : state === 'wrong' ? <XCircle className="h-4 w-4" /> : i + 1}
                                                         </span>
-                                                        <span className={state === 'correct' ? 'text-emerald-800' : state === 'wrong' ? 'text-red-700' : 'text-[#163628]'}>{o.text}</span>
+                                                        <span className={state === 'correct' ? 'text-emerald-800' : state === 'wrong' ? 'text-red-700' : 'text-[#163628]'}><Markdown inline>{o.text}</Markdown></span>
                                                     </motion.button>
                                                 );
                                             })}
@@ -536,7 +535,7 @@ const PowerHourView = ({ projectId, availableTopics = [], selectedDocuments = []
                                         {picked && q.explanation && (
                                             <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
                                                 className="mt-4 rounded-2xl border border-[#E6D5CC] bg-[#FDF6F0] p-4 text-sm text-[#163628]">
-                                                <span className="font-semibold">Why: </span>{q.explanation}
+                                                <span className="font-semibold">Why: </span><Markdown inline>{q.explanation}</Markdown>
                                             </motion.div>
                                         )}
                                     </div>

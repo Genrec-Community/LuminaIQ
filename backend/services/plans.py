@@ -12,6 +12,7 @@ Metered features
   cram       Exam Tonight cram cards generated (monthly; cached/shared ones are free)
   visual     Visual Lab simulations built (monthly; cached/shared/repairs are free)
   books      documents across all of the user's projects (total)
+  image      photo questions in chat (daily)
 """
 
 from __future__ import annotations
@@ -27,12 +28,16 @@ FEATURE_PERIOD = {
     "cram": "month",
     "visual": "month",
     "books": "total",
+    "ai_tokens": "month",
+    "image": "day",
 }
 
 # Short names for "not included in your plan" messages
 FEATURE_NAMES = {
     "chat": "Chat answers", "questions": "Quiz questions", "tools": "Study tools",
     "deep": "Deep answers", "cram": "Cram cards", "visual": "Visual Lab builds", "books": "More books",
+    "ai_tokens": "More AI use this month",
+    "image": "Photo questions",
 }
 
 FEATURE_LABELS = {
@@ -43,6 +48,8 @@ FEATURE_LABELS = {
     "cram": "cram cards this month",
     "visual": "Visual Lab builds this month",
     "books": "books",
+    "ai_tokens": "AI tokens this month",
+    "image": "photo questions today",
 }
 
 PLANS: Dict[str, Dict[str, Any]] = {
@@ -50,14 +57,14 @@ PLANS: Dict[str, Dict[str, Any]] = {
         "name": "Free",
         "price_inr": 0,
         "limits": {"chat": 20, "questions": 60, "tools": 20, "deep": 0,
-                   "cram": 30, "visual": 3, "books": 3},
+                   "cram": 30, "visual": 3, "books": 3, "image": 5},
     },
     "scholar": {
         "name": "Scholar",
         "price_inr": 299,
         "price_inr_yearly": 2499,
         "limits": {"chat": 60, "questions": 300, "tools": 60, "deep": 0,
-                   "cram": 300, "visual": 15, "books": 15},
+                   "cram": 300, "visual": 15, "books": 15, "image": 30},
     },
     "topper": {
         "name": "Topper",
@@ -66,15 +73,30 @@ PLANS: Dict[str, Dict[str, Any]] = {
         # "Unlimited" features still have a fair-use ceiling so one account
         # can't run up unbounded AI costs
         "limits": {"chat": 100, "questions": 1000, "tools": 150, "deep": 200,
-                   "cram": 1000, "visual": 40, "books": None},
+                   "cram": 1000, "visual": 40, "books": None, "image": 100},
     },
     "institution": {
         "name": "Institution",
         "price_inr": 179,          # per seat per month (+ GST once INSTITUTION_GSTIN is set)
         "limits": {"chat": 60, "questions": 500, "tools": 100, "deep": 50,
-                   "cram": 500, "visual": 15, "books": None},
+                   "cram": 500, "visual": 15, "books": None, "image": 30},
     },
 }
+
+# Safety net on top of the per-feature limits: total AI tokens (input + output, cache hits
+# excluded) one account may use per calendar month. Set well above what normal use of the
+# feature limits needs, so only runaway usage hits it. None = no cap.
+MONTHLY_TOKENS: Dict[str, Optional[int]] = {
+    "free": 5_000_000,
+    "scholar": 15_000_000,
+    "topper": 40_000_000,
+    "institution": 15_000_000,
+}
+
+
+def monthly_token_cap(plan: str) -> Optional[int]:
+    return MONTHLY_TOKENS.get(plan, MONTHLY_TOKENS["free"])
+
 
 # Paid personal plans (bought by students themselves)
 PAID_PLANS = ("scholar", "topper")

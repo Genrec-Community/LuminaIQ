@@ -101,6 +101,16 @@ jobs:
             SECRETS+=("$name=$val"); ENVS+=("$key=secretref:$name")
           done <<< "$BACKEND_ENV"
           if [ ${#SECRETS[@]} -eq 0 ]; then echo "::error::BACKEND_ENV secret is empty"; exit 1; fi
+          # The app database (created by Azure ops → create-db, kept as the database-url secret on the app),
+          # and the existing deep model as the big model. Secrets already on the app stay as they are.
+          EXISTING=$(az containerapp secret list -n "$APP" -g "$RG" --query "[].name" -o tsv 2>/dev/null || true)
+          if ! grep -qx database-url <<< "$EXISTING"; then
+            echo "::error::No database-url secret on $APP: run Actions → Azure ops → create-db first (AZURE_DATABASE_MIGRATION.md)"; exit 1
+          fi
+          ENVS+=("DATABASE_URL=secretref:database-url")
+          for pair in BIG_LLM_MODEL:llm-deep-model BIG_LLM_BASE_URL:llm-deep-base-url BIG_LLM_API_KEY:llm-deep-api-key; do
+            grep -qx "${pair#*:}" <<< "$EXISTING" && ENVS+=("${pair%%:*}=secretref:${pair#*:}")
+          done
           USER=$(az acr credential show -n "$ACR" --query username -o tsv)
           PASS=$(az acr credential show -n "$ACR" --query "passwords[0].value" -o tsv)
           echo "::add-mask::$PASS"

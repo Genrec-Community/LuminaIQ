@@ -3,7 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, ArrowLeft, Sparkles, Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
-import { AI_CHARACTERS, USER_AVATARS, AI_AVATARS, AGE_GROUPS, getCharacter } from '../utils/persona';
+import { AI_CHARACTERS, USER_AVATARS, AI_AVATARS, getCharacter } from '../utils/persona';
+import { useTools } from '../context/ToolsContext';
+import LevelPicker from './LevelPicker';
 
 export const onboardedKey = (userId) => `lumina_onboarded_${userId}`;
 
@@ -43,12 +45,13 @@ const inputCls = 'w-full px-4 py-3 bg-[#FDF6F0] border border-[#E6D5CC] rounded-
 const Onboarding = ({ onDone, fullScreen = false }) => {
     const { user } = useAuth();
     const { settings, updateSettings } = useSettings();
+    const tools = useTools();
     const [step, setStep] = useState(0);
+    const [level, setLevel] = useState(tools.level || '');
     const [form, setForm] = useState(() => ({
         studentName: settings.studentName || user?.full_name || '',
         nickname: settings.nickname || '',
         userAvatar: settings.userAvatar || '🦊',
-        ageGroup: settings.ageGroup || '',
         aiName: settings.aiName || 'Lumi',
         aiAvatar: settings.aiAvatar || '✨',
         aiCharacter: settings.aiCharacter || 'buddy',
@@ -56,16 +59,18 @@ const Onboarding = ({ onDone, fullScreen = false }) => {
         examName: settings.examName || '',
         examDate: settings.examDate || '',
         dailyStudyGoal: settings.dailyStudyGoal || 30,
-        selfLevel: settings.selfLevel || 'intermediate',
     }));
     const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v?.target ? v.target.value : v }));
 
     const character = getCharacter(form.aiCharacter);
     const callName = form.nickname || form.studentName.split(' ')[0] || 'friend';
-    const STEPS = 4;
+    const STEPS = 5;
 
     const finish = () => {
-        updateSettings({ ...form, onboardingComplete: true });
+        // The level decides answer style and tools
+        const levelPart = level && !tools.locked ? { studyLevel: level } : {};
+        updateSettings({ ...form, ...levelPart, onboardingComplete: true });
+        if (levelPart.studyLevel && level !== tools.level) tools.chooseLevel(level).catch(() => {});
         try { localStorage.setItem(onboardedKey(user?.id), '1'); } catch { /* ignore */ }
         onDone?.();
     };
@@ -76,7 +81,12 @@ const Onboarding = ({ onDone, fullScreen = false }) => {
         onDone?.();
     };
 
-    const canNext = step !== 1 || form.studentName.trim().length > 0;
+    const canNext = step === 1 ? form.studentName.trim().length > 0
+        : step === 2 ? (tools.locked || !!level)
+            : true;
+    // Said next to a disabled Next button, so nobody wonders why it won't move
+    const nextHint = step === 1 && !canNext ? 'Type your name to continue'
+        : step === 2 && !canNext ? 'Pick one to continue' : '';
 
     const screens = [
         // 0 — Welcome
@@ -89,7 +99,7 @@ const Onboarding = ({ onDone, fullScreen = false }) => {
             >
                 ✨
             </motion.div>
-            <h2 className="text-3xl md:text-4xl font-bold text-[#163628] mb-3">Welcome to Lumina IQ</h2>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#163628] mb-3">Welcome to Lumina IQ</h2>
             <p className="text-[#5E5046] text-lg max-w-md mx-auto">
                 Turn any textbook into bite-sized lessons, quizzes and a study buddy that actually gets you.
             </p>
@@ -107,7 +117,7 @@ const Onboarding = ({ onDone, fullScreen = false }) => {
         // 1 — About you
         <div key="you" className="space-y-5">
             <div>
-                <h2 className="text-2xl font-bold text-[#163628]">First, who are you? 👋</h2>
+                <h2 className="text-xl sm:text-2xl font-bold text-[#163628]">First, who are you? 👋</h2>
                 <p className="text-[#5E5046]">So your companion knows what to call you.</p>
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
@@ -119,7 +129,7 @@ const Onboarding = ({ onDone, fullScreen = false }) => {
                 </Field>
             </div>
             <Field label="Pick your avatar">
-                <div className="grid grid-cols-10 gap-2">
+                <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
                     {USER_AVATARS.map((a) => (
                         <Chip key={a} active={form.userAvatar === a} onClick={() => set('userAvatar')(a)} className="aspect-square text-2xl flex items-center justify-center">
                             {a}
@@ -127,22 +137,28 @@ const Onboarding = ({ onDone, fullScreen = false }) => {
                     ))}
                 </div>
             </Field>
-            <Field label="Which describes you best?" hint="Your companion adapts its language to you">
-                <div className="grid grid-cols-2 gap-2">
-                    {Object.entries(AGE_GROUPS).map(([k, g]) => (
-                        <Chip key={k} active={form.ageGroup === k} onClick={() => set('ageGroup')(k)} className="p-3 text-left">
-                            <div className="font-semibold text-[#163628] text-sm">{g.label}</div>
-                            <div className="text-xs text-[#5E5046]">{g.hint}</div>
-                        </Chip>
-                    ))}
-                </div>
-            </Field>
         </div>,
 
-        // 2 — Companion
+        // 2 — Level (its own step: the most important answer)
+        <div key="level" className="space-y-5">
+            <div>
+                <h2 className="text-xl sm:text-2xl font-bold text-[#163628]">What are you studying? 📚</h2>
+                <p className="text-[#5E5046]">Answers, tools and difficulty are made for this. You can change it in Settings.</p>
+            </div>
+            {tools.locked ? (
+                <div className="rounded-2xl border-2 border-[#1E5C42]/30 bg-[#1E5C42]/5 p-4 text-[#163628]">
+                    <div className="text-sm font-semibold">Your level: {tools.level_label}</div>
+                    <div className="text-xs text-[#5E5046]">Set by your class. Answers and tools are made for this level.</div>
+                </div>
+            ) : (
+                <LevelPicker value={level} onChange={setLevel} />
+            )}
+        </div>,
+
+        // 3 — Companion
         <div key="ai" className="space-y-5">
             <div>
-                <h2 className="text-2xl font-bold text-[#163628]">Design your study companion 🎨</h2>
+                <h2 className="text-xl sm:text-2xl font-bold text-[#163628]">Design your study companion 🎨</h2>
                 <p className="text-[#5E5046]">Give them a name and a personality. You can change this anytime.</p>
             </div>
             <div className="grid sm:grid-cols-[1fr_auto] gap-4 items-end">
@@ -184,10 +200,10 @@ const Onboarding = ({ onDone, fullScreen = false }) => {
             </motion.div>
         </div>,
 
-        // 3 — Mission
+        // 4 — Mission
         <div key="goal" className="space-y-5">
             <div>
-                <h2 className="text-2xl font-bold text-[#163628]">What&apos;s the mission? 🎯</h2>
+                <h2 className="text-xl sm:text-2xl font-bold text-[#163628]">What&apos;s the mission? 🎯</h2>
                 <p className="text-[#5E5046]">We&apos;ll count down to your exam and keep you on track.</p>
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
@@ -199,26 +215,19 @@ const Onboarding = ({ onDone, fullScreen = false }) => {
                 </Field>
             </div>
             <Field label="Daily study goal">
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {DAILY_GOALS.map((g) => (
                         <Chip key={g.minutes} active={form.dailyStudyGoal === g.minutes} onClick={() => set('dailyStudyGoal')(g.minutes)} className="p-3 text-center">
                             <div className="text-2xl">{g.emoji}</div>
-                            <div className="font-bold text-[#163628]">{g.minutes} min</div>
+                            <div className="font-bold text-[#163628] whitespace-nowrap">{g.minutes} min</div>
                             <div className="text-xs text-[#5E5046]">{g.label}</div>
                         </Chip>
                     ))}
                 </div>
             </Field>
-            <Field label="How well do you know your subject right now?">
-                <div className="grid grid-cols-3 gap-2">
-                    {[['beginner', '🐣 Just starting'], ['intermediate', '🙂 Know the basics'], ['advanced', '🧠 Polishing up']].map(([k, l]) => (
-                        <Chip key={k} active={form.selfLevel === k} onClick={() => set('selfLevel')(k)} className="p-3 text-sm font-medium text-[#163628]">{l}</Chip>
-                    ))}
-                </div>
-            </Field>
         </div>,
 
-        // 4 — Ready
+        // 5 — Ready
         <div key="ready" className="text-center py-6">
             <motion.div
                 initial={{ scale: 0.5, opacity: 0 }}
@@ -228,7 +237,7 @@ const Onboarding = ({ onDone, fullScreen = false }) => {
             >
                 {form.aiAvatar}
             </motion.div>
-            <h2 className="text-3xl font-bold text-[#163628] mb-2">You&apos;re all set, {callName}! {form.userAvatar}</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold text-[#163628] mb-2">You&apos;re all set, {callName}! {form.userAvatar}</h2>
             <p className="text-lg text-[#163628] max-w-md mx-auto mb-6">
                 <span className="font-semibold text-[#1E5C42]">{form.aiName || 'Lumi'}:</span> {character.greet(callName)}
             </p>
@@ -242,15 +251,18 @@ const Onboarding = ({ onDone, fullScreen = false }) => {
     ];
 
     return (
-        <div className={`fixed inset-0 z-[9999] flex items-center justify-center ${fullScreen ? 'bg-white' : 'bg-[#182B22]/50 backdrop-blur-md p-3 md:p-6'}`}>
+        // Phones: a full screen of its own (no card floating over a blurred page, no
+        // size jumps between steps). Larger screens: a centred card.
+        <div className={`fixed inset-0 z-[9999] flex items-center justify-center bg-white ${fullScreen ? '' : 'sm:bg-[#182B22]/50 sm:backdrop-blur-md sm:p-6'}`}
+            role="dialog" aria-modal="true" aria-label="Set up Lumina IQ">
             <motion.div
                 initial={{ opacity: 0, y: 30, scale: 0.97 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 className={fullScreen
                     ? 'bg-white w-full h-[100dvh] flex flex-col overflow-hidden pt-[var(--sat)] pb-[var(--sab)]'
-                    : 'bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[94vh] flex flex-col overflow-hidden'}
+                    : 'bg-white w-full h-[100dvh] flex flex-col overflow-hidden pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] sm:h-auto sm:max-h-[94vh] sm:max-w-2xl sm:rounded-3xl sm:shadow-2xl sm:pt-0 sm:pb-0'}
             >
-                <div className="flex items-center gap-2 px-6 pt-5">
+                <div className="flex items-center gap-2 px-5 sm:px-6 pt-5">
                     {Array.from({ length: STEPS + 1 }).map((_, i) => (
                         <div key={i} className={`h-1.5 rounded-full transition-all duration-300 ${i <= step ? 'bg-[#1E5C42] flex-[2]' : 'bg-[#E6D5CC] flex-1'}`} />
                     ))}
@@ -259,7 +271,7 @@ const Onboarding = ({ onDone, fullScreen = false }) => {
                     )}
                 </div>
 
-                <div className="flex-1 overflow-y-auto px-6 py-5">
+                <div className="flex-1 overflow-y-auto px-5 sm:px-6 py-5">
                     <AnimatePresence mode="wait">
                         <motion.div
                             key={step}
@@ -273,12 +285,13 @@ const Onboarding = ({ onDone, fullScreen = false }) => {
                     </AnimatePresence>
                 </div>
 
-                <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-[#E6D5CC]">
+                <div className="flex items-center justify-between gap-3 px-5 sm:px-6 py-4 border-t border-[#E6D5CC]">
                     {step > 0 ? (
                         <button onClick={() => setStep(step - 1)} className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-[#5E5046] hover:bg-[#FDF6F0]">
                             <ArrowLeft className="h-4 w-4" /> Back
                         </button>
                     ) : <span />}
+                    {nextHint && <span className="text-xs text-[#5E5046] text-right flex-1" aria-live="polite">{nextHint}</span>}
                     {step < STEPS ? (
                         <button
                             disabled={!canNext}

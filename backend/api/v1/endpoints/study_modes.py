@@ -17,6 +17,8 @@ import re
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from utils.rate_limit import rate_limit
+from utils.tools import require_tool
 from pydantic import BaseModel, Field
 
 from api.deps import get_current_user
@@ -71,20 +73,13 @@ async def _cache_put(project_id: str, topic: str, kind: str, content: Dict[str, 
 
 
 async def _topic_context(project_id: str, topic: str, document_ids: List[str], limit: int = 8) -> str:
-    """Book passages about a topic: vector search, falling back to the stored text."""
-    from services.embedding_service import embedding_service
+    """Book passages about a topic (hybrid search, falling back to the stored text)."""
     from services.graph_analytics_service import graph_analytics
-    from services.qdrant_service import qdrant_service
+    from services.retrieval import search_passages
 
     parts: List[str] = []
     try:
-        vector = await embedding_service.generate_embedding(topic)
-        hits = await qdrant_service.search(
-            collection_name=f"project_{project_id}",
-            query_vector=vector,
-            limit=limit,
-            filter_conditions={"document_ids": document_ids} if document_ids else None,
-        )
+        hits = await search_passages(project_id, [topic], per_query=limit, document_ids=document_ids or None)
         parts = [h["text"] for h in hits if h.get("text")]
     except Exception as e:
         logger.warning(f"Vector search failed for '{topic}', using stored text: {e}")
@@ -109,7 +104,8 @@ def _parse_json_object(text: str) -> Optional[Dict[str, Any]]:
     if start == -1 or end <= start:
         return None
     try:
-        data = json.loads(clean[start:end + 1])
+        from utils.json_latex import loads as latex_loads
+        data = latex_loads(clean[start:end + 1])
         return data if isinstance(data, dict) else None
     except json.JSONDecodeError:
         return None
@@ -182,7 +178,7 @@ async def _mastery(user_id: str, project_id: str) -> Dict[str, float]:
     return mastery
 
 
-@router.post("/cram/plan")
+@router.post("/cram/plan", dependencies=[Depends(rate_limit("generate")), Depends(require_tool("cram"))])
 async def cram_plan(request: CramPlanRequest, current_user: dict = Depends(get_current_user)):
     await _require_project(request.project_id, current_user)
 
@@ -246,7 +242,7 @@ def _clean_card(data: Dict[str, Any], topic: str) -> Dict[str, Any]:
     }
 
 
-@router.post("/cram/card")
+@router.post("/cram/card", dependencies=[Depends(rate_limit("generate")), Depends(require_tool("cram"))])
 async def cram_card(request: CramCardRequest, current_user: dict = Depends(get_current_user)):
     await _require_project(request.project_id, current_user)
     topic = request.topic.strip()
@@ -418,7 +414,7 @@ def _sanitize_html(raw: str) -> Optional[str]:
     return html
 
 
-@router.post("/visualize")
+@router.post("/visualize", dependencies=[Depends(rate_limit("generate")), Depends(require_tool("lab"))])
 async def visualize(request: VisualizeRequest, current_user: dict = Depends(get_current_user)):
     await _require_project(request.project_id, current_user)
     topic = request.topic.strip()

@@ -1,9 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Loader2, Search, ShieldCheck, Ban, CalendarPlus, History, ChevronLeft, ChevronRight } from 'lucide-react';
 import {
     getPlatformMe, listPlatformSchools, approveSchool, suspendSchool, extendSchool, getSchoolAudit, apiErrorText,
+    getPlatformLevels,
 } from '../api';
+import AICosts from '../components/platform/AICosts';
+import Analytics from '../components/platform/Analytics';
 
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
 
@@ -99,9 +102,42 @@ const School = ({ s, onChanged }) => {
     );
 };
 
-/** Lumina IQ staff console: approve, pause and extend schools. */
+/** Every level at a glance; each opens its own page to choose tools. */
+const LevelsOverview = () => {
+    const navigate = useNavigate();
+    const [data, setData] = useState(null);
+    const [error, setError] = useState('');
+    useEffect(() => { getPlatformLevels().then(setData).catch((e) => setError(apiErrorText(e))); }, []);
+    if (error) return <p className="text-sm text-rose-600">{error}</p>;
+    if (!data) return <div className="flex items-center gap-2 text-[#5E5046]"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>;
+    return (
+        <>
+            <p className="mb-4 text-[#5E5046]">Choose what each level of learner gets. Schools can switch tools off for a class, never on.</p>
+            <ul className="grid gap-3 sm:grid-cols-2">
+                {data.levels.map((l) => (
+                    <li key={l.key}>
+                        <button onClick={() => navigate(`/platform/levels/${l.key}`)}
+                            className="w-full rounded-2xl border border-[#E6D5CC] bg-white p-4 text-left transition-colors hover:border-[#1E5C42]">
+                            <span className="flex items-center justify-between">
+                                <span className="text-lg font-bold">{l.label}</span>
+                                <ChevronRight className="h-4 w-4 text-[#5E5046]" />
+                            </span>
+                            <span className="mt-1 block text-sm text-[#5E5046]">
+                                {l.tools.length} of {data.tools.length} tools · hints {l.hints_default ? 'on' : 'off'} by default · {l.outside_book ? 'may answer beyond the book' : 'book only'}
+                            </span>
+                        </button>
+                    </li>
+                ))}
+            </ul>
+        </>
+    );
+};
+
+/** Lumina IQ staff console: analytics; approve, pause and extend schools; tools per level; AI costs. */
 const Platform = () => {
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const tab = ['schools', 'levels', 'costs'].includes(searchParams.get('tab')) ? searchParams.get('tab') : 'analytics';
     const [allowed, setAllowed] = useState(null);
     const [status, setStatus] = useState('pending');
     const [q, setQ] = useState('');
@@ -114,10 +150,10 @@ const Platform = () => {
         try { setData(await listPlatformSchools({ status, q, page })); setError(''); } catch (e) { setError(apiErrorText(e)); }
     }, [status, q, page]);
     useEffect(() => {
-        if (!allowed) return undefined;
+        if (!allowed || tab !== 'schools') return undefined;
         const t = setTimeout(load, q ? 300 : 0);
         return () => clearTimeout(t);
-    }, [allowed, load, q]);
+    }, [allowed, load, q, tab]);
 
     const pages = data ? Math.max(1, Math.ceil(data.total / data.page_size)) : 1;
     return (
@@ -126,12 +162,26 @@ const Platform = () => {
                 <button onClick={() => navigate('/dashboard')} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold hover:bg-white">
                     <ArrowLeft className="h-4 w-4" /> Dashboard
                 </button>
-                <span className="font-bold">Schools console</span>
+                <span className="font-bold">Admin console</span>
             </header>
             <main className="mx-auto max-w-5xl px-4 pb-16">
                 {allowed === null && <div className="flex items-center gap-2 text-[#5E5046]"><Loader2 className="h-4 w-4 animate-spin" /> Checking access…</div>}
                 {allowed === false && <p className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-800">This page is for Lumina IQ staff.</p>}
                 {allowed && (
+                    <div role="tablist" className="mb-5 inline-flex max-w-full overflow-x-auto rounded-2xl border border-[#E6D5CC] bg-white p-1">
+                        {[['analytics', 'Analytics'], ['schools', 'Schools'], ['levels', 'Levels & tools'], ['costs', 'AI costs']].map(([id, label]) => (
+                            <button key={id} role="tab" aria-selected={tab === id}
+                                onClick={() => setSearchParams(id === 'analytics' ? {} : { tab: id })}
+                                className={`rounded-xl px-4 py-1.5 text-sm font-semibold ${tab === id ? 'bg-[#163628] text-white' : 'text-[#5E5046]'}`}>
+                                {label}
+                            </button>
+                        ))}
+                    </div>
+                )}
+                {allowed && tab === 'levels' && <LevelsOverview />}
+                {allowed && tab === 'analytics' && <Analytics />}
+                {allowed && tab === 'costs' && <AICosts />}
+                {allowed && tab === 'schools' && (
                     <>
                         <div className="mb-4 flex flex-wrap items-center gap-2">
                             {FILTERS.map(([id, label]) => (

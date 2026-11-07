@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import Markdown from '../Markdown';
 import {
     GitBranch, X, RefreshCw, ZoomIn, ZoomOut,
     ChevronRight, ChevronDown, Circle, ArrowLeft
@@ -25,7 +26,7 @@ const MindmapNode = ({ node, depth = 0, colorIndex = 0, isLast = false }) => {
         return (
             <div className="flex flex-col items-center">
                 <div className="px-6 py-3 bg-gradient-to-br from-[#1E5C42] to-[#163628] text-white rounded-2xl shadow-lg font-bold text-lg text-center max-w-xs border-2 border-white/20">
-                    {node.label}
+                    <Markdown inline>{node.label}</Markdown>
                 </div>
                 {hasChildren && (
                     <div className="mt-4 flex flex-col items-center w-full">
@@ -79,7 +80,7 @@ const MindmapNode = ({ node, depth = 0, colorIndex = 0, isLast = false }) => {
                             <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />
                     )}
                     {!hasChildren && <Circle className="h-2 w-2 flex-shrink-0 fill-current opacity-50" />}
-                    <span className="leading-tight">{node.label}</span>
+                    <span className="leading-tight"><Markdown inline>{node.label}</Markdown></span>
                 </div>
             </button>
 

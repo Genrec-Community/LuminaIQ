@@ -46,7 +46,7 @@ const GetStarted = ({ hasBook, reminderOn, onAddBook, onFeed, onReminder }) => {
                         <p className="text-[16px] font-extrabold">{all ? 'You are all set up! 🎉' : 'Get started'}</p>
                         <p className="text-[12.5px]" style={{ color: 'var(--m-muted)' }}>{all ? 'That is the hardest part done.' : `${done} of ${steps.length} done · about 3 minutes`}</p>
                     </div>
-                    <button onClick={dismiss} aria-label="Hide checklist" className="m-pressable rounded-full p-1.5" style={{ color: 'var(--m-muted)' }}><X className="h-4 w-4" /></button>
+                    <button onClick={dismiss} aria-label="Hide checklist" className="m-pressable -m-1.5 rounded-full p-3" style={{ color: 'var(--m-muted)' }}><X className="h-4 w-4" /></button>
                 </div>
                 <div className="mt-3 h-1.5 overflow-hidden rounded-full" style={{ background: 'var(--m-soft)' }}>
                     <motion.div className="h-full rounded-full" style={{ background: 'var(--m-accent)' }} initial={{ width: 0 }} animate={{ width: `${(done / steps.length) * 100}%` }} transition={{ duration: 0.8, ease: 'easeOut' }} />

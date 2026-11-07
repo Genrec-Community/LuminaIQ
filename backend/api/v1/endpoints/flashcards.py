@@ -1,8 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
+from utils.rate_limit import rate_limit
+from utils.tools import require_tool
 from typing import List, Optional
 from pydantic import BaseModel
 from api.deps import get_current_user
 from services.flashcard_service import FlashcardService
+from services import levels
 from services.usage_service import usage, metered
 
 router = APIRouter()
@@ -82,7 +85,7 @@ async def get_flashcards(
     service = FlashcardService()
     return await service.get_flashcards(current_user["id"], set_id)
 
-@router.post("/{project_id}/generate")
+@router.post("/{project_id}/generate", dependencies=[Depends(rate_limit("generate")), Depends(require_tool("flashcards"))])
 async def generate_flashcards(
     project_id: str,
     data: FlashcardGenerateRequest,
@@ -90,12 +93,18 @@ async def generate_flashcards(
 ):
     """Generate flashcards using AI"""
     metered(current_user, "flashcards")
-    await usage.consume(current_user["id"], "tools")
+    # Cards drawn entirely from a shared book's pool don't use up a study-tool credit
+    await usage.check(current_user["id"], "tools")
+    eff = await levels.effective_for(current_user["id"])
     service = FlashcardService()
-    return await service.generate_flashcards_with_ai(
+    result = await service.generate_flashcards_with_ai(
         user_id=current_user["id"],
         project_id=project_id,
         topic=data.topic,
         num_cards=data.num_cards,
-        selected_documents=data.selected_documents
+        selected_documents=data.selected_documents,
+        level=eff.get("level", ""),
     )
+    if not isinstance(result, dict) or result.get("generated", 1):
+        await usage.charge(current_user["id"], "tools")
+    return result

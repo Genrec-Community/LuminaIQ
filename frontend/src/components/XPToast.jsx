@@ -7,26 +7,21 @@ import { isAppShell } from '../utils/platform';
 // Phone app: a small pill under the top bar, clear of the feed's caption and buttons
 const APP_SHELL = isAppShell();
 
-const ACTIVITY_LABELS = {
-    quiz: 'Quiz Completed',
-    review: 'Card Reviewed',
-    notes: 'Notes Generated',
-    qa: 'Q&A Studied',
-    chat: 'Chat Message',
-    pomodoro: 'Pomodoro Done',
-    path: 'Path Progress',
-    exam: 'Exam Practice',
-    knowledge_graph: 'Graph Explored',
-    sprint: 'Power Hour Card',
-};
-
+/**
+ * Rewards as they're earned, shown the way the learner's level prefers (Phase 7):
+ * playful (Class 5-10) celebrates; exam and quiet styles get a calm toast; research sees
+ * milestones only (levels and badges), never per-reward pop-ups or confetti.
+ */
 const XPToast = () => {
-    const { xpEvents, dismissXpEvent } = useGamification();
+    const { xpEvents, dismissXpEvent, style } = useGamification();
+    const celebrate = style === 'playful';
+    const milestonesOnly = style === 'milestones';
+    const shown = milestonesOnly ? xpEvents.filter((e) => e.leveled_up || e.new_badges?.length) : xpEvents;
 
     return (
         <div className={`fixed left-1/2 -translate-x-1/2 z-[110] flex flex-col items-center gap-2 pointer-events-none ${APP_SHELL ? 'bottom-[calc(var(--sab)+92px)]' : 'top-4'}`}>
             <AnimatePresence>
-                {xpEvents.map((event) => (
+                {shown.map((event) => (
                     <motion.div
                         key={event.id}
                         initial={{ opacity: 0, y: -30, scale: 0.8 }}
@@ -41,11 +36,11 @@ const XPToast = () => {
                                 className="relative bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-500 text-white rounded-2xl shadow-2xl shadow-amber-500/30 px-6 py-4 flex items-center gap-4 min-w-[320px] overflow-hidden"
                             >
                                 {/* Shimmer effect */}
-                                <motion.div
+                                {celebrate && <motion.div
                                     animate={{ x: ['-100%', '200%'] }}
                                     transition={{ duration: 1.5, repeat: 2 }}
                                     className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                                />
+                                />}
                                 
                                 <div className="relative">
                                     <motion.div
@@ -56,7 +51,7 @@ const XPToast = () => {
                                         <TrendingUp className="h-6 w-6" />
                                     </motion.div>
                                     {/* Particle dots */}
-                                    {[...Array(6)].map((_, i) => (
+                                    {celebrate && [...Array(6)].map((_, i) => (
                                         <motion.div
                                             key={i}
                                             initial={{ opacity: 0, scale: 0 }}
@@ -82,15 +77,17 @@ const XPToast = () => {
                                     </p>
                                 </div>
 
-                                <motion.div
-                                    animate={{ rotate: 360 }}
-                                    transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
-                                    className="ml-auto"
-                                >
-                                    <Star className="h-6 w-6 text-yellow-200 fill-yellow-200" />
-                                </motion.div>
+                                {celebrate && (
+                                    <motion.div
+                                        animate={{ rotate: 360 }}
+                                        transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
+                                        className="ml-auto"
+                                    >
+                                        <Star className="h-6 w-6 text-yellow-200 fill-yellow-200" />
+                                    </motion.div>
+                                )}
                             </motion.div>
-                        ) : APP_SHELL ? (
+                        ) : milestonesOnly ? null : APP_SHELL ? (
                             <motion.div onClick={() => dismissXpEvent(event.id)}
                                 className="flex items-center gap-1.5 rounded-full bg-[#142A1F]/90 px-3.5 py-1.5 text-[13px] font-extrabold text-amber-300 shadow-lg backdrop-blur">
                                 <Zap className="h-4 w-4 fill-amber-300" /> +{event.xp_earned} XP
@@ -123,7 +120,7 @@ const XPToast = () => {
                                         +{event.xp_earned} XP
                                     </motion.p>
                                     <p className="text-[11px] text-[#5E5046] font-medium">
-                                        {ACTIVITY_LABELS[event.activity] || 'Activity'}
+                                        {event.label || 'Learning'}
                                     </p>
                                 </div>
 

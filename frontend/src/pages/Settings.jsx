@@ -29,15 +29,19 @@ import {
     Zap,
     Trophy,
     Type,
-    KeyRound
+    KeyRound,
+    Library
 } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
 import PlanUsage from '../components/PlanUsage';
+import MemorySettings from '../components/MemorySettings';
 import ChangePasswordForm from '../components/ChangePasswordForm';
 import DeleteAccountForm from '../components/DeleteAccountForm';
 import { useGamification } from '../context/GamificationContext';
 import { useAuth } from '../context/AuthContext';
-import { AI_CHARACTERS, USER_AVATARS, AI_AVATARS, AGE_GROUPS, getCharacter, displayName } from '../utils/persona';
+import { AI_CHARACTERS, USER_AVATARS, AI_AVATARS, getCharacter, displayName } from '../utils/persona';
+import { useTools } from '../context/ToolsContext';
+import { LEVEL_OPTIONS } from '../components/LevelPicker';
 import { onboardedKey } from '../components/Onboarding';
 import { THEMES, FONT_STYLES, ACCENT_PRESETS, resolveThemeId } from '../utils/themes';
 
@@ -110,10 +114,18 @@ const TextInput = ({ value, onChange, label, description, icon: Icon, placeholde
 const Settings = () => {
     const navigate = useNavigate();
     const { settings, updateSetting, updateSettings, resetSettings } = useSettings();
+    const tools = useTools();
     const { data: gamificationData } = useGamification();
     const { user } = useAuth();
     const [searchParams] = useSearchParams();
-    const [activeSection, setActiveSection] = useState(searchParams.get('section') || 'profile');
+    const [activeSection, setActiveSectionState] = useState(searchParams.get('section') || 'profile');
+    // Phones: a list of sections first; a section opens on its own page (a link with ?section= opens it directly)
+    const [mobileOpen, setMobileOpen] = useState(Boolean(searchParams.get('section')));
+    const setActiveSection = (id) => {
+        setActiveSectionState(id);
+        setMobileOpen(true);
+        window.scrollTo?.(0, 0);
+    };
 
     const isDark = settings?.darkMode ?? false;
 
@@ -128,16 +140,18 @@ const Settings = () => {
 
 
     const sections = [
-        { id: 'profile', label: 'Profile', icon: User },
-        { id: 'companion', label: 'AI Buddy', icon: Sparkles },
-        { id: 'study', label: 'Study', icon: Layers },
-        { id: 'focus', label: 'Focus', icon: Maximize2 },
-        { id: 'ai', label: 'AI & Quiz', icon: Brain },
-        { id: 'appearance', label: 'Display', icon: Sun },
-        { id: 'notifications', label: 'Alerts', icon: Bell },
-        { id: 'plan', label: 'Plan', icon: Crown },
-        { id: 'account', label: 'Account', icon: KeyRound },
+        { id: 'profile', label: 'Profile', icon: User, hint: 'Your name, avatar, goals and exam' },
+        { id: 'companion', label: 'AI Buddy', icon: Sparkles, hint: 'Name and personality of your tutor' },
+        { id: 'study', label: 'Study', icon: Layers, hint: 'Daily goal and study preferences' },
+        { id: 'focus', label: 'Focus', icon: Maximize2, hint: 'Distraction-free mode' },
+        { id: 'ai', label: 'AI & Quiz', icon: Brain, hint: 'Answer style and quiz difficulty' },
+        { id: 'appearance', label: 'Display', icon: Sun, hint: 'Theme, text size and colours' },
+        { id: 'memory', label: 'Memory', icon: Brain, hint: 'What Lumina remembers about you' },
+        { id: 'notifications', label: 'Alerts', icon: Bell, hint: 'Reminders and sounds' },
+        { id: 'plan', label: 'Plan', icon: Crown, hint: 'Your plan and what you have left' },
+        { id: 'account', label: 'Account', icon: KeyRound, hint: 'Password and deleting your account' },
     ];
+    const currentLabel = sections.find((x) => x.id === activeSection)?.label || 'Settings';
 
     // --- Reusable Components ---
 
@@ -299,14 +313,27 @@ const Settings = () => {
                     placeholder="e.g. Captain, Doc, Pri..."
                 />
                 <ChoiceGrid label="Your Avatar" value={settings.userAvatar || '🦊'} options={USER_AVATARS} onPick={(v) => updateSetting('userAvatar', v)} />
-                <SelectOption
-                    value={settings.ageGroup || ''}
-                    onChange={(v) => updateSetting('ageGroup', v)}
-                    label="About You"
-                    description="Your AI adapts its language to you"
-                    icon={User}
-                    options={[{ value: '', label: 'Prefer not to say' }, ...Object.entries(AGE_GROUPS).map(([value, g]) => ({ value, label: g.label }))]}
-                />
+                {tools.locked ? (
+                    <div className="flex items-center gap-3.5 p-4 bg-white rounded-2xl border border-[#E6D5CC]/80">
+                        <div className="h-10 w-10 bg-[#FDF6F0] rounded-xl flex items-center justify-center shrink-0">
+                            <GraduationCap className="h-5 w-5 text-[#1E5C42]" />
+                        </div>
+                        <div>
+                            <p className="font-semibold text-[#163628] text-sm">What you&apos;re studying: {tools.level_label}</p>
+                            <p className="text-xs text-[#5E5046] mt-0.5">Set by your class. Ask your teacher to change it.</p>
+                        </div>
+                    </div>
+                ) : (
+                    <SelectOption
+                        value={tools.level || ''}
+                        onChange={(v) => { if (v) tools.chooseLevel(v).catch(() => {}); }}
+                        label="What you're studying"
+                        description="Answers, tools and difficulty are made for this"
+                        icon={GraduationCap}
+                        options={[...(tools.level ? [] : [{ value: '', label: 'Choose…' }]),
+                            ...LEVEL_OPTIONS.map((o) => ({ value: o.key, label: `${o.label} · ${o.hint}` }))]}
+                    />
+                )}
                 <TextInput
                     value={settings.examName}
                     onChange={(v) => updateSetting('examName', v)}
@@ -339,18 +366,6 @@ const Settings = () => {
                     description="What are you studying for?"
                     icon={Target}
                     placeholder="e.g., Pass my biology exam, Master JavaScript..."
-                />
-                <SelectOption
-                    value={settings.selfLevel || 'intermediate'}
-                    onChange={(v) => updateSetting('selfLevel', v)}
-                    label="Your Level"
-                    description="How would you rate your current knowledge?"
-                    icon={GraduationCap}
-                    options={[
-                        { value: 'beginner', label: 'Beginner — Just starting out' },
-                        { value: 'intermediate', label: 'Intermediate — Know the basics' },
-                        { value: 'advanced', label: 'Advanced — Looking to master' },
-                    ]}
                 />
                 <SelectOption
                     value={settings.learningStyle || 'balanced'}
@@ -900,6 +915,14 @@ const Settings = () => {
     );
 
 
+    const renderMemory = () => (
+        <div className="space-y-5">
+            <SectionHeader icon={Brain} title="What Lumina remembers about you" subtitle="See, edit or delete it any time" />
+            <MemorySettings colors={{ paper, border, muted, heading, inputBg }} settings={settings}
+                updateSetting={updateSetting} Toggle={ToggleSwitch} icons={{ books: Library, brain: Brain }} />
+        </div>
+    );
+
     const renderPlan = () => (
         <div className="space-y-5">
             <SectionHeader icon={Crown} title="Plan & usage" subtitle="What your plan includes and how much you've used" />
@@ -980,6 +1003,7 @@ const Settings = () => {
             case 'ai': return renderAI();
             case 'appearance': return renderAppearance();
             case 'notifications': return renderNotifications();
+            case 'memory': return renderMemory();
             case 'plan': return renderPlan();
             case 'account': return renderAccount();
             default: return renderProfile();
@@ -993,8 +1017,12 @@ const Settings = () => {
                 style={{ background: isDark ? 'rgba(28,24,20,0.95)' : 'rgba(255,255,255,0.80)', borderColor: border }}>
                 <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
                     <button
-                        onClick={() => navigate(-1)}
-                        className="p-2 rounded-xl transition-colors shrink-0"
+                        onClick={() => {
+                            if (mobileOpen && window.matchMedia?.('(max-width: 767px)').matches) setMobileOpen(false);
+                            else navigate(-1);
+                        }}
+                        aria-label={mobileOpen ? 'Back to all settings' : 'Back'}
+                        className="p-2.5 rounded-xl transition-colors shrink-0"
                         style={{ background: 'transparent' }}
                         onMouseEnter={e => e.currentTarget.style.background = inputBg}
                         onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
@@ -1005,7 +1033,10 @@ const Settings = () => {
                         <div className="h-9 w-9 bg-gradient-to-br from-[#1E5C42] to-[#163628] rounded-xl flex items-center justify-center shadow-sm">
                             <SettingsIcon className="h-4.5 w-4.5 text-white" />
                         </div>
-                        <h1 className="text-lg font-bold" style={{ color: heading }}>Settings</h1>
+                        <h1 className="text-lg font-bold" style={{ color: heading }}>
+                            <span className="md:hidden">{mobileOpen ? currentLabel : 'Settings'}</span>
+                            <span className="hidden md:inline">Settings</span>
+                        </h1>
                     </div>
                 </div>
             </div>
@@ -1053,28 +1084,39 @@ const Settings = () => {
                         </div>
                     </nav>
 
-                    {/* Mobile Tab Bar */}
-                    <div className="md:hidden fixed bottom-0 left-0 right-0 backdrop-blur-md border-t z-20 px-2 py-1.5 flex justify-around"
-                        style={{ background: isDark ? 'rgba(28,24,20,0.97)' : 'rgba(255,255,255,0.95)', borderColor: border }}>
-                        {sections.map(sec => {
-                            const Icon = sec.icon;
-                            const isActive = activeSection === sec.id;
-                            return (
-                                <button
-                                    key={sec.id}
-                                    onClick={() => setActiveSection(sec.id)}
-                                    className="flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg text-[10px] font-medium transition-colors"
-                                    style={{ color: isActive ? '#1E5C42' : muted }}
-                                >
-                                    <Icon className="h-4.5 w-4.5" />
-                                    <span>{sec.label}</span>
-                                </button>
-                            );
-                        })}
-                    </div>
+                    {/* Phones: all sections as a list (no tab bar to hunt through) */}
+                    {!mobileOpen && (
+                        <div className="md:hidden w-full">
+                            <ul className="overflow-hidden rounded-2xl border" style={{ background: paper, borderColor: border }}>
+                                {sections.map((sec, i) => {
+                                    const Icon = sec.icon;
+                                    return (
+                                        <li key={sec.id} style={i ? { borderTop: `1px solid ${border}` } : undefined}>
+                                            <button onClick={() => setActiveSection(sec.id)}
+                                                className="flex w-full items-center gap-3.5 px-4 py-3.5 text-left">
+                                                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: inputBg }}>
+                                                    <Icon className="h-5 w-5 text-[#1E5C42]" />
+                                                </span>
+                                                <span className="min-w-0 flex-1">
+                                                    <span className="block text-[15px] font-semibold" style={{ color: heading }}>{sec.label}</span>
+                                                    <span className="block truncate text-xs" style={{ color: muted }}>{sec.hint}</span>
+                                                </span>
+                                                <ChevronLeft className="h-5 w-5 rotate-180" style={{ color: muted }} />
+                                            </button>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                            <button
+                                onClick={() => { if (confirm('Reset all settings to defaults?')) resetSettings(); }}
+                                className="mt-4 w-full rounded-xl px-4 py-3 text-sm font-medium text-red-500">
+                                Reset all settings
+                            </button>
+                        </div>
+                    )}
 
                     {/* Main Content */}
-                    <div className="flex-1 min-w-0 mb-20 md:mb-0">
+                    <div className={`flex-1 min-w-0 ${mobileOpen ? '' : 'hidden md:block'}`}>
                         {renderSection()}
                     </div>
                 </div>

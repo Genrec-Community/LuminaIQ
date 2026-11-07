@@ -5,6 +5,7 @@ import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import { SettingsProvider } from './context/SettingsContext';
 import { GamificationProvider } from './context/GamificationContext';
+import { ToolsProvider } from './context/ToolsContext';
 import PrivateRoute from './components/PrivateRoute';
 import XPToast from './components/XPToast';
 import LimitModal from './components/LimitModal';
@@ -23,6 +24,7 @@ const Landing = lazy(() => import('./pages/Landing'));
 const Pricing = lazy(() => import('./pages/Pricing'));
 const Institution = lazy(() => import('./pages/Institution'));
 const Platform = lazy(() => import('./pages/Platform'));
+const PlatformLevel = lazy(() => import('./pages/PlatformLevel'));
 const JoinClass = lazy(() => import('./pages/JoinClass'));
 const Privacy = lazy(() => import('./pages/Legal').then((m) => ({ default: m.Privacy })));
 const DeleteAccount = lazy(() => import('./pages/Legal').then((m) => ({ default: m.DeleteAccount })));
@@ -94,6 +96,7 @@ function App() {
     return (
         <AuthProvider>
             <SettingsProvider>
+                <ToolsProvider>
                 <GamificationProvider>
                     <ToastProvider>
                         <Router>
@@ -123,6 +126,7 @@ function App() {
                                     <Route path="/bookstore" element={<BookStore />} />
                                     <Route path="/institution" element={<Institution />} />
                                     <Route path="/platform" element={<Platform />} />
+                                    <Route path="/platform/levels/:level" element={<PlatformLevel />} />
                                     <Route path="/join/:code" element={<JoinClass />} />
                                 </Route>
                                 <Route path="*" element={<NotFound />} />
@@ -134,6 +138,7 @@ function App() {
                         <XPToast />
                     </ToastProvider>
                 </GamificationProvider>
+                </ToolsProvider>
             </SettingsProvider>
         </AuthProvider>
     );

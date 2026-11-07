@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { BookOpen, Copy, Loader2, ChevronDown, FileDown, Trash2, Clock, Eye, Plus, ArrowLeft } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import Markdown from '../Markdown';
 import { generateNotes, getSavedNotes, getSavedNote, deleteSavedNote } from '../../api';
 import { useToast } from '../../context/ToastContext';
 import { recordActivity } from '../../utils/studyActivity';
@@ -349,14 +348,14 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
             {/* ========== LIST VIEW: Show saved notes ========== */}
             {!notesLoading && viewMode === 'list' && (
                 <div className="animate-in fade-in slide-in-from-bottom-4">
-                    <div className="flex items-center justify-between mb-8">
+                    <div className="flex flex-wrap items-center justify-between gap-3 mb-5 md:mb-8">
                         <div>
-                            <h2 className="text-2xl font-bold text-[#163628]">Study Notes</h2>
-                            <p className="text-[#5E5046]">Generate comprehensive summaries or targeted study guides</p>
+                            <h2 className="text-xl sm:text-2xl font-bold text-[#163628]">Study Notes</h2>
+                            <p className="hidden sm:block text-[#5E5046]">Generate comprehensive summaries or targeted study guides</p>
                         </div>
                         <button
                             onClick={() => setViewMode('form')}
-                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#1E5C42] to-[#163628] text-white rounded-lg hover:opacity-90 transition-opacity shadow-sm"
+                            className="flex items-center gap-2 whitespace-nowrap px-4 py-2.5 bg-gradient-to-r from-[#1E5C42] to-[#163628] text-white rounded-lg hover:opacity-90 transition-opacity shadow-sm"
                         >
                             <Plus className="h-4 w-4" />
                             New Notes
@@ -597,9 +596,9 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
                                 <span className="font-medium">Writing your notes...</span>
                             </div>
                         ) : (
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            <Markdown>
                                 {notesContent}
-                            </ReactMarkdown>
+                            </Markdown>
                         )}
                         {notesLoading && notesContent && (
                             <div className="mt-4 flex items-center gap-2 text-[#1E5C42] animate-pulse">

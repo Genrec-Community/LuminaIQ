@@ -69,16 +69,18 @@ class ClearSearchesRequest(BaseModel):
 
 
 class AwardXPRequest(BaseModel):
-    activity_type: str
+    activity_type: str = "activity"
     meta: Optional[Dict[str, Any]] = None
+    # The last time this device synced: XP earned since then comes back for the toasts
+    since: Optional[str] = None
 
 
 # ============== Gamification ==============
 
 @router.get("/gamification")
-async def get_gamification_data(current_user: dict = Depends(get_current_user)):
+async def get_gamification_data(since: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     try:
-        data = await gamification.get_gamification(current_user["id"])
+        data = await gamification.get_gamification(current_user["id"], since)
         return data
     except Exception as e:
         logger.error(f"Error getting gamification: {e}")
@@ -90,16 +92,28 @@ async def award_xp(
     request: AwardXPRequest,
     current_user: dict = Depends(get_current_user)
 ):
+    """
+    Sync after an activity. Grants nothing itself (Phase 7: XP comes only from learning the
+    server measured); returns the state plus any XP earned since `since`, for the toasts.
+    """
     try:
         result = await gamification.award_xp(
             user_id=current_user["id"],
             activity_type=request.activity_type,
             meta=request.meta,
+            since=request.since,
         )
         return result
     except Exception as e:
         logger.error(f"Error awarding XP: {e}")
         raise HTTPException(500, str(e))
+
+
+@router.get("/leaderboard")
+async def class_leaderboard(current_user: dict = Depends(get_current_user)):
+    """This week's learning XP in the student's class (school level, when the class has the leaderboard on)."""
+    from services.leaderboard import class_week
+    return await class_week(current_user["id"])
 
 
 # ============== Settings ==============
@@ -121,10 +135,65 @@ async def save_settings(
 ):
     try:
         settings = await user_data.save_settings(current_user["id"], request.settings)
+        from services.levels import forget
+        await forget(current_user["id"])   # studyLevel may have changed
         return {"settings": settings}
     except Exception as e:
         logger.error(f"Error saving settings: {e}")
         raise HTTPException(500, str(e))
+
+
+# ============== Where the student left off (Phase 5) ==============
+# One JSON object per user: last book and view, in-progress quiz, lesson position, so a
+# student resumes on any device. PATCH merges keys; a null value removes a key.
+
+APP_STATE_MAX_BYTES = 64 * 1024
+
+
+class AppStatePatch(BaseModel):
+    state: Dict[str, Any]
+
+
+@router.get("/state")
+async def get_app_state(current_user: dict = Depends(get_current_user)):
+    from db.client import async_db, get_supabase_client
+    pg = get_supabase_client().pg
+    rows = await async_db(lambda: pg.fetch("SELECT state, updated_at FROM app_state WHERE user_id = %s",
+                                           (current_user["id"],)))
+    return {"state": rows[0]["state"] if rows else {}, "updated_at": rows[0]["updated_at"] if rows else None}
+
+
+@router.patch("/state")
+async def patch_app_state(body: AppStatePatch, current_user: dict = Depends(get_current_user)):
+    import json as _json
+    from db.client import async_db, get_supabase_client
+    if len(body.state) > 50 or any(len(k) > 120 for k in body.state):
+        raise HTTPException(400, "Too many or too long keys.")
+    pg = get_supabase_client().pg
+    uid = current_user["id"]
+    sets = {k: v for k, v in body.state.items() if v is not None}
+    drops = [k for k, v in body.state.items() if v is None]
+
+    def run():
+        with pg.pool.connection() as conn:
+            with conn.transaction():
+                row = conn.execute("SELECT state FROM app_state WHERE user_id = %s FOR UPDATE", (uid,)).fetchone()
+                state = dict(row["state"]) if row else {}
+                state.update(sets)
+                for k in drops:
+                    state.pop(k, None)
+                raw = _json.dumps(state)
+                if len(raw.encode()) > APP_STATE_MAX_BYTES:
+                    return None
+                conn.execute(
+                    """INSERT INTO app_state (user_id, state, updated_at) VALUES (%s, %s::jsonb, now())
+                       ON CONFLICT (user_id) DO UPDATE SET state = EXCLUDED.state, updated_at = now()""", (uid, raw))
+                return state
+
+    state = await async_db(run)
+    if state is None:
+        raise HTTPException(413, "Saved state is too large.")
+    return {"state": state}
 
 
 # ============== Bookmarks ==============
@@ -240,11 +309,18 @@ async def save_learning_progress(
     current_user: dict = Depends(get_current_user)
 ):
     try:
+        before = set(await user_data.get_learning_progress(current_user["id"], request.project_id) or [])
         topics = await user_data.save_learning_progress(
             user_id=current_user["id"],
             project_id=request.project_id,
             completed_topics=request.completed_topics,
         )
+        # A plan step completed for the first time earns XP once (untick/retick earns nothing)
+        from services.gamification_service import gamification
+        for topic in [t for t in (topics or []) if t not in before][:10]:
+            await gamification.award(current_user["id"], "exam_plan_step",
+                                     dedupe_key=f"plan:{request.project_id}:{topic}",
+                                     meta={"topic": topic, "project_id": request.project_id})
         return {"completed_topics": topics}
     except Exception as e:
         raise HTTPException(500, str(e))

@@ -18,6 +18,8 @@ import Library from './screens/Library';
 import Me from './screens/Me';
 import Book from './screens/Book';
 import Setup from './screens/Setup';
+import LevelGate from '../components/LevelGate';
+import { useTools } from '../context/ToolsContext';
 import './mobile.css';
 import logo from './logo.png';
 
@@ -44,6 +46,7 @@ const welcomed = () => { try { return localStorage.getItem(WELCOMED_KEY) === '1'
 const Guard = () => {
     const { user } = useAuth();
     const { settings, loaded } = useSettings();
+    const tools = useTools();
     const location = useLocation();
     if (!user) return <Navigate to="/signin" replace state={{ from: location.pathname }} />;
     if (user.must_change_password) return <ForcePasswordChange />;
@@ -53,6 +56,7 @@ const Guard = () => {
         <>
             <Outlet />
             {loaded && !onboarded && <Setup />}
+            {loaded && onboarded && tools.loaded && tools.needs_level && <LevelGate />}
         </>
     );
 };

@@ -92,7 +92,8 @@ class IndraOCRClient:
                     except Exception:
                         pass
             logger.info(f"[IndraOCR] {done}/{total} pages in {time.time() - t0:.0f} s")
-        text = "\n\n".join(t.strip() for t in texts if t and t.strip())
+        from utils.file_parser import PAGE_BREAK
+        text = PAGE_BREAK.join((t or "").strip() for t in texts)
         return text, done
 
 

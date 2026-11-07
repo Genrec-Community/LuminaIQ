@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies required for PDF parsing and OCR
+# System packages for PDF parsing and OCR
 RUN apt-get update && apt-get install -y --no-install-recommends \
     poppler-utils \
     tesseract-ocr \
@@ -11,15 +11,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+# uv installs the locked dependencies
+RUN pip install --no-cache-dir uv==0.11.32
 
-RUN pip install --no-cache-dir -r requirements.txt
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=never \
+    PYTHONUNBUFFERED=1
+
+# Dependencies first so code changes don't reinstall them
+COPY pyproject.toml uv.lock .python-version ./
+RUN uv sync --frozen --no-dev --no-install-project
 
 COPY . .
 
-# Ensure LF line endings for startup scripts across OS checkouts
-RUN sed -i 's/\r$//' startup.sh && chmod +x startup.sh
-
 EXPOSE 8000
 
-CMD ["sh", "startup.sh"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+    CMD curl -fsS "http://localhost:${PORT:-8000}/health" || exit 1
+
+# One uvicorn process by default. Set GUNICORN=1 (and WEB_CONCURRENCY) for several workers.
+CMD ["uv", "run", "--no-sync", "run.py"]

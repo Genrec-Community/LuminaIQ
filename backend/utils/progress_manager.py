@@ -41,7 +41,7 @@ class ProgressManager:
     """
 
     PERSIST_EVERY = 2.5   # seconds between DB writes per document (stage changes always write)
-    POLL_EVERY = 3.0      # seconds between DB reads when nothing arrives locally
+    POLL_EVERY = 1.5      # seconds between DB reads (the work usually runs on a worker, not here)
 
     def __init__(self):
         # document_id -> list of asyncio.Queue (one per subscriber)

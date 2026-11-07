@@ -166,7 +166,7 @@ const Welcome = () => {
                             style={{ width: n === i ? 22 : 6, background: n <= i ? 'var(--m-accent)' : 'var(--m-border)' }} />
                     ))}
                 </div>
-                {!last && <button onClick={() => finish()} className="m-pressable px-2 py-1 text-[14px] font-semibold" style={{ color: 'var(--m-muted)' }}>Skip</button>}
+                {!last && <button onClick={() => finish()} className="m-pressable px-3 py-2.5 text-[15px] font-semibold" style={{ color: 'var(--m-muted)' }}>Skip</button>}
             </div>
 
             <motion.div

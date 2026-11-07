@@ -100,7 +100,7 @@ const LazyPage = ({ pageNumber, width, estHeight, active, target, highlight, onV
     );
 };
 
-const PdfView = ({ url, passage, onLocated, jumpSignal }) => {
+const PdfView = ({ url, passage, pageHint, onLocated, jumpSignal }) => {
     const scrollRef = useRef(null);
     const pageEls = useRef({});
     const [pdf, setPdf] = useState(null);
@@ -140,14 +140,19 @@ const PdfView = ({ url, passage, onLocated, jumpSignal }) => {
         } catch { /* keep default */ }
     };
 
-    // Find the cited passage: score every page, highlight the best match
+    // Find the cited passage and highlight the best match. The citation says which
+    // page it came from, so look there (and next door) first, then everywhere else.
     useEffect(() => {
-        if (!pdf || !passage) return undefined;
+        if (!pdf || (!passage && !pageHint)) return undefined;
         let cancelled = false;
         (async () => {
             setSearching(true);
             let best = null;
-            for (let i = 1; i <= pdf.numPages && !cancelled; i++) {
+            const hint = pageHint && pageHint >= 1 && pageHint <= pdf.numPages ? pageHint : null;
+            const near = hint ? [hint, hint + 1, hint - 1].filter((n) => n >= 1 && n <= pdf.numPages) : [];
+            const order = [...near, ...Array.from({ length: pdf.numPages }, (_, k) => k + 1).filter((n) => !near.includes(n))];
+            for (const i of passage ? order : []) {
+                if (cancelled) break;
                 try {
                     const page = await pdf.getPage(i);
                     const content = await page.getTextContent();
@@ -167,12 +172,17 @@ const PdfView = ({ url, passage, onLocated, jumpSignal }) => {
                 setTarget(best);
                 onLocated?.(best.page);
                 setTimeout(() => scrollToPage(best.page, false), 50);
+            } else if (hint) {
+                // Text not matched exactly (e.g. a scanned page): still open the cited page
+                setTarget({ page: hint, score: 0, items: new Set() });
+                onLocated?.(hint);
+                setTimeout(() => scrollToPage(hint, false), 50);
             } else {
                 onLocated?.(null);
             }
         })();
         return () => { cancelled = true; };
-    }, [pdf, passage, onLocated, scrollToPage]);
+    }, [pdf, passage, pageHint, onLocated, scrollToPage]);
 
     // After the target page renders, bring the highlighted lines into view
     useEffect(() => {
@@ -277,7 +287,7 @@ const TextView = ({ text, passage, onLocated, jumpSignal }) => {
  * jumps to and highlights the cited passage, with the passage itself shown as
  * proof above the book.
  */
-const DocumentReader = ({ projectId, documentId, title, passage, onClose }) => {
+const DocumentReader = ({ projectId, documentId, title, passage, page, onClose }) => {
     const [source, setSource] = useState(null); // {kind, url} | {kind:'text', text}
     const [error, setError] = useState('');
     const [located, setLocated] = useState(undefined); // page number | 'text' | null
@@ -349,7 +359,7 @@ const DocumentReader = ({ projectId, documentId, title, passage, onClose }) => {
                 ) : !source ? (
                     <div className="flex-1 flex items-center justify-center gap-2 text-[#5E5046]"><Loader2 className="h-5 w-5 animate-spin" /> Opening…</div>
                 ) : source.kind === 'pdf' ? (
-                    <PdfView url={source.url} passage={cleanPassage} onLocated={onLocated} jumpSignal={jump} />
+                    <PdfView url={source.url} passage={cleanPassage} pageHint={page} onLocated={onLocated} jumpSignal={jump} />
                 ) : (
                     <TextView text={source.text} passage={cleanPassage} onLocated={onLocated} jumpSignal={jump} />
                 )}

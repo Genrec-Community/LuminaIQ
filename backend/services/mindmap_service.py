@@ -1,7 +1,6 @@
 from typing import List, Dict, Any, Optional
 from db.client import get_supabase_client, async_db
 from services.llm_service import LLMService
-from services.rag_service import RAGService
 from utils.logger import logger
 import json
 
@@ -9,7 +8,6 @@ class MindmapService:
     def __init__(self):
         self.supabase = get_supabase_client()
         self.llm_service = LLMService()
-        self.rag_service = RAGService()
     
     async def get_mindmaps(self, user_id: str, project_id: str) -> List[Dict[str, Any]]:
         """Get all mindmaps for a project"""
@@ -46,93 +44,22 @@ class MindmapService:
     ) -> Dict[str, Any]:
         """Generate a new mindmap using LLM"""
         try:
-            # Get relevant context from documents
-            context = ""
-            if selected_documents:
-                rag_results = await self.rag_service.get_answer(
-                    project_id=project_id,
-                    question=f"Explain {topic} and its key concepts, relationships, and subtopics in detail",
-                    selected_documents=selected_documents,
-                    chat_history=[]
-                )
-                context = rag_results['answer']
-            
-            # Generate mindmap structure using LLM
-            prompt = f"""You are a knowledge mapping expert. Generate a detailed, well-structured mindmap for the topic: "{topic}"
+            from services import shared_content
+            from services.retrieval import passages_text
 
-Context from study documents:
-{context if context else "No specific context provided. Use general knowledge about this topic."}
+            scope = await shared_content.scope_for(project_id, selected_documents)
 
-Requirements:
-1. Central node: The main topic
-2. 4-7 main branches: Key concepts/themes directly related to the central topic
-3. 2-4 sub-branches per main branch: Specific details, examples, or subtopics
-4. Each label should be concise (2-6 words), descriptive, and educational
-5. Use the document context to make labels specific and accurate, not generic
+            async def make():
+                # Book passages straight from search: no full chat answer needed just for context
+                context = await passages_text(
+                    project_id, [topic, f"key concepts and subtopics of {topic}", f"how ideas in {topic} relate"],
+                    per_query=4, document_ids=selected_documents or None, limit=10)
+                return await self._build_mindmap(topic, context)
 
-Return ONLY a valid JSON object (no markdown, no explanation) with this exact structure:
-{{
-  "nodes": [
-    {{"id": "1", "label": "{topic}", "level": 0}},
-    {{"id": "2", "label": "Main Concept A", "level": 1, "parent": "1"}},
-    {{"id": "3", "label": "Detail of A", "level": 2, "parent": "2"}},
-    {{"id": "4", "label": "Main Concept B", "level": 1, "parent": "1"}},
-    {{"id": "5", "label": "Detail of B", "level": 2, "parent": "4"}}
-  ],
-  "edges": [
-    {{"from": "1", "to": "2"}},
-    {{"from": "2", "to": "3"}},
-    {{"from": "1", "to": "4"}},
-    {{"from": "4", "to": "5"}}
-  ]
-}}
+            # Shared-library and class books reuse one mindmap per topic
+            mindmap_data, _ = await shared_content.asset(scope, "mindmap", [topic], make)
+            mindmap_data = {k: v for k, v in mindmap_data.items() if k != "_fallback"}
 
-Generate a comprehensive mindmap with at least 15-25 nodes total. Return ONLY the JSON."""
-
-            llm_response = await self.llm_service.chat_completion(
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.7,
-                max_tokens=8000,
-                light=True
-            )
-            
-            # Parse the LLM response
-            try:
-                # Clean the response
-                response_text = llm_response.strip()
-                if response_text.startswith("```json"):
-                    response_text = response_text[7:]
-                if response_text.startswith("```"):
-                    response_text = response_text[3:]
-                if response_text.endswith("```"):
-                    response_text = response_text[:-3]
-                response_text = response_text.strip()
-                
-                mindmap_data = json.loads(response_text)
-                
-                # Validate structure
-                if 'nodes' not in mindmap_data or 'edges' not in mindmap_data:
-                    raise ValueError("Invalid mindmap structure - missing nodes or edges")
-                
-                # Ensure all nodes have required fields
-                for node in mindmap_data['nodes']:
-                    if 'id' not in node or 'label' not in node:
-                        raise ValueError("Invalid node - missing id or label")
-                    node.setdefault('level', 0)
-                
-                # Validate edges reference existing node IDs
-                node_ids = {n['id'] for n in mindmap_data['nodes']}
-                mindmap_data['edges'] = [
-                    e for e in mindmap_data['edges']
-                    if e.get('from') in node_ids and e.get('to') in node_ids
-                ]
-                
-            except (json.JSONDecodeError, ValueError) as e:
-                logger.error(f"Failed to parse LLM response: {e}")
-                logger.warning(f"Response text (first 500 chars): {response_text[:500]}")
-                # Fallback to a meaningful structure
-                mindmap_data = self._build_fallback_mindmap(topic, context)
-            
             # Save to database
             node_count = len(mindmap_data.get('nodes', []))
             edge_count = len(mindmap_data.get('edges', []))
@@ -167,6 +94,87 @@ Generate a comprehensive mindmap with at least 15-25 nodes total. Return ONLY th
             logger.error(f"Error generating mindmap: {e}")
             raise Exception(f"Failed to generate mindmap: {str(e)}")
     
+    async def _build_mindmap(self, topic: str, context: str) -> Dict[str, Any]:
+        """The mindmap structure for a topic from the book's passages (fallback on bad output)."""
+        response_text = ""
+        # Generate mindmap structure using LLM
+        prompt = f"""You are a knowledge mapping expert. Generate a detailed, well-structured mindmap for the topic: "{topic}"
+
+Context from study documents:
+{context if context else "No specific context provided. Use general knowledge about this topic."}
+
+Requirements:
+1. Central node: The main topic
+2. 4-7 main branches: Key concepts/themes directly related to the central topic
+3. 2-4 sub-branches per main branch: Specific details, examples, or subtopics
+4. Each label should be concise (2-6 words), descriptive, and educational; write any formula in labels as $...$ with escaped backslashes
+5. Use the document context to make labels specific and accurate, not generic
+
+Return ONLY a valid JSON object (no markdown, no explanation) with this exact structure:
+{{
+  "nodes": [
+{{"id": "1", "label": "{topic}", "level": 0}},
+{{"id": "2", "label": "Main Concept A", "level": 1, "parent": "1"}},
+{{"id": "3", "label": "Detail of A", "level": 2, "parent": "2"}},
+{{"id": "4", "label": "Main Concept B", "level": 1, "parent": "1"}},
+{{"id": "5", "label": "Detail of B", "level": 2, "parent": "4"}}
+  ],
+  "edges": [
+{{"from": "1", "to": "2"}},
+{{"from": "2", "to": "3"}},
+{{"from": "1", "to": "4"}},
+{{"from": "4", "to": "5"}}
+  ]
+}}
+
+Generate a comprehensive mindmap with at least 15-25 nodes total. Return ONLY the JSON."""
+
+        llm_response = await self.llm_service.chat_completion(
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7,
+            max_tokens=8000,
+            light=True
+        )
+        
+        # Parse the LLM response
+        try:
+            # Clean the response
+            response_text = llm_response.strip()
+            if response_text.startswith("```json"):
+                response_text = response_text[7:]
+            if response_text.startswith("```"):
+                response_text = response_text[3:]
+            if response_text.endswith("```"):
+                response_text = response_text[:-3]
+            response_text = response_text.strip()
+            
+            from utils.json_latex import extract
+            mindmap_data = extract(response_text, "{")
+            
+            # Validate structure
+            if 'nodes' not in mindmap_data or 'edges' not in mindmap_data:
+                raise ValueError("Invalid mindmap structure - missing nodes or edges")
+            
+            # Ensure all nodes have required fields
+            for node in mindmap_data['nodes']:
+                if 'id' not in node or 'label' not in node:
+                    raise ValueError("Invalid node - missing id or label")
+                node.setdefault('level', 0)
+            
+            # Validate edges reference existing node IDs
+            node_ids = {n['id'] for n in mindmap_data['nodes']}
+            mindmap_data['edges'] = [
+                e for e in mindmap_data['edges']
+                if e.get('from') in node_ids and e.get('to') in node_ids
+            ]
+            
+        except (json.JSONDecodeError, ValueError) as e:
+            logger.error(f"Failed to parse LLM response: {e}")
+            logger.warning(f"Response text (first 500 chars): {response_text[:500]}")
+            # Fallback to a meaningful structure
+            mindmap_data = {**self._build_fallback_mindmap(topic, context), "_fallback": True}
+        return mindmap_data
+
     def _build_fallback_mindmap(self, topic: str, context: str = "") -> Dict[str, Any]:
         """Build a basic fallback mindmap when LLM parsing fails."""
         # Extract some keywords from context if available

@@ -3,6 +3,7 @@ import {
     Moon, Zap, Target, MessageSquare, FlaskConical, Network, HelpCircle, CheckSquare,
     FileText, Layers, Brain, ChevronDown, Pin, PinOff, Eye, EyeOff, SlidersHorizontal, Check, RotateCcw,
 } from 'lucide-react';
+import { useTools } from '../context/ToolsContext';
 
 /*
  * Project sidebar navigation: grouped sections, one consistent row style, and
@@ -56,7 +57,11 @@ const SidebarNav = ({ activeTab, onSelect, collapsed, isDark, aiLabel }) => {
         ...p, [field]: p[field].includes(value) ? p[field].filter(v => v !== value) : [...p[field], value],
     }));
 
-    const groups = groupsFor(aiLabel);
+    const { has } = useTools();
+    // Only tools switched on for this learner's level and class
+    const groups = groupsFor(aiLabel)
+        .map(g => ({ ...g, items: g.items.filter(i => has(i.id)) }))
+        .filter(g => g.items.length > 0);
     const all = groups.flatMap(g => g.items);
     const pinned = prefs.pinned.map(id => all.find(i => i.id === id)).filter(Boolean);
     const visible = (item) => editing || !prefs.hidden.includes(item.id);

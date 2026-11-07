@@ -324,10 +324,16 @@ export const getQueueStatus = async () => {
     return response.data;
 };
 
-export const getChatHistory = async (projectId) => {
-    const response = await api.get(`/chat/history/${projectId}`);
+export const getChatHistory = async (projectId, threadId = null) => {
+    const response = await api.get(`/chat/history/${projectId}`, { params: threadId ? { thread_id: threadId } : {} });
     return response.data;
 };
+
+// --- Several chats per book ("New chat") ---
+export const listChatThreads = async (projectId) => (await api.get(`/chat/threads/${projectId}`)).data.threads || [];
+export const createChatThread = async (projectId) => (await api.post('/chat/threads', { project_id: projectId })).data;
+export const renameChatThread = async (threadId, title) => (await api.patch(`/chat/threads/${threadId}`, { title })).data;
+export const deleteChatThread = async (threadId) => (await api.delete(`/chat/threads/${threadId}`)).data;
 
 
 export const chatMessage = async (projectId, message, history = []) => {
@@ -371,6 +377,12 @@ export const chatMessageStream = async (projectId, message, history = [], select
                     session_history: history,
                     selected_documents: selectedDocuments,
                     deep: !!options.deep,
+                    // A photo of a question or diagram (shrunk data URL)
+                    ...(options.image ? { image: options.image } : {}),
+                    // Which of the book's chats this goes to (none: the latest chat)
+                    ...(options.threadId ? { thread_id: options.threadId } : {}),
+                    // Hints-first toggle (undefined = use the level/class default)
+                    ...(typeof options.hints === 'boolean' ? { hints: options.hints } : {}),
                 })
             });
 
@@ -394,6 +406,9 @@ export const chatMessageStream = async (projectId, message, history = [], select
                 }
                 throw new Error((typeof detail === 'string' ? detail : detail?.message) || `HTTP error ${response.status}`);
             }
+
+            const threadHeader = response.headers.get('X-Thread-Id');
+            if (threadHeader && options.onThread) options.onThread(threadHeader);
 
             // Check for null body
             if (!response.body) {
@@ -879,6 +894,19 @@ export const saveUserSettings = async (settings) => {
     return response.data;
 };
 
+// --- Memory: "What Lumina remembers about you" ---
+export const submitMCQAnswers = async (testId, answers) => (await api.post('/mcq/submit', { test_id: testId, answers })).data;
+export const getMemory = async () => (await api.get('/memory')).data;
+export const addMemory = async (content, kind = 'fact') => (await api.post('/memory', { content, kind })).data;
+export const editMemory = async (id, content) => (await api.patch(`/memory/${id}`, { content })).data;
+export const deleteMemory = async (id) => (await api.delete(`/memory/${id}`)).data;
+export const clearMemory = async () => (await api.delete('/memory')).data;
+export const deleteChatSummary = async (projectId) => (await api.delete(`/memory/summaries/${projectId}`)).data;
+
+// --- Where the student left off (any device) ---
+export const getAppState = async () => (await api.get('/user-data/state')).data.state || {};
+export const patchAppState = async (state) => (await api.patch('/user-data/state', { state })).data.state;
+
 // --- Bookmarks ---
 export const getBookmarks = async (projectId) => {
     const response = await api.get(`/user-data/bookmarks/${projectId}`);
@@ -988,18 +1016,23 @@ export const updateStreak = async (projectId) => {
 };
 
 // --- Gamification ---
-export const getGamification = async () => {
-    const response = await api.get('/user-data/gamification');
+export const getGamification = async (since = null) => {
+    const response = await api.get('/user-data/gamification', { params: since ? { since } : {} });
     return response.data;
 };
 
-export const awardXP = async (activityType, meta = null) => {
+// Sync after an activity: the server grants XP only for learning it measured; this returns
+// the state plus XP earned since `since` (for toasts)
+export const awardXP = async (activityType, meta = null, since = null) => {
     const response = await api.post('/user-data/gamification/award-xp', {
         activity_type: activityType,
         meta,
+        since,
     });
     return response.data;
 };
+
+export const getLeaderboard = async () => (await api.get('/user-data/leaderboard')).data;
 
 // ============== Flashcard API ==============
 
@@ -1353,3 +1386,28 @@ export const getDocumentText = async (projectId, documentId) =>
 
 // Permanently delete the signed-in account and all of its data
 export const deleteAccount = async () => (await api.delete('/auth/account')).data;
+
+
+// ─────────────────────────────────────────────────────────────
+// Learner levels and tools (backend: services/levels.py)
+// ─────────────────────────────────────────────────────────────
+
+export const getLevelCatalog = async () => (await api.get('/levels/catalog')).data;
+
+/** { level, level_label, locked, needs_level, tools: [...], hint_mode, hints_default, outside_book } */
+export const getMyLevel = async () => (await api.get('/levels/me')).data;
+
+export const setMyLevel = async (level) => (await api.put('/levels/me', { level })).data;
+
+export const getPlatformLevels = async () => (await api.get('/platform/levels')).data;
+
+export const getPlatformCosts = async (days = 30) => (await api.get('/platform/costs', { params: { days } })).data;
+
+export const getPlatformAnalytics = async (days = 30) => (await api.get('/platform/analytics', { params: { days } })).data;
+
+export const updatePlatformLevel = async (level, body) => (await api.put(`/platform/levels/${level}`, body)).data;
+
+export const getClassSettings = async (classId) => (await api.get(`/institutions/classes/${classId}/settings`)).data;
+
+export const updateClassSettings = async (classId, body) =>
+    (await api.put(`/institutions/classes/${classId}/settings`, body)).data;

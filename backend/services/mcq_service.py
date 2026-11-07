@@ -1,8 +1,7 @@
 import json
 import asyncio
-from typing import List, Dict, Any, Union
+from typing import Any, Dict, List, Optional, Union
 from services.embedding_service import embedding_service
-from services.qdrant_service import qdrant_service
 from services.llm_service import llm_service
 from db.client import get_supabase_client, async_db
 from config.settings import settings
@@ -114,59 +113,91 @@ class MCQService:
         num_questions: int = 5,
         selected_documents: List[str] = None,
         difficulty: str = "medium",
+        user_id: Optional[str] = None,
+        level: str = "",
     ) -> Dict[str, Any]:
-        """Generate MCQ test from project documents
-
-        Args:
-            difficulty: 'easy', 'medium', or 'hard'
         """
-        try:
-            # 1. Get relevant content for the chapter/topic
-            logger.info(
-                f"Retrieving content for topic: {topic if topic else 'General'}"
-            )
-            # Increased chunks for better context
-            content = await self._get_context_content(
-                project_id, topic, num_chunks=15, selected_documents=selected_documents
-            )
+        An MCQ test on a topic. For shared-library and class books the questions come from
+        the book's shared pool (only missing ones are generated); personal books always
+        get fresh questions. The result's "generated" says how many were newly made.
+        """
+        from services import shared_content
 
-            if not content:
-                # Fallback if no specific content found
-                logger.warning(
-                    "No specific content found, generating generic questions"
-                )
+        if not topic and user_id:
+            # No topic chosen: practise what the student finds hardest (learner model)
+            try:
+                from services import learner_model
+                weak = await learner_model.weak_topics(user_id, project_id, limit=1)
+                if weak:
+                    topic = weak[0][0]
+                    logger.info(f"Quiz without a topic: targeting weakest topic '{topic}'")
+            except Exception as e:
+                logger.debug(f"Weak topics unavailable: {e}")
 
-            # 2. Generate MCQs using LLM with difficulty modifier
-            prompt_topic = f"Topic: {topic}" if topic else "Topic: General Review"
+        scope = await shared_content.scope_for(project_id, selected_documents)
 
-            # Difficulty-specific instructions
-            difficulty_instructions = {
-                "easy": """
+        async def make(n: int) -> List[Dict[str, Any]]:
+            return await self.make_questions(project_id, topic, n, selected_documents, difficulty, level)
+
+        questions, generated = await shared_content.draw(
+            user_id, scope, "quiz", topic or "General Review", level, num_questions, make, variant=difficulty)
+        if not questions:
+            raise Exception("Failed to parse MCQ questions from response")
+
+        test_id = str(uuid4())
+        await async_db(lambda: self.client.table("mcq_tests").insert({
+            "id": test_id,
+            "project_id": project_id,
+            "chapter_name": topic if topic else "General Quiz",
+            "questions": json.dumps(questions),
+        }).execute())
+        logger.info(f"Created MCQ test {test_id} ({generated} of {len(questions)} questions generated)")
+        return {"test_id": test_id, "topic": topic, "questions": questions, "generated": generated}
+
+    async def make_questions(self, project_id: str, topic: Optional[str], n: int,
+                             selected_documents: Optional[List[str]], difficulty: str, level: str) -> List[Dict[str, Any]]:
+        """n new questions from the book (one model call)."""
+        content = await self._get_context_content(project_id, topic, num_chunks=15,
+                                                  selected_documents=selected_documents)
+        if not content:
+            logger.warning("No specific content found, generating generic questions")
+        response = await llm_service.chat_completion(
+            [{"role": "user", "content": self._mcq_prompt(topic, n, difficulty, content, level)}],
+            temperature=0.7, max_tokens=6000, light=True)
+        parsed = self._parse_mcq_response(response)
+        if not parsed:
+            raise Exception("Failed to parse MCQ questions from response")
+        return parsed
+
+    @staticmethod
+    def _mcq_prompt(topic: Optional[str], num_questions: int, difficulty: str, content: str, level: str) -> str:
+        from services.prompts.levels import LEVEL_STYLE
+
+        difficulty_instructions = {
+            "easy": """
 - Questions should test basic recall and understanding.
 - Options should be clearly distinguishable.
 - Avoid trick questions or subtle distinctions.
 - Focus on fundamental concepts and definitions.""",
-                "medium": """
+            "medium": """
 - Questions should test understanding and application.
 - Include some questions requiring comparison or analysis.
 - Options may have subtle differences but should be fair.
 - Balance between recall and critical thinking.""",
-                "hard": """
+            "hard": """
 - Questions should test deep understanding, analysis, and critical thinking.
 - Include questions that require synthesizing multiple concepts.
 - Options may be nuanced and require careful consideration.
 - Include scenario-based and application questions.
 - Some questions may require multi-step reasoning.""",
-            }
-
-            diff_instruction = difficulty_instructions.get(
-                difficulty, difficulty_instructions["medium"]
-            )
-
-            prompt = f"""Based on the following educational content, generate {num_questions} multiple-choice questions.
+        }
+        diff_instruction = difficulty_instructions.get(difficulty, difficulty_instructions["medium"])
+        audience = f"\nThe learners:\n{LEVEL_STYLE[level]}\nPitch the wording at this level.\n" if level in LEVEL_STYLE else ""
+        prompt_topic = f"Topic: {topic}" if topic else "Topic: General Review"
+        return f"""Based on the following educational content, generate {num_questions} multiple-choice questions.
 {prompt_topic}
 Difficulty Level: {difficulty.upper()}
-
+{audience}
 Content:
 {content}
 
@@ -175,7 +206,10 @@ Requirements:
 - Each question should have 4 options (A, B, C, D).
 - Only one option should be correct.
 - **Use Markdown** for the question text and explanation (e.g., bold keywords, code blocks if relevant).
+- Write maths in LaTeX: $...$ inline, $$...$$ for display (escape backslashes for JSON).
 - Include a clear and detailed explanation for the correct answer.
+- The options are shown in a random order, so the explanation must name the correct answer by its
+  content, never by its letter (not "A is correct" or "option B").
 
 Format your response as a **JSON array** with this structure:
 [
@@ -188,41 +222,11 @@ Format your response as a **JSON array** with this structure:
       {{"option": "D", "text": "Fourth option"}}
     ],
     "correct_answer": "A",
-    "explanation": "Explanation of why **A** is correct..."
+    "explanation": "Explanation of why the first option is correct..."
   }}
 ]
 
 Respond ONLY with the valid JSON array. Do not add any markdown formatting (like ```json) around the response."""
-
-            messages = [{"role": "user", "content": prompt}]
-            response = await llm_service.chat_completion(
-                messages, temperature=0.7, max_tokens=6000, light=True
-            )
-
-            # 3. Parse response
-            questions = self._parse_mcq_response(response)
-
-            if not questions:
-                raise Exception("Failed to parse MCQ questions from response")
-
-            # 4. Store in database
-            test_id = str(uuid4())
-            await async_db(lambda: self.client.table("mcq_tests").insert(
-                {
-                    "id": test_id,
-                    "project_id": project_id,
-                    "chapter_name": topic if topic else "General Quiz",
-                    "questions": json.dumps(questions),
-                }
-            ).execute())
-
-            logger.info(f"Created MCQ test with ID: {test_id}")
-
-            return {"test_id": test_id, "topic": topic, "questions": questions}
-
-        except Exception as e:
-            logger.error(f"Error generating MCQ: {str(e)}")
-            raise
 
     async def _get_context_content(
         self,
@@ -258,36 +262,23 @@ Respond ONLY with the valid JSON array. Do not add any markdown formatting (like
             return ""
 
     def _parse_mcq_response(self, response: str) -> List[Dict[str, Any]]:
-        """Parse LLM response to extract MCQ questions"""
+        """The questions in a model reply (LaTeX kept intact), or [] if it isn't usable."""
+        from utils.json_latex import extract
         try:
-            # Try to find JSON array in response
-            start = response.find("[")
-            end = response.rfind("]") + 1
-
-            if start == -1 or end == 0:
-                logger.warning("No JSON array found in response")
-                return []
-
-            json_str = response[start:end]
-            questions = json.loads(json_str)
-
-            # Validate structure
-            for q in questions:
-                if not all(
-                    key in q
-                    for key in ["question", "options", "correct_answer", "explanation"]
-                ):
-                    logger.warning("Invalid question structure")
-                    return []
-
-            return questions
-
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON parse error: {str(e)}")
+            questions = extract(response, "[")
+        except ValueError as e:
+            logger.warning(f"No usable JSON array in MCQ response: {e}")
             return []
+        if not isinstance(questions, list):
+            return []
+        for q in questions:
+            if not isinstance(q, dict) or not all(k in q for k in ("question", "options", "correct_answer", "explanation")):
+                logger.warning("Invalid question structure")
+                return []
+        return questions
 
     async def submit_test(
-        self, test_id: str, answers: Dict[int, str]
+        self, test_id: str, answers: Dict[int, str], user_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """Evaluate submitted test answers"""
         try:
@@ -327,6 +318,8 @@ Respond ONLY with the valid JSON array. Do not add any markdown formatting (like
                 )
 
             percentage = (score / total * 100) if total > 0 else 0
+            if user_id:
+                await self._remember_answers(user_id, test, questions, feedback)
 
             return {
                 "score": score,
@@ -339,6 +332,27 @@ Respond ONLY with the valid JSON array. Do not add any markdown formatting (like
             logger.error(f"Error submitting test: {str(e)}")
             raise
 
+
+    @staticmethod
+    async def _remember_answers(user_id: str, test: Dict[str, Any], questions: List[Dict[str, Any]],
+                                feedback: List[Dict[str, Any]]) -> None:
+        """Wrong answers feed the learner model (with misconceptions); right ones fix old mistakes."""
+        from services import learner_model
+
+        def text(q, letter):
+            return next((o.get("text", "") for o in q.get("options") or [] if o.get("option") == letter), letter or "")
+
+        wrong = [{"question": q["question"], "wrong_answer": text(q, f["user_answer"]),
+                  "correct_answer": text(q, f["correct_answer"])}
+                 for q, f in zip(questions, feedback) if f["user_answer"] and not f["is_correct"]]
+        right = [q["question"] for q, f in zip(questions, feedback) if f["is_correct"]]
+        topic = test.get("chapter_name") or ""
+        try:
+            await learner_model.mark_fixed(user_id, test["project_id"], right)
+            if wrong:
+                await learner_model.record_mistakes(user_id, test["project_id"], topic, wrong)
+        except Exception as e:
+            logger.warning(f"Learner model not updated from quiz: {e}")
 
     async def get_saved_tests(self, project_id: str) -> List[Dict[str, Any]]:
         """Get all saved MCQ tests for a project"""

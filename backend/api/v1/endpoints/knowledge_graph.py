@@ -10,6 +10,8 @@ Provides:
 """
 
 from fastapi import APIRouter, HTTPException, Depends
+from utils.rate_limit import rate_limit
+from utils.tools import require_tool
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 from api.deps import get_current_user
@@ -60,7 +62,7 @@ class EndSessionRequest(BaseModel):
 
 # ============== Graph Visualization ==============
 
-@router.get("/graph/{project_id}")
+@router.get("/graph/{project_id}", dependencies=[Depends(require_tool("knowledge"))])
 async def get_knowledge_graph(
     project_id: str,
     current_user: dict = Depends(get_current_user)
@@ -159,7 +161,7 @@ async def get_knowledge_graph(
 
 # ============== Topic Summaries ==============
 
-@router.post("/topic-summary")
+@router.post("/topic-summary", dependencies=[Depends(rate_limit("generate")), Depends(require_tool("knowledge"))])
 async def get_topic_summary(
     request: TopicSummaryRequest,
     current_user: dict = Depends(get_current_user)

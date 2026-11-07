@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import Markdown from '../Markdown';
 import {
     Layers, RefreshCw, ArrowLeft, ArrowRight,
     RotateCcw, Check, X, Shuffle, Eye, EyeOff
@@ -36,7 +37,7 @@ const FlashCard = ({ card, index, total, flipped, onFlip }) => {
                     </div>
                     <div className="text-center">
                         <p className="text-lg font-bold text-[#163628] leading-relaxed">
-                            {card.front}
+                            <Markdown inline>{card.front}</Markdown>
                         </p>
                     </div>
                     <p className="absolute bottom-4 text-xs text-[#5E5046] font-medium">
@@ -63,7 +64,7 @@ const FlashCard = ({ card, index, total, flipped, onFlip }) => {
                     </div>
                     <div className="text-center">
                         <p className="text-base text-[#163628] leading-relaxed">
-                            {card.back}
+                            <Markdown inline>{card.back}</Markdown>
                         </p>
                     </div>
                     <p className="absolute bottom-4 text-xs text-emerald-600 font-medium">

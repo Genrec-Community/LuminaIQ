@@ -398,6 +398,8 @@ class InstitutionService:
             await async_db(lambda: self.client.table("class_members").upsert({
                 "class_id": cls["id"], "user_id": user_id, "project_id": project_id,
             }, on_conflict="class_id,user_id").execute())
+        from services.levels import forget
+        await forget(user_id)   # their class may now set their level and tools
         for book in await self._all("class_books", class_id=cls["id"]):
             await self._copy_book_to(book, user_id, project_id)
         return project_id
@@ -421,11 +423,26 @@ class InstitutionService:
             "class_id": class_id, "source_document_id": document_id,
             "title": doc["filename"], "published_by": user["id"],
         }, on_conflict="class_id,source_document_id").execute())).data[0]
+        await self._maybe_pregenerate(class_id, doc)
         copied = 0
         for member in await self._all("class_members", class_id=class_id):
             if member.get("project_id") and await self._copy_book_to(book, member["user_id"], member["project_id"]):
                 copied += 1
         return {"book": book, "copied_to": copied}
+
+    async def _maybe_pregenerate(self, class_id: str, doc: Dict[str, Any]) -> None:
+        """Queue filling the book's quiz and flashcard pools for the class level (PREGENERATE_SHARED)."""
+        from config.settings import settings
+        if not settings.PREGENERATE_SHARED:
+            return
+        try:
+            cls = await self._one("institution_classes", id=class_id)
+            from services.jobs import enqueue
+            await enqueue("pregenerate_shared", {"project_id": doc["project_id"], "document_id": doc["id"],
+                                                 "level": (cls or {}).get("level") or "school"},
+                          dedupe_key=f"pregenerate:{doc['id']}:{(cls or {}).get('level')}")
+        except Exception as e:
+            logger.warning(f"[Institution] pre-generation not queued: {e}")
 
     async def _copy_book_to(self, book: Dict[str, Any], user_id: str, project_id: str) -> bool:
         """Give one student a copy of a class book (idempotent)."""
@@ -445,12 +462,11 @@ class InstitutionService:
         await async_db(lambda: self.client.table("class_book_copies").insert({
             "class_book_id": book["id"], "user_id": user_id, "document_id": copy["id"],
         }).execute())
-        # Search index: copy the teacher's vectors (no embedding calls). If the
+        # Search index: copy the teacher's passages and vectors (no embedding calls). If the
         # source isn't indexed, the normal self-heal re-indexes the copy on first use.
         try:
-            from services.qdrant_service import qdrant_service
-            await qdrant_service.copy_document_vectors(
-                f"project_{src['project_id']}", src["id"], f"project_{project_id}", copy["id"], src["filename"])
+            from services import vector_store
+            await vector_store.copy_document(src["id"], project_id, copy["id"])
         except Exception as e:
             logger.warning(f"[Institution] vector copy failed for {copy['id']}: {e}")
         # Learning-path links between this book's topics
@@ -496,6 +512,8 @@ class InstitutionService:
                            .in_("class_id", chunk).eq("user_id", member_user_id).execute())
         await self._revoke_plan(member_user_id, m["institution_id"])
         self.forget(user_id=member_user_id)
+        from services.levels import forget as forget_level
+        await forget_level(member_user_id)
         await self.audit(m["institution_id"], user["id"], "member_removed", {"user_id": member_user_id})
         return {"removed": member_user_id}
 
@@ -825,6 +843,13 @@ class InstitutionService:
             acts.setdefault(key(r), []).append(r)
 
         week_ago = (_now() - timedelta(days=7)).date().isoformat()
+        # Who needs help: from practice, mastery and mistakes only (never chats or memory)
+        from services.teacher_insights import stuck_signals
+        try:
+            stuck = await stuck_signals((cm["user_id"], cm.get("project_id")) for cm in cms)
+        except Exception as e:
+            logger.warning(f"[Institution] stuck signals unavailable: {e}")
+            stuck = {}
         rows, weak_counts = [], {}
         for cm in cms:
             uid, pid = cm["user_id"], cm.get("project_id")
@@ -848,6 +873,7 @@ class InstitutionService:
                 "mastered": mastered, "total_topics": len(all_topics),
                 "accuracy": round(100 * correct / (correct + wrong)) if correct + wrong else None,
                 "weak_topics": weak[:5], "active_days_7": active_days, "last_active": last_active,
+                "stuck": stuck.get((str(uid), str(pid)), []) if pid else [],
             })
         rows.sort(key=lambda r: (r["last_active"] or "", r["mastered"]), reverse=True)
         return {
@@ -855,6 +881,8 @@ class InstitutionService:
             "books": [{"id": b["id"], "title": b["title"], "document_id": b["source_document_id"]} for b in books],
             "students": rows,
             "class_weak_topics": sorted(weak_counts.items(), key=lambda kv: -kv[1])[:8],
+            "needs_help": [{"user_id": r["user_id"], "name": r["name"], "reasons": r["stuck"]}
+                           for r in rows if r["stuck"] and not r["disabled"]],
         }
 
     async def publishable_documents(self, user: dict) -> List[Dict[str, Any]]:

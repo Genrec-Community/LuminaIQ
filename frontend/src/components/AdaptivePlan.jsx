@@ -4,7 +4,6 @@ import {
     Sparkles, Clock, ArrowRight, Brain, RotateCcw, Lock, Layers, ChevronDown, Info, Loader2, GitBranch, Scale, Activity,
 } from 'lucide-react';
 import { getLearningPlan, getLearningMetrics } from '../api';
-import MemoryCurve from './MemoryCurve';
 
 /*
  * The learning engine's plan: what to learn next and why, what follows, the
@@ -161,19 +160,18 @@ const AdaptivePlan = ({ projectId, selectedDocuments, onLearn, onPractise, color
                 </div>
             </motion.div>
 
-            {/* The memory curve: what reviews protect, from this student's own answers */}
-            <MemoryCurve
-                profile={data.profile}
-                compact
-                action={(() => {
-                    const due = (data.profile || []).find((r) => r.due);
-                    return due ? (
-                        <button type="button" className="lumina-curve__cta" onClick={() => onPractise?.(due.topic)}>
-                            Review “{due.topic}” before it fades · 3 min <ArrowRight className="h-4 w-4" />
-                        </button>
-                    ) : null;
-                })()}
-            />
+            {/* A topic due for review: one tap to keep it from fading */}
+            {(() => {
+                const due = (data.profile || []).find((r) => r.due);
+                return due ? (
+                    <button type="button" onClick={() => onPractise?.(due.topic)}
+                        className="flex w-full items-center justify-between gap-3 rounded-2xl border px-5 py-4 text-left font-semibold"
+                        style={{ background: card, borderColor: cardBorder, color: bodyText }}>
+                        <span>Review “{due.topic}” before it fades · 3 min</span>
+                        <ArrowRight className="h-4 w-4 shrink-0" />
+                    </button>
+                ) : null;
+            })()}
 
             {/* Then */}
             {then.length > 0 && (

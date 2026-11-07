@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import Markdown from '../Markdown';
 import { Zap, Plus, Trash2, Eye, Loader2, Download, X, ZoomIn, ZoomOut, Maximize2, RefreshCw } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 import { getMindmaps, generateMindmap as generateMindmapAPI, deleteMindmap as deleteMindmapAPI } from '../../api';
@@ -183,7 +184,7 @@ const MindmapRenderer = ({ data }) => {
                             color: depth === 1 ? color.text : '#163628',
                         } : {}}
                     >
-                        {node.label}
+                        <Markdown inline>{node.label}</Markdown>
                         {hasChildren && (
                             <span className={`ml-1.5 text-xs opacity-60 ${isRoot ? 'text-white/70' : ''}`}>
                                 {isExpanded ? '−' : `+${node.children.length}`}

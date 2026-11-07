@@ -513,6 +513,18 @@ class SpacedRepetition:
                 f"Reviewed card {card_id}: quality={quality}, "
                 f"next_review in {new_interval} days"
             )
+            # XP for keeping up: the review was done while the card was due (Phase 7)
+            due_at = card.get("next_review")
+            try:
+                was_due = not due_at or datetime.fromisoformat(str(due_at).replace("Z", "+00:00")).replace(
+                    tzinfo=None) <= datetime.utcnow()
+            except ValueError:
+                was_due = False
+            if was_due and card.get("user_id"):
+                from services.gamification_service import gamification
+                await gamification.award(card["user_id"], "review_on_time",
+                                         dedupe_key=f"review:{card_id}:{datetime.utcnow().date().isoformat()}",
+                                         meta={"topic": card.get("topic")})
 
             return {
                 "card_id": card_id,

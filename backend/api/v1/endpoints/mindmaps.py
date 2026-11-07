@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
+from utils.rate_limit import rate_limit
+from utils.tools import require_tool
 from typing import List, Optional
 from pydantic import BaseModel
 from api.deps import get_current_user
@@ -25,7 +27,7 @@ async def get_mindmaps(
     service = MindmapService()
     return await service.get_mindmaps(current_user["id"], project_id)
 
-@router.post("/{project_id}/generate")
+@router.post("/{project_id}/generate", dependencies=[Depends(rate_limit("generate")), Depends(require_tool("mindmap"))])
 async def generate_mindmap(
     project_id: str,
     data: MindmapGenerate,

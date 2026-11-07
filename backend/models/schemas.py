@@ -49,8 +49,8 @@ class DocumentUploadResponse(BaseModel):
     id: str
     project_id: str
     filename: str
-    file_type: str
-    file_size: int
+    file_type: Optional[str] = None
+    file_size: Optional[int] = None
     upload_status: str
     created_at: Optional[datetime] = None
 
@@ -71,6 +71,8 @@ class ChatMessage(BaseModel):
     role: str
     content: str
     created_at: Optional[str] = None
+    image_url: Optional[str] = None     # short-lived link to the photo the student sent, if any
+    sources: Optional[List[Dict[str, Any]]] = None   # citations of an answer, so a reopened chat keeps them
 
 
 class ChatRequest(BaseModel):
@@ -81,6 +83,14 @@ class ChatRequest(BaseModel):
     system_prompt: Optional[str] = None
     # Topper "Deep" answer from the stronger model (counts against the Deep allowance)
     deep: bool = False
+    # Hints-first for this message (the chat-menu toggle); the class setting can override it
+    hints: Optional[bool] = None
+    # Which of the book's chats this message belongs to (None = the latest chat, or a new one)
+    thread_id: Optional[str] = None
+    # A photo of a question or diagram, as a data URL (the app shrinks it to <= 1600 px JPEG)
+    image: Optional[str] = Field(default=None, max_length=6_000_000)
+    # Set by the server only (where the photo was stored); anything a client sends is replaced
+    image_path: Optional[str] = None
 
 
 class SourceInfo(BaseModel):
@@ -92,6 +102,7 @@ class SourceInfo(BaseModel):
 class ChatResponse(BaseModel):
     answer: str
     sources: List[SourceInfo]
+    thread_id: Optional[str] = None
 
 
 # Summary Schema (separate from ChatRequest since it doesn't need message)

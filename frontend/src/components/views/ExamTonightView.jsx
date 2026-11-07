@@ -5,6 +5,7 @@ import {
     Sparkles, Lightbulb, AlertTriangle, Target, FlaskConical, RotateCcw, Layers, BookOpen,
 } from 'lucide-react';
 import { getCramPlan, getCramCard, recordLearning } from '../../api';
+import Markdown from '../Markdown';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
 import { useGamification } from '../../context/GamificationContext';
@@ -60,6 +61,14 @@ const daysUntil = (iso) => {
  * for fast reading: "Label:" sections become a list with bold labels, "; "
  * separated parts become lines, and "Thing — detail" starts with a bold thing.
  */
+// A formula written as LaTeX without $ signs (e.g. "v^2 = u^2 + 2as") is shown as maths;
+// a formula in words ("speed = distance / time") stays as text
+const formulaText = (expr) => {
+    const t = String(expr || '');
+    if (t.includes('$')) return t;
+    return /[\\^_{}]/.test(t) ? `$${t}$` : t;
+};
+
 const inline = (text) => {
     // **bold** first, then a leading "Thing — " / "Thing: " in bold
     const parts = String(text).split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
@@ -67,9 +76,9 @@ const inline = (text) => {
         if (part.startsWith('**') && part.endsWith('**')) return <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong>;
         if (i === 0) {
             const m = part.match(/^([^—:]{1,40}?)\s*(—|–|:)\s+(.+)$/s);
-            if (m) return <React.Fragment key={i}><strong className="font-semibold">{m[1]}</strong> <span className="text-[#5E5046]">{m[2] === ':' ? '' : '— '}</span>{m[3]}</React.Fragment>;
+            if (m) return <React.Fragment key={i}><strong className="font-semibold">{m[1]}</strong> <span className="text-[#5E5046]">{m[2] === ':' ? '' : '— '}</span><Markdown inline>{m[3]}</Markdown></React.Fragment>;
         }
-        return <React.Fragment key={i}>{part}</React.Fragment>;
+        return <Markdown inline key={i}>{part}</Markdown>;
     });
 };
 
@@ -141,7 +150,7 @@ const CramCard = ({ card, tier, onVisualize }) => (
         {card.tldr && (
             <div className="rounded-2xl bg-[#FDF6F0] border border-[#E6D5CC] p-4 text-[#163628] leading-relaxed">
                 <span className="text-xs font-bold uppercase tracking-wide text-[#1E5C42] block mb-1">In a nutshell</span>
-                {card.tldr}
+                <Markdown inline>{card.tldr}</Markdown>
             </div>
         )}
         {card.key_points?.length > 0 && (
@@ -160,8 +169,8 @@ const CramCard = ({ card, tier, onVisualize }) => (
                 <div className="grid gap-2 sm:grid-cols-2">
                     {card.formulas.map((f, i) => (
                         <div key={i} className="rounded-xl border border-[#E6D5CC] bg-white p-3">
-                            <div className="font-mono text-base font-semibold text-[#163628] break-words">{f.expr}</div>
-                            {f.meaning && <div className="text-xs text-[#5E5046] mt-1">{f.meaning}</div>}
+                            <div className="text-base font-semibold text-[#163628] break-words"><Markdown inline>{formulaText(f.expr)}</Markdown></div>
+                            {f.meaning && <div className="text-xs text-[#5E5046] mt-1"><Markdown inline>{f.meaning}</Markdown></div>}
                         </div>
                     ))}
                 </div>
@@ -276,7 +285,7 @@ const RevisionSheet = ({ timeline, cards, onBack, onRestart }) => {
                     </div>
                 </div>
                 <div id="cram-revision-sheet" className="rounded-3xl border border-[#E6D5CC] bg-white p-5 md:p-8">
-                    <h2 className="text-2xl font-bold text-[#163628]">Rapid revision sheet</h2>
+                    <h2 className="text-xl sm:text-2xl font-bold text-[#163628]">Rapid revision sheet</h2>
                     <p className="text-sm text-[#5E5046] mb-4">Read this top to bottom right before the exam. Topics are in the order they build on each other.</p>
                     <div className="grid gap-4 md:grid-cols-2">
                         {topics.map((e, n) => {

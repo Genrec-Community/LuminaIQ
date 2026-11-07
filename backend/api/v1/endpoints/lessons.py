@@ -16,6 +16,8 @@ Every answer is evidence for the learner model (services.learning_engine).
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from utils.rate_limit import rate_limit
+from utils.tools import require_tool
 from pydantic import BaseModel, Field
 
 from api.deps import get_current_user
@@ -117,7 +119,7 @@ async def _neighbours(project_id: str, topic: str) -> Dict[str, List[str]]:
     return out
 
 
-@router.post("/lesson")
+@router.post("/lesson", dependencies=[Depends(rate_limit("generate")), Depends(require_tool("power"))])
 async def lesson(request: LessonRequest, current_user: dict = Depends(get_current_user)):
     await _require_project(request.project_id, current_user)
     topic = request.topic.strip()
@@ -136,8 +138,14 @@ async def lesson(request: LessonRequest, current_user: dict = Depends(get_curren
         "Pick the ONE most easily confused with the topic for the contrast question, or use null if none truly is."
         if contrast_pool else "No contrast topic: set \"contrast\" to null."
     )
+    from services.levels import effective_for
+    from services.prompts.levels import LEVEL_STYLE
+    level = (await effective_for(current_user["id"]))["level"] or "general"
     prompt = f"""You are a master teacher. Build a short lesson that makes the topic below genuinely
 understood and remembered, grounded in the material.
+
+WHO IS LEARNING (pitch every part of the lesson at this level):
+{LEVEL_STYLE[level]}
 
 TOPIC: {topic}
 BUILDS ON: {', '.join(graph['requires'][:5]) or 'nothing in particular'}
@@ -193,7 +201,7 @@ and skimmable; the whole lesson should take about 8 minutes."""
     return {"lesson": result, "cached": False}
 
 
-@router.post("/lesson/grade")
+@router.post("/lesson/grade", dependencies=[Depends(rate_limit("generate")), Depends(require_tool("power"))])
 async def grade_recall(request: GradeRequest, current_user: dict = Depends(get_current_user)):
     """Grade an explanation written from memory and record it as recall evidence."""
     await _require_project(request.project_id, current_user)

@@ -10,9 +10,11 @@ an email listed in PLATFORM_ADMIN_EMAILS.
 - POST /platform/institutions/{id}/extend         - offline payment / goodwill: days, paid_until, seats
 - POST /platform/institutions/{id}/trial          - mark as trial or paid
 - GET  /platform/institutions/{id}/audit          - what happened to this school
+- GET  /platform/costs?days=30                     - AI cost dashboard (per user, feature, model; cache hits)
+- GET  /platform/analytics?days=30                 - product analytics (growth, funnel, retention, learning, revenue, health)
 """
 
-from typing import Optional
+from typing import Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -98,3 +100,53 @@ async def set_trial(institution_id: str, request: TrialRequest, admin: dict = De
 @router.get("/institutions/{institution_id}/audit")
 async def audit(institution_id: str, admin: dict = Depends(require_platform_admin)):
     return {"events": await institutions.audit_log(institution_id)}
+
+
+# ---- Learner levels: which tools each level gets (AGENTS.md Phase 2)
+
+class LevelPolicyRequest(BaseModel):
+    tools: Dict[str, bool] = {}
+    hints_default: Optional[bool] = None
+    outside_book: Optional[bool] = None
+
+
+@router.get("/levels")
+async def list_levels(admin: dict = Depends(require_platform_admin)):
+    from services import levels as lv
+    from services.tools_catalog import LEVELS, TOOLS
+    return {
+        "levels": [{"key": k, **meta, **(await lv.level_policy(k))} for k, meta in LEVELS.items()],
+        "tools": [{"key": k, "label": v} for k, v in TOOLS.items()],
+    }
+
+
+@router.put("/levels/{level}")
+async def update_level(level: str, request: LevelPolicyRequest, admin: dict = Depends(require_platform_admin)):
+    from services import levels as lv
+    try:
+        return await lv.save_level_policy(level, request.tools, hints_default=request.hints_default,
+                                          outside_book=request.outside_book)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+# ---- AI costs (AGENTS.md Phase 4)
+
+@router.get("/costs")
+async def ai_costs(days: int = 30, admin: dict = Depends(require_platform_admin)):
+    """Cost per user, feature and model, cache hit rate and money saved, for the last `days` days."""
+    from services.cost_report import report
+    from services.telemetry import telemetry
+    await telemetry.flush()     # include this process's most recent calls
+    return await report(days)
+
+
+# ---- Product analytics (sign-up → learning → revenue, plus system health)
+
+@router.get("/analytics")
+async def analytics(days: int = 30, admin: dict = Depends(require_platform_admin)):
+    """The whole journey for the last `days` days: growth, activation, retention, learning, revenue, health."""
+    from services.analytics_report import report
+    from services.telemetry import telemetry
+    await telemetry.flush()
+    return await report(days)

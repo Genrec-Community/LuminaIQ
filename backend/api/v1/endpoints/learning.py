@@ -30,6 +30,8 @@ Dashboard:
 """
 
 from fastapi import APIRouter, HTTPException, Depends
+from utils.rate_limit import rate_limit
+from utils.tools import require_tool
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 from services.learning_engine import get_learning_engine
@@ -41,10 +43,12 @@ from services.learning_service import (
 )
 from services.knowledge_graph_service import knowledge_graph
 from services.llm_service import llm_service
+from api.access import assert_row_access
 from api.deps import get_current_user
 from utils.logger import logger
 import json
 from services.usage_service import usage, metered
+from services.prompts.levels import MATH_RULE
 
 router = APIRouter()
 
@@ -314,6 +318,7 @@ async def record_review(
     - 4: Correct answer with some hesitation
     - 5: Perfect recall, no hesitation
     """
+    await assert_row_access("review_cards", card_id, current_user["id"])
     try:
         result = await spaced_repetition.record_review(
             card_id=card_id, quality=request.quality
@@ -331,6 +336,7 @@ async def delete_review_card(
     card_id: str, current_user: dict = Depends(get_current_user)
 ):
     """Delete a review card."""
+    await assert_row_access("review_cards", card_id, current_user["id"])
     try:
         success = await spaced_repetition.delete_card(card_id)
 
@@ -459,7 +465,7 @@ class AddRelationRequest(BaseModel):
     weight: float = Field(default=0.5, ge=0.1, le=1.0)
 
 
-@router.post("/knowledge-graph/{project_id}/build")
+@router.post("/knowledge-graph/{project_id}/build", dependencies=[Depends(require_tool("knowledge"))])
 async def build_knowledge_graph(
     project_id: str,
     request: BuildGraphRequest,
@@ -585,7 +591,7 @@ async def get_topic_prerequisites(
         raise HTTPException(500, str(e))
 
 
-@router.get("/knowledge-graph/{project_id}/learning-path")
+@router.get("/knowledge-graph/{project_id}/learning-path", dependencies=[Depends(require_tool("path"))])
 async def get_learning_path(
     project_id: str,
     target_topics: Optional[str] = None,
@@ -746,7 +752,7 @@ class GenerateMindmapRequest(BaseModel):
     selected_documents: List[str] = []
 
 
-@router.post("/mindmap/generate")
+@router.post("/mindmap/generate", dependencies=[Depends(rate_limit("generate")), Depends(require_tool("mindmap"))])
 async def generate_mindmap(
     request: GenerateMindmapRequest,
     current_user: dict = Depends(get_current_user),
@@ -809,7 +815,7 @@ OUTPUT FORMAT - Return ONLY valid JSON, no markdown:
   ]
 }}"""
 
-        messages = [{"role": "user", "content": prompt}]
+        messages = [{"role": "user", "content": f"{prompt}\n\n{MATH_RULE}"}]
         response = await llm_service.chat_completion(
             messages, temperature=0.3, max_tokens=2000, light=True
         )
@@ -892,7 +898,7 @@ class GenerateFlashcardsRequest(BaseModel):
     selected_documents: List[str] = []
 
 
-@router.post("/flashcards/generate")
+@router.post("/flashcards/generate", dependencies=[Depends(rate_limit("generate")), Depends(require_tool("flashcards"))])
 async def generate_flashcards(
     request: GenerateFlashcardsRequest,
     current_user: dict = Depends(get_current_user),
@@ -939,7 +945,7 @@ OUTPUT FORMAT - Return ONLY valid JSON array, no markdown:
   {{"front": "How does Y work?", "back": "Y works by..."}}
 ]"""
 
-        messages = [{"role": "user", "content": prompt}]
+        messages = [{"role": "user", "content": f"{prompt}\n\n{MATH_RULE}"}]
         response = await llm_service.chat_completion(
             messages, temperature=0.4, max_tokens=3000, light=True
         )

@@ -8,6 +8,7 @@ import {
 import { getDocuments, uploadDocument, subscribeDocumentProgress, deleteDocument, deleteProject, retryDocument } from '../../api';
 import { useToast } from '../../context/ToastContext';
 import { useSettings } from '../../context/SettingsContext';
+import { useTools } from '../../context/ToolsContext';
 import { aiName } from '../../utils/persona';
 import { clearProjectsCache } from '../../utils/projectCache';
 import { LAST_PROJECT_KEY } from '../../utils/dailyProgress';
@@ -37,6 +38,7 @@ const tools = (ai) => [
 /** A book's home: its files (with live progress) and every study tool. */
 const Book = () => {
     const { bookId } = useParams();
+    const { has } = useTools();
     const navigate = useNavigate();
     const location = useLocation();
     const toast = useToast();
@@ -243,7 +245,7 @@ const Book = () => {
                 <section>
                     <h2 className="mb-3 px-1 text-[18px] font-extrabold">Study tools</h2>
                     <div className="grid grid-cols-2 gap-3">
-                        {tools(aiName(settings)).map((t, i) => (
+                        {tools(aiName(settings)).filter((t) => has(t.id)).map((t, i) => (
                             <motion.button key={t.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
                                 onClick={() => openTool(t.id)} className="m-card m-pressable flex flex-col items-start gap-2 p-4 text-left">
                                 <span className="flex h-11 w-11 items-center justify-center rounded-2xl text-white" style={{ background: t.color }}><t.icon className="h-5.5 w-5.5" /></span>

@@ -4,8 +4,7 @@ import {
     BookOpen, Sparkles, RefreshCw, ThumbsUp, ThumbsDown,
     MessageSquare, GraduationCap, Baby, Microscope, X, GripHorizontal
 } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import Markdown from './Markdown';
 import { recordActivity } from '../utils/studyActivity';
 import { useSettings } from '../context/SettingsContext';
 import { API_URL } from '../api';
@@ -383,9 +382,9 @@ Guidelines:
                                 <div className={`text-sm prose prose-sm max-w-none overflow-x-auto ${
                                     msg.role === 'user' ? 'prose-invert' : ''
                                 }`}>
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                    <Markdown>
                                         {msg.content}
-                                    </ReactMarkdown>
+                                    </Markdown>
                                 </div>
                             ) : (
                                 <Loader2 className="h-5 w-5 animate-spin" />

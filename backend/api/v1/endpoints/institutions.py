@@ -17,7 +17,7 @@ Institution plan endpoints (services/institution_service.py).
 - POST   /institutions/seats/checkout         - pay for a term of student seats (admin)
 """
 
-from typing import List, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -199,3 +199,41 @@ async def seats_checkout(request: SeatsRequest, current_user: dict = Depends(get
         "name": "Lumina IQ", "description": f"Institution · {request.seats} students · {term}",
         "prefill": {"email": current_user.get("email") or ""},
     }
+
+
+# ---- Class level, tools, hints and outside-book answers (institution admins only)
+
+class ClassSettingsRequest(BaseModel):
+    level: Optional[str] = None
+    hint_mode: Optional[str] = None
+    allow_outside_book: Optional[bool] = None
+    tools: Dict[str, bool] = {}
+
+
+async def _admin_class(current_user: dict, class_id: str) -> None:
+    m = await institutions.require_staff(current_user["id"], admin=True)
+    from db.client import async_db, get_supabase_client
+    res = await async_db(lambda: get_supabase_client().table("institution_classes").select("institution_id")
+                         .eq("id", class_id).limit(1).execute())
+    if not res.data or res.data[0]["institution_id"] != m["institution_id"]:
+        raise HTTPException(404, "Class not found")
+
+
+@router.get("/classes/{class_id}/settings")
+async def class_settings(class_id: str, current_user: dict = Depends(get_current_user)):
+    await _admin_class(current_user, class_id)
+    from services import levels
+    return await levels.class_policy(class_id)
+
+
+@router.put("/classes/{class_id}/settings")
+async def update_class_settings(class_id: str, request: ClassSettingsRequest,
+                                current_user: dict = Depends(get_current_user)):
+    await _admin_class(current_user, class_id)
+    from services import levels
+    try:
+        return await levels.save_class_policy(class_id, request.tools, level=request.level,
+                                              hint_mode=request.hint_mode,
+                                              allow_outside_book=request.allow_outside_book)
+    except ValueError as e:
+        raise HTTPException(400, str(e))

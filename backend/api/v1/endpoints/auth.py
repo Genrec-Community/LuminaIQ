@@ -160,7 +160,6 @@ async def delete_account(current_user: dict = Depends(get_current_user)):
     """
     from db.client import get_supabase_client, async_db
     from services.document_service import document_service
-    from services.qdrant_service import qdrant_service
     from utils.logger import logger
 
     user_id = current_user["id"]
@@ -174,10 +173,7 @@ async def delete_account(current_user: dict = Depends(get_current_user)):
                 await document_service.delete_document(pid, d["id"])
             except Exception as e:
                 logger.warning(f"[DeleteAccount] document {d['id']}: {e}")
-        try:
-            await qdrant_service.async_client.delete_collection(f"project_{pid}")
-        except Exception:
-            pass  # no collection for an empty book
+        # Passages are deleted with the book (chunks.project_id ON DELETE CASCADE)
     await async_db(lambda: client.table("documents").delete().eq("user_id", user_id).execute())
     await async_db(lambda: client.table("projects").delete().eq("user_id", user_id).execute())
     for table in _USER_TABLES:

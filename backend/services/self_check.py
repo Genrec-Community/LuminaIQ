@@ -38,14 +38,10 @@ async def _llm(light: bool = False, deep: bool = False, plan: str = None) -> str
 
 
 async def _llm_stream() -> str:
-    # The chat endpoint streams with stream_usage on; exercise that exact path
-    from services.llm_service import _build_client, _convert_messages
+    # The chat endpoint streams; exercise that exact path
+    from services.llm_service import llm_service
 
-    client = _build_client(temperature=0, max_tokens=2000)
-    pieces = []
-    async for chunk in client.astream(_convert_messages(_PROMPT)):
-        if chunk.content:
-            pieces.append(chunk.content)
+    pieces = [p async for p in llm_service.chat_completion_stream(_PROMPT, temperature=0, max_tokens=2000)]
     text = "".join(pieces).strip()
     if not text:
         raise RuntimeError("stream produced no text")
@@ -63,27 +59,19 @@ async def _embedding() -> str:
     return f"model={settings.EMBEDDING_MODEL} dim={len(vec)}"
 
 
-async def _qdrant() -> str:
-    from services.qdrant_service import qdrant_service
+async def _vector_db() -> str:
+    """The chunks table exists and stores vectors of the size we embed at."""
+    from db.client import async_db, get_supabase_client
 
-    # Raw client: names listed by Qdrant are already physical (suffix included)
-    client = getattr(qdrant_service.async_client, "_client", qdrant_service.async_client)
-    cols = (await client.get_collections()).collections
-    detail = f"collections={len(cols)}"
-    if cols:
-        # Existing books must have been embedded at the size we embed queries at
-        info = await client.get_collection(cols[0].name)
-        params = info.config.params.vectors
-        size = getattr(params, "size", None)
-        if size is None and isinstance(params, dict) and params:
-            size = next(iter(params.values())).size
-        if size and size != settings.EMBEDDING_DIMENSION:
-            raise RuntimeError(
-                f"collection {cols[0].name} stores {size}-dim vectors but EMBEDDING_DIMENSION="
-                f"{settings.EMBEDDING_DIMENSION}: searches on existing books will fail"
-            )
-        detail += f" sample_dim={size}"
-    return detail
+    pg = get_supabase_client().pg
+    rows = await async_db(lambda: pg.fetch(
+        """SELECT format_type(atttypid, atttypmod) AS t FROM pg_attribute
+           WHERE attrelid = 'chunks'::regclass AND attname = 'embedding'"""))
+    col = rows[0]["t"] if rows else "missing"
+    if col != f"vector({settings.EMBEDDING_DIMENSION})":
+        raise RuntimeError(f"chunks.embedding is {col} but EMBEDDING_DIMENSION={settings.EMBEDDING_DIMENSION}")
+    n = await async_db(lambda: pg.fetch("SELECT count(*) AS n FROM chunks"))
+    return f"{col} passages={n[0]['n']}"
 
 
 async def _storage() -> str:
@@ -163,25 +151,20 @@ async def _signed_uploads() -> str:
 async def run_self_check():
     await asyncio.sleep(2)  # let the server finish binding first
     checks = [
-        ("llm.main", _llm()),
+        ("llm.small", _llm()),
         ("llm.stream", _llm_stream()),
         ("embedding", _embedding()),
-        ("qdrant", _qdrant()),
+        ("vector_db", _vector_db()),
         ("storage", _storage()),
         ("storage.signed_upload", _signed_uploads()),
     ]
     if settings.INDRA_OCR_URL:
         checks.append(("ocr.indra", _indra()))
-    if settings.LLM_LIGHT_MODEL and settings.LLM_LIGHT_MODEL != settings.LLM_MODEL:
-        checks.append((f"llm.light ({settings.LLM_LIGHT_MODEL})", _llm(light=True)))
-    if settings.LLM_DEEP_MODEL or settings.LLM_DEEP_BASE_URL:
-        checks.append((f"llm.deep ({settings.LLM_DEEP_MODEL or settings.LLM_MODEL})", _llm(deep=True)))
-    from services.llm_service import tier_models
-    seen = {settings.LLM_MODEL, settings.LLM_LIGHT_MODEL, settings.LLM_DEEP_MODEL}
-    for plan, model in tier_models().items():
-        if model not in seen:
-            seen.add(model)
-            checks.append((f"llm.{plan} ({model})", _llm(plan=plan)))
+    from services.llm_service import big_config
+    big = big_config()
+    if big:
+        # Paid plans use the big model for Deep answers and Visual Lab
+        checks.append((f"llm.big ({big.model})", _llm(deep=True, plan="topper")))
     results = await asyncio.gather(*(_timed(n, c, 240 if n == "ocr.indra" else 60) for n, c in checks))
     failed = [n for (n, _), ok in zip(checks, results) if not ok]
     if failed:

@@ -1,6 +1,6 @@
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, DotEnvSettingsSource, EnvSettingsSource
 from pydantic import Field, field_validator
-from typing import Optional, List, Union, Any
+from typing import Any, ClassVar, Dict, List, Optional, Union
 
 
 class CustomDotEnvSettingsSource(DotEnvSettingsSource):
@@ -36,62 +36,71 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_KEY: str = Field(default="")
 
     # ─────────────────────────────────────────────────────────
-    # Unified / Single Variable for Model API Key
+    # Chat models: any OpenAI-compatible API (OpenAI, Azure /openai/v1, Groq,
+    # Together, OpenRouter, vLLM, Ollama ...). See services/llm_service.py.
     # ─────────────────────────────────────────────────────────
-    MODEL_API_KEY: Optional[str] = None
-
-    # ─────────────────────────────────────────────────────────
-    # Azure OpenAI (primary LLM — used for chat, topics, graph)
-    # .env keys: AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT,
-    #            AZURE_OPENAI_DEPLOYMENT, AZURE_OPENAI_API_VERSION
-    # ─────────────────────────────────────────────────────────
-    AZURE_OPENAI_API_KEY: Optional[str] = None
-    AZURE_OPENAI_ENDPOINT: Optional[str] = None
-    AZURE_OPENAI_API_VERSION: str = "2024-12-01-preview"
-
-    # Deployment name in Azure (your .env uses AZURE_OPENAI_DEPLOYMENT)
-    AZURE_OPENAI_DEPLOYMENT: str = "gpt-5-mini"
-
-    # Alias kept for backward-compat with any service that imports this name
-    @property
-    def AZURE_OPENAI_CHAT_DEPLOYMENT(self) -> str:
-        return self.AZURE_OPENAI_DEPLOYMENT
-
-    # Embedding deployment name (Azure OpenAI — text-embedding-3-small)
-    AZURE_OPENAI_EMBED_DEPLOYMENT: str = "text-embedding-3-small"
-
-    # ─────────────────────────────────────────────────────────
-    # Legacy OpenAI-compatible LLM fields
-    # Kept so any old service import doesn't crash.
-    # Defaults to Azure values so they're usable even if not set.
-    # ─────────────────────────────────────────────────────────
+    # Most work, and every request from free users
+    SMALL_LLM_MODEL: str = Field(default="")
+    SMALL_LLM_BASE_URL: str = Field(default="")
+    SMALL_LLM_API_KEY: str = Field(default="")
+    SMALL_LLM_REASONING_EFFORT: str = Field(default="")   # e.g. low | medium | high, if supported
+    # Deep answers, Visual Lab builds, photo questions (paid plans). Empty = small model.
+    # Base URL and key default to the small model's.
+    BIG_LLM_MODEL: str = Field(default="")
+    BIG_LLM_BASE_URL: str = Field(default="")
+    BIG_LLM_API_KEY: str = Field(default="")
+    BIG_LLM_REASONING_EFFORT: str = Field(default="")
+    # Can the model read images? Photo questions are shown only to learners whose model can
+    # (free users use the small model; paid users the big one when it's set).
+    SMALL_LLM_VISION: bool = Field(default=False)
+    BIG_LLM_VISION: bool = Field(default=False)
+    LLM_TIMEOUT_SECONDS: float = 120.0
+    # Older names, still read when the SMALL_LLM_* ones are empty
     LLM_API_KEY: str = Field(default="")
     LLM_BASE_URL: str = Field(default="")
-    LLM_MODEL: str = Field(default="gpt-4.1-mini")
-    # Which chat model provider to use:
-    #   "auto"   → Azure OpenAI if configured, otherwise the OpenAI-compatible LLM_* provider
-    #   "azure"  → always Azure OpenAI
-    #   "openai" → always the OpenAI-compatible provider (LLM_BASE_URL / LLM_API_KEY / LLM_MODEL),
-    #              e.g. Inception Mercury, while embeddings can still use Azure
-    LLM_PROVIDER: str = Field(default="auto")
-    # Optional reasoning effort for providers that support it (e.g. Mercury: "low" | "medium" | "high")
+    LLM_MODEL: str = Field(default="")
     LLM_REASONING_EFFORT: str = Field(default="")
-    # Optional cheaper model (same provider, base URL and key) for bulk structured
-    # work: quiz questions, flashcards, mindmaps, topic summaries and knowledge-graph
-    # links. Empty = everything uses LLM_MODEL. Not used with Azure.
-    LLM_LIGHT_MODEL: str = Field(default="")
-    # Optional stronger "Deep" model: Topper chat answers in Deep mode, Topper cram
-    # cards and Visual Lab builds. Empty = LLM_MODEL. Base URL / key default to the
-    # main provider's, so a different OpenAI-compatible provider can be used here.
-    LLM_DEEP_MODEL: str = Field(default="")
-    LLM_DEEP_BASE_URL: str = Field(default="")
-    LLM_DEEP_API_KEY: str = Field(default="")
-    # Model per plan, so paying users get better models. Comma-separated plan=model
-    # pairs on the main provider (with Azure, the values are deployment names), e.g.
-    #   free=gpt-4.1-nano,scholar=gpt-4.1-mini,topper=gpt-4.1,institution=gpt-4.1-mini
-    # A plan left out uses LLM_MODEL (or LLM_LIGHT_MODEL for bulk work). Deep answers
-    # always use LLM_DEEP_MODEL.
-    LLM_TIER_MODELS: str = Field(default="")
+
+    # Optional reranker (Cohere/Jina-style /rerank). On only when the key is set.
+    RERANK_API_KEY: str = Field(default="")
+    RERANK_BASE_URL: str = Field(default="https://api.cohere.com/v2")
+    RERANK_MODEL: str = Field(default="rerank-v3.5")
+    # Below this cosine similarity the book "doesn't cover" a question (the outside-book
+    # rule applies). Depends on the embedding model; 0.3 suits text-embedding-3-*.
+    RAG_MIN_SIMILARITY: float = 0.30
+    RAG_TOP_PASSAGES: int = 6        # passages given to the model per answer
+
+    # ── Cost (Phase 4) ──
+    # Prices in USD per 1M tokens, used to estimate the cost of each call for the admin
+    # dashboard. 0 = unknown (calls are still counted). Cached input defaults to input.
+    SMALL_LLM_PRICE_INPUT: float = 0.0
+    SMALL_LLM_PRICE_OUTPUT: float = 0.0
+    SMALL_LLM_PRICE_CACHED_INPUT: float = -1.0
+    BIG_LLM_PRICE_INPUT: float = 0.0
+    BIG_LLM_PRICE_OUTPUT: float = 0.0
+    BIG_LLM_PRICE_CACHED_INPUT: float = -1.0
+    EMBEDDING_PRICE_INPUT: float = 0.0
+    RERANK_PRICE_PER_CALL: float = 0.0
+    # Token budgets for one chat prompt (rough tokens: characters / 4)
+    CONTEXT_BUDGET_EXCERPTS: int = 6000
+    CONTEXT_BUDGET_HISTORY: int = 2500
+    CONTEXT_BUDGET_PROFILE: int = 1200
+    CONTEXT_BUDGET_MEMORY: int = 900     # learner model + memory facts + chat summary
+    # Cached answers to first questions on shared books
+    ANSWER_CACHE_ENABLED: bool = True
+    ANSWER_CACHE_TTL_DAYS: int = 30
+    SEMANTIC_CACHE_THRESHOLD: float = 0.95
+    # Shared quiz/flashcard pools and notes for shared-library and class books
+    SHARED_CONTENT_ENABLED: bool = True
+    PREGENERATE_SHARED: bool = False
+    # Photo questions in chat: largest image accepted (after the app shrinks it) and where it's kept
+    CHAT_IMAGE_MAX_BYTES: int = 3_000_000
+    CHAT_IMAGES_BUCKET: str = Field(default="chat-images")
+    # Optional AI-call tracing (Langfuse), on when both keys are set
+    LANGFUSE_PUBLIC_KEY: str = Field(default="")
+    LANGFUSE_SECRET_KEY: str = Field(default="")
+    LANGFUSE_HOST: str = Field(default="https://cloud.langfuse.com")
+
     # ── Razorpay (payments) ── fill these in Render; empty = payments disabled
     RAZORPAY_KEY_ID: str = Field(default="")            # rzp_test_... / rzp_live_...
     RAZORPAY_KEY_SECRET: str = Field(default="")
@@ -134,28 +143,15 @@ class Settings(BaseSettings):
     MAIN_API_WEBHOOK_URL: str = Field(default="http://localhost:8000/api/v1/webhook/document-ready")
 
     # ─────────────────────────────────────────────────────────
-    # Embeddings — Azure OpenAI / OpenAI-compatible
+    # Embeddings: any OpenAI-compatible /embeddings API
     # ─────────────────────────────────────────────────────────
-    EMBEDDING_API_KEY: str = Field(default="")
-    EMBEDDING_BASE_URL: str = Field(default="")
+    EMBEDDING_API_KEY: str = Field(default="")    # empty = the small chat model's key
+    EMBEDDING_BASE_URL: str = Field(default="")   # empty = the small chat model's base URL
     EMBEDDING_MODEL: str = Field(default="text-embedding-3-small")
+    # Must match the model. Fixed when the chunks table is created (db/schema/0004).
     EMBEDDING_DIMENSION: int = 1536
-    # "auto" → Azure if configured, else OpenAI-compatible EMBEDDING_BASE_URL/EMBEDDING_API_KEY;
-    # "azure" or "openai" to force one. EMBEDDING_DIMENSION must match the chosen model.
-    EMBEDDING_PROVIDER: str = Field(default="auto")
-    # Ask the provider to return EMBEDDING_DIMENSION-sized vectors (the OpenAI
-    # "dimensions" parameter). Use with models that support shortening, e.g.
-    # Gemini gemini-embedding-001 (768/1536/3072) or OpenAI text-embedding-3-*.
+    # Send "dimensions" (models that can shorten vectors, e.g. text-embedding-3-*, Gemini)
     EMBEDDING_SEND_DIMENSIONS: bool = Field(default=False)
-    # Appended to book collection names (project_<id><suffix>). Change it when switching
-    # embedding model: books are then re-embedded from their stored text automatically.
-    QDRANT_COLLECTION_SUFFIX: str = Field(default="")
-
-    # ─────────────────────────────────────────────────────────
-    # Qdrant Vector Store
-    # ─────────────────────────────────────────────────────────
-    QDRANT_URL: str = "http://localhost:6333"
-    QDRANT_API_KEY: Optional[str] = None
 
     # ─────────────────────────────────────────────────────────
     # Azure Computer Vision — OCR for scanned PDFs and images
@@ -176,9 +172,6 @@ class Settings(BaseSettings):
     OCR_LOCAL_ENABLED: bool = True
     OCR_DPI: int = 200
     OCR_MAX_PAGES: int = 600
-
-    # Together AI (optional - for some services)
-    TOGETHER_API_KEY: str = Field(default="")
 
     # ─────────────────────────────────────────────────────────
     # Application
@@ -221,8 +214,9 @@ class Settings(BaseSettings):
         "jpg", "jpeg", "png", "bmp", "tiff", "tif", "gif", "webp",
     ]
 
-    CHUNK_SIZE: int = 800
-    CHUNK_OVERLAP: int = 80
+    # Passage size for search and citations (services/chunking.py)
+    CHUNK_TOKENS: int = 500
+    CHUNK_OVERLAP_TOKENS: int = 75
 
     # ─────────────────────────────────────────────────────────
     # Concurrency — all limits in one place for easy tuning
@@ -235,17 +229,17 @@ class Settings(BaseSettings):
     MAX_CONCURRENT_DOCUMENT_UPLOADS: int = 2
 
     # Global limits inside the embedding pipeline (shared across all docs)
-    MAX_GLOBAL_DB_OPERATIONS: int = 10      # Qdrant write concurrency
+    MAX_GLOBAL_DB_OPERATIONS: int = 10      # concurrent vector writes
     MAX_GLOBAL_EMBEDDINGS: int = 5         # Concurrent embedding API calls
     MAX_CONCURRENT_LLM: int = 3             # Concurrent LLM calls (topic/graph gen)
 
     # Batch size for embedding API calls
     EMBEDDING_BATCH_SIZE: int = 50
-    EMBEDDING_DELAY_MS: int = 0  # 0 = no artificial delay (Azure has no rate limits)
 
     # Gunicorn workers for production
     # Recommended: (2 * CPU cores) + 1. Azure 1-core = 3 workers.
     GUNICORN_WORKERS: int = 3
+    GUNICORN_MAX_REQUESTS: int = 20000   # requests before a worker is recycled
 
     # Webhook secret
     WEBHOOK_SECRET: str = "supersecretwebhook"
@@ -256,6 +250,54 @@ class Settings(BaseSettings):
     BOOK_STORE_PAGE_SIZE: int = 20
     BOOK_STORE_MAX_DESCRIPTION: int = 2000
     BOOK_IMPORT_TEXTS_BUCKET: str = "texts"   # Supabase bucket for extracted .txt files
+
+    # ─────────────────────────────────────────────────────────
+    # App database (all tables, pgvector, job queue, caches) and optional Redis
+    # ─────────────────────────────────────────────────────────
+    # Docker Postgres in development, AWS RDS in production. Empty = not configured yet.
+    DATABASE_URL: str = Field(default="")
+    DB_POOL_SIZE: int = 10          # connections per process
+    DB_THREADS: int = 32            # threads running database/storage calls per process
+    RUN_MIGRATIONS: bool = True     # apply db/schema on startup
+
+    # Background jobs. WORKER_INLINE runs a worker inside each web process (dev, single box);
+    # set it to false when separate `uv run worker.py` processes do the work.
+    WORKER_INLINE: bool = True
+    WORKER_CONCURRENCY: int = 2       # jobs at once per worker (book processing is heavy)
+    JOB_POLL_SECONDS: float = 1.0
+    JOB_STALE_SECONDS: float = 300.0  # a running job with no heartbeat for this long is retried
+
+    # Per-user rate limits (floods and runaway clients; plan quotas are separate)
+    RATE_LIMITS_ENABLED: bool = True
+    RATE_LIMIT_CHAT_PER_MIN: int = 20
+    RATE_LIMIT_GENERATE_PER_MIN: int = 10
+    RATE_LIMIT_UPLOAD_PER_HOUR: int = 30
+
+    # Optional moderation API (OpenAI-compatible /moderations) for school-level chat
+    MODERATION_BASE_URL: str = Field(default="")
+    MODERATION_API_KEY: str = Field(default="")
+    MODERATION_MODEL: str = Field(default="omni-moderation-latest")
+    # Optional: hot cache, rate limits and progress pub/sub. Empty = off.
+    REDIS_URL: str = Field(default="")
+
+    # Placeholder values that must never reach production
+    DEFAULT_SECRETS: ClassVar[Dict[str, str]] = {
+        "SECRET_KEY": "supersecretkey",
+        "WEBHOOK_SECRET": "supersecretwebhook",
+        "MAIN_API_WEBHOOK_SECRET": "supersecretwebhook",
+    }
+
+    def validate_production(self) -> None:
+        """Refuse to start in production while any secret still has its placeholder value."""
+        if self.ENVIRONMENT != "production":
+            return
+        weak = [name for name, default in self.DEFAULT_SECRETS.items()
+                if not getattr(self, name) or getattr(self, name) == default]
+        if weak:
+            raise RuntimeError(
+                "Refusing to start in production with default secrets: " + ", ".join(weak)
+                + ". Set them in the environment."
+            )
 
     @classmethod
     def settings_customise_sources(
@@ -280,7 +322,8 @@ class Settings(BaseSettings):
         )
 
     class Config:
-        env_file = ".env"
+        # backend/.env wins over the repo-root .env (which docker compose also reads)
+        env_file = ("../.env", ".env")
         case_sensitive = True
         extra = "ignore"
 

@@ -21,6 +21,6 @@ Upload a textbook and every feature works toward that one goal:
 ## Layout
 
 - `frontend/`: React + Vite, deployed on Vercel.
-- `backend/`: FastAPI with Supabase (Postgres + storage), Qdrant vectors and any OpenAI-compatible LLM. Deployed on Render.
-- `backend/migrations/`: SQL migrations, applied in order.
+- `backend/`: FastAPI with its own Postgres (all data; Docker in dev, AWS RDS in prod), Supabase for sign-in and file storage, and any OpenAI-compatible LLM. Run locally with `docker compose up` or `cd backend && uv run run.py`.
+- `backend/db/schema/`: database schema files, applied in order on startup (`backend/db/migrate.py`).
 - `DEPLOY_TEST.md`: the test environment (test.luminaiq.fun) and its configuration.

@@ -1,8 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import Markdown from '../../components/Markdown';
 import { Heart, MessageCircle, ChevronUp, ChevronDown, Check, X, RotateCcw, Sparkles, Upload, RefreshCw, BookOpen } from 'lucide-react';
 import {
     api, getTopics, getDueCards, recordReview, createReviewCard, getFlashcardSets, getFlashcards, recordPerformance,
@@ -48,7 +47,7 @@ const shuffle = (arr) => {
 
 const Md = ({ children, className = '' }) => (
     <div className={`prose prose-invert max-w-none prose-p:my-1.5 prose-strong:text-white prose-code:text-amber-200 ${className}`}>
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{children || ''}</ReactMarkdown>
+        <Markdown>{children || ''}</Markdown>
     </div>
 );
 

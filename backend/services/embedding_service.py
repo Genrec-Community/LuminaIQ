@@ -1,132 +1,97 @@
-from config.settings import settings
-from typing import List
-from utils.logger import logger
-import os
+"""
+Text embeddings over any OpenAI-compatible /embeddings API.
+
+EMBEDDING_BASE_URL / EMBEDDING_API_KEY default to the small chat model's, so one
+provider can serve both. Requests are batched, a few run at once, and query
+embeddings are cached briefly (the same question is often asked twice).
+"""
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
+import hashlib
+import time
+from typing import List
+
+import openai
+
+from config.settings import settings
+from utils.logger import logger
+
+_QUERY_CACHE_TTL = 3600
+
+
+def _record(tokens: int, latency_ms: int, ok: bool = True) -> None:
+    try:
+        from services.telemetry import telemetry
+        telemetry.record("embedding", settings.EMBEDDING_MODEL, role="embedding", input_tokens=tokens,
+                         latency_ms=latency_ms, ok=ok)
+    except Exception:
+        pass
 
 
 class EmbeddingService:
-    """
-    High-performance embedding service with dedicated thread pool.
-
-    Uses AzureOpenAIEmbeddings via langchain_openai, backed by the Azure
-    OpenAI resource endpoint and API key from settings.
-
-    Optimizations:
-    - Dedicated thread pool (not shared default executor)
-    - Configurable worker count for parallel API calls
-    - Connection reuse via persistent client
-    """
-
-    # Optimal workers for I/O-bound embedding API calls
-    MAX_WORKERS_BATCH = 15  # Increased from 3 to handle large books significantly faster
-    MAX_WORKERS_SEARCH = 2
-
     def __init__(self):
-        self._embeddings_instance = None
-        # Dedicated thread pool for batch embedding calls (document processing)
-        self._batch_executor = ThreadPoolExecutor(
-            max_workers=self.MAX_WORKERS_BATCH, thread_name_prefix="embed_batch"
-        )
-        # Dedicated thread pool for search queries (user-facing, prevents starvation)
-        self._search_executor = ThreadPoolExecutor(
-            max_workers=self.MAX_WORKERS_SEARCH, thread_name_prefix="embed_search"
-        )
-    
+        self._client = None
+        self._sem = None
+
     @property
-    def embeddings(self):
-        if self._embeddings_instance is not None:
-            return self._embeddings_instance
-            
-        azure_key = settings.AZURE_OPENAI_API_KEY or settings.MODEL_API_KEY
-        provider = (settings.EMBEDDING_PROVIDER or "auto").strip().lower()
-        use_azure = provider == "azure" or (
-            provider == "auto" and bool(settings.AZURE_OPENAI_ENDPOINT and azure_key)
-        )
-        if use_azure:
-            from langchain_openai import AzureOpenAIEmbeddings
+    def client(self) -> openai.AsyncOpenAI:
+        if self._client is None:
+            base_url = settings.EMBEDDING_BASE_URL or settings.SMALL_LLM_BASE_URL or settings.LLM_BASE_URL or None
+            api_key = settings.EMBEDDING_API_KEY or settings.SMALL_LLM_API_KEY or settings.LLM_API_KEY or "not-set"
+            self._client = openai.AsyncOpenAI(base_url=base_url, api_key=api_key, timeout=60, max_retries=3)
+            logger.info(f"[Embeddings] {settings.EMBEDDING_MODEL} ({settings.EMBEDDING_DIMENSION}d) @ {base_url or 'api.openai.com'}")
+        return self._client
 
-            self._embeddings_instance = AzureOpenAIEmbeddings(
-                model=settings.EMBEDDING_MODEL,
-                azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
-                api_key=azure_key,
-                openai_api_version=settings.AZURE_OPENAI_API_VERSION,
-                azure_deployment=settings.AZURE_OPENAI_EMBED_DEPLOYMENT,
-            )
-            logger.info(
-                f"[EmbeddingService] Initialized with AzureOpenAIEmbeddings "
-                f"| model={settings.EMBEDDING_MODEL} "
-                f"| deployment={settings.AZURE_OPENAI_EMBED_DEPLOYMENT}"
-            )
-        else:
-            from langchain_openai import OpenAIEmbeddings
+    @property
+    def _semaphore(self) -> asyncio.Semaphore:
+        if self._sem is None:
+            self._sem = asyncio.Semaphore(max(1, settings.MAX_GLOBAL_EMBEDDINGS))
+        return self._sem
 
-            fallback_key = (
-                settings.EMBEDDING_API_KEY
-                or settings.MODEL_API_KEY
-                or settings.LLM_API_KEY
-                or settings.AZURE_OPENAI_API_KEY
-            )
-            fallback_base = settings.EMBEDDING_BASE_URL or settings.LLM_BASE_URL or None
-
-            self._embeddings_instance = OpenAIEmbeddings(
-                model=settings.EMBEDDING_MODEL or "text-embedding-3-small",
-                openai_api_key=fallback_key,
-                openai_api_base=fallback_base,
-                # Non-OpenAI providers expect plain strings, not tiktoken token arrays
-                check_embedding_ctx_length=not bool(fallback_base),
-                dimensions=settings.EMBEDDING_DIMENSION if settings.EMBEDDING_SEND_DIMENSIONS else None,
-            )
-            logger.info(
-                f"[EmbeddingService] Initialized with OpenAI-compatible embeddings "
-                f"| model={settings.EMBEDDING_MODEL}"
-            )
-        return self._embeddings_instance
+    async def _embed_batch(self, batch: List[str]) -> List[List[float]]:
+        kwargs = {"model": settings.EMBEDDING_MODEL, "input": batch}
+        if settings.EMBEDDING_SEND_DIMENSIONS:
+            kwargs["dimensions"] = settings.EMBEDDING_DIMENSION
+        async with self._semaphore:
+            started = time.perf_counter()
+            try:
+                resp = await self.client.embeddings.create(**kwargs)
+            except Exception:
+                _record(0, int((time.perf_counter() - started) * 1000), ok=False)
+                raise
+        usage = getattr(resp, "usage", None)
+        tokens = (getattr(usage, "prompt_tokens", 0) or 0) if usage else sum(len(t) // 4 for t in batch)
+        _record(tokens, int((time.perf_counter() - started) * 1000))
+        vectors = [d.embedding for d in sorted(resp.data, key=lambda d: d.index)]
+        if vectors and len(vectors[0]) != settings.EMBEDDING_DIMENSION:
+            raise ValueError(
+                f"Embedding model returned {len(vectors[0])} dimensions but EMBEDDING_DIMENSION is "
+                f"{settings.EMBEDDING_DIMENSION}. Set them to match (or EMBEDDING_SEND_DIMENSIONS=true).")
+        return vectors
 
     async def generate_embeddings(self, texts: List[str]) -> List[List[float]]:
-        """
-        Generate embeddings for a batch of texts (documents/passages).
-
-        Uses dedicated thread pool for faster concurrent API calls.
-        """
-        try:
-            if not texts:
-                return []
-
-            loop = asyncio.get_running_loop()
-
-            embeddings = await loop.run_in_executor(
-                self._batch_executor,  # Use dedicated batch pool
-                self.embeddings.embed_documents,
-                texts,
-            )
-            return embeddings
-
-        except Exception as e:
-            logger.error(f"Error generating embeddings: {str(e)}")
-            raise
+        """Embeddings for many texts, in order. Empty strings become a single space."""
+        if not texts:
+            return []
+        clean = [t if t and t.strip() else " " for t in texts]
+        size = max(1, settings.EMBEDDING_BATCH_SIZE)
+        batches = [clean[i:i + size] for i in range(0, len(clean), size)]
+        results = await asyncio.gather(*[self._embed_batch(b) for b in batches])
+        return [v for batch in results for v in batch]
 
     async def generate_embedding(self, text: str) -> List[float]:
-        """Generate embedding for a single text (search query)."""
-        try:
-            loop = asyncio.get_running_loop()
-            return await loop.run_in_executor(
-                self._search_executor,  # Use dedicated search pool
-                self.embeddings.embed_query,
-                text,
-            )
-        except Exception as e:
-            logger.error(f"Error generating embedding: {str(e)}")
-            raise
+        """One embedding (a search query), cached for an hour."""
+        from utils.cache import get_cache
+        key = "emb:" + hashlib.sha256(f"{settings.EMBEDDING_MODEL}|{text}".encode()).hexdigest()
+        cache = get_cache()
+        cached = await cache.get(key)
+        if cached:
+            return cached
+        vector = (await self.generate_embeddings([text]))[0]
+        await cache.set(key, vector, ttl=_QUERY_CACHE_TTL)
+        return vector
 
     def shutdown(self):
-        """Cleanup thread pools on shutdown"""
-        if hasattr(self, '_batch_executor') and self._batch_executor:
-            self._batch_executor.shutdown(wait=False)
-        if hasattr(self, '_search_executor') and self._search_executor:
-            self._search_executor.shutdown(wait=False)
-        logger.info("[EmbeddingService] Thread pools shut down")
+        pass   # nothing to release; kept for main.py's shutdown hook
 
 
 embedding_service = EmbeddingService()

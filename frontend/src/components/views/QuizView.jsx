@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { HelpCircle, FileText, LogOut, CheckSquare, X, ChevronDown, Loader2, BookMarked, Brain, Zap, Sparkles, ArrowLeft, Target, Trophy, AlertTriangle, Clock, Trash2, Eye, Plus } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import { generateMCQ, generateSubjectiveTest, submitEvaluation, submitSubjectiveTest, generateNotes, recordPerformance, createCardsFromQuiz, getSuggestedTopic, getPerformance, getSavedQuizzes, getSavedQuiz, deleteSavedQuiz } from '../../api';
+import Markdown from '../Markdown';
+import { generateMCQ, generateSubjectiveTest, submitEvaluation, submitSubjectiveTest, generateNotes, recordPerformance, createCardsFromQuiz, getSuggestedTopic, getPerformance, getSavedQuizzes, getSavedQuiz, deleteSavedQuiz, submitMCQAnswers } from '../../api';
+import { saveResume, loadResume } from '../../utils/resume';
 import { useToast } from '../../context/ToastContext';
 import { recordActivity } from '../../utils/studyActivity';
 import { useSettings } from '../../context/SettingsContext';
@@ -226,7 +226,7 @@ const QuizView = ({
         }
     };
 
-    const handleViewSavedQuiz = async (testId) => {
+    const handleViewSavedQuiz = async (testId, restore = null) => {
         try {
             setMcqLoading(true);
             setShowSavedList(false);
@@ -239,10 +239,10 @@ const QuizView = ({
             setMcqTopic(data.chapter_name || '');
             setMcqTopicSelection(data.chapter_name || '');
             setQuizMode('mcq');
-            setMcqUserAnswers({});
+            setMcqUserAnswers(restore?.answers || {});
             setMcqSubmitted(false);
             setMcqScore(null);
-            setCurrentQuestionIndex(0);
+            setCurrentQuestionIndex(Math.min(restore?.index || 0, Math.max(0, (data.questions || []).length - 1)));
             setPerformanceSaved(false);
             setCardsCreated(null);
         } catch (error) {
@@ -305,12 +305,30 @@ const QuizView = ({
         }
     };
 
+    // An unfinished quiz (from this or another device) can be picked up where it was left
+    const [unfinished, setUnfinished] = useState(null);
+    useEffect(() => {
+        let alive = true;
+        loadResume().then((state) => { if (alive) setUnfinished(state[`quiz:${projectId}`] || null); });
+        return () => { alive = false; };
+    }, [projectId]);
+    useEffect(() => {
+        if (quizMode !== 'mcq' || !mcqTest?.test_id || mcqSubmitted || !Object.keys(mcqUserAnswers).length) return;
+        saveResume({ [`quiz:${projectId}`]: { testId: mcqTest.test_id, topic: mcqTest.topic || '', answers: mcqUserAnswers,
+            index: currentQuestionIndex, total: mcqTest.questions?.length || 0 } });
+    }, [mcqUserAnswers, currentQuestionIndex, mcqTest, mcqSubmitted, quizMode, projectId]);
+
     const handleOptionSelect = (qIndex, option) => {
         if (mcqSubmitted) return;
         setMcqUserAnswers(prev => ({ ...prev, [qIndex]: option }));
     };
 
     const handleSubmitMCQ = async () => {
+        // The finished quiz no longer needs resuming; the server learns which answers were wrong
+        // (mistakes and misconceptions for the learner model) and which old mistakes are now fixed
+        saveResume({ [`quiz:${projectId}`]: null });
+        setUnfinished(null);
+        if (mcqTest?.test_id) submitMCQAnswers(mcqTest.test_id, mcqUserAnswers).catch(() => {});
         let score = 0;
         const feedbackData = [];
         
@@ -625,6 +643,19 @@ const QuizView = ({
         <div className="h-full flex flex-col relative w-full">
             {/* No 'Back to Chat' link: the sidebar is always one tap away */}
 
+            {unfinished && !mcqTest && !mcqLoading && (
+                <div className="mx-4 mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[#1E5C42]/30 bg-[#1E5C42]/5 p-4">
+                    <p className="basis-full sm:basis-auto min-w-0 sm:flex-1 text-sm text-[#163628]">
+                        You have an unfinished quiz{unfinished.topic ? <> on <span className="font-semibold">{unfinished.topic}</span></> : null}
+                        {unfinished.total ? ` (${Object.keys(unfinished.answers || {}).length} of ${unfinished.total} answered)` : ''}.
+                    </p>
+                    <button onClick={() => { const u = unfinished; setUnfinished(null); handleViewSavedQuiz(u.testId, u); }}
+                        className="rounded-xl bg-[#1E5C42] px-4 py-2 text-sm font-semibold text-white">Resume</button>
+                    <button onClick={() => { setUnfinished(null); saveResume({ [`quiz:${projectId}`]: null }); }}
+                        className="rounded-xl px-3 py-2 text-sm font-semibold text-[#5E5046]">Dismiss</button>
+                </div>
+            )}
+
             {/* Full-screen Loading State for MCQ */}
             {mcqLoading && (
                 <div className="h-full flex flex-col items-center justify-center animate-in fade-in duration-300">
@@ -678,15 +709,15 @@ const QuizView = ({
                 {/* ==================== SAVED QUIZZES LIST ==================== */}
                 {showSavedList && !mcqTest && !evalTest && !cameFromPath && (
                     <div className="animate-in fade-in slide-in-from-bottom-4">
-                        <div className="flex items-center justify-between mb-8">
+                        <div className="flex flex-wrap items-center justify-between gap-3 mb-5 md:mb-8">
                             <div>
-                                <h2 className="text-2xl font-bold text-[#163628]">Quizzes</h2>
-                                <p className="text-[#5E5046]">Test your knowledge with AI-generated quizzes</p>
+                                <h2 className="text-xl sm:text-2xl font-bold text-[#163628]">Quizzes</h2>
+                                <p className="hidden sm:block text-[#5E5046]">Test your knowledge with AI-generated quizzes</p>
                             </div>
                             {savedQuizzes.length > 0 && (
                                 <button
                                     onClick={() => setShowSavedList(false)}
-                                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#1E5C42] to-[#163628] text-white rounded-lg hover:opacity-90 transition-opacity shadow-sm"
+                                    className="flex items-center gap-2 whitespace-nowrap px-4 py-2.5 bg-gradient-to-r from-[#1E5C42] to-[#163628] text-white rounded-lg hover:opacity-90 transition-opacity shadow-sm"
                                 >
                                     <Plus className="h-4 w-4" />
                                     New Quiz
@@ -917,9 +948,9 @@ const QuizView = ({
                                 <div className="flex-1 flex flex-col animate-in fade-in slide-in-from-right-4 duration-300 px-2" key={currentQuestionIndex}>
                                     <div className="bg-white p-6 md:p-8 rounded-3xl border border-[#E6D5CC] shadow-sm mb-6">
                                         <div className="prose prose-lg max-w-none text-[#163628] font-medium mb-6 overflow-x-auto">
-                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                            <Markdown>
                                                 {mcqTest.questions[currentQuestionIndex].question}
-                                            </ReactMarkdown>
+                                            </Markdown>
                                         </div>
 
                                         <div className="space-y-3">
@@ -941,7 +972,7 @@ const QuizView = ({
                                                             {opt.option}
                                                         </div>
                                                         <span className={`text-[#163628] font-medium ${isSelected ? 'opacity-100' : 'opacity-80'}`}>
-                                                            {opt.text}
+                                                            <Markdown inline>{opt.text}</Markdown>
                                                         </span>
                                                     </button>
                                                 );
@@ -1008,7 +1039,7 @@ const QuizView = ({
                                         <div className="font-bold text-lg mb-4 flex gap-2">
                                             <span>{i + 1}.</span>
                                             <div className="prose prose-sm max-w-none">
-                                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{q.question}</ReactMarkdown>
+                                                <Markdown>{q.question}</Markdown>
                                             </div>
                                         </div>
                                         <textarea
@@ -1384,7 +1415,7 @@ const QuizView = ({
                                                         <div className="flex gap-2 mb-3">
                                                             <span className="font-bold text-xs opacity-50 mt-1">Q{i + 1}</span>
                                                             <div className="text-sm font-medium flex-1">
-                                                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{q.question}</ReactMarkdown>
+                                                                <Markdown>{q.question}</Markdown>
                                                             </div>
                                                             {isCorrect
                                                                 ? <CheckSquare className="h-5 w-5 text-green-600 flex-shrink-0" />
@@ -1415,7 +1446,7 @@ const QuizView = ({
                                                                 <div className="mt-3 p-3 bg-white/60 rounded-lg border border-[#E6D5CC]/50">
                                                                     <span className="font-semibold text-[#163628] block mb-1">Explanation:</span>
                                                                     <div className="text-[#2B3F35] prose prose-sm max-w-none overflow-x-auto">
-                                                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{q.explanation}</ReactMarkdown>
+                                                                        <Markdown>{q.explanation}</Markdown>
                                                                     </div>
                                                                 </div>
                                                             )}
@@ -1430,9 +1461,9 @@ const QuizView = ({
                                     <div className="flex-1 flex flex-col animate-in fade-in slide-in-from-right-4 duration-300 px-2" key={currentQuestionIndex}>
                                         <div className="bg-white p-6 md:p-8 rounded-3xl border border-[#E6D5CC] shadow-sm mb-6 flex-1 md:flex-none">
                                             <div className="prose prose-lg max-w-none text-[#163628] font-medium mb-6">
-                                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                                <Markdown>
                                                     {mcqTest.questions[currentQuestionIndex].question}
-                                                </ReactMarkdown>
+                                                </Markdown>
                                             </div>
 
                                             <div className="space-y-3">
@@ -1454,7 +1485,7 @@ const QuizView = ({
                                                                 {opt.option}
                                                             </div>
                                                             <span className={`text-[#163628] font-medium ${isSelected ? 'opacity-100' : 'opacity-80'}`}>
-                                                                {opt.text}
+                                                                <Markdown inline>{opt.text}</Markdown>
                                                             </span>
                                                         </button>
                                                     );
@@ -1648,7 +1679,7 @@ const QuizView = ({
                                             <div className="font-bold text-lg mb-4 flex gap-2">
                                                 <span>{i + 1}.</span>
                                                 <div className="prose prose-sm max-w-none">
-                                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{q.question}</ReactMarkdown>
+                                                    <Markdown>{q.question}</Markdown>
                                                 </div>
                                             </div>
 
@@ -1676,7 +1707,7 @@ const QuizView = ({
                                                             <span className="font-bold text-lg">{result?.score}/10</span>
                                                         </div>
                                                         <div className="mb-2 prose prose-sm max-w-none">
-                                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{result?.feedback}</ReactMarkdown>
+                                                            <Markdown>{result?.feedback}</Markdown>
                                                         </div>
                                                     </div>
                                                 </div>

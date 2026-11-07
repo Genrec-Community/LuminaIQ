@@ -1,6 +1,16 @@
+import contextvars
 import logging
 import sys
 from datetime import datetime
+
+# The id of the request being handled, so every log line can be traced back to it
+request_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("request_id", default="-")
+
+
+class RequestIdFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.request_id = request_id_var.get()
+        return True
 
 
 class EndpointFilter(logging.Filter):
@@ -18,6 +28,7 @@ class EndpointFilter(logging.Filter):
         "OPTIONS",  # CORS preflight requests
         "GET /api/v1/documents/",  # Document polling
         "GET /health",  # Health checks
+        "GET /ready",
         "GET / HTTP",  # Root endpoint
     ]
 
@@ -79,9 +90,10 @@ def setup_logger(name: str = "lumina") -> logging.Logger:
 
         # Use colored formatter with standard ASCII pipe to prevent Windows cp1252 charmap errors
         formatter = ColoredFormatter(
-            "%(asctime)s | %(levelname)-8s | %(message)s", datefmt="%H:%M:%S"
+            "%(asctime)s | %(levelname)-8s | %(request_id)s | %(message)s", datefmt="%H:%M:%S"
         )
         handler.setFormatter(formatter)
+        handler.addFilter(RequestIdFilter())
         logger.addHandler(handler)
 
     return logger
