@@ -756,10 +756,11 @@ export const getAllLearningStats = async () => {
 };
 
 // Knowledge Graph
-export const buildKnowledgeGraph = async (projectId, topics, forceRebuild = false) => {
+export const buildKnowledgeGraph = async (projectId, topics, forceRebuild = false, documentIds = null) => {
     const response = await api.post(`/learning/knowledge-graph/${projectId}/build`, {
         topics,
-        force_rebuild: forceRebuild
+        force_rebuild: forceRebuild,
+        ...(documentIds?.length ? { document_ids: documentIds } : {})
     });
     return response.data;
 };
@@ -777,8 +778,9 @@ export const getRelatedTopics = async (projectId, topic, maxDistance = 2) => {
     return response.data;
 };
 
-export const getLearningPath = async (projectId, targetTopics = null) => {
+export const getLearningPath = async (projectId, targetTopics = null, documentIds = null) => {
     const params = targetTopics ? { target_topics: targetTopics.join(',') } : {};
+    if (documentIds?.length) params.document_ids = documentIds.join(',');
     const response = await api.get(`/learning/knowledge-graph/${projectId}/learning-path`, { params });
     return response.data;
 };

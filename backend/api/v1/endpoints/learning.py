@@ -454,6 +454,9 @@ async def get_all_stats(current_user: dict = Depends(get_current_user)):
 class BuildGraphRequest(BaseModel):
     topics: List[str]
     force_rebuild: bool = False
+    # Set when rebuilding the path for one book: only that book's edges are
+    # replaced instead of wiping the whole project's graph.
+    document_ids: Optional[List[str]] = None
 
 
 class AddRelationRequest(BaseModel):
@@ -488,6 +491,7 @@ async def build_knowledge_graph(
             project_id=project_id,
             topics=request.topics,
             force_rebuild=request.force_rebuild,
+            scoped=bool(request.document_ids),
         )
 
         return result
@@ -595,6 +599,7 @@ async def get_topic_prerequisites(
 async def get_learning_path(
     project_id: str,
     target_topics: Optional[str] = None,
+    document_ids: Optional[str] = None,
     current_user: dict = Depends(get_current_user),
 ):
     """
@@ -609,15 +614,17 @@ async def get_learning_path(
         targets = None
         if target_topics:
             targets = [t.strip() for t in target_topics.split(",") if t.strip()]
+        doc_ids = [d.strip() for d in (document_ids or "").split(",") if d.strip()] or None
 
         path = await knowledge_graph.generate_learning_path(
-            project_id=project_id, target_topics=targets
+            project_id=project_id, target_topics=targets, document_ids=doc_ids
         )
 
         return {
             "learning_path": path,
             "total_topics": len(path),
             "target_topics": targets,
+            "document_ids": doc_ids,
         }
 
     except Exception as e:

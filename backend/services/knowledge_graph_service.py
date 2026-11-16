@@ -71,7 +71,11 @@ class KnowledgeGraph:
     # ============== Graph Building ==============
 
     async def build_graph_from_topics(
-        self, project_id: str, topics: List[str], force_rebuild: bool = False
+        self,
+        project_id: str,
+        topics: List[str],
+        force_rebuild: bool = False,
+        scoped: bool = False,
     ) -> Dict[str, Any]:
         """
         Build knowledge graph from document topics using LLM.
@@ -88,10 +92,10 @@ class KnowledgeGraph:
             return {"edges_created": 0, "message": "Build already in progress"}
 
         async with project_lock:
-            return await self._build_graph_locked(project_id, topics, force_rebuild)
+            return await self._build_graph_locked(project_id, topics, force_rebuild, scoped)
 
     async def _build_graph_locked(
-        self, project_id: str, topics: List[str], force_rebuild: bool
+        self, project_id: str, topics: List[str], force_rebuild: bool, scoped: bool = False
     ) -> Dict[str, Any]:
         """Inner build — runs while the per-project lock is held."""
         try:
@@ -112,6 +116,10 @@ class KnowledgeGraph:
                         "edges_created": 0,
                         "message": "Graph already exists. Use force_rebuild=True to rebuild.",
                     }
+            elif scoped:
+                # Rebuilding one book: only drop edges that touch its topics, so
+                # the other books in the project keep their prerequisite graph.
+                await self._delete_edges_touching(project_id, topics)
             else:
                 # Wipe before LLM calls so we don't accumulate stale edges
                 await async_db(lambda:
@@ -181,6 +189,19 @@ class KnowledgeGraph:
             import traceback
             logger.error(traceback.format_exc())
             return {"edges_created": 0, "message": f"Error: {str(e)}"}
+
+    async def _delete_edges_touching(self, project_id: str, topics: List[str]) -> None:
+        topics = list(set(topics))
+        for column in ("from_topic", "to_topic"):
+            for i in range(0, len(topics), 200):
+                chunk = topics[i: i + 200]
+                await async_db(lambda c=chunk, col=column: (
+                    self.client.table("topic_relations")
+                    .delete()
+                    .eq("project_id", project_id)
+                    .in_(col, c)
+                    .execute()
+                ))
 
     def _create_overlapping_batches(self, topics: List[str]) -> List[List[str]]:
         """Create batches with some overlap for cross-batch relationships"""
@@ -600,18 +621,23 @@ OUTPUT FORMAT - Return ONLY valid JSON, no markdown:
         project_id: str,
         target_topics: Optional[List[str]] = None,
         documents: Optional[List[Dict[str, Any]]] = None,
+        document_ids: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
         """
         Learning path for the project, ordered by services.topic_ordering
         (weighted, cycle-safe topological sort — the same order every screen
         uses). With target_topics, only those topics and everything they
-        transitively depend on are included.
+        transitively depend on are included. With document_ids, only those
+        books' topics are used (the "Generate Path For" choice).
         """
         from services.topic_ordering import order_topics, topics_in_book_order, chapter_lookup
 
         try:
             if documents is None:
                 documents = await self.load_project_documents(project_id)
+            if document_ids:
+                wanted = set(document_ids)
+                documents = [d for d in documents if d.get("id") in wanted]
             edges = await self.get_prerequisite_edges(project_id)
 
             topics = topics_in_book_order(documents)
@@ -631,15 +657,17 @@ OUTPUT FORMAT - Return ONLY valid JSON, no markdown:
                     t for t in target_topics if t not in topics
                 ]
 
-            doc_names = {}
+            doc_names, doc_ids = {}, {}
             for doc in documents:
                 for t in doc.get("topics") or []:
                     doc_names.setdefault(t, doc.get("filename", "Unknown"))
+                    doc_ids.setdefault(t, doc.get("id"))
             chapters = chapter_lookup(documents)
 
             path = order_topics(topics, edges)
             for item in path:
                 item["document"] = doc_names.get(item["topic"], "Unknown")
+                item["document_id"] = doc_ids.get(item["topic"])
                 item["chapter"] = (chapters.get(item["topic"]) or {}).get("chapter")
             return path
 
