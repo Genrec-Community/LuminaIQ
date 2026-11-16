@@ -90,6 +90,24 @@ class EmbeddingService:
         await cache.set(key, vector, ttl=_QUERY_CACHE_TTL)
         return vector
 
+    async def generate_query_embeddings(self, texts: List[str]) -> List[List[float]]:
+        """Embeddings for several search queries: cached ones are reused and the rest
+        go out in one request, instead of one request per query."""
+        if not texts:
+            return []
+        from utils.cache import get_cache
+        cache = get_cache()
+        keys = ["emb:" + hashlib.sha256(f"{settings.EMBEDDING_MODEL}|{t}".encode()).hexdigest() for t in texts]
+        cached = await asyncio.gather(*[cache.get(k) for k in keys])
+        missing = [i for i, v in enumerate(cached) if not v]
+        out = list(cached)
+        if missing:
+            vectors = await self.generate_embeddings([texts[i] for i in missing])
+            for i, vector in zip(missing, vectors):
+                out[i] = vector
+            await asyncio.gather(*[cache.set(keys[i], out[i], ttl=_QUERY_CACHE_TTL) for i in missing])
+        return out
+
     def shutdown(self):
         pass   # nothing to release; kept for main.py's shutdown hook
 

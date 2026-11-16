@@ -117,32 +117,63 @@ def _rrf(ranked_lists: List[List[vector_store.Hit]]) -> List[tuple]:
     return sorted(((h, s, sim) for h, s, sim in fused.values()), key=lambda e: -e[1])
 
 
-async def _search_one(project_id: str, query: str, document_ids) -> List[tuple]:
-    """[("dense", hits), ("keyword", hits)] for one query; a failing search is skipped."""
-    lists: List[tuple] = []
+async def _query_vectors(queries: List[str]) -> List[Optional[List[float]]]:
+    """One embedding per query from a single batched request (None each if embedding fails)."""
     try:
-        vector = await embedding_service.generate_embedding(query)
-        lists.append(("dense", await vector_store.search_dense(project_id, vector, CANDIDATES, document_ids)))
+        return await embedding_service.generate_query_embeddings(queries)
     except Exception as e:
         logger.warning(f"[Retrieval] meaning search skipped ({e}); using keyword search")
-    try:
-        lists.append(("keyword", await vector_store.search_keyword(project_id, query, CANDIDATES, document_ids)))
-    except Exception as e:
-        logger.warning(f"[Retrieval] keyword search failed: {e}")
+        return [None] * len(queries)
+
+
+async def _search_one(project_id: str, query: str, document_ids,
+                      vector: Optional[List[float]] = None) -> List[tuple]:
+    """[("dense", hits), ("keyword", hits)] for one query; a failing search is skipped.
+    Both searches run at the same time (they used to wait for each other)."""
+    async def dense():
+        if vector is None:
+            return None
+        try:
+            return await vector_store.search_dense(project_id, vector, CANDIDATES, document_ids)
+        except Exception as e:
+            logger.warning(f"[Retrieval] meaning search skipped ({e}); using keyword search")
+            return None
+
+    async def keyword():
+        try:
+            return await vector_store.search_keyword(project_id, query, CANDIDATES, document_ids)
+        except Exception as e:
+            logger.warning(f"[Retrieval] keyword search failed: {e}")
+            return None
+
+    dense_hits, keyword_hits = await asyncio.gather(dense(), keyword())
+    lists: List[tuple] = []
+    if dense_hits is not None:
+        lists.append(("dense", dense_hits))
+    if keyword_hits is not None:
+        lists.append(("keyword", keyword_hits))
     return lists
 
 
-async def _hybrid(project_id: str, queries: List[str], document_ids) -> List[tuple]:
-    """[(hit, fused score, best cosine similarity)] over every query and both search types."""
+def _fuse(results: List[List[tuple]]) -> List[tuple]:
+    """[(hit, fused score, best cosine similarity)] from _search_one results."""
     lists: List[List[vector_store.Hit]] = []
     dense_sim: Dict[int, float] = {}
-    for result in await asyncio.gather(*[_search_one(project_id, q, document_ids) for q in queries]):
+    for result in results:
         for kind, hits in result:
             lists.append(hits)
             if kind == "dense":
                 for h in hits:
                     dense_sim[h.chunk_id] = max(dense_sim.get(h.chunk_id, 0.0), h.score)
     return [(h, s, dense_sim.get(h.chunk_id, 0.0)) for h, s, _ in _rrf(lists)]
+
+
+async def _hybrid(project_id: str, queries: List[str], document_ids) -> List[tuple]:
+    """[(hit, fused score, best cosine similarity)] over every query and both search types."""
+    vectors = await _query_vectors(queries)
+    results = await asyncio.gather(*[_search_one(project_id, q, document_ids, v)
+                                     for q, v in zip(queries, vectors)])
+    return _fuse(results)
 
 
 def _join_without_overlap(a: str, b: str) -> str:
@@ -241,9 +272,16 @@ async def search_passages(project_id: str, queries: List[str], per_query: int = 
     out: List[Dict[str, Any]] = []
     seen = set()
     try:
-        if await _project_has_chunks(project_id):
-            for q in queries:
-                fused = await _hybrid(project_id, [q], document_ids)
+        # Every query is searched at once, with one embedding request for all of them.
+        # They used to run one after another, which made notes and quizzes wait for
+        # 4-6 rounds of embedding + two database searches before the model could start.
+        # Results are still taken in query order, so the passages are the same as before.
+        has_chunks, vectors = await asyncio.gather(_project_has_chunks(project_id), _query_vectors(queries))
+        if has_chunks:
+            results = await asyncio.gather(*[_search_one(project_id, q, document_ids, v)
+                                             for q, v in zip(queries, vectors)])
+            for result in results:
+                fused = _fuse([result])
                 for p in (await _merge(fused[: per_query * 2]))[:per_query]:
                     if p.text not in seen:
                         seen.add(p.text)

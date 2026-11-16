@@ -1,5 +1,5 @@
 import asyncio
-from typing import Dict, Any, List
+from typing import Any, AsyncIterator, Dict, List
 from db.client import get_supabase_client, async_db
 from utils.logger import logger
 from uuid import uuid4
@@ -386,6 +386,38 @@ Respond ONLY with the Markdown content."""
             logger.error(f"Error saving generated notes: {str(e)}")
             raise
 
+    async def _prompt(self, project_id: str, note_type: str, topic: str = None,
+                      selected_documents: List[str] = None, level: str = ""):
+        """(messages, config) for one generation, or (None, config) when the book has no matching text."""
+        from services.prompts.levels import LEVEL_STYLE, MATH_RULE
+        from services.retrieval import search_passages
+
+        config = self._get_note_config(note_type, topic)
+        # Retrieve content (vector search, or the stored text when the index is unavailable)
+        all_hits = await search_passages(project_id, config["queries"], 10, selected_documents)
+        if not all_hits:
+            return None, config
+        chunk_limit = 25 if "Comprehensive" in note_type or "Summary" in note_type else 20
+        context = "\n\n".join([hit["text"] for hit in all_hits[:chunk_limit]])
+        system = f'{config["system_prompt"]}\n\n{MATH_RULE}'
+        if level in LEVEL_STYLE:
+            system += f"\n\nThe readers:\n{LEVEL_STYLE[level]}\nWrite the notes at this level."
+        messages = [{"role": "system", "content": system},
+                    {"role": "user", "content": config["user_prompt"].replace("{context}", context)}]
+        return messages, config
+
+    async def _save_and_wrap(self, project_id, user_id, response, note_type, topic) -> Dict[str, Any]:
+        saved_note = None
+        if user_id and response:
+            try:
+                saved_note = await self.save_generated_notes(
+                    project_id=project_id, user_id=user_id, content=response, note_type=note_type, topic=topic)
+            except Exception as save_err:
+                logger.error(f"Failed to auto-save notes: {save_err}")
+        if saved_note:
+            return {"content": response, "note_id": saved_note.get("id"), "title": saved_note.get("title")}
+        return {"content": response}
+
     async def generate_notes(
         self,
         project_id: str,
@@ -398,55 +430,87 @@ Respond ONLY with the Markdown content."""
         """Generate notes using AI with type-specific prompts and retrieval strategies."""
         try:
             logger.info(f"Generating notes ({note_type}) for project {project_id}, topic: {topic}")
-
-            # 1. Get type-specific configuration
-            config = self._get_note_config(note_type, topic)
-
             from services import shared_content
-            from services.prompts.levels import LEVEL_STYLE, MATH_RULE
-            from services.retrieval import search_passages
 
             async def make():
-                # Retrieve content (vector search, or the stored text when the index is unavailable)
-                all_hits = await search_passages(project_id, config["queries"], 10, selected_documents)
-                if not all_hits:
+                messages, config = await self._prompt(project_id, note_type, topic, selected_documents, level)
+                if not messages:
                     return None
-                chunk_limit = 25 if "Comprehensive" in note_type or "Summary" in note_type else 20
-                context = "\n\n".join([hit["text"] for hit in all_hits[:chunk_limit]])
-                system = f'{config["system_prompt"]}\n\n{MATH_RULE}'
-                if level in LEVEL_STYLE:
-                    system += f"\n\nThe readers:\n{LEVEL_STYLE[level]}\nWrite the notes at this level."
                 return await llm_service.chat_completion(
-                    [{"role": "system", "content": system},
-                     {"role": "user", "content": config["user_prompt"].replace("{context}", context)}],
-                    temperature=config["temperature"], max_tokens=config["max_tokens"])
+                    messages, temperature=config["temperature"], max_tokens=config["max_tokens"])
 
             # Shared-library and class books reuse one set of notes per type, topic and level
             scope = await shared_content.scope_for(project_id, selected_documents)
             response, _ = await shared_content.asset(scope, "notes", [note_type, topic or "", level], make)
             if not response:
-                return "No content found to generate notes. Please ensure documents are uploaded and processed."
-
-            # Auto-save generated notes if user_id is provided
-            saved_note = None
-            if user_id and response:
-                try:
-                    saved_note = await self.save_generated_notes(
-                        project_id=project_id,
-                        user_id=user_id,
-                        content=response,
-                        note_type=note_type,
-                        topic=topic
-                    )
-                except Exception as save_err:
-                    logger.error(f"Failed to auto-save notes: {save_err}")
-
-            if saved_note:
-                return {"content": response, "note_id": saved_note.get("id"), "title": saved_note.get("title")}
-            return {"content": response}
+                return NO_CONTENT
+            return await self._save_and_wrap(project_id, user_id, response, note_type, topic)
 
         except Exception as e:
             logger.error(f"Error generating notes: {str(e)}")
             raise
+
+    async def generate_notes_stream(
+        self,
+        project_id: str,
+        note_type: str,
+        topic: str = None,
+        selected_documents: List[str] = None,
+        user_id: str = None,
+        level: str = "",
+    ) -> AsyncIterator[Dict[str, Any]]:
+        """
+        The same notes as generate_notes, as events while they're written:
+        {"type": "token", "text": ...} pieces, then {"type": "done", "note_id", "title"}
+        (or {"type": "error", "message"}). Students see the first lines in a couple of
+        seconds instead of waiting for the whole 1,000-1,500 words.
+        """
+        from services import shared_content
+        from services.telemetry import meter
+
+        logger.info(f"Streaming notes ({note_type}) for project {project_id}, topic: {topic}")
+        key = [note_type, topic or "", level]
+        try:
+            # Retrieval starts straight away, alongside the shared-book check; a cache hit cancels it
+            prompt = asyncio.create_task(self._prompt(project_id, note_type, topic, selected_documents, level))
+            try:
+                scope = await shared_content.scope_for(project_id, selected_documents)
+                cached = await shared_content.asset_lookup(scope, "notes", key)
+            except BaseException:
+                prompt.cancel()
+                raise
+            if cached:
+                prompt.cancel()
+                text = cached
+                yield {"type": "token", "text": text}
+                result = await self._save_and_wrap(project_id, user_id, text, note_type, topic)
+                yield {"type": "done", "note_id": result.get("note_id"), "title": result.get("title")}
+                return
+            messages, config = await prompt
+            if not messages:
+                yield {"type": "token", "text": NO_CONTENT}
+                yield {"type": "done"}
+                return
+            parts: List[str] = []
+            with meter() as spent:
+                async for piece in llm_service.chat_completion_stream(
+                        messages, temperature=config["temperature"], max_tokens=config["max_tokens"]):
+                    parts.append(piece)
+                    yield {"type": "token", "text": piece}
+                text = "".join(parts).strip()
+                if len(text) < llm_service.EMPTY_RESPONSE_MIN_CHARS:
+                    # A reasoning model spent its budget thinking: the non-streaming call retries with more room
+                    text = await llm_service.chat_completion(
+                        messages, temperature=config["temperature"], max_tokens=config["max_tokens"])
+                    yield {"type": "replace", "text": text}
+            await shared_content.asset_store(scope, "notes", key, text, spent.cost)
+            result = await self._save_and_wrap(project_id, user_id, text, note_type, topic)
+            yield {"type": "done", "note_id": result.get("note_id"), "title": result.get("title")}
+        except Exception as e:
+            logger.error(f"Error streaming notes: {e}")
+            yield {"type": "error", "message": "Notes generation failed. Please try again."}
+
+
+NO_CONTENT = "No content found to generate notes. Please ensure documents are uploaded and processed."
 
 notes_service = NotesService()

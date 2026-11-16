@@ -208,3 +208,19 @@ def test_rerank_failure_falls_back(monkeypatch):
     monkeypatch.setattr(reranker.httpx, "AsyncClient",
                         lambda **kw: FakeHTTP(lambda req: httpx.Response(500, json={"error": "down"})))
     assert run(reranker.rerank("q", ["a", "b"], 2)) is None
+
+
+def test_query_embeddings_reuse_the_cache_and_send_the_rest_in_one_request(monkeypatch):
+    import utils.cache as cache_mod
+    monkeypatch.setattr(cache_mod, "_cache", cache_mod.Cache(cache_mod.MemoryBackend()))
+    svc = emb_mod.EmbeddingService()
+    requests = []
+
+    async def batch(texts):
+        requests.append(list(texts))
+        return [[float(len(t))] for t in texts]
+
+    monkeypatch.setattr(svc, "generate_embeddings", batch)
+    assert asyncio.run(svc.generate_query_embeddings(["a", "bb"])) == [[1.0], [2.0]]
+    assert asyncio.run(svc.generate_query_embeddings(["bb", "ccc", "a"])) == [[2.0], [3.0], [1.0]]
+    assert requests == [["a", "bb"], ["ccc"]]

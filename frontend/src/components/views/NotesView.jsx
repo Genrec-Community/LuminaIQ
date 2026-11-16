@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { BookOpen, Copy, Loader2, ChevronDown, FileDown, Trash2, Clock, Eye, Plus, ArrowLeft } from 'lucide-react';
 import Markdown from '../Markdown';
-import { generateNotes, getSavedNotes, getSavedNote, deleteSavedNote } from '../../api';
+import { generateNotesStream, getSavedNotes, getSavedNote, deleteSavedNote } from '../../api';
 import { useToast } from '../../context/ToastContext';
 import { recordActivity } from '../../utils/studyActivity';
 
@@ -125,11 +125,13 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
         const effectiveTopic = notesTopicSelection === '__custom__' ? notesTopic : notesTopicSelection;
 
         try {
-            const data = await generateNotes(
+            // Notes appear as they're written; the full result (with the saved note's title) comes at the end
+            const data = await generateNotesStream(
                 projectId,
                 notesType,
                 effectiveTopic,
-                selectedDocuments
+                selectedDocuments,
+                (text) => setNotesContent(text)
             );
             setNotesContent(typeof data === 'string' ? data : (data.notes || data.content || JSON.stringify(data)));
             setNotesTitle(data.title || notesType);
@@ -520,7 +522,7 @@ const NotesView = ({ projectId, availableTopics, selectedDocuments, preSelectedT
             )}
 
             {/* ========== VIEWING MODE: Show notes content ========== */}
-            {!notesLoading && viewMode === 'viewing' && notesContent && (
+            {viewMode === 'viewing' && notesContent && (
                 <div className="pb-6 animate-in fade-in slide-in-from-bottom-8 duration-500">
                     {/* Action Bar */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-[#E6D5CC]">
