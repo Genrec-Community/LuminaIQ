@@ -777,8 +777,9 @@ export const getRelatedTopics = async (projectId, topic, maxDistance = 2) => {
     return response.data;
 };
 
-export const getLearningPath = async (projectId, targetTopics = null) => {
+export const getLearningPath = async (projectId, targetTopics = null, documentIds = null) => {
     const params = targetTopics ? { target_topics: targetTopics.join(',') } : {};
+    if (documentIds?.length) params.document_ids = documentIds.join(',');
     const response = await api.get(`/learning/knowledge-graph/${projectId}/learning-path`, { params });
     return response.data;
 };
