@@ -12,6 +12,7 @@ import { api } from '../api';
 const CHUNK_SIZE = 6 * 1024 * 1024; // Supabase requires exactly 6 MB chunks
 const BUCKET = 'uploads';
 const PENDING_KEY = 'lumina_pending_uploads';
+const MAX_STALLED_RESTARTS = 4;
 
 const readPending = () => {
     try { return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); } catch { return []; }
@@ -106,6 +107,11 @@ export async function uploadToStorage(file, projectId, onProgress) {
     try {
         await new Promise((resolve, reject) => {
             let lastSaved = 0;
+            // Restarts since bytes last moved. tus already retries each chunk ~70 s
+            // before giving up, so this many in a row means the link is dead, not
+            // blipping: stop and say so instead of showing "Uploading…" forever.
+            let stalledRestarts = 0;
+            let lastSent = -1;
             const upload = new tus.Upload(file, {
                 endpoint: `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/upload/resumable/sign`,
                 retryDelays: [0, 1000, 3000, 5000, 10000, 20000, 30000],
@@ -122,6 +128,7 @@ export async function uploadToStorage(file, projectId, onProgress) {
                     cacheControl: '3600',
                 },
                 onProgress: (sent, total) => {
+                    if (sent > lastSent) { lastSent = sent; stalledRestarts = 0; }
                     const pct = total ? Math.round((sent / total) * 100) : 0;
                     onProgress?.(pct, sent);
                     if (pct - lastSaved >= 5) {
@@ -132,6 +139,10 @@ export async function uploadToStorage(file, projectId, onProgress) {
                 onError: (error) => {
                     const status = error?.originalResponse?.getStatus?.();
                     if (!status) {
+                        if (++stalledRestarts > MAX_STALLED_RESTARTS) {
+                            reject(Object.assign(new Error('The connection keeps dropping. Upload again to continue where it stopped.'), { stalled: true }));
+                            return;
+                        }
                         // Connection lost (screen off, signal, tab in background): wait, then carry on
                         // from the last finished chunk with the same file; nothing to re-pick
                         whenBackOnline().then(() => upload.start());
@@ -147,6 +158,9 @@ export async function uploadToStorage(file, projectId, onProgress) {
             }).catch(() => upload.start());
         });
     } catch (tusError) {
+        // A dead connection won't do better with a one-shot upload of the whole file.
+        // The finished chunks are kept, so picking the same file again resumes.
+        if (tusError?.stalled) throw tusError;
         // Resumable refused (e.g. an expired token on an old resume): one plain upload with a fresh token
         console.warn('Resumable upload refused, uploading in one go', tusError?.status);
         try {
