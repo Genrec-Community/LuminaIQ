@@ -454,9 +454,6 @@ async def get_all_stats(current_user: dict = Depends(get_current_user)):
 class BuildGraphRequest(BaseModel):
     topics: List[str]
     force_rebuild: bool = False
-    # Set when rebuilding the path for one book: only that book's edges are
-    # replaced instead of wiping the whole project's graph.
-    document_ids: Optional[List[str]] = None
 
 
 class AddRelationRequest(BaseModel):
@@ -491,7 +488,6 @@ async def build_knowledge_graph(
             project_id=project_id,
             topics=request.topics,
             force_rebuild=request.force_rebuild,
-            scoped=bool(request.document_ids),
         )
 
         return result

@@ -78,7 +78,7 @@ const LearningPathView = ({
     const [learningPath, setLearningPath] = useState(null);
     const [graphStats, setGraphStats] = useState(null);
     const [performance, setPerformance] = useState({});
-    // Which book the path is for ("Generate Path For"). Remembered per project so
+    // Which book the path is shown for ("Show Path For"). Remembered per project so
     // the choice survives a reload instead of snapping back to "All Documents".
     const docChoiceKey = `lumina_path_doc_${projectId}`;
     const [selectedDoc, setSelectedDocState] = useState(() => {
@@ -183,14 +183,12 @@ const LearningPathView = ({
         }
     };
     
+    // Only used when a project has no path at all yet. It builds the graph over
+    // every book once and never replaces an existing graph: the path it gives is
+    // the one optimal order, and picking a book just filters it.
     const handleBuildGraph = async () => {
-        // Get topics based on selection
-        let topicsToUse = availableTopics;
-        
-        if (selectedDoc !== 'all' && documentTopics && documentTopics[selectedDoc]) {
-            topicsToUse = documentTopics[selectedDoc];
-        }
-        
+        const topicsToUse = availableTopics;
+
         if (!topicsToUse || topicsToUse.length < 2) {
             toast.warning('Need at least 2 topics to build a learning path. Please select a document with more topics.');
             return;
@@ -198,8 +196,7 @@ const LearningPathView = ({
         
         setBuilding(true);
         try {
-            // For one book, only that book's graph is rebuilt; the others keep theirs.
-            await buildKnowledgeGraph(projectId, topicsToUse, true, selectedDoc !== 'all' ? [selectedDoc] : null);
+            await buildKnowledgeGraph(projectId, topicsToUse, false);
             // Clear cache so fresh data is loaded
             sessionStorage.removeItem(`lumina_path_${projectId}_${selectedDoc}`);
             await loadData();
@@ -210,6 +207,19 @@ const LearningPathView = ({
             toast.error('Failed to build learning path. Please try again.');
         } finally {
             setBuilding(false);
+        }
+    };
+
+    // Reload the path for the chosen book (or all books) without changing it.
+    const [refreshing, setRefreshing] = useState(false);
+    const handleRefresh = async () => {
+        setRefreshing(true);
+        try {
+            sessionStorage.removeItem(`lumina_path_${projectId}_${selectedDoc}`);
+            await loadData();
+            if (onTopicsChange) onTopicsChange();
+        } finally {
+            setRefreshing(false);
         }
     };
     
@@ -437,7 +447,7 @@ const LearningPathView = ({
                 <div className="rounded-xl border p-4 mb-6 overflow-hidden" style={{ background: card, borderColor: cardBorder }}>
                     <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
                         <div className="w-full sm:w-auto sm:max-w-[60%]">
-                            <label className="block text-sm font-bold mb-1" style={{ color: bodyText }}>Generate Path For</label>
+                            <label className="block text-sm font-bold mb-1" style={{ color: bodyText }}>Show Path For</label>
                             <select
                                 value={selectedDoc}
                                 onChange={(e) => setSelectedDoc(e.target.value)}
@@ -460,8 +470,8 @@ const LearningPathView = ({
                         </div>
 
                         <button
-                            onClick={handleBuildGraph}
-                            disabled={building}
+                            onClick={handleRefresh}
+                            disabled={refreshing}
                             className="px-5 py-3 rounded-xl font-bold disabled:opacity-50 flex items-center gap-2 whitespace-nowrap flex-shrink-0 transition-all duration-200"
                             style={isDark ? {
                                 background: '#D3EE6A',
@@ -469,10 +479,10 @@ const LearningPathView = ({
                                 boxShadow: '0 4px 14px rgba(200,162,136,0.35), 0 0 0 1px rgba(200,162,136,0.25)'
                             } : { background: '#1E5C42', color: '#fff' }}
                         >
-                            {building ? (
-                                <><Loader2 className="h-5 w-5 animate-spin" />Synthesizing...</>
+                            {refreshing ? (
+                                <><Loader2 className="h-5 w-5 animate-spin" />Refreshing...</>
                             ) : (
-                                <><Brain className="h-5 w-5" />Regenerate Path</>
+                                <><RefreshCw className="h-5 w-5" />Refresh</>
                             )}
                         </button>
                     </div>
@@ -485,7 +495,7 @@ const LearningPathView = ({
                         <Sparkles className="h-12 w-12 text-[#1E5C42] mx-auto mb-4" />
                         <h3 className="text-xl font-bold mb-2" style={{ color: bodyText }}>No Learning Path Yet</h3>
                         <p className="mb-6 max-w-md mx-auto" style={{ color: mutedText }}>
-                            Click "Generate Path" to create an AI-powered learning sequence based on topic dependencies.
+                            Your path appears here once your books finish processing.
                         </p>
                         <div className="flex items-center justify-center gap-2 text-sm" style={{ color: mutedText }}>
                             <BookOpen className="h-4 w-4" />

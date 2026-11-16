@@ -756,11 +756,10 @@ export const getAllLearningStats = async () => {
 };
 
 // Knowledge Graph
-export const buildKnowledgeGraph = async (projectId, topics, forceRebuild = false, documentIds = null) => {
+export const buildKnowledgeGraph = async (projectId, topics, forceRebuild = false) => {
     const response = await api.post(`/learning/knowledge-graph/${projectId}/build`, {
         topics,
-        force_rebuild: forceRebuild,
-        ...(documentIds?.length ? { document_ids: documentIds } : {})
+        force_rebuild: forceRebuild
     });
     return response.data;
 };
