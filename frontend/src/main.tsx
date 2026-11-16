@@ -11,7 +11,7 @@ import './themes.css'
 import './lumina.css'
 import App from './App.jsx'
 import { warmUp } from './api'
-import Analytics from "@vercel/analytics"
+import { inject as injectAnalytics } from "@vercel/analytics"
 import { injectSpeedInsights } from "@vercel/speed-insights"
 
 // After a redeploy, a tab opened earlier can't load the new code chunks
@@ -27,9 +27,14 @@ window.addEventListener('vite:preloadError', (event) => {
   window.location.reload()
 })
 
-// Initialize Vercel analytics and speed insights
-Analytics.inject()
-injectSpeedInsights()
+// Vercel Web Analytics and Speed Insights load their scripts from /_vercel/*,
+// which only exists when Vercel serves the site. Production (luminaiq.fun) is on
+// Azure Static Web Apps and the Android shell serves from localhost, where those
+// paths fall through to index.html and fill the console with MIME-type errors.
+if (window.location.hostname.endsWith('.vercel.app')) {
+  injectAnalytics()
+  injectSpeedInsights()
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

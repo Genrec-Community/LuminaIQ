@@ -46,6 +46,7 @@ const Dashboard = () => {
     const [isCreating, setIsCreating] = useState(false);
     const [dragActive, setDragActive] = useState(false);
     const [uploadStatus, setUploadStatus] = useState({}); // { fileName: 'pending' | 'uploading' | 'success' | 'error' }
+    const [uploadPct, setUploadPct] = useState({}); // { fileName: 0-100 } while uploading
     const [projects, setProjects] = useState(() => getCachedProjects() || []);
     // "Continue" opens the book last used on any device: refresh from the server once
     const [, setResumeTick] = useState(0);
@@ -341,6 +342,7 @@ const Dashboard = () => {
         const initialStatus = {};
         selectedFiles.forEach(f => initialStatus[f.name] = 'pending');
         setUploadStatus(initialStatus);
+        setUploadPct({});
         try {
             const projectData = await createProject(newProjectName);
             if (projectData?.id) {
@@ -354,14 +356,16 @@ const Dashboard = () => {
                 for (const file of selectedFiles) {
                     setUploadStatus(prev => ({ ...prev, [file.name]: 'uploading' }));
                     try {
-                        await uploadDocument(projectData.id, file, null, bookOptions);
+                        await uploadDocument(projectData.id, file,
+                            (pct) => setUploadPct(prev => ({ ...prev, [file.name]: Math.max(prev[file.name] || 0, pct) })),
+                            bookOptions);
                         setUploadStatus(prev => ({ ...prev, [file.name]: 'success' }));
                     } catch (err) {
                         setUploadStatus(prev => ({ ...prev, [file.name]: 'error' }));
                         const detail = err?.response?.data?.detail;
                         // A plan limit opens the upgrade prompt on its own; say what failed otherwise
                         if (err?.response?.status !== 402) {
-                            toast.error(`${file.name}: ${typeof detail === 'string' ? detail : !err?.response ? "couldn't reach the server" : 'upload failed'}`);
+                            toast.error(`${file.name}: ${typeof detail === 'string' ? detail : err?.stalled ? err.message : !err?.response ? "couldn't reach the server" : 'upload failed'}`);
                         }
                     }
                 }
@@ -978,7 +982,8 @@ const Dashboard = () => {
                                                     : uploadStatus[file.name] === 'uploading' ? 'bg-blue-100 text-blue-700'
                                                     : 'bg-gray-100 text-gray-500'
                                                 }`}>
-                                                    {uploadStatus[file.name] === 'uploading' ? 'Uploading…' : uploadStatus[file.name] === 'success' ? '✓ Done' : uploadStatus[file.name] === 'error' ? '✗ Failed' : 'Pending'}
+                                                    {uploadStatus[file.name] === 'uploading'
+                                                        ? (uploadPct[file.name] >= 100 ? 'Processing…' : uploadPct[file.name] > 0 ? `Uploading ${uploadPct[file.name]}%` : 'Uploading…') : uploadStatus[file.name] === 'success' ? '✓ Done' : uploadStatus[file.name] === 'error' ? '✗ Failed' : 'Pending'}
                                                 </span>
                                             </div>
                                         ))}
