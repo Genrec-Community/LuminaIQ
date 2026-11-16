@@ -600,12 +600,18 @@ OUTPUT FORMAT - Return ONLY valid JSON, no markdown:
         project_id: str,
         target_topics: Optional[List[str]] = None,
         documents: Optional[List[Dict[str, Any]]] = None,
+        document_ids: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
         """
         Learning path for the project, ordered by services.topic_ordering
         (weighted, cycle-safe topological sort — the same order every screen
         uses). With target_topics, only those topics and everything they
         transitively depend on are included.
+
+        With document_ids, the path is still ordered over every book in the
+        project and then narrowed to those books' topics, so picking a book
+        only filters the one optimal path: its topics and their order never
+        change.
         """
         from services.topic_ordering import order_topics, topics_in_book_order, chapter_lookup
 
@@ -631,15 +637,21 @@ OUTPUT FORMAT - Return ONLY valid JSON, no markdown:
                     t for t in target_topics if t not in topics
                 ]
 
-            doc_names = {}
+            doc_names, doc_ids = {}, {}
             for doc in documents:
                 for t in doc.get("topics") or []:
                     doc_names.setdefault(t, doc.get("filename", "Unknown"))
+                    doc_ids.setdefault(t, doc.get("id"))
             chapters = chapter_lookup(documents)
 
             path = order_topics(topics, edges)
+            if document_ids:
+                wanted = set(document_ids)
+                keep = {t for d in documents if d.get("id") in wanted for t in (d.get("topics") or [])}
+                path = [item for item in path if item["topic"] in keep]
             for item in path:
                 item["document"] = doc_names.get(item["topic"], "Unknown")
+                item["document_id"] = doc_ids.get(item["topic"])
                 item["chapter"] = (chapters.get(item["topic"]) or {}).get("chapter")
             return path
 

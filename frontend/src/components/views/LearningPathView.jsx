@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
     Target, BookOpen, ChevronRight, Loader2, RefreshCw, 
     CheckCircle, Circle, Brain, Sparkles,
@@ -78,13 +78,30 @@ const LearningPathView = ({
     const [learningPath, setLearningPath] = useState(null);
     const [graphStats, setGraphStats] = useState(null);
     const [performance, setPerformance] = useState({});
-    const [selectedDoc, setSelectedDoc] = useState('all');
+    // Which book the path is shown for ("Show Path For"). Remembered per project so
+    // the choice survives a reload instead of snapping back to "All Documents".
+    const docChoiceKey = `lumina_path_doc_${projectId}`;
+    const [selectedDoc, setSelectedDocState] = useState(() => {
+        try { return localStorage.getItem(docChoiceKey) || 'all'; } catch { return 'all'; }
+    });
+    const setSelectedDoc = (value) => {
+        setSelectedDocState(value);
+        try { localStorage.setItem(docChoiceKey, value); } catch { /* storage blocked */ }
+    };
     const [expandedTopic, setExpandedTopic] = useState(null);
     const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
     
+    // A remembered book that has since been removed falls back to all books.
+    useEffect(() => {
+        if (selectedDoc !== 'all' && documentTopics && Object.keys(documentTopics).length > 0
+            && !documentTopics[selectedDoc]) {
+            setSelectedDoc('all');
+        }
+    }, [documentTopics, selectedDoc]);
+
     useEffect(() => {
         loadData();
-    }, [projectId]);
+    }, [projectId, selectedDoc]);
 
     // Handle rotating loading messages
     useEffect(() => {
@@ -110,9 +127,13 @@ const LearningPathView = ({
         }
     }, [loading, building, learningPath, availableTopics, projectId]);
     
+    // Switching books quickly must not let an older response overwrite a newer one.
+    const loadSeq = useRef(0);
     const loadData = async () => {
+        const seq = ++loadSeq.current;
         // Try to load from sessionStorage cache for instant display
-        const cacheKey = `lumina_path_${projectId}`;
+        const docIds = selectedDoc !== 'all' ? [selectedDoc] : null;
+        const cacheKey = `lumina_path_${projectId}_${selectedDoc}`;
         const cached = sessionStorage.getItem(cacheKey);
         if (cached) {
             try {
@@ -128,13 +149,15 @@ const LearningPathView = ({
         
         try {
             // Fetch fresh data (background refresh if cached data was shown)
-            const pathData = await getLearningPath(projectId);
+            const pathData = await getLearningPath(projectId, null, docIds);
+            if (seq !== loadSeq.current) return;
             setLearningPath(pathData);
             
             const graphData = await getKnowledgeGraph(projectId);
             setGraphStats(graphData.stats);
             
             const perfData = await getPerformance(projectId);
+            if (seq !== loadSeq.current) return;
             const perfMap = {};
             (perfData.performance || []).forEach(p => {
                 const total = (p.correct_count || 0) + (p.wrong_count || 0);
@@ -160,14 +183,12 @@ const LearningPathView = ({
         }
     };
     
+    // Only used when a project has no path at all yet. It builds the graph over
+    // every book once and never replaces an existing graph: the path it gives is
+    // the one optimal order, and picking a book just filters it.
     const handleBuildGraph = async () => {
-        // Get topics based on selection
-        let topicsToUse = availableTopics;
-        
-        if (selectedDoc !== 'all' && documentTopics && documentTopics[selectedDoc]) {
-            topicsToUse = documentTopics[selectedDoc];
-        }
-        
+        const topicsToUse = availableTopics;
+
         if (!topicsToUse || topicsToUse.length < 2) {
             toast.warning('Need at least 2 topics to build a learning path. Please select a document with more topics.');
             return;
@@ -175,9 +196,9 @@ const LearningPathView = ({
         
         setBuilding(true);
         try {
-            await buildKnowledgeGraph(projectId, topicsToUse, true);
+            await buildKnowledgeGraph(projectId, topicsToUse, false);
             // Clear cache so fresh data is loaded
-            sessionStorage.removeItem(`lumina_path_${projectId}`);
+            sessionStorage.removeItem(`lumina_path_${projectId}_${selectedDoc}`);
             await loadData();
             if (onTopicsChange) onTopicsChange();
             recordActivity(projectId, 'path', { action: 'build_graph', topicCount: topicsToUse.length });
@@ -186,6 +207,19 @@ const LearningPathView = ({
             toast.error('Failed to build learning path. Please try again.');
         } finally {
             setBuilding(false);
+        }
+    };
+
+    // Reload the path for the chosen book (or all books) without changing it.
+    const [refreshing, setRefreshing] = useState(false);
+    const handleRefresh = async () => {
+        setRefreshing(true);
+        try {
+            sessionStorage.removeItem(`lumina_path_${projectId}_${selectedDoc}`);
+            await loadData();
+            if (onTopicsChange) onTopicsChange();
+        } finally {
+            setRefreshing(false);
         }
     };
     
@@ -297,11 +331,33 @@ const LearningPathView = ({
     };
     
     // Calculate overall progress
+    // Only topics in the path on screen count, so another book's completed
+    // topics don't inflate this book's progress.
+    const countCompletedInPath = () =>
+        (learningPath?.learning_path || []).filter(i => completedTopics.has(i.topic)).length;
     const calculateProgress = () => {
         const pathItems = learningPath?.learning_path || [];
         if (pathItems.length === 0) return 0;
-        return Math.round((completedTopics.size / pathItems.length) * 100);
+        return Math.round((countCompletedInPath() / pathItems.length) * 100);
     };
+
+    // "All Documents" shows one section per book; a single book is one list.
+    const pathGroups = (() => {
+        const items = learningPath?.learning_path || [];
+        const groups = [];
+        const byDoc = new Map();
+        items.forEach((item, idx) => {
+            const docId = item.document_id || findDocumentsForTopic(item.topic)[0] || 'unknown';
+            if (!byDoc.has(docId)) {
+                const group = { docId, name: item.document && item.document !== 'Unknown' ? item.document : getDocName(docId), entries: [] };
+                byDoc.set(docId, group);
+                groups.push(group);
+            }
+            byDoc.get(docId).entries.push({ item, idx });
+        });
+        return groups;
+    })();
+    const showGroupHeaders = selectedDoc === 'all' && pathGroups.length > 1;
     
     // Check how many docs in context for a topic
     const getDocsInContext = (topic) => {
@@ -376,7 +432,7 @@ const LearningPathView = ({
                         </div>
                         <div className="mt-2.5 flex items-center gap-1.5">
                             <span className="text-xs font-semibold" style={{ color: isDark ? '#1E5C42' : '#5E5046' }}>
-                                {completedTopics.size}
+                                {countCompletedInPath()}
                             </span>
                             <span className="text-xs" style={{ color: mutedText }}>of</span>
                             <span className="text-xs font-semibold" style={{ color: isDark ? '#1E5C42' : '#5E5046' }}>
@@ -391,7 +447,7 @@ const LearningPathView = ({
                 <div className="rounded-xl border p-4 mb-6 overflow-hidden" style={{ background: card, borderColor: cardBorder }}>
                     <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
                         <div className="w-full sm:w-auto sm:max-w-[60%]">
-                            <label className="block text-sm font-bold mb-1" style={{ color: bodyText }}>Generate Path For</label>
+                            <label className="block text-sm font-bold mb-1" style={{ color: bodyText }}>Show Path For</label>
                             <select
                                 value={selectedDoc}
                                 onChange={(e) => setSelectedDoc(e.target.value)}
@@ -414,8 +470,8 @@ const LearningPathView = ({
                         </div>
 
                         <button
-                            onClick={handleBuildGraph}
-                            disabled={building}
+                            onClick={handleRefresh}
+                            disabled={refreshing}
                             className="px-5 py-3 rounded-xl font-bold disabled:opacity-50 flex items-center gap-2 whitespace-nowrap flex-shrink-0 transition-all duration-200"
                             style={isDark ? {
                                 background: '#D3EE6A',
@@ -423,10 +479,10 @@ const LearningPathView = ({
                                 boxShadow: '0 4px 14px rgba(200,162,136,0.35), 0 0 0 1px rgba(200,162,136,0.25)'
                             } : { background: '#1E5C42', color: '#fff' }}
                         >
-                            {building ? (
-                                <><Loader2 className="h-5 w-5 animate-spin" />Synthesizing...</>
+                            {refreshing ? (
+                                <><Loader2 className="h-5 w-5 animate-spin" />Refreshing...</>
                             ) : (
-                                <><Brain className="h-5 w-5" />Regenerate Path</>
+                                <><RefreshCw className="h-5 w-5" />Refresh</>
                             )}
                         </button>
                     </div>
@@ -439,7 +495,7 @@ const LearningPathView = ({
                         <Sparkles className="h-12 w-12 text-[#1E5C42] mx-auto mb-4" />
                         <h3 className="text-xl font-bold mb-2" style={{ color: bodyText }}>No Learning Path Yet</h3>
                         <p className="mb-6 max-w-md mx-auto" style={{ color: mutedText }}>
-                            Click "Generate Path" to create an AI-powered learning sequence based on topic dependencies.
+                            Your path appears here once your books finish processing.
                         </p>
                         <div className="flex items-center justify-center gap-2 text-sm" style={{ color: mutedText }}>
                             <BookOpen className="h-4 w-4" />
@@ -464,11 +520,22 @@ const LearningPathView = ({
                             </div>
                         </div>
 
-                        {/* Path Items */}
-                        {learningPath.learning_path.map((item, idx) => {
+                        {/* Path Items, one section per book */}
+                        {pathGroups.map((group) => (
+                        <div key={group.docId} className="space-y-4">
+                        {showGroupHeaders && (
+                            <div className="flex items-center gap-2 pt-4 pb-1 border-b" style={{ borderColor: cardBorder }}>
+                                <BookOpen className="h-4 w-4 flex-shrink-0 text-[#1E5C42]" />
+                                <h3 className="font-bold truncate" style={{ color: bodyText }} title={group.name}>{group.name}</h3>
+                                <span className="text-xs whitespace-nowrap ml-auto" style={{ color: mutedText }}>
+                                    {group.entries.filter(e => completedTopics.has(e.item.topic)).length} of {group.entries.length} done
+                                </span>
+                            </div>
+                        )}
+                        {group.entries.map(({ item, idx }, posInGroup) => {
                             const status = getTopicStatus(item.topic);
                             const perf = performance[item.topic];
-                            const isLast = idx === learningPath.learning_path.length - 1;
+                            const isLast = posInGroup === group.entries.length - 1;
                             const isExpanded = expandedTopic === idx;
                             const docsWithTopic = findDocumentsForTopic(item.topic);
                             const docsInContext = getDocsInContext(item.topic);
@@ -521,7 +588,7 @@ const LearningPathView = ({
                                                     {status.status === 'completed' ? (
                                                         <CheckCircle className="h-6 w-6" />
                                                     ) : (
-                                                        item.order
+                                                        posInGroup + 1
                                                     )}
                                                 </div>
                                                 
@@ -798,7 +865,9 @@ const LearningPathView = ({
                                 </div>
                             );
                         })}
-                        
+                        </div>
+                        ))}
+
                         {/* All Complete Banner */}
                         {calculateProgress() === 100 && (
                             <div className="bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-2xl p-8 text-center animate-in fade-in zoom-in">

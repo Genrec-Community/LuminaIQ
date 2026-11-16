@@ -595,6 +595,7 @@ async def get_topic_prerequisites(
 async def get_learning_path(
     project_id: str,
     target_topics: Optional[str] = None,
+    document_ids: Optional[str] = None,
     current_user: dict = Depends(get_current_user),
 ):
     """
@@ -609,15 +610,17 @@ async def get_learning_path(
         targets = None
         if target_topics:
             targets = [t.strip() for t in target_topics.split(",") if t.strip()]
+        doc_ids = [d.strip() for d in (document_ids or "").split(",") if d.strip()] or None
 
         path = await knowledge_graph.generate_learning_path(
-            project_id=project_id, target_topics=targets
+            project_id=project_id, target_topics=targets, document_ids=doc_ids
         )
 
         return {
             "learning_path": path,
             "total_topics": len(path),
             "target_topics": targets,
+            "document_ids": doc_ids,
         }
 
     except Exception as e:
