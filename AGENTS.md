@@ -42,7 +42,7 @@ Anti-goals (a failure even if it "works"):
   backend change. RAG changes must also pass the eval in §6 (Phase 3).
 - **Migrations:**
   - One database (`DATABASE_URL`): `backend/db/schema/NNNN_name.sql`, applied in order on startup by `db/migrate.py`
-    (or `uv run python -m db.migrate`). `0001_init.sql` is the fresh-start schema; the latest is `0011_document_file_type.sql`, so the next file is `0012_`.
+    (or `uv run python -m db.migrate`). `0001_init.sql` is the fresh-start schema; the latest is `0012_notes_many_per_book.sql`, so the next file is `0013_`.
     Never edit an applied file; add a new one.
   - `backend/db/supabase_auth.sql` is the only SQL that runs in Supabase (the Google sign-up allowlist on `auth.users`).
 - **Database access:** services call `get_supabase_client().table(...)` / `.rpc(...)` as before. That now goes to our
@@ -535,6 +535,23 @@ The owner will provide the real `.env`. Keep `.env.example` complete and up to d
 
 ## 8. Results log
 Record load-test numbers (Phase 1), RAG eval baselines and results (Phase 3), and cache hit rates (Phase 4) here, with the date and commit.
+
+### 2026-11-16 · Faster notes and study-tool retrieval
+`search_passages` (notes, quizzes, Q&A, learning path) searched its 4-6 queries one after another, each with its own
+embedding request, then a meaning search and a word search that also waited for each other. Now all queries go out
+together with one embedding request, and the two searches per query run at once (same passages, same order).
+Notes also stream (`POST /notes/generate/stream`, one JSON event per line) so text shows as it's written.
+Measured with a benchmark against real Postgres + pgvector (600 chunks), a fake model API at 250 ms per embedding
+request, 4 ms per database round trip, and a model at 0.8 s to first token and 80 tokens/s writing ~2,000 tokens:
+
+| Comprehensive notes | Before | After |
+| --- | --- | --- |
+| Retrieval (7 queries) | 1.88 s, 7 embedding requests | **0.29 s**, 1 request |
+| Time until the student sees text | 27.2 s (whole note at once) | **1.1 s** |
+| Total time | 27.2 s | 26.3 s (the model's writing speed is the rest) |
+
+Also fixed: `notes_user_project_unique` (left over from the single-notepad era) made every generated note after the
+first in a book fail to save; `0012` drops it.
 
 ### 2026-10-31 · Phase 4 shared-book reuse (end-to-end, fake model server)
 A teacher's 4-page book published to a class; two students (same level) each generate a 5-question quiz, 5

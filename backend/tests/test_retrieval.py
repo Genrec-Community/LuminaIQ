@@ -46,7 +46,12 @@ def fakes(monkeypatch):
     async def project_chunk_count(project_id):
         return state["count"]
 
+    async def embed_many(texts):
+        state.setdefault("embed_calls", []).append(list(texts))
+        return [await embed(t) for t in texts]
+
     monkeypatch.setattr(r.embedding_service, "generate_embedding", embed)
+    monkeypatch.setattr(r.embedding_service, "generate_query_embeddings", embed_many)
     monkeypatch.setattr(r.vector_store, "search_dense", dense)
     monkeypatch.setattr(r.vector_store, "search_keyword", keyword)
     monkeypatch.setattr(r.vector_store, "neighbours", neighbours)
@@ -173,3 +178,30 @@ def test_merge_stops_after_a_few_chunks(fakes):
     fakes["dense"]["*"] = [hit(i, f"Part {i}.", score=0.9 - i / 100) for i in range(6)]
     res = run(r.retrieve("p", "q", top_n=6))
     assert max(len(p.chunk_ids) for p in res.passages) <= r.MAX_MERGE
+
+
+def test_search_passages_embeds_once_and_searches_queries_together(fakes, monkeypatch):
+    """Study tools send 4-6 queries: one embedding request, all searches at once, results in query order."""
+    import time
+    fakes["count"] = 5
+    queries = ["alpha", "beta", "gamma", "delta"]
+    for i, q in enumerate(queries):
+        fakes["keyword"][q] = [hit(10 + i, f"{q} text", doc=q)]
+
+    async def slow_keyword(project_id, query, k=30, document_ids=None):
+        await asyncio.sleep(0.05)
+        return fakes["keyword"].get(query, [])
+
+    async def slow_dense(project_id, vector, k=30, document_ids=None):
+        await asyncio.sleep(0.05)
+        return []
+
+    monkeypatch.setattr(r.vector_store, "search_keyword", slow_keyword)
+    monkeypatch.setattr(r.vector_store, "search_dense", slow_dense)
+    started = time.perf_counter()
+    out = run(r.search_passages("p", queries, per_query=3))
+    elapsed = time.perf_counter() - started
+    assert [h["text"] for h in out] == [f"{q} text" for q in queries]
+    assert fakes["embed_calls"] == [queries]
+    # 4 queries x (dense + keyword) at 50 ms each took 400 ms one after another
+    assert elapsed < 0.2

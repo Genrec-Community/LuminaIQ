@@ -214,15 +214,18 @@ async def draw(user_id: Optional[str], scope: Optional[Scope], tool: str, topic:
 
 # ------------------------------------------------------------------- one-per-key assets
 
-async def asset(scope: Optional[Scope], tool: str, key_parts: List[Any],
-                make: Callable[[], Awaitable[Any]]) -> Tuple[Any, bool]:
-    """(content, came from the shared cache). Personal books always generate."""
-    from services.telemetry import meter, telemetry
+def _asset_key(scope: Scope, tool: str, key_parts: List[Any]) -> str:
+    parts = [_topic_key(p) if isinstance(p, str) else p for p in key_parts]
+    return _hash("asset", tool, scope.roots, parts, PROMPT_VERSIONS.get(tool, 1))
+
+
+async def asset_lookup(scope: Optional[Scope], tool: str, key_parts: List[Any]) -> Any:
+    """The shared content for this key, or None (always None for personal books)."""
+    from services.telemetry import telemetry
 
     if scope is None:
-        return await make(), False
-    parts = [_topic_key(p) if isinstance(p, str) else p for p in key_parts]
-    key = _hash("asset", tool, scope.roots, parts, PROMPT_VERSIONS.get(tool, 1))
+        return None
+    key = _asset_key(scope, tool, key_parts)
     pg = _pg()
     try:
         rows = await _db(lambda: pg.fetch(
@@ -230,18 +233,38 @@ async def asset(scope: Optional[Scope], tool: str, key_parts: List[Any],
         if rows:
             telemetry.record_hit("asset", saved_usd=float(rows[0].get("cost_usd") or 0))
             logger.info(f"[Shared] {tool} reused from the shared cache")
-            return rows[0]["content"]["value"], True
+            return rows[0]["content"]["value"]
     except Exception as e:
         logger.debug(f"[Shared] asset read failed: {e}")
+    return None
+
+
+async def asset_store(scope: Optional[Scope], tool: str, key_parts: List[Any], content: Any, cost: float) -> None:
+    """Share freshly made content (never a fallback result, never for personal books)."""
+    if scope is None or not content or (isinstance(content, dict) and content.get("_fallback")):
+        return
+    key = _asset_key(scope, tool, key_parts)
+    pg = _pg()
+    try:
+        await _db(lambda: pg.fetch(
+            """INSERT INTO shared_content (key, tool, root_ids, content, cost_usd)
+               VALUES (%s, %s, %s::uuid[], %s::jsonb, %s) ON CONFLICT (key) DO NOTHING""",
+            (key, tool, scope.roots, json.dumps({"value": content}), round(cost, 6))))
+    except Exception as e:
+        logger.debug(f"[Shared] asset write failed: {e}")
+
+
+async def asset(scope: Optional[Scope], tool: str, key_parts: List[Any],
+                make: Callable[[], Awaitable[Any]]) -> Tuple[Any, bool]:
+    """(content, came from the shared cache). Personal books always generate."""
+    from services.telemetry import meter
+
+    if scope is None:
+        return await make(), False
+    cached = await asset_lookup(scope, tool, key_parts)
+    if cached is not None:
+        return cached, True
     with meter() as m:
         content = await make()
-    # A fallback result (the model's output couldn't be used) is never shared
-    if content and not (isinstance(content, dict) and content.get("_fallback")):
-        try:
-            await _db(lambda: pg.fetch(
-                """INSERT INTO shared_content (key, tool, root_ids, content, cost_usd)
-                   VALUES (%s, %s, %s::uuid[], %s::jsonb, %s) ON CONFLICT (key) DO NOTHING""",
-                (key, tool, scope.roots, json.dumps({"value": content}), round(m.cost, 6))))
-        except Exception as e:
-            logger.debug(f"[Shared] asset write failed: {e}")
+    await asset_store(scope, tool, key_parts, content, m.cost)
     return content, False
