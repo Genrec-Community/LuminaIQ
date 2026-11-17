@@ -576,8 +576,10 @@ const Dashboard = () => {
 
                             <button
                                 onClick={(e) => handleDeleteClick(e, project.id)}
+                                data-cursor="Delete"
+                                data-cursor-tone="danger"
                                 className="absolute top-4 right-4 p-2 text-[#5E5046] hover:text-red-600 hover:bg-red-50 rounded-full transition-colors z-20 opacity-100"
-                                title="Delete Project"
+                                aria-label="Delete book"
                             >
                                 <Trash2 className="h-5 w-5" />
                             </button>
