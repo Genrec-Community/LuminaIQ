@@ -9,6 +9,7 @@ import { getPlans, startCheckout, startPassCheckout, verifyPayment } from '../ap
 import usePlan from '../hooks/usePlan';
 import { emitPlanChanged } from '../utils/plan';
 import { openCheckout } from '../utils/razorpay';
+import { track } from '../utils/analytics';
 import { STUDENT_PLANS, INSTITUTION_PLAN, EXAM_NIGHT_PASS, yearlySaving, inr } from '../utils/pricing';
 import { isNativeApp } from '../utils/platform';
 
@@ -21,6 +22,7 @@ const errText = (e) => e?.response?.data?.detail?.message || e?.response?.data?.
  * Payments run through Razorpay Checkout; the backend verifies every payment.
  */
 const Pricing = () => {
+    useEffect(() => { track('paywall_shown', { from: 'plans_page' }); }, []);
     const { user } = useAuth();
     const navigate = useNavigate();
     const [params] = useSearchParams();
@@ -54,6 +56,7 @@ const Pricing = () => {
         if (requireLogin(`/pricing?plan=${key}&cycle=${cycle}`)) return;
         setBusy(key);
         try {
+            track('checkout_started', { plan: key, cycle });
             const co = await startCheckout(key, cycle);
             const renewing = co.mode === 'subscription';
             const resp = await openCheckout(renewing ? {
@@ -84,6 +87,7 @@ const Pricing = () => {
         if (requireLogin('/pricing#pass')) return;
         setBusy('pass');
         try {
+            track('checkout_started', { plan: 'pass' });
             const co = await startPassCheckout();
             const resp = await openCheckout({
                 key: co.key_id, order_id: co.order_id, amount: co.amount_paise, currency: 'INR',

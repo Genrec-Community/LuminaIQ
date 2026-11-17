@@ -106,7 +106,8 @@ async def submit_mcq(
     await assert_row_access("mcq_tests", request.test_id, current_user["id"])
     try:
         result = await mcq_service.submit_test(
-            test_id=request.test_id, answers=request.answers, user_id=current_user["id"]
+            test_id=request.test_id, answers=request.answers, user_id=current_user["id"],
+            started_at=request.started_at, duration_seconds=request.duration_seconds,
         )
         return result
     except Exception as e:

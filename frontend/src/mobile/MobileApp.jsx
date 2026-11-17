@@ -19,6 +19,8 @@ import Me from './screens/Me';
 import Book from './screens/Book';
 import Setup from './screens/Setup';
 import LevelGate from '../components/LevelGate';
+import ConsentGate from '../components/ConsentGate';
+import NpsPrompt from '../components/NpsPrompt';
 import { useTools } from '../context/ToolsContext';
 import './mobile.css';
 import logo from './logo.png';
@@ -57,6 +59,8 @@ const Guard = () => {
             <Outlet />
             {loaded && !onboarded && <Setup />}
             {loaded && onboarded && tools.loaded && tools.needs_level && <LevelGate />}
+            {loaded && onboarded && tools.loaded && !tools.needs_level && <ConsentGate />}
+            {loaded && onboarded && tools.loaded && !tools.needs_level && <NpsPrompt />}
         </>
     );
 };

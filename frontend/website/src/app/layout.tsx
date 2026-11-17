@@ -6,6 +6,7 @@ import { plans, site } from '@/data/site';
 import { display, text } from './fonts';
 import '../engine/engine.css';
 import './globals.css';
+import { Visit } from '@/components/Visit';
 
 export const metadata: Metadata = {
   metadataBase: new URL(site.url),
@@ -90,6 +91,7 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
         </div>
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }} />
         <Motion />
+        <Visit />
       </body>
     </html>
   );

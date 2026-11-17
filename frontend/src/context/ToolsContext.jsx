@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { useAuth } from './AuthContext';
 import { useSettings } from './SettingsContext';
 import { getMyLevel, setMyLevel } from '../api';
+import { track } from '../utils/analytics';
 
 /**
  * The learner's level and the tools they may use (set by the platform admin per
@@ -41,6 +42,7 @@ export const ToolsProvider = ({ children }) => {
 
     const chooseLevel = useCallback(async (level) => {
         setInfo(await setMyLevel(level));
+        track('onboarding_level_chosen', { level });
         setLoaded(true);
         // Keep the local settings in step, so a later settings save doesn't drop it
         updateSettings({ studyLevel: level });

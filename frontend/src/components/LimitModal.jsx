@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, X, Clock, Crown } from 'lucide-react';
 import { LIMIT_EVENT, formatReset } from '../utils/plan';
 import { isNativeApp } from '../utils/platform';
+import { track } from '../utils/analytics';
 
 const NEXT_PLAN = {
     free: { key: 'scholar', name: 'Scholar', pitch: '6× more chat, 15 books and 15 Visual Lab builds a month' },
@@ -20,7 +21,10 @@ const LimitModal = () => {
     const [detail, setDetail] = useState(null);
 
     useEffect(() => {
-        const onLimit = (e) => setDetail(e.detail);
+        const onLimit = (e) => {
+            setDetail(e.detail);
+            track('paywall_shown', { feature: e.detail?.feature || null, plan: e.detail?.plan || null, from: 'limit' });
+        };
         window.addEventListener(LIMIT_EVENT, onLimit);
         return () => window.removeEventListener(LIMIT_EVENT, onLimit);
     }, []);
