@@ -96,6 +96,7 @@ class BillingService:
 
         try:
             await write(row)
+            await _track_payment(row)
         except Exception as e:
             try:
                 if not _missing_column(e):
@@ -251,3 +252,25 @@ class BillingService:
 
 
 billing = BillingService()
+
+
+async def _track_payment(row: Dict[str, Any]) -> None:
+    """payment_succeeded / payment_failed funnel events (amounts only, never card details)."""
+    status = row.get("status")
+    if status not in ("paid", "failed") or not row.get("user_id"):
+        return
+    try:
+        from services import product_analytics
+        name = "payment_succeeded" if status == "paid" else "payment_failed"
+        pid = row.get("razorpay_payment_id") or row.get("razorpay_order_id")
+        if pid:
+            # the checkout callback and the webhook both record the same payment
+            seen = await async_db(lambda: get_supabase_client().pg.fetch(
+                "SELECT 1 FROM product_events WHERE name = %s AND props->>'payment_id' = %s LIMIT 1", (name, pid)))
+            if seen:
+                return
+        await product_analytics.track_server(
+            name, row["user_id"], kind=row.get("kind"), plan=row.get("plan"), payment_id=pid,
+            amount_inr=(row.get("amount_paise") or 0) / 100)
+    except Exception:
+        pass

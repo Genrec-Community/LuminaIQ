@@ -5,6 +5,8 @@ import { useSettings } from '../context/SettingsContext';
 import Onboarding, { onboardedKey } from './Onboarding';
 import ForcePasswordChange from './ForcePasswordChange';
 import LevelGate from './LevelGate';
+import ConsentGate from './ConsentGate';
+import NpsPrompt from './NpsPrompt';
 import { useTools } from '../context/ToolsContext';
 
 const hasOnboardedLocally = (userId) => {
@@ -36,6 +38,8 @@ const PrivateRoute = () => {
             <Outlet />
             {showOnboarding && <Onboarding />}
             {!showOnboarding && tools.loaded && tools.needs_level && <LevelGate />}
+            {!showOnboarding && tools.loaded && !tools.needs_level && <ConsentGate />}
+            {!showOnboarding && tools.loaded && !tools.needs_level && <NpsPrompt />}
         </>
     );
 };

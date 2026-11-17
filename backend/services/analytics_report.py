@@ -388,6 +388,8 @@ async def report(days: int = 30) -> Dict[str, Any]:
     def q(sql: str):
         return pg.fetch(sql, p)
 
+    from services.analytics_growth import all_sections as growth_sections
+
     def run():
         return {
             "overview": _overview(q),
@@ -398,6 +400,7 @@ async def report(days: int = 30) -> Dict[str, Any]:
             "learning": _learning(q),
             "revenue": _revenue(q),
             "health": _health(q),
+            **growth_sections(q),
         }
 
     out = await async_db(run)

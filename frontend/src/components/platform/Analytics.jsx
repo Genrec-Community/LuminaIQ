@@ -24,9 +24,14 @@ const XP_NAMES = {
     daily_goal: 'Daily goals', exam_plan_step: 'Plan steps', comeback: 'Comebacks',
 };
 const SECTIONS = [
-    ['overview', 'Overview'], ['growth', 'Growth'], ['activation', 'Activation'], ['retention', 'Retention'],
-    ['engagement', 'Engagement'], ['learning', 'Learning'], ['revenue', 'Revenue'], ['health', 'Health'],
+    ['investor', 'Investor view'], ['overview', 'Overview'], ['growth', 'Growth'], ['activation', 'Activation'], ['retention', 'Retention'],
+    ['engagement', 'Engagement'], ['learning', 'Learning'], ['revenue', 'Revenue'], ['acquisition', 'Acquisition'], ['product', 'Product funnel'],
+    ['assessments', 'Quizzes'], ['feedback', 'Feedback'], ['health', 'Health'],
 ];
+const CHANNEL_NAMES = {
+    search: 'Search', social: 'Social media', referral: 'Other sites / referrals', school: 'School invite',
+    email: 'Email', paid: 'Paid ads', direct: 'Direct / typed in', other: 'Other campaign', unknown: 'Not tracked yet',
+};
 
 const shortDay = (d) => new Date(`${d}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 const compact = (v) => (v >= 10000 ? `${Math.round(v / 1000)}K` : v >= 1000 ? `${(v / 1000).toFixed(1)}K` : `${Math.round(v * 100) / 100}`);
@@ -223,6 +228,8 @@ const Report = ({ data, days }) => {
     const signups = funnel[0]?.users || 0;
     return (
         <>
+            {data.investor && <InvestorSection inv={data.investor} revenue={r} />}
+
             <Section id="overview" title="Overview">
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                     <Stat label="Total learners" value={num(o.total_users)} hint={`${num(o.paying_users)} paying (${pct(o.paying_share)})`} />
@@ -364,6 +371,8 @@ const Report = ({ data, days }) => {
                 ]} />
             </Section>
 
+            <GrowthSections data={data} />
+
             <Section id="health" title="System health" intro="Background work, book processing and the AI provider.">
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                     <Stat label="Jobs waiting now" value={num(h.queue.queued)}
@@ -380,6 +389,175 @@ const Report = ({ data, days }) => {
                     empty="No safety flags in this period." rows={h.safety} columns={[
                         ['category', 'Category'], ['level', 'Level', 'left', (v) => LEVEL_NAMES[v] || v], ['count', 'Times', 'right', num],
                     ]} />
+            </Section>
+        </>
+    );
+};
+
+const shortMonth = (m) => new Date(`${m}-01T00:00:00`).toLocaleDateString('en-IN', { month: 'short', year: '2-digit' });
+
+/** Monthly columns (last 12 months) with the value on hover. */
+const MonthColumns = ({ title, rows, field, format = num }) => {
+    const [hover, setHover] = useState(null);
+    const values = rows.map((m) => Number(m[field] || 0));
+    const max = Math.max(...values, 0);
+    return (
+        <figure className="rounded-2xl border border-[#E6D5CC] bg-white p-4">
+            <figcaption className="flex items-baseline justify-between gap-2">
+                <span className="font-semibold">{title}</span>
+                {hover !== null && <span className="text-sm tabular-nums text-[#5E5046]">{shortMonth(rows[hover].month)} · <b>{format(values[hover])}</b></span>}
+            </figcaption>
+            <div className="relative mt-4 flex h-28 items-end gap-1" onMouseLeave={() => setHover(null)} role="img"
+                aria-label={`${title} by month: ${rows.map((m, i) => `${shortMonth(m.month)} ${format(values[i])}`).join(', ')}`}>
+                {values.map((v, i) => (
+                    <button key={rows[i].month} type="button" className="flex h-full flex-1 items-end focus:outline-none"
+                        aria-label={`${shortMonth(rows[i].month)}: ${format(v)}`}
+                        onMouseEnter={() => setHover(i)} onFocus={() => setHover(i)} onClick={() => setHover(i)}>
+                        <span className="block w-full rounded-t-[4px]" style={{ height: max ? `${Math.max((v / max) * 100, v ? 2 : 0)}%` : 0,
+                            background: BAR, opacity: hover === null || hover === i ? 1 : 0.45 }} />
+                    </button>
+                ))}
+            </div>
+            <div className="mt-1 flex justify-between text-[10px] text-[#5E5046]">
+                <span>{rows.length ? shortMonth(rows[0].month) : ''}</span>
+                <span>{rows.length ? shortMonth(rows[rows.length - 1].month) : ''}</span>
+            </div>
+        </figure>
+    );
+};
+
+/** A plain-text summary to paste into a deck or an email. */
+const investorText = (inv, revenue) => [
+    `Lumina IQ — key numbers (${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })})`,
+    `Learners: ${num(inv.learners)} · Monthly active: ${num(inv.mau)} · Weekly active: ${num(inv.wau)} (WAU/MAU ${pct(inv.wau_over_mau)})`,
+    `Sign-ups this month: ${num(inv.signups_this_month)} (last month ${num(inv.signups_last_month)})`,
+    `Activation (first study action within 7 days): ${pct(inv.activation.rate)} of ${num(inv.activation.cohort)} recent sign-ups`,
+    `Retention: D1 ${pct(inv.retention.d1.rate)} · D7 ${pct(inv.retention.d7.rate)} · D30 ${pct(inv.retention.d30.rate)}`,
+    `Practice answers per monthly active learner: ${inv.answers_per_mau_30d}`,
+    `Lifetime: ${num(inv.lifetime.books)} books · ${num(inv.lifetime.practice_answers)} practice answers · ${num(inv.lifetime.quizzes_finished)} quizzes finished`,
+    `Revenue to date: ${inr(inv.lifetime.revenue_inr)} from ${num(inv.lifetime.paying_customers)} paying customers · MRR ${inr((revenue?.mrr_inr || 0) + (revenue?.school_mrr_inr || 0))}`,
+    `AI cost per weekly active learner (last 7 days): ${usd(inv.ai_cost_per_wau_usd)}`,
+].join('\n');
+
+const InvestorSection = ({ inv, revenue }) => {
+    const [copied, setCopied] = useState(false);
+    const copy = async () => {
+        try { await navigator.clipboard.writeText(investorText(inv, revenue)); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* no clipboard */ }
+    };
+    const csv = () => {
+        const head = ['month', 'signups', 'active', 'revenue_inr'];
+        const lines = [head.join(','), ...inv.monthly.map((m) => head.map((h) => m[h]).join(','))];
+        const url = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv' }));
+        const a = document.createElement('a');
+        a.href = url; a.download = 'lumina-monthly.csv'; a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    };
+    const ret = inv.retention;
+    return (
+        <Section id="investor" title="Investor view"
+            intro="All-time and rolling numbers (not limited to the period above). Activated = had a book ready, practised or asked the tutor within 7 days of signing up. Dn retention = of people who signed up at least n days ago (last 6 months), the share who came back on day n or later.">
+            <div className="mb-3 flex flex-wrap gap-2">
+                <button onClick={copy} className="rounded-2xl bg-[#163628] px-3 py-1.5 text-sm font-semibold text-white">
+                    {copied ? 'Copied' : 'Copy summary for a deck'}
+                </button>
+                <button onClick={csv} className="flex items-center gap-1.5 rounded-2xl border border-[#E6D5CC] bg-white px-3 py-1.5 text-sm font-semibold">
+                    <Download className="h-4 w-4" /> Monthly CSV
+                </button>
+            </div>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <Stat label="Learners" value={num(inv.learners)} hint={`${num(inv.signups_this_month)} this month · ${num(inv.signups_last_month)} last month`} />
+                <Stat label="Monthly active" value={num(inv.mau)}
+                    hint={inv.mau_growth === null ? 'vs previous 30 days: n/a' : `${inv.mau_growth >= 0 ? '+' : ''}${pct(inv.mau_growth)} vs previous 30 days`} />
+                <Stat label="Weekly active" value={num(inv.wau)} hint={`WAU/MAU ${pct(inv.wau_over_mau)} · today ${num(inv.dau)}`} />
+                <Stat label="Activation" value={pct(inv.activation.rate)} hint={`${num(inv.activation.activated)} of ${num(inv.activation.cohort)} sign-ups (last 90 days)`} />
+                <Stat label="D1 retention" value={pct(ret.d1.rate)} hint={`${num(ret.d1.returned)} of ${num(ret.d1.eligible)}`} />
+                <Stat label="D7 retention" value={pct(ret.d7.rate)} hint={`${num(ret.d7.returned)} of ${num(ret.d7.eligible)}`} />
+                <Stat label="D30 retention" value={pct(ret.d30.rate)} hint={`${num(ret.d30.returned)} of ${num(ret.d30.eligible)}`} />
+                <Stat label="Paid, of activated" value={pct(inv.activation.paid_of_activated)} hint={`${num(inv.lifetime.paying_customers)} paying customers ever`} />
+                <Stat label="Practice per active" value={num(inv.answers_per_mau_30d)} hint="answers per monthly active, 30 days" />
+                <Stat label="Books uploaded" value={num(inv.lifetime.books)} hint="all time" />
+                <Stat label="Revenue to date" value={inr(inv.lifetime.revenue_inr)} />
+                <Stat label="AI cost per weekly active" value={usd(inv.ai_cost_per_wau_usd)} hint="last 7 days" />
+            </div>
+            <div className="mt-3 grid gap-3 md:grid-cols-3">
+                <MonthColumns title="Sign-ups by month" rows={inv.monthly} field="signups" />
+                <MonthColumns title="Active learners by month" rows={inv.monthly} field="active" />
+                <MonthColumns title="Revenue by month" rows={inv.monthly} field="revenue_inr" format={inr} />
+            </div>
+        </Section>
+    );
+};
+
+const Unavailable = () => <p className="text-sm text-[#5E5046]">Not available yet (the new tables are created on the next deploy).</p>;
+
+const GrowthSections = ({ data }) => {
+    const { acquisition: a, product_funnel: pf, assessments: as, feedback: fb, consent: c } = data;
+    return (
+        <>
+            <Section id="acquisition" title="Where learners come from"
+                intro="Channel of each sign-up in this period, from campaign tags (utm_…), invite or referral codes, or the site that linked to us. Sign-ups from before tracking started show as “Not tracked yet”.">
+                {!a ? <Unavailable /> : (
+                    <>
+                        <div className="rounded-2xl border border-[#E6D5CC] bg-white p-4">
+                            {a.channels.length === 0 ? <p className="text-sm text-[#5E5046]">No sign-ups in this period.</p> : (
+                                <Bars rows={a.channels.map((ch) => ({
+                                    label: CHANNEL_NAMES[ch.channel] || ch.channel, value: ch.signups,
+                                    extra: `${pct(ch.activation_rate)} activated · ${num(ch.paid)} paid`,
+                                }))} />
+                            )}
+                            <p className="mt-3 text-xs text-[#5E5046]">Channel known for {pct(a.tracked_share)} of sign-ups in this period.</p>
+                        </div>
+                        <Table title="Top sources" empty="No tracked sources yet." rows={a.top_sources} columns={[
+                            ['source', 'Source'], ['campaign', 'Campaign', 'left', (v) => v || '—'], ['signups', 'Sign-ups', 'right', num],
+                        ]} />
+                    </>
+                )}
+            </Section>
+
+            <Section id="product" title="Product funnel" intro="Distinct people reaching each step in this period (signed in or not), from in-app events.">
+                {!pf ? <Unavailable /> : (
+                    <>
+                        <div className="rounded-2xl border border-[#E6D5CC] bg-white p-4">
+                            <Bars rows={pf.steps.map((st) => ({
+                                label: st.label, value: st.people,
+                                extra: st.of_previous === null ? null : `${pct(st.of_previous)} of previous step`,
+                            }))} />
+                            <p className="mt-3 text-xs text-[#5E5046]">Uploads that failed: {pct(pf.upload_failure_rate)}.</p>
+                        </div>
+                        <div className="grid gap-3 md:grid-cols-2">
+                            <Table title="Top pages" empty="No page views yet." rows={pf.top_pages} columns={[
+                                ['path', 'Page'], ['views', 'Views', 'right', num], ['people', 'People', 'right', num],
+                            ]} />
+                            <Table title="Platforms" empty="No events yet." rows={pf.platforms} columns={[
+                                ['platform', 'Platform'], ['people', 'People', 'right', num],
+                            ]} />
+                        </div>
+                    </>
+                )}
+            </Section>
+
+            <Section id="assessments" title="Quizzes" intro="Finished quizzes in this period. Improvement compares a learner's first and latest quiz on the same topic (all time).">
+                {!as ? <Unavailable /> : (
+                    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                        <Stat label="Quizzes finished" value={num(as.attempts)} hint={`${num(as.learners)} learners · ${num(as.questions)} questions`} />
+                        <Stat label="Finished, of started" value={as.completion_rate === null ? '—' : pct(as.completion_rate)} hint={`${num(as.started)} started`} />
+                        <Stat label="Average score" value={`${as.avg_score_pct}%`} hint={`median time ${Math.round(as.median_seconds / 60)} min`} />
+                        <Stat label="Score improvement" value={`${as.improvement.avg_gain_points >= 0 ? '+' : ''}${as.improvement.avg_gain_points} pts`}
+                            hint={`${pct(as.improvement.improved_share)} of ${num(as.improvement.learner_topics)} learner-topics improved`} />
+                    </div>
+                )}
+            </Section>
+
+            <Section id="feedback" title="Feedback and consent" intro="Thumbs on tutor answers and NPS in this period; consent counts are all time.">
+                {!fb ? <Unavailable /> : (
+                    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                        <Stat label="Helpful answers" value={pct(fb.ratings.helpful_rate)} hint={`${num(fb.ratings.up)} up · ${num(fb.ratings.down)} down`} />
+                        <Stat label="NPS" value={fb.nps.score === null ? '—' : fb.nps.score} hint={`${num(fb.nps.responses)} responses`} />
+                        <Stat label="Bug reports" value={num(fb.bugs)} hint={`${num(fb.ideas)} ideas`} />
+                        {c && <Stat label="Guardian consents" value={num(c.guardian_consents)}
+                            hint={`${num(c.accepted_terms)} accepted terms · ${num(c.pending_data_requests)} data requests waiting`} />}
+                    </div>
+                )}
             </Section>
         </>
     );

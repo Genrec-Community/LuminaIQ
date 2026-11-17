@@ -25,6 +25,7 @@ from api.v1.endpoints import (
     billing,
     institutions,
     platform,
+    events,
 )
 
 api_router = APIRouter()
@@ -56,6 +57,7 @@ api_router.include_router(memory.router, prefix="/memory", tags=["memory"], depe
 api_router.include_router(flashcards.router, prefix="/flashcards", tags=["flashcards"], dependencies=_GUARD)
 api_router.include_router(mindmaps.router, prefix="/mindmaps", tags=["mindmaps"], dependencies=_GUARD)
 api_router.include_router(progress.router, prefix="/progress", tags=["progress"])
+api_router.include_router(events.router, prefix="/events", tags=["events"])
 
 # Book Store
 api_router.include_router(books.router, prefix="/books", tags=["books"], dependencies=_GUARD)

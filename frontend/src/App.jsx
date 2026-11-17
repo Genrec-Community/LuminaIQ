@@ -10,6 +10,7 @@ import PrivateRoute from './components/PrivateRoute';
 import XPToast from './components/XPToast';
 import LimitModal from './components/LimitModal';
 import RouteMeta from './components/RouteMeta';
+import AnalyticsTracker from './components/AnalyticsTracker';
 import Feel from './feel/Feel';
 import { Mark } from './components/brand/Logo';
 
@@ -100,6 +101,7 @@ function App() {
                 <GamificationProvider>
                     <ToastProvider>
                         <Router>
+                            <AnalyticsTracker />
                             {!APP_SHELL && <RouteMeta />}
                             {!APP_SHELL && <SkipLink />}
                             {!APP_SHELL && <Feel />}

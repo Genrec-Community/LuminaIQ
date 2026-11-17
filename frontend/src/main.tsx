@@ -11,6 +11,7 @@ import './themes.css'
 import './lumina.css'
 import App from './App.jsx'
 import { warmUp } from './api'
+import { captureFirstTouch } from './utils/analytics'
 import { inject as injectAnalytics } from "@vercel/analytics"
 import { injectSpeedInsights } from "@vercel/speed-insights"
 
@@ -35,6 +36,9 @@ if (window.location.hostname.endsWith('.vercel.app')) {
   injectAnalytics()
   injectSpeedInsights()
 }
+
+// Before anything rewrites the address: keep the campaign tags and referrer of the first visit
+captureFirstTouch()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
