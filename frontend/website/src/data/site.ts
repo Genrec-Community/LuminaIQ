@@ -276,7 +276,7 @@ export const comparison: { row: string; free: string | boolean; scholar: string 
 export const faqs = [
   {
     q: 'What can I upload?',
-    a: 'PDF, Word and text files, or paste text straight in. Scanned PDFs are run through OCR, so photographed handouts work too. Each file can be up to 50 MB.',
+    a: 'PDF, Word and text files, or paste text straight in. Scanned PDFs are run through OCR, so photographed handouts work too. Each file can be up to 150 MB.',
   },
   {
     q: 'Does Lumina IQ make things up?',

@@ -72,4 +72,4 @@ export const yearlySaving = (p) => (p.monthly ? Math.round((1 - p.yearly / (p.mo
 export const inr = (n) => `₹${Number(n).toLocaleString('en-IN')}`;
 
 // Per-file upload limit; keep in step with MAX_FILE_SIZE on the backend
-export const MAX_UPLOAD_MB = 50;
+export const MAX_UPLOAD_MB = 150;

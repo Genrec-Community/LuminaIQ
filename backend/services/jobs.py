@@ -33,18 +33,15 @@ async def stage_upload(document_id: str, temp_path: str, filename: str) -> Dict[
     fails (storage down, file over the size limit), the job is pinned to this
     host, where the temp file is.
     """
+    from utils import split_storage
+
     ext = os.path.splitext(filename)[1].lower() or ".bin"
     path = f"{STAGING_PREFIX}/{document_id}{ext}"
     try:
-        with open(temp_path, "rb") as f:
-            data = f.read()
-
-        def _upload():
-            get_supabase_client().storage.from_(STAGING_BUCKET).upload(
-                file=data, path=path, file_options={"upsert": "true"})
-
-        await async_db(_upload)
-        return {"staged": f"{STAGING_BUCKET}/{path}"}
+        client = get_supabase_client()
+        # Big books go up in parts (one storage object is limited to 50 MB)
+        parts = await async_db(lambda: split_storage.upload_file(client, STAGING_BUCKET, path, temp_path))
+        return {"staged": split_storage.make_ref(STAGING_BUCKET, path, parts)}
     except Exception as e:
         logger.warning(f"[Jobs] staging {filename} failed, pinning the job to {HOST}: {e}")
         return {"local_path": temp_path, "pinned_host": HOST}
@@ -66,16 +63,17 @@ async def queue_document_processing(*, document_id: str, project_id: str, temp_p
 @handler("process_document")
 async def handle_process_document(job: Dict[str, Any]) -> Dict[str, Any]:
     from services.document_service import document_service
+    from utils import split_storage
 
     p = job["payload"]
-    staged = p.get("staged")
+    staged = split_storage.parse_ref(p.get("staged"))
     if staged:
-        bucket, path = staged.split("/", 1)
-        data = await async_db(lambda: get_supabase_client().storage.from_(bucket).download(path))
+        bucket, path, parts = staged
         os.makedirs("temp", exist_ok=True)
         fd, file_path = tempfile.mkstemp(suffix=os.path.splitext(path)[1], dir="temp")
-        with os.fdopen(fd, "wb") as f:
-            f.write(data)
+        os.close(fd)
+        client = get_supabase_client()
+        await async_db(lambda: split_storage.download_to(client, bucket, path, parts, file_path))
     else:
         file_path = p["local_path"]
         if not os.path.exists(file_path):
@@ -87,7 +85,7 @@ async def handle_process_document(job: Dict[str, Any]) -> Dict[str, Any]:
     )
     if staged:
         try:
-            await async_db(lambda: get_supabase_client().storage.from_(bucket).remove([path]))
+            await async_db(lambda: split_storage.remove(get_supabase_client(), bucket, path, parts))
         except Exception as e:
             logger.debug(f"[Jobs] staged copy not removed: {e}")
     return {"document_id": p["document_id"]}

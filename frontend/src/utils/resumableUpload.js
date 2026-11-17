@@ -81,98 +81,125 @@ const putSigned = (file, bucket, path, token, onProgress) => new Promise((resolv
 });
 
 /**
+ * One resumable TUS upload of `blob` to bucket/path (the whole file, or one part
+ * of a big one). Resolves when it is stored; rejects with { stalled: true } when
+ * the connection keeps dropping, or with the server's status.
+ */
+const tusUpload = (blob, contentType, bucket, path, token, onProgress) => new Promise((resolve, reject) => {
+    // Restarts since bytes last moved. tus already retries each chunk ~70 s
+    // before giving up, so this many in a row means the link is dead, not
+    // blipping: stop and say so instead of showing "Uploading…" forever.
+    let stalledRestarts = 0;
+    let lastSent = -1;
+    const upload = new tus.Upload(blob, {
+        endpoint: `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/upload/resumable/sign`,
+        retryDelays: [0, 1000, 3000, 5000, 10000, 20000, 30000],
+        // Same file (name + size) in the same project = same upload, even after re-picking
+        fingerprint: async () => ['lumina', path].join('|'),
+        chunkSize: CHUNK_SIZE,
+        uploadDataDuringCreation: true,
+        removeFingerprintOnSuccess: true,
+        headers: { 'x-signature': token, apikey: import.meta.env.VITE_SUPABASE_ANON_KEY, 'x-upsert': 'true' },
+        metadata: {
+            bucketName: bucket,
+            objectName: path,
+            contentType,
+            cacheControl: '3600',
+        },
+        onProgress: (sent) => {
+            if (sent > lastSent) { lastSent = sent; stalledRestarts = 0; }
+            onProgress(sent);
+        },
+        onError: (error) => {
+            const status = error?.originalResponse?.getStatus?.();
+            if (!status) {
+                if (++stalledRestarts > MAX_STALLED_RESTARTS) {
+                    reject(Object.assign(new Error('The connection keeps dropping. Upload again to continue where it stopped.'), { stalled: true }));
+                    return;
+                }
+                // Connection lost (screen off, signal, tab in background): wait, then carry on
+                // from the last finished chunk with the same file; nothing to re-pick
+                whenBackOnline().then(() => upload.start());
+                return;
+            }
+            reject(Object.assign(error, { status }));
+        },
+        onSuccess: () => resolve(),
+    });
+    upload.findPreviousUploads().then((previous) => {
+        if (previous.length) upload.resumeFromPreviousUpload(previous[0]);
+        upload.start();
+    }).catch(() => upload.start());
+});
+
+const askPermit = async (file, projectId, opts) =>
+    (await api.post('/documents/upload-url', { project_id: projectId, filename: file.name, size: file.size }, opts)).data;
+
+/**
  * Upload a file to the user's folder in the "uploads" bucket.
  * The backend hands out a signed token for this one file, so it works for every
  * login method (email logins have no Supabase session in the browser).
- * Resolves with the storage path. Throws { fallback: true } when the direct
+ * A book over 50 MB (one storage object's limit) goes up as several parts,
+ * one after another, each resumable; the backend joins them.
+ * Resolves with { path, key, parts }. Throws { fallback: true } when the direct
  * upload can't be used, so the caller can use the old route.
  */
 export async function uploadToStorage(file, projectId, onProgress) {
     let permit;
     try {
         // Short timeout: the permit is instant, so a slow answer means the server is unreachable
-        permit = (await api.post('/documents/upload-url', { project_id: projectId, filename: file.name, size: file.size }, { timeout: 30000 })).data;
+        permit = await askPermit(file, projectId, { timeout: 30000 });
     } catch (e) {
         if (e?.response?.status && e.response.status < 500 && e.response.status !== 404) throw e; // limit, too big, wrong type
         const err = new Error('Upload permit unavailable');
         err.fallback = true;
         throw err;
     }
-    const { bucket, path, token } = permit;
+    const { bucket, path } = permit;
+    // Older servers answer with one path/token only
+    const parts = permit.parts?.length ? permit.parts : [{ path, token: permit.token }];
+    const partBytes = parts.length > 1 ? permit.part_bytes : file.size;
+    const contentType = file.type || 'application/octet-stream';
     const key = keyOf(file);
     const entry = { key, projectId, name: file.name, size: file.size, pct: 0, startedAt: Date.now() };
     rememberPending(entry);
 
+    let lastSaved = 0;
+    const report = (sentTotal) => {
+        const pct = file.size ? Math.min(100, Math.round((sentTotal / file.size) * 100)) : 0;
+        onProgress?.(pct, sentTotal);
+        if (pct - lastSaved >= 5) {
+            lastSaved = pct;
+            rememberPending({ ...entry, pct });
+        }
+    };
+
     const release = keepAwake();
     try {
-        await new Promise((resolve, reject) => {
-            let lastSaved = 0;
-            // Restarts since bytes last moved. tus already retries each chunk ~70 s
-            // before giving up, so this many in a row means the link is dead, not
-            // blipping: stop and say so instead of showing "Uploading…" forever.
-            let stalledRestarts = 0;
-            let lastSent = -1;
-            const upload = new tus.Upload(file, {
-                endpoint: `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/upload/resumable/sign`,
-                retryDelays: [0, 1000, 3000, 5000, 10000, 20000, 30000],
-                // Same file (name + size) in the same project = same upload, even after re-picking
-                fingerprint: async () => ['lumina', path].join('|'),
-                chunkSize: CHUNK_SIZE,
-                uploadDataDuringCreation: true,
-                removeFingerprintOnSuccess: true,
-                headers: { 'x-signature': token, apikey: import.meta.env.VITE_SUPABASE_ANON_KEY, 'x-upsert': 'true' },
-                metadata: {
-                    bucketName: bucket,
-                    objectName: path,
-                    contentType: file.type || 'application/octet-stream',
-                    cacheControl: '3600',
-                },
-                onProgress: (sent, total) => {
-                    if (sent > lastSent) { lastSent = sent; stalledRestarts = 0; }
-                    const pct = total ? Math.round((sent / total) * 100) : 0;
-                    onProgress?.(pct, sent);
-                    if (pct - lastSaved >= 5) {
-                        lastSaved = pct;
-                        rememberPending({ ...entry, pct });
-                    }
-                },
-                onError: (error) => {
-                    const status = error?.originalResponse?.getStatus?.();
-                    if (!status) {
-                        if (++stalledRestarts > MAX_STALLED_RESTARTS) {
-                            reject(Object.assign(new Error('The connection keeps dropping. Upload again to continue where it stopped.'), { stalled: true }));
-                            return;
-                        }
-                        // Connection lost (screen off, signal, tab in background): wait, then carry on
-                        // from the last finished chunk with the same file; nothing to re-pick
-                        whenBackOnline().then(() => upload.start());
-                        return;
-                    }
-                    reject(Object.assign(error, { status }));
-                },
-                onSuccess: () => resolve(),
-            });
-            upload.findPreviousUploads().then((previous) => {
-                if (previous.length) upload.resumeFromPreviousUpload(previous[0]);
-                upload.start();
-            }).catch(() => upload.start());
-        });
-    } catch (tusError) {
-        // A dead connection won't do better with a one-shot upload of the whole file.
-        // The finished chunks are kept, so picking the same file again resumes.
-        if (tusError?.stalled) throw tusError;
-        // Resumable refused (e.g. an expired token on an old resume): one plain upload with a fresh token
-        console.warn('Resumable upload refused, uploading in one go', tusError?.status);
-        try {
-            const fresh = (await api.post('/documents/upload-url', { project_id: projectId, filename: file.name, size: file.size })).data;
-            await putSigned(file, fresh.bucket, fresh.path, fresh.token, onProgress);
-        } catch (putError) {
-            putError.fallback = true;
-            throw putError;
+        for (let i = 0; i < parts.length; i++) {
+            const offset = i * partBytes;
+            const blob = parts.length > 1 ? file.slice(offset, Math.min(offset + partBytes, file.size), contentType) : file;
+            try {
+                await tusUpload(blob, contentType, bucket, parts[i].path, parts[i].token, (sent) => report(offset + sent));
+            } catch (tusError) {
+                // A dead connection won't do better with a one-shot upload.
+                // The finished chunks are kept, so picking the same file again resumes.
+                if (tusError?.stalled) throw tusError;
+                // Resumable refused (e.g. an expired token on an old resume): one plain upload with a fresh token
+                console.warn('Resumable upload refused, uploading in one go', tusError?.status);
+                try {
+                    const fresh = await askPermit(file, projectId);
+                    const freshPart = fresh.parts?.[i] || { path: fresh.path, token: fresh.token };
+                    await putSigned(blob, fresh.bucket, freshPart.path, freshPart.token, (_pct, sent) => report(offset + sent));
+                } catch (putError) {
+                    putError.fallback = true;
+                    throw putError;
+                }
+            }
         }
     } finally {
         release();
     }
 
-    return { path, key };
+    return { path, key, parts: parts.length };
 }

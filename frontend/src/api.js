@@ -223,10 +223,11 @@ export const getProjects = async () => {
 export const uploadDocument = async (projectId, file, onProgress, bookOptions = {}) => {
     // Preferred: resumable upload straight to storage, then the backend fetches it
     try {
-        const { path, key } = await uploadToStorage(file, projectId, onProgress);
+        const { path, key, parts } = await uploadToStorage(file, projectId, onProgress);
         const res = await api.post('/documents/upload-from-storage', {
             project_id: projectId,
             storage_path: path,
+            parts,
             filename: file.name,
             is_public: !!bookOptions.isPublic,
             book_title: bookOptions.bookTitle,

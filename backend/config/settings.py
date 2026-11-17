@@ -211,7 +211,14 @@ class Settings(BaseSettings):
         return v
 
     UPLOAD_DIR: str = "./uploads"
-    MAX_FILE_SIZE: int = 104857600  # 100MB
+    MAX_FILE_SIZE: int = 157286400  # 150 MB per book
+    # Supabase Storage refuses objects over 50 MB (free plan), so bigger files are
+    # stored as parts of this size (utils/split_storage.py). Keep it under 50 MB.
+    STORAGE_PART_BYTES: int = 48 * 1024 * 1024
+    # Original PDFs bigger than this are recompressed for the reader (Ghostscript,
+    # images downsampled) before they are stored; text is read from the untouched file.
+    PDF_COMPRESS_ABOVE_BYTES: int = 48 * 1024 * 1024
+    PDF_COMPRESS_TIMEOUT_SECONDS: int = 900
     ALLOWED_EXTENSIONS: List[str] = [
         "pdf", "docx", "txt", "html", "md",
         # Image formats — processed via Azure CV OCR
