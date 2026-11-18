@@ -206,7 +206,7 @@ class FileParser:
         from config.settings import settings
 
         with fitz.open(file_path) as doc:
-            total = min(len(doc), settings.OCR_MAX_PAGES)
+            total = min(len(doc), settings.OCR_PAGE_LIMIT or len(doc))
             if len(doc) > total:
                 logger.warning(f"[FileParser] OCR limited to the first {total} of {len(doc)} pages")
 
@@ -287,7 +287,7 @@ class FileParser:
         parts = []
         try:
             with fitz.open(file_path) as doc:
-                end = min(len(doc), settings.OCR_MAX_PAGES if end is None else end)
+                end = min(len(doc), (settings.OCR_PAGE_LIMIT or len(doc)) if end is None else end)
                 total = max(0, end - start)
                 logger.info(f"[FileParser] Tesseract OCR → pages {start + 1}-{end} ({total}) at {settings.OCR_DPI} dpi")
                 for i in range(total):

@@ -296,17 +296,33 @@ const DocumentReader = ({ projectId, documentId, title, passage, page, onClose }
 
     useEffect(() => {
         let alive = true;
+        let objectUrl = null;
         (async () => {
             try {
                 const r = await getDocumentUrl(projectId, documentId);
                 if (r.kind === 'pdf' && r.url) { if (alive) setSource({ kind: 'pdf', url: r.url }); return; }
+                if (r.kind === 'pdf' && r.parts?.length) {
+                    // A big book is stored in parts (one storage object can't pass 50 MB): join them in order
+                    const blobs = await Promise.all(r.parts.map(async (u) => {
+                        const res = await fetch(u);
+                        if (!res.ok) throw new Error(`part ${res.status}`);
+                        return res.blob();
+                    }));
+                    if (!alive) return;
+                    objectUrl = URL.createObjectURL(new Blob(blobs, { type: 'application/pdf' }));
+                    setSource({ kind: 'pdf', url: objectUrl });
+                    return;
+                }
                 const t = await getDocumentText(projectId, documentId);
                 if (alive) setSource({ kind: 'text', text: t.text });
             } catch (e) {
                 if (alive) setError(e?.response?.data?.detail || "This document couldn't be opened.");
             }
         })();
-        return () => { alive = false; };
+        return () => {
+            alive = false;
+            if (objectUrl) URL.revokeObjectURL(objectUrl);
+        };
     }, [projectId, documentId]);
 
     useEffect(() => {
