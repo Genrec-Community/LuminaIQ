@@ -105,6 +105,7 @@ class DocumentService:
         The actual processing pipeline, called inside doc_semaphore.
         Separated so the semaphore scope is clear.
         """
+        original_task = None
         try:
             await self._update_document_status(document_id, "processing")
             await progress.emit(document_id, "extracting", 0, "Extracting text...")
@@ -156,14 +157,19 @@ class DocumentService:
                     await self._update_document_text_path(document_id, path)
                 return path
 
+            # Keep the original PDF so students can read it in the app and
+            # citations can open at the exact passage. A big book is recompressed
+            # first (minutes for a large scan), so this runs alongside the rest
+            # of the pipeline and is awaited before the book is marked ready.
+            original_task = asyncio.create_task(
+                self._save_original_to_storage(document_id, project_id, filename, file_path)
+            )
+
             logger.info(f"Chunking text from {filename}")
             await progress.emit(document_id, "chunking", 0, "Splitting into chunks...")
-            text_storage_path, chunks, _ = await asyncio.gather(
+            text_storage_path, chunks = await asyncio.gather(
                 save_text(),
                 make_chunks(text, filename),
-                # Keep the original PDF so students can read it in the app and
-                # citations can open at the exact passage
-                self._save_original_to_storage(document_id, project_id, filename, file_path),
             )
 
             if not chunks:
@@ -269,6 +275,10 @@ class DocumentService:
                 logger.error(f"Failed to build knowledge graph: {kg_err}")
                 await progress.emit(document_id, "graph", 100, "Knowledge graph skipped")
 
+            # The temp file is deleted once the pipeline returns: finish storing it first
+            await original_task
+            original_task = None
+
             # ── 8. Update status to completed ──────────────────────────────────
             await self._update_document_status(document_id, "completed")
             await progress.emit(
@@ -284,6 +294,10 @@ class DocumentService:
             logger.error(f"Error in pipeline for {filename}: {str(e)}")
             await self._update_document_status(document_id, "failed", str(e))
             await progress.emit(document_id, "failed", 0, str(e))
+        finally:
+            # Stored even if a later step failed, so "Retry" can reprocess from it
+            if original_task is not None:
+                await asyncio.gather(original_task, return_exceptions=True)
 
     # ──────────────────────────────────────────────────────────────────────────
     # Storage helpers
@@ -326,36 +340,40 @@ class DocumentService:
             return None
 
     ORIGINALS_BUCKET = "documents"
-    MAX_ORIGINAL_BYTES = 50 * 1024 * 1024  # Supabase free-tier per-file limit
 
     async def _save_original_to_storage(
         self, document_id: str, project_id: str, filename: str, file_path: str
     ) -> Optional[str]:
-        """Store the uploaded PDF (originals of other types aren't viewable, so skip them)."""
+        """
+        Store the uploaded PDF for the reader (originals of other types aren't
+        viewable, so skip them). A big PDF is recompressed first; if it is still
+        over the storage object limit it is stored in parts (utils/split_storage).
+        """
+        from services.pdf_compress import compress_pdf
+        from utils import split_storage
+
+        compressed = None
         try:
             if not filename.lower().endswith(".pdf") or not os.path.exists(file_path):
                 return None
-            if os.path.getsize(file_path) > self.MAX_ORIGINAL_BYTES:
-                logger.info(f"[{filename}] Original too large to store; reader will show text")
-                return None
+            source = file_path
+            if os.path.getsize(file_path) > settings.PDF_COMPRESS_ABOVE_BYTES:
+                compressed = await compress_pdf(file_path, split_storage.SINGLE_MAX)
+                source = compressed or file_path
             path = f"{project_id}/{document_id}.pdf"
-            with open(file_path, "rb") as f:
-                data = f.read()
-
-            def _upload():
-                get_supabase_client().storage.from_(self.ORIGINALS_BUCKET).upload(
-                    file=data, path=path,
-                    file_options={"content-type": "application/pdf", "upsert": "true"},
-                )
-
-            await async_db(_upload)
-            stored = f"{self.ORIGINALS_BUCKET}/{path}"
+            client = get_supabase_client()
+            parts = await async_db(lambda: split_storage.upload_file(
+                client, self.ORIGINALS_BUCKET, path, source, "application/pdf"))
+            stored = split_storage.make_ref(self.ORIGINALS_BUCKET, path, parts)
             await async_db(lambda: self.client.table("documents").update({"file_url": stored})
                            .eq("id", document_id).execute())
             return stored
         except Exception as e:
             logger.warning(f"[{filename}] Original file not stored: {e}")
             return None
+        finally:
+            if compressed and os.path.exists(compressed):
+                os.unlink(compressed)
 
     async def _update_document_text_path(self, document_id: str, path: str):
         """Update text_storage_path in the documents record."""

@@ -175,7 +175,9 @@ class Settings(BaseSettings):
     # Local OCR (Tesseract, in the Docker image) for scanned PDFs when Azure isn't set
     OCR_LOCAL_ENABLED: bool = True
     OCR_DPI: int = 200
-    OCR_MAX_PAGES: int = 600
+    # Pages to OCR per scanned book; 0 reads every page. (Replaces OCR_MAX_PAGES, which
+    # capped books at 600 pages; the new name means an old value in a deployed .env is ignored.)
+    OCR_PAGE_LIMIT: int = 0
 
     # ─────────────────────────────────────────────────────────
     # Application
@@ -211,7 +213,16 @@ class Settings(BaseSettings):
         return v
 
     UPLOAD_DIR: str = "./uploads"
-    MAX_FILE_SIZE: int = 104857600  # 100MB
+    # Largest book a user can upload. (Replaces MAX_FILE_SIZE, so an old 50/100 MB value
+    # left in a deployed .env can't quietly keep the old limit.)
+    MAX_BOOK_BYTES: int = 157286400  # 150 MB
+    # Supabase Storage refuses objects over 50 MB (free plan), so bigger files are
+    # stored as parts of this size (utils/split_storage.py). Keep it under 50 MB.
+    STORAGE_PART_BYTES: int = 48 * 1024 * 1024
+    # Original PDFs bigger than this are recompressed for the reader (Ghostscript,
+    # images downsampled) before they are stored; text is read from the untouched file.
+    PDF_COMPRESS_ABOVE_BYTES: int = 48 * 1024 * 1024
+    PDF_COMPRESS_TIMEOUT_SECONDS: int = 900
     ALLOWED_EXTENSIONS: List[str] = [
         "pdf", "docx", "txt", "html", "md",
         # Image formats — processed via Azure CV OCR

@@ -18,6 +18,7 @@ from models.schemas import DocumentUploadResponse, DocumentList
 from config.settings import settings
 from api.deps import get_current_user
 from utils.logger import logger
+from utils import split_storage
 from db.client import async_db, get_supabase_client
 from services.usage_service import usage, metered
 
@@ -193,12 +194,12 @@ async def upload_document(
             if not chunk:
                 break
             file_size += len(chunk)
-            if file_size > settings.MAX_FILE_SIZE:
+            if file_size > settings.MAX_BOOK_BYTES:
                 temp_file.close()
                 os.unlink(temp_file.name)
                 raise HTTPException(
                     status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                    f"This file is larger than the {settings.MAX_FILE_SIZE // (1024 * 1024)} MB upload limit.",
+                    f"This file is larger than the {settings.MAX_BOOK_BYTES // (1024 * 1024)} MB upload limit.",
                 )
             temp_file.write(chunk)
 
@@ -241,6 +242,8 @@ class StorageUploadRequest(BaseModel):
     project_id: str
     storage_path: str
     filename: str
+    # Books over 50 MB arrive as parts: storage_path.part0 .. part{N-1} (see /upload-url)
+    parts: int = 1
     is_public: bool = False
     book_title: Optional[str] = None
     book_author: Optional[str] = None
@@ -299,20 +302,28 @@ async def get_upload_url(request: UploadUrlRequest, current_user: dict = Depends
     ext = os.path.splitext(request.filename)[1].lower().lstrip(".")
     if ext not in _UPLOAD_TYPES:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Supported files: PDF, DOCX and TXT.")
-    if request.size <= 0 or request.size > settings.MAX_FILE_SIZE:
+    if request.size <= 0 or request.size > settings.MAX_BOOK_BYTES:
         raise HTTPException(
             status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            f"This file is larger than the {settings.MAX_FILE_SIZE // (1024 * 1024)} MB upload limit.",
+            f"This file is larger than the {settings.MAX_BOOK_BYTES // (1024 * 1024)} MB upload limit.",
         )
     if await _existing_copy(request.project_id, request.filename, request.size):
         raise HTTPException(status.HTTP_409_CONFLICT, f"\"{request.filename}\" is already in this project.")
     path = upload_object_path(current_user["id"], request.project_id, request.filename, request.size)
-    token = await create_signed_upload(path)
+    # One storage object can't be over 50 MB, so a bigger book is uploaded as
+    # parts (byte ranges of the file, in order), each with its own permit
+    parts = split_storage.parts_needed(request.size)
+    paths = split_storage.part_paths(path, parts)
+    tokens = await asyncio.gather(*(create_signed_upload(p) for p in paths))
     if ext == "pdf":
         # A scanned book may need the OCR service: wake it while the file uploads
         from utils.indra_ocr_client import warm_up
         warm_up()
-    return {"bucket": UPLOADS_BUCKET, "path": path, "token": token}
+    return {
+        "bucket": UPLOADS_BUCKET, "path": path, "token": tokens[0],
+        "part_bytes": split_storage.part_bytes(),
+        "parts": [{"path": p, "token": t} for p, t in zip(paths, tokens)],
+    }
 
 
 @router.post("/upload-from-storage", dependencies=[Depends(rate_limit("upload"))])
@@ -337,8 +348,11 @@ async def upload_from_storage(
     file_ext = os.path.splitext(request.filename)[1].lower().lstrip(".")
     if file_ext not in _UPLOAD_TYPES:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Supported files: PDF, DOCX and TXT.")
+    if not 1 <= request.parts <= split_storage.MAX_PARTS:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid upload.")
+    paths = split_storage.part_paths(path, request.parts)
 
-    url = f"{settings.SUPABASE_URL.rstrip('/')}/storage/v1/object/{UPLOADS_BUCKET}/{path}"
+    base = f"{settings.SUPABASE_URL.rstrip('/')}/storage/v1/object/{UPLOADS_BUCKET}"
     headers = {"Authorization": f"Bearer {settings.SUPABASE_SERVICE_KEY}", "apikey": settings.SUPABASE_SERVICE_KEY}
     os.makedirs("temp", exist_ok=True)
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_ext}", dir="temp")
@@ -346,19 +360,21 @@ async def upload_from_storage(
     file_size = 0
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(300, connect=20)) as client:
-            async with client.stream("GET", url, headers=headers) as resp:
-                if resp.status_code == 404:
-                    raise HTTPException(status.HTTP_404_NOT_FOUND, "The upload wasn't found. Please upload the file again.")
-                if resp.status_code >= 400:
-                    raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Couldn't fetch the upload ({resp.status_code}).")
-                async for chunk in resp.aiter_bytes(1024 * 1024):
-                    file_size += len(chunk)
-                    if file_size > settings.MAX_FILE_SIZE:
-                        raise HTTPException(
-                            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                            f"This file is larger than the {settings.MAX_FILE_SIZE // (1024 * 1024)} MB upload limit.",
-                        )
-                    temp_file.write(chunk)
+            # Parts are joined back into the original file, in order
+            for part_path in paths:
+                async with client.stream("GET", f"{base}/{part_path}", headers=headers) as resp:
+                    if resp.status_code in (400, 404):
+                        raise HTTPException(status.HTTP_404_NOT_FOUND, "The upload wasn't found. Please upload the file again.")
+                    if resp.status_code >= 400:
+                        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Couldn't fetch the upload ({resp.status_code}).")
+                    async for chunk in resp.aiter_bytes(1024 * 1024):
+                        file_size += len(chunk)
+                        if file_size > settings.MAX_BOOK_BYTES:
+                            raise HTTPException(
+                                status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                                f"This file is larger than the {settings.MAX_BOOK_BYTES // (1024 * 1024)} MB upload limit.",
+                            )
+                        temp_file.write(chunk)
         temp_file.close()
 
         document = await _start_processing(
@@ -380,8 +396,7 @@ async def upload_from_storage(
     # The file is now on this server (the original PDF is kept by processing); free the bucket
     try:
         async with httpx.AsyncClient(timeout=30) as client:
-            await client.request("DELETE", f"{settings.SUPABASE_URL.rstrip('/')}/storage/v1/object/{UPLOADS_BUCKET}",
-                                 headers=headers, json={"prefixes": [path]})
+            await client.request("DELETE", base, headers=headers, json={"prefixes": paths})
     except Exception as e:
         logger.debug(f"Could not remove {path} from {UPLOADS_BUCKET}: {e}")
     return document
@@ -436,25 +451,28 @@ async def retry_document(
     if status_row.data and status_row.data[0]["upload_status"] != "failed":
         raise HTTPException(status.HTTP_409_CONFLICT, "This document isn't in a failed state.")
 
-    data, suffix = None, None
-    if doc.get("file_url") and "/" in doc["file_url"]:
-        bucket, path = doc["file_url"].split("/", 1)
+    os.makedirs("temp", exist_ok=True)
+    temp_path = None
+    original = split_storage.parse_ref(doc.get("file_url"))
+    if original:
+        bucket, path, parts = original
+        fd, candidate = tempfile.mkstemp(suffix=os.path.splitext(path)[1] or ".pdf", dir="temp")
+        os.close(fd)
         try:
-            data = await async_db(lambda: client.storage.from_(bucket).download(path))
-            suffix = os.path.splitext(path)[1] or ".pdf"
+            # Streamed to disk part by part (a big book is never held in memory whole)
+            await async_db(lambda: split_storage.download_to(client, bucket, path, parts, candidate))
+            temp_path = candidate
         except Exception as e:
+            os.unlink(candidate)
             logger.warning(f"Retry: original not available for {document_id}: {e}")
-    if not data:
+    if not temp_path:
         text = await document_service.load_stored_text(doc)
         if text:
-            data, suffix = text.encode("utf-8"), ".txt"
-    if not data:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".txt", dir="temp") as f:
+                f.write(text.encode("utf-8"))
+                temp_path = f.name
+    if not temp_path:
         raise HTTPException(status.HTTP_410_GONE, "The file for this document is gone. Please upload it again.")
-
-    os.makedirs("temp", exist_ok=True)
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix, dir="temp") as f:
-        f.write(data)
-        temp_path = f.name
 
     await async_db(lambda: client.table("documents")
                    .update({"upload_status": "pending", "error_message": None})
@@ -476,6 +494,10 @@ async def get_document_url(
     """
     How to show a document in the reader:
       {"kind": "pdf", "url": <signed URL>}  - the original PDF is stored
+      {"kind": "pdf", "parts": [<signed URL>, ...]}
+                                            - a big PDF stored in parts: the reader
+                                              joins them in order (no "url", so an
+                                              older app falls back to the text)
       {"kind": "text"}                      - no original (older uploads, other file
                                               types): the reader shows the full text
                                               from GET /{project_id}/{document_id}/text
@@ -487,9 +509,29 @@ async def get_document_url(
     # Where the original lives: recorded at upload (class copies point at the
     # teacher's file), else the legacy conventions
     candidates = []
-    if doc.get("file_url") and "/" in doc["file_url"]:
-        bucket, path = doc["file_url"].split("/", 1)
-        candidates.append((bucket, path))
+    original = split_storage.parse_ref(doc.get("file_url"))
+    if original and original[2] > 1:
+        bucket, path, parts = original
+
+        def _sign_parts():
+            urls = []
+            for part_path in split_storage.part_paths(path, parts):
+                result = supabase.storage.from_(bucket).create_signed_url(part_path, EXPIRY)
+                url = isinstance(result, dict) and (result.get("signedURL") or result.get("signed_url"))
+                if not url:
+                    return None
+                urls.append(url)
+            return urls
+
+        try:
+            urls = await async_db(_sign_parts)
+        except Exception as e:
+            logger.warning(f"Reader: couldn't sign parts of {document_id}: {e}")
+            urls = None
+        if urls:
+            return {"kind": "pdf", "parts": urls, "filename": doc["filename"]}
+    elif original:
+        candidates.append(original[:2])
     candidates += [("documents", f"{project_id}/{document_id}.pdf"), ("documents", f"{project_id}/{document_id}")]
 
     def _try_signed():

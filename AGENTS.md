@@ -495,6 +495,18 @@ Builder's calls:
 - A sign-up is a user's first signed-in request (`app_users.created_at`).
 - Counts and learning data only: no chat text or memory notes appear on this page.
 
+### Follow-up (2026-11-17): books up to 150 MB
+Supabase (free plan) refuses any storage object over 50 MB, so `utils/split_storage.py` stores a bigger file as
+`path.part0..N` (48 MB each) and refers to it as `bucket/path#parts=N`; files up to 50 MB stay one object, as before.
+- **Upload:** `/documents/upload-url` hands out one signed permit per part; the browser uploads each byte range with
+  TUS (`utils/resumableUpload.js`) and `/upload-from-storage` joins them (`parts`).
+- **Worker staging** and the **stored original** use the same parts. Original PDFs over `PDF_COMPRESS_ABOVE_BYTES`
+  are recompressed with Ghostscript first (`services/pdf_compress.py`: 150 then 110 dpi images); extraction and OCR
+  always read the untouched upload. `/url` returns `parts` (signed links) for a split original and the reader joins them.
+- Builder's call: compression is only for the reader's copy, never for text extraction, so OCR quality doesn't drop.
+- Owner (2026-11-18): read **every** page of a scanned book (`OCR_PAGE_LIMIT=0`, was a 600-page cap) and the `texts`
+  bucket limit is 50 MB. The size limit is `MAX_BOOK_BYTES` (renamed from `MAX_FILE_SIZE` so an old deployed value can't keep 100 MB).
+
 ---
 
 ## 6. Configuration (new settings)
