@@ -194,12 +194,12 @@ async def upload_document(
             if not chunk:
                 break
             file_size += len(chunk)
-            if file_size > settings.MAX_FILE_SIZE:
+            if file_size > settings.MAX_BOOK_BYTES:
                 temp_file.close()
                 os.unlink(temp_file.name)
                 raise HTTPException(
                     status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                    f"This file is larger than the {settings.MAX_FILE_SIZE // (1024 * 1024)} MB upload limit.",
+                    f"This file is larger than the {settings.MAX_BOOK_BYTES // (1024 * 1024)} MB upload limit.",
                 )
             temp_file.write(chunk)
 
@@ -302,10 +302,10 @@ async def get_upload_url(request: UploadUrlRequest, current_user: dict = Depends
     ext = os.path.splitext(request.filename)[1].lower().lstrip(".")
     if ext not in _UPLOAD_TYPES:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Supported files: PDF, DOCX and TXT.")
-    if request.size <= 0 or request.size > settings.MAX_FILE_SIZE:
+    if request.size <= 0 or request.size > settings.MAX_BOOK_BYTES:
         raise HTTPException(
             status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            f"This file is larger than the {settings.MAX_FILE_SIZE // (1024 * 1024)} MB upload limit.",
+            f"This file is larger than the {settings.MAX_BOOK_BYTES // (1024 * 1024)} MB upload limit.",
         )
     if await _existing_copy(request.project_id, request.filename, request.size):
         raise HTTPException(status.HTTP_409_CONFLICT, f"\"{request.filename}\" is already in this project.")
@@ -369,10 +369,10 @@ async def upload_from_storage(
                         raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Couldn't fetch the upload ({resp.status_code}).")
                     async for chunk in resp.aiter_bytes(1024 * 1024):
                         file_size += len(chunk)
-                        if file_size > settings.MAX_FILE_SIZE:
+                        if file_size > settings.MAX_BOOK_BYTES:
                             raise HTTPException(
                                 status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                                f"This file is larger than the {settings.MAX_FILE_SIZE // (1024 * 1024)} MB upload limit.",
+                                f"This file is larger than the {settings.MAX_BOOK_BYTES // (1024 * 1024)} MB upload limit.",
                             )
                         temp_file.write(chunk)
         temp_file.close()

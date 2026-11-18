@@ -66,7 +66,7 @@ def test_real_limits_150mb_book_needs_four_parts_under_50mb():
     assert split_storage.parts_needed(50 * MB) == 1          # what used to work stays one object
     assert split_storage.parts_needed(150 * MB) == 4
     assert split_storage.part_bytes() < 50 * MB
-    assert settings.MAX_FILE_SIZE >= 150 * MB
+    assert settings.MAX_BOOK_BYTES >= 150 * MB
 
 
 def test_small_file_is_one_object_at_the_same_path(tmp_path, small_parts):
@@ -323,3 +323,32 @@ def test_retry_rebuilds_a_parted_original(setup, small_parts, monkeypatch):
     res = client.post(f"/api/v1/documents/{project['id']}/{doc['id']}/retry")
     assert res.status_code == 200, res.text
     assert queued["data"] == data
+
+
+# ---------------------------------------------------------------- every page of a long scan
+
+def test_ocr_reads_every_page_of_a_long_book(tmp_path, monkeypatch):
+    fitz = pytest.importorskip("fitz")
+    from utils.file_parser import FileParser
+
+    pdf = str(tmp_path / "long.pdf")
+    doc = fitz.open()
+    for _ in range(650):
+        doc.new_page(width=100, height=100)
+    doc.save(pdf)
+    asked = {}
+
+    def fake_tesseract(path, on_progress=None, start=0, end=None):
+        asked["range"] = (start, end)
+        return "text"
+
+    monkeypatch.setattr(FileParser, "_vision_pages_allowed", staticmethod(lambda total: 0))
+    monkeypatch.setattr("utils.indra_ocr_client.get_indra_ocr", lambda: None)
+    monkeypatch.setattr(FileParser, "_try_tesseract_ocr", staticmethod(fake_tesseract))
+    assert settings.OCR_PAGE_LIMIT == 0
+    FileParser._ocr_scanned_pdf(pdf)
+    assert asked["range"] == (0, 650)
+
+    monkeypatch.setattr(settings, "OCR_PAGE_LIMIT", 100)   # a cap can still be set if ever needed
+    FileParser._ocr_scanned_pdf(pdf)
+    assert asked["range"] == (0, 100)

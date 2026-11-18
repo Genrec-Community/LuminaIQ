@@ -504,6 +504,8 @@ Supabase (free plan) refuses any storage object over 50 MB, so `utils/split_stor
   are recompressed with Ghostscript first (`services/pdf_compress.py`: 150 then 110 dpi images); extraction and OCR
   always read the untouched upload. `/url` returns `parts` (signed links) for a split original and the reader joins them.
 - Builder's call: compression is only for the reader's copy, never for text extraction, so OCR quality doesn't drop.
+- Owner (2026-11-18): read **every** page of a scanned book (`OCR_PAGE_LIMIT=0`, was a 600-page cap) and the `texts`
+  bucket limit is 50 MB. The size limit is `MAX_BOOK_BYTES` (renamed from `MAX_FILE_SIZE` so an old deployed value can't keep 100 MB).
 
 ---
 
