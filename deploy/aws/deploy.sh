@@ -13,7 +13,8 @@ aws s3 cp "s3://$BUCKET/deploy/docker-compose.yml" docker-compose.yml --only-sho
 aws s3 cp "s3://$BUCKET/deploy/Caddyfile" Caddyfile --only-show-errors
 aws s3 cp "s3://$BUCKET/deploy/backup.sh" backup.sh --only-show-errors && chmod +x backup.sh
 
-# Settings: the old Azure BACKEND_ENV, then AWS overrides (later keys win), then secrets from SSM
+# Settings: the old Azure BACKEND_ENV, then secrets from SSM, then AWS overrides (later keys win;
+# "@NAME" in an override takes the value of NAME, e.g. a secret from SSM)
 umask 077
 aws s3 cp "s3://$BUCKET/config/backend_env" /tmp/base.env --only-show-errors
 aws s3 cp "s3://$BUCKET/deploy/backend.aws.env" /tmp/over.env --only-show-errors
@@ -24,7 +25,7 @@ for name in $(aws ssm get-parameters-by-path --path /luminaiq/env/ --query "Para
 done
 source /opt/luminaiq/pg.env
 echo "DATABASE_URL=postgresql://lumina:${POSTGRES_PASSWORD}@postgres:5432/lumina" >> /tmp/ssm.env
-python3 - /tmp/base.env /tmp/over.env /tmp/ssm.env > backend.env.new <<'PY'
+python3 - /tmp/base.env /tmp/ssm.env /tmp/over.env > backend.env.new <<'PY'
 import sys
 env = {}
 for path in sys.argv[1:]:

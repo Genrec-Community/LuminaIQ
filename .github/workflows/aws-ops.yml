@@ -4,6 +4,8 @@
 #                     server's Postgres with scripts/migrate_from_supabase.py; dry_run shows the plan only
 #   reindex           queue re-index jobs for books that have no search passages yet
 #   backup            take a database backup to S3 now
+#   set-embedding-dim change the vector columns to the deployed EMBEDDING_DIMENSION (empties chunks and
+#                     answer_cache: run reindex after)
 name: AWS ops
 
 on:
@@ -16,7 +18,7 @@ on:
     inputs:
       task:
         type: choice
-        options: [status, migrate-supabase, reindex, backup]
+        options: [status, migrate-supabase, reindex, backup, set-embedding-dim]
         default: status
       dry_run:
         type: boolean
@@ -89,3 +91,8 @@ jobs:
       - name: Backup now
         if: env.TASK == 'backup'
         run: .github/scripts/aws-run.sh "/opt/luminaiq/backup.sh && echo done"
+
+      - name: Change the embedding size
+        if: env.TASK == 'set-embedding-dim'
+        run: |
+          .github/scripts/aws-run.sh "cd /opt/luminaiq && D=\$(grep '^EMBEDDING_DIMENSION=' backend.env | cut -d= -f2) && echo dim=\$D && docker compose exec -T postgres psql -U lumina -d lumina -v ON_ERROR_STOP=1 -c \"TRUNCATE chunks, answer_cache; ALTER TABLE chunks ALTER COLUMN embedding TYPE vector(\$D); ALTER TABLE answer_cache ALTER COLUMN embedding TYPE vector(\$D);\" && docker compose restart api"
