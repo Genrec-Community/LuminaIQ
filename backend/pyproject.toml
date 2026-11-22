@@ -13,6 +13,7 @@ dependencies = [
     "attrs==25.4.0",
     "bcrypt==5.0.0",
     "beautifulsoup4==4.12.3",
+    "boto3>=1.40",
     "certifi==2025.11.12",
     "cffi==2.0.0",
     "charset-normalizer==3.4.4",

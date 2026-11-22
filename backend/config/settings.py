@@ -149,6 +149,10 @@ class Settings(BaseSettings):
     # ─────────────────────────────────────────────────────────
     # Embeddings: any OpenAI-compatible /embeddings API
     # ─────────────────────────────────────────────────────────
+    # "openai" (any OpenAI-compatible /embeddings API) or "bedrock" (AWS Bedrock with the server's
+    # AWS credentials: amazon.titan-embed-text-v2:0 or a Cohere embed model; EMBEDDING_MODEL is the model id)
+    EMBEDDING_PROVIDER: str = Field(default="openai")
+    BEDROCK_REGION: str = Field(default="ap-southeast-2")
     EMBEDDING_API_KEY: str = Field(default="")    # empty = the small chat model's key
     EMBEDDING_BASE_URL: str = Field(default="")   # empty = the small chat model's base URL
     EMBEDDING_MODEL: str = Field(default="text-embedding-3-small")

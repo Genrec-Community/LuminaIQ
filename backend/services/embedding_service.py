@@ -1,5 +1,5 @@
 """
-Text embeddings over any OpenAI-compatible /embeddings API.
+Text embeddings over any OpenAI-compatible /embeddings API, or AWS Bedrock (EMBEDDING_PROVIDER=bedrock).
 
 EMBEDDING_BASE_URL / EMBEDDING_API_KEY default to the small chat model's, so one
 provider can serve both. Requests are batched, a few run at once, and query
@@ -9,6 +9,8 @@ import asyncio
 import hashlib
 import time
 from typing import List
+
+import json
 
 import openai
 
@@ -31,6 +33,8 @@ class EmbeddingService:
     def __init__(self):
         self._client = None
         self._sem = None
+        self._bedrock = None
+        self._one_sem = None
 
     @property
     def client(self) -> openai.AsyncOpenAI:
@@ -47,7 +51,61 @@ class EmbeddingService:
             self._sem = asyncio.Semaphore(max(1, settings.MAX_GLOBAL_EMBEDDINGS))
         return self._sem
 
+    @property
+    def bedrock(self):
+        if self._bedrock is None:
+            import boto3
+            from botocore.config import Config
+            self._bedrock = boto3.client("bedrock-runtime", region_name=settings.BEDROCK_REGION,
+                                         config=Config(retries={"max_attempts": 6, "mode": "adaptive"},
+                                                       max_pool_connections=32))
+            logger.info(f"[Embeddings] {settings.EMBEDDING_MODEL} ({settings.EMBEDDING_DIMENSION}d) @ Bedrock {settings.BEDROCK_REGION}")
+        return self._bedrock
+
+    def _bedrock_invoke(self, body: dict) -> dict:
+        resp = self.bedrock.invoke_model(modelId=settings.EMBEDDING_MODEL, body=json.dumps(body),
+                                         contentType="application/json", accept="application/json")
+        return json.loads(resp["body"].read())
+
+    async def _bedrock_batch(self, batch: List[str]):
+        """Titan takes one text per call (run a few at once); Cohere takes up to 96."""
+        model = settings.EMBEDDING_MODEL
+        dim = settings.EMBEDDING_DIMENSION
+        if "cohere" in model:
+            out: List[List[float]] = []
+            for i in range(0, len(batch), 96):
+                data = await asyncio.to_thread(self._bedrock_invoke, {
+                    "texts": [t[:2048] for t in batch[i:i + 96]], "input_type": "search_document",
+                    "embedding_types": ["float"], "output_dimension": dim})
+                emb = data["embeddings"]
+                out.extend(emb["float"] if isinstance(emb, dict) else emb)
+            return out, sum(len(t) // 4 for t in batch)
+
+        if self._one_sem is None:
+            self._one_sem = asyncio.Semaphore(8)
+
+        async def one(text: str):
+            # Titan v2 reads at most 8k tokens (about 50k characters)
+            async with self._one_sem:
+                return await asyncio.to_thread(self._bedrock_invoke, {"inputText": text[:40000], "dimensions": dim,
+                                                                      "normalize": True})
+        results = await asyncio.gather(*[one(t) for t in batch])
+        return [r["embedding"] for r in results], sum(r.get("inputTextTokenCount", 0) for r in results)
+
     async def _embed_batch(self, batch: List[str]) -> List[List[float]]:
+        if settings.EMBEDDING_PROVIDER == "bedrock":
+            async with self._semaphore:
+                started = time.perf_counter()
+                try:
+                    vectors, tokens = await self._bedrock_batch(batch)
+                except Exception:
+                    _record(0, int((time.perf_counter() - started) * 1000), ok=False)
+                    raise
+            _record(tokens, int((time.perf_counter() - started) * 1000))
+            if vectors and len(vectors[0]) != settings.EMBEDDING_DIMENSION:
+                raise ValueError(f"Bedrock returned {len(vectors[0])} dimensions, EMBEDDING_DIMENSION is "
+                                 f"{settings.EMBEDDING_DIMENSION}")
+            return vectors
         kwargs = {"model": settings.EMBEDDING_MODEL, "input": batch}
         if settings.EMBEDDING_SEND_DIMENSIONS:
             kwargs["dimensions"] = settings.EMBEDDING_DIMENSION
