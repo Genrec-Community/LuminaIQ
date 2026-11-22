@@ -2,9 +2,10 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# System packages for PDF parsing and OCR
+# System packages for PDF parsing and OCR (ghostscript shrinks big PDFs before storing them)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     poppler-utils \
+    ghostscript \
     tesseract-ocr \
     build-essential \
     libpq-dev \
