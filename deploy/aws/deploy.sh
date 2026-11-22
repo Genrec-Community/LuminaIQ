@@ -38,6 +38,10 @@ for path in sys.argv[1:]:
             env.pop(k, None)
         else:
             env[k] = v
+# "@NAME" copies another key's value (one AI key serving chat, deep model and embeddings)
+for k, v in list(env.items()):
+    if v.startswith("@") and v[1:] in env:
+        env[k] = env[v[1:]]
 for k, v in env.items():
     print(f"{k}={v}")
 PY
