@@ -1,0 +1,89 @@
+# Hand-run operations on the AWS server (see AWS.md). Actions → AWS ops → Run workflow.
+#   status            containers, disk, memory, API health, recent API logs
+#   migrate-supabase  copy the app data from the Supabase database (SUPABASE_DB_URL secret) into the
+#                     server's Postgres with scripts/migrate_from_supabase.py; dry_run shows the plan only
+#   reindex           queue re-index jobs for books that have no search passages yet
+#   backup            take a database backup to S3 now
+name: AWS ops
+
+on:
+  push:
+    branches: [claude/move-to-aws]
+    # Until this workflow is on main (manual runs need that), a push of deploy/aws/ops-task runs the
+    # task written in it: "<task> [dry_run=true|false] [reindex=true|false]"
+    paths: ["deploy/aws/ops-task"]
+  workflow_dispatch:
+    inputs:
+      task:
+        type: choice
+        options: [status, migrate-supabase, reindex, backup]
+        default: status
+      dry_run:
+        type: boolean
+        default: true
+      reindex:
+        description: "migrate-supabase: queue book re-indexing after the copy"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: aws-ops
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-southeast-2
+
+jobs:
+  ops:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::524554316555:role/luminaiq-github-deploy
+          aws-region: ap-southeast-2
+
+      - name: Which task
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            read -r T A B < deploy/aws/ops-task
+          else
+            T="${{ inputs.task }}"; A="dry_run=${{ inputs.dry_run }}"; B="reindex=${{ inputs.reindex }}"
+          fi
+          echo "TASK=$T" >> "$GITHUB_ENV"
+          DRY=true; RE=true
+          for kv in $A $B; do case "$kv" in dry_run=*) DRY=${kv#*=} ;; reindex=*) RE=${kv#*=} ;; esac; done
+          echo "DRY_RUN=$DRY" >> "$GITHUB_ENV"; echo "REINDEX=$RE" >> "$GITHUB_ENV"
+          echo "task=$T dry_run=$DRY reindex=$RE"
+
+      - name: Status
+        if: env.TASK == 'status'
+        run: |
+          .github/scripts/aws-run.sh 'cd /opt/luminaiq && docker compose ps && df -h / && free -m && docker compose exec -T api curl -s http://localhost:8000/ready; echo; docker compose logs --tail 120 api'
+
+      - name: Copy data from Supabase
+        if: env.TASK == 'migrate-supabase'
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          [ -n "$SUPABASE_DB_URL" ] || { echo "::error::SUPABASE_DB_URL secret is empty"; exit 1; }
+          aws ssm put-parameter --name /luminaiq/secret/SUPABASE_DB_URL --type SecureString --overwrite --value "$SUPABASE_DB_URL" >/dev/null
+          FLAGS=""
+          [ "$DRY_RUN" = "false" ] || FLAGS="--dry-run"
+          [ "$REINDEX" = "false" ] && FLAGS="$FLAGS --no-reindex" || true
+          .github/scripts/aws-run.sh "cd /opt/luminaiq && SRC=\$(aws ssm get-parameter --region $AWS_REGION --name /luminaiq/secret/SUPABASE_DB_URL --with-decryption --query Parameter.Value --output text) && docker compose exec -T -e SOURCE_DATABASE_URL=\"\$SRC\" api uv run --no-sync python -m scripts.migrate_from_supabase $FLAGS 2>&1 | tail -150" 3000
+
+      - name: Queue re-indexing
+        if: env.TASK == 'reindex'
+        run: |
+          .github/scripts/aws-run.sh "cd /opt/luminaiq && docker compose exec -T api uv run --no-sync python -c \"import os, psycopg; from scripts.migrate_from_supabase import queue_reindex; c = psycopg.connect(os.environ['DATABASE_URL'], autocommit=True); print('queued', queue_reindex(c))\""
+
+      - name: Backup now
+        if: env.TASK == 'backup'
+        run: .github/scripts/aws-run.sh "/opt/luminaiq/backup.sh && echo done"

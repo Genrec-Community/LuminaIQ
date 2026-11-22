@@ -1,0 +1,96 @@
+# Deploys Lumina IQ to AWS (see AWS.md): one EC2 server in Sydney running the API, Postgres and
+# Caddy (HTTPS + the website). GitHub signs in to AWS with OIDC, so no AWS keys are stored here.
+#   backend  → image in ECR luminaiq-backend
+#   frontend → built with a same-origin API (/api/v1), uploaded to S3, served by Caddy
+#   deploy   → SSM runs deploy/aws/deploy.sh on the server
+name: Deploy to AWS
+
+on:
+  push:
+    branches: [main, claude/move-to-aws]
+    paths: ["backend/**", "frontend/src/**", "frontend/scripts/**", "frontend/public/**", "frontend/index.html",
+            "frontend/package.json", "deploy/aws/**", ".github/workflows/aws.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: aws-deploy
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-southeast-2
+  ROLE: arn:aws:iam::524554316555:role/luminaiq-github-deploy
+  ECR: 524554316555.dkr.ecr.ap-southeast-2.amazonaws.com/luminaiq-backend
+  BUCKET: luminaiq-backups-524554316555
+  WEB_BUCKET: luminaiq-web-524554316555
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      image: ${{ steps.push.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with: { role-to-assume: "${{ env.ROLE }}", aws-region: "${{ env.AWS_REGION }}" }
+      - uses: aws-actions/amazon-ecr-login@v2
+      - name: Build and push the API image
+        id: push
+        run: |
+          set -euo pipefail
+          IMAGE="$ECR:${GITHUB_SHA}"
+          docker build -t "$IMAGE" -t "$ECR:latest" backend/
+          docker push -q "$IMAGE"; docker push -q "$ECR:latest"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      # Same origin: Caddy on the server sends /api/* to the API, so the site works on any of its names
+      VITE_MAIN_API_URL: /api/v1
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://bcosfvilvwyxtrctsmez.supabase.co' }}
+      VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJjb3Nmdmlsdnd5eHRyY3RzbWV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY3ODIyMTMsImV4cCI6MjA4MjM1ODIxM30.bj9wwAT41fkvGX6CLrmyQT16-Fph4_mgqSXZintsNX0' }}
+      VITE_GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - uses: aws-actions/configure-aws-credentials@v4
+        with: { role-to-assume: "${{ env.ROLE }}", aws-region: "${{ env.AWS_REGION }}" }
+      - name: Upload the website
+        run: |
+          aws s3 sync dist/assets "s3://$WEB_BUCKET/assets" --only-show-errors
+          aws s3 sync dist "s3://$WEB_BUCKET" --delete --exclude "assets/*" --only-show-errors
+          aws s3 sync dist/assets "s3://$WEB_BUCKET/assets" --delete --only-show-errors
+
+  deploy:
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with: { role-to-assume: "${{ env.ROLE }}", aws-region: "${{ env.AWS_REGION }}" }
+      - name: Run deploy.sh on the server
+        env:
+          IMAGE: ${{ needs.backend.outputs.image }}
+        run: |
+          set -euo pipefail
+          for f in docker-compose.yml Caddyfile deploy.sh backup.sh backend.aws.env; do
+            aws s3 cp "deploy/aws/$f" "s3://$BUCKET/deploy/$f" --sse AES256 --only-show-errors
+          done
+          .github/scripts/aws-run.sh "aws s3 cp s3://$BUCKET/deploy/deploy.sh /opt/luminaiq/deploy.sh --only-show-errors --region $AWS_REGION && chmod +x /opt/luminaiq/deploy.sh && /opt/luminaiq/deploy.sh $IMAGE"
+          echo "### Deployed $IMAGE" >> "$GITHUB_STEP_SUMMARY"

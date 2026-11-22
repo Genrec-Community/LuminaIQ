@@ -1,0 +1,27 @@
+# SITE_HOSTS (site.env) lists the names this server answers for, e.g.
+#   "luminaiq.fun, www.luminaiq.fun, 3-104-1-2.sslip.io"
+# Caddy gets the HTTPS certificates itself once DNS points here.
+{$SITE_HOSTS} {
+	encode zstd gzip
+
+	@api path /api/* /health /ready /docs /openapi.json
+	handle @api {
+		reverse_proxy api:8000 {
+			flush_interval -1
+			transport http {
+				read_timeout 15m
+				write_timeout 15m
+			}
+		}
+	}
+
+	handle {
+		root * /srv/web
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		@html not path /assets/*
+		header @html Cache-Control "no-cache"
+		try_files {path} /index.html
+		file_server
+	}
+}
