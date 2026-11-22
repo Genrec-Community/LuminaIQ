@@ -1,1 +1,1 @@
-status
+migrate-supabase dry_run=true

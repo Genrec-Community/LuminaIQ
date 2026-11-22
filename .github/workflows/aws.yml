@@ -89,7 +89,7 @@ jobs:
           IMAGE: ${{ needs.backend.outputs.image }}
         run: |
           set -euo pipefail
-          for f in docker-compose.yml Caddyfile deploy.sh backup.sh backend.aws.env; do
+          for f in docker-compose.yml Caddyfile deploy.sh backup.sh backend.aws.env site-hosts; do
             aws s3 cp "deploy/aws/$f" "s3://$BUCKET/deploy/$f" --sse AES256 --only-show-errors
           done
           .github/scripts/aws-run.sh "aws s3 cp s3://$BUCKET/deploy/deploy.sh /opt/luminaiq/deploy.sh --only-show-errors --region $AWS_REGION && chmod +x /opt/luminaiq/deploy.sh && /opt/luminaiq/deploy.sh $IMAGE"

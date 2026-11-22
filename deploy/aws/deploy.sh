@@ -43,7 +43,9 @@ for k, v in env.items():
 PY
 mv backend.env.new backend.env
 rm -f /tmp/base.env /tmp/over.env /tmp/ssm.env
-[ -f site.env ] || echo "SITE_HOSTS=$(curl -s http://checkip.amazonaws.com | tr . -).sslip.io" > site.env
+# Names Caddy serves (and gets HTTPS certificates for)
+aws s3 cp "s3://$BUCKET/deploy/site-hosts" /tmp/site-hosts --only-show-errors
+echo "SITE_HOSTS=$(head -1 /tmp/site-hosts)" > site.env
 
 # Website
 mkdir -p web

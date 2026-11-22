@@ -11,10 +11,9 @@
 #   AZURE_API_URL (custom API domain, e.g. https://api.luminaiq.fun/api/v1)
 name: Deploy to Azure
 
+# Production moved to AWS on 2026-11-22 (AWS.md, aws.yml) after the Azure subscription was disabled.
+# Kept for manual runs only.
 on:
-  push:
-    branches: [main]
-    paths: ["backend/**", "frontend/src/**", "frontend/scripts/**", "frontend/public/**", "frontend/index.html", "frontend/package.json", ".github/workflows/azure.yml"]
   workflow_dispatch:
 
 permissions:
