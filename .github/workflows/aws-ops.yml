@@ -64,6 +64,8 @@ jobs:
       - name: Status
         if: env.TASK == 'status'
         run: |
+          for u in https://3-105-245-239.sslip.io/health https://3-105-245-239.sslip.io/ https://luminaiq.fun/health; do
+            curl -s -m 20 -o /dev/null -w "%{http_code} %{time_total}s $u\n" "$u" || echo "fail $u"; done
           .github/scripts/aws-run.sh 'cd /opt/luminaiq && docker compose ps && df -h / && free -m && docker compose exec -T api curl -s http://localhost:8000/ready; echo; docker compose logs --tail 120 api'
 
       - name: Copy data from Supabase
