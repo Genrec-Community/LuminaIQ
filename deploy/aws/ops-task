@@ -1,1 +1,1 @@
-migrate-supabase dry_run=true
+migrate-supabase dry_run=false reindex=false
