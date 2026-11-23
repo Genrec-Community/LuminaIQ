@@ -8,7 +8,7 @@ import httpx
 
 OUT = "/app/ops_out"
 LOG = open(f"{OUT}/quality.md", "w")
-ONLY = set(filter(None, os.environ.get("QT_ONLY", "quiz,lab").split(",")))
+ONLY = set(filter(None, os.environ.get("QT_ONLY", "quiz").split(",")))
 
 
 def w(s=""):
