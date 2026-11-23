@@ -9,7 +9,8 @@ on:
   push:
     branches: [main, claude/move-to-aws]
     paths: ["backend/**", "frontend/src/**", "frontend/scripts/**", "frontend/public/**", "frontend/index.html",
-            "frontend/package.json", "deploy/aws/**", ".github/workflows/aws.yml"]
+            "frontend/package.json", "deploy/aws/**", ".github/workflows/aws.yml",
+            "!deploy/aws/ops/**", "!deploy/aws/ops-task"]
   workflow_dispatch:
 
 permissions:
