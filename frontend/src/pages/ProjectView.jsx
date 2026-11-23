@@ -1926,6 +1926,18 @@ const ProjectView = () => {
                                     );
                                 })()}
 
+                                {/* Books whose text was lost in the server move: ask for a re-upload */}
+                                {!isProcessingDocs && documents.some(d => d.needs_reupload) && (
+                                    <div className="flex justify-center my-4">
+                                        <div className="bg-amber-50 text-amber-800 px-5 py-4 rounded-xl text-sm border border-amber-200 shadow-sm max-w-lg w-full">
+                                            <p className="font-bold text-xs uppercase tracking-wide mb-1.5">Please re-upload {documents.filter(d => d.needs_reupload).length === 1 ? 'this book' : 'these books'}</p>
+                                            <p className="text-[12px] leading-relaxed">
+                                                {documents.filter(d => d.needs_reupload).map(d => `"${d.filename}"`).join(', ')} lost {documents.filter(d => d.needs_reupload).length === 1 ? 'its' : 'their'} text when we moved servers, so answers can't use {documents.filter(d => d.needs_reupload).length === 1 ? 'it' : 'them'}. Delete {documents.filter(d => d.needs_reupload).length === 1 ? 'it' : 'them'} in the sidebar and upload the file again. Sorry about that.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
                                 {/* Failed doc banner — shown when any doc fails */}
                                 {!isProcessingDocs && documents.some(d => d.upload_status === 'failed' || d.upload_status === 'error') && (
                                     <div className="flex justify-center my-4 animate-in fade-in slide-in-from-bottom-2">
@@ -2610,6 +2622,11 @@ const ProjectView = () => {
                                                         stagePct={isReady ? 100 : docStages[doc.id]?.progress}
                                                         message={docStages[doc.id]?.message}
                                                     />
+                                                )}
+                                                {isReady && doc.needs_reupload && (
+                                                    <p className="mt-1 text-[10px] leading-snug text-amber-700">
+                                                        Please re-upload this book. Its text was lost when we moved servers, so answers can't use it. Delete it and upload the file again.
+                                                    </p>
                                                 )}
                                                 {isStalledDoc && (
                                                     <p className="mt-1 text-[10px] leading-snug text-amber-700">

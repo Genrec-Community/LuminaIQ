@@ -55,6 +55,11 @@ class Settings(BaseSettings):
     SMALL_LLM_VISION: bool = Field(default=False)
     BIG_LLM_VISION: bool = Field(default=False)
     LLM_TIMEOUT_SECONDS: float = 120.0
+    # Per-feature model choice on the same endpoint: "chat=model-a,generate=model-b,big:deep=model-c".
+    # A plain key applies to small-model calls, "big:" to big-model calls; "vision" always applies.
+    LLM_TASK_MODELS: str = Field(default="")
+    # Tried once when the chosen model fails (throttled, down, removed); same endpoint and key
+    FALLBACK_LLM_MODEL: str = Field(default="")
     # Older names, still read when the SMALL_LLM_* ones are empty
     LLM_API_KEY: str = Field(default="")
     LLM_BASE_URL: str = Field(default="")
@@ -149,6 +154,10 @@ class Settings(BaseSettings):
     # ─────────────────────────────────────────────────────────
     # Embeddings: any OpenAI-compatible /embeddings API
     # ─────────────────────────────────────────────────────────
+    # "openai" (any OpenAI-compatible /embeddings API) or "bedrock" (AWS Bedrock with the server's
+    # AWS credentials: amazon.titan-embed-text-v2:0 or a Cohere embed model; EMBEDDING_MODEL is the model id)
+    EMBEDDING_PROVIDER: str = Field(default="openai")
+    BEDROCK_REGION: str = Field(default="ap-southeast-2")
     EMBEDDING_API_KEY: str = Field(default="")    # empty = the small chat model's key
     EMBEDDING_BASE_URL: str = Field(default="")   # empty = the small chat model's base URL
     EMBEDDING_MODEL: str = Field(default="text-embedding-3-small")

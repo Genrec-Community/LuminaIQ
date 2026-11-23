@@ -167,7 +167,9 @@ class MCQService:
         parsed = self._parse_mcq_response(response)
         if not parsed:
             raise Exception("Failed to parse MCQ questions from response")
-        return parsed
+        # Models tend to put the right answer first: reorder so it isn't always "A"
+        from services.shared_content import shuffle_options
+        return [shuffle_options(q) for q in parsed]
 
     @staticmethod
     def _mcq_prompt(topic: Optional[str], num_questions: int, difficulty: str, content: str, level: str) -> str:
@@ -204,7 +206,8 @@ Content:
 Requirements:
 {diff_instruction}
 - Each question should have 4 options (A, B, C, D).
-- Only one option should be correct.
+- Exactly one option is correct. No wrong option may be equal to the correct answer in another form
+  (for maths: not the same expression expanded, simplified or rearranged). Check each wrong option.
 - **Use Markdown** for the question text and explanation (e.g., bold keywords, code blocks if relevant).
 - Write maths in LaTeX: $...$ inline, $$...$$ for display (escape backslashes for JSON).
 - Include a clear and detailed explanation for the correct answer.

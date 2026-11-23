@@ -33,6 +33,12 @@ bcrypt==5.0.0
     # via luminaiq-backend
 beautifulsoup4==4.12.3
     # via luminaiq-backend
+boto3==1.44.9
+    # via luminaiq-backend
+botocore==1.44.9
+    # via
+    #   boto3
+    #   s3transfer
 certifi==2025.11.12
     # via
     #   httpcore
@@ -148,6 +154,10 @@ jiter==0.12.0
     # via
     #   luminaiq-backend
     #   openai
+jmespath==1.1.0
+    # via
+    #   boto3
+    #   botocore
 jsonpatch==1.33
     # via luminaiq-backend
 jsonpointer==3.0.0
@@ -271,7 +281,9 @@ pypdf2==3.0.1
 pytesseract==0.3.13
     # via luminaiq-backend
 python-dateutil==2.9.0.post0
-    # via luminaiq-backend
+    # via
+    #   botocore
+    #   luminaiq-backend
 python-docx==1.1.0
     # via luminaiq-backend
 python-dotenv==1.0.0
@@ -309,6 +321,8 @@ rsa==4.9.1
     # via
     #   luminaiq-backend
     #   python-jose
+s3transfer==0.19.3
+    # via boto3
 setuptools==80.9.0
     # via luminaiq-backend
 six==1.17.0
@@ -395,6 +409,7 @@ tzdata==2026.6 ; sys_platform == 'win32'
     # via psycopg
 urllib3==1.26.20
     # via
+    #   botocore
     #   luminaiq-backend
     #   requests
 uuid-utils==0.12.0

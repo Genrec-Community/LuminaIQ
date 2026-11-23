@@ -414,9 +414,31 @@ async def list_documents(
             .eq("project_id", project_id)
             .execute()
         )
-        return {"documents": response.data}
+        docs = response.data or []
+        empty = await _ready_without_passages(project_id, docs)
+        for d in docs:
+            d["needs_reupload"] = d["id"] in empty
+        return {"documents": docs}
     except Exception as e:
         raise HTTPException(500, str(e))
+
+
+async def _ready_without_passages(project_id: str, docs: list) -> set:
+    """Ids of ready documents with no passages (their text couldn't be recovered)."""
+    if not any(d.get("upload_status") in ("completed", "ready") for d in docs):
+        return set()
+    pg = getattr(get_supabase_client(), "pg", None)
+    if pg is None:      # test fake without SQL
+        return set()
+    try:
+        rows = await async_db(lambda: pg.fetch(
+            "SELECT d.id FROM documents d WHERE d.project_id = %s"
+            " AND d.upload_status IN ('completed', 'ready')"
+            " AND NOT EXISTS (SELECT 1 FROM chunks c WHERE c.document_id = d.id)", (project_id,)))
+        return {str(r["id"]) for r in rows}
+    except Exception as e:
+        logger.debug(f"[docs] passage check skipped: {e}")
+        return set()
 
 
 async def _owned_document(project_id: str, document_id: str, user_id: str) -> dict:

@@ -213,7 +213,10 @@ const Book = () => {
                                 <div className="min-w-0 flex-1">
                                     <p className="truncate text-[14.5px] font-bold">{d.filename}</p>
                                     {workingDoc && <ProcessingProgress stage={st?.stage || d.upload_status} stagePct={st?.progress || 0} message={st?.message || ''} />}
-                                    {isReady(d) && <p className="text-[12.5px]" style={{ color: 'var(--m-muted)' }}>Ready</p>}
+                                    {isReady(d) && !d.needs_reupload && <p className="text-[12.5px]" style={{ color: 'var(--m-muted)' }}>Ready</p>}
+                                    {isReady(d) && d.needs_reupload && (
+                                        <p className="text-[12.5px] leading-snug text-amber-700">Please re-upload this book. Its text was lost when we moved servers. Delete it and upload the file again.</p>
+                                    )}
                                     {isFailed(d) && (
                                         <div className="mt-1 flex items-center gap-2">
                                             <p className="text-[12.5px] text-red-500">Couldn't be read.</p>

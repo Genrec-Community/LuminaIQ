@@ -1,0 +1,46 @@
+# Lumina IQ production on one AWS EC2 server (see AWS.md). Managed by deploy.sh; don't edit on the server.
+name: luminaiq
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    env_file: /opt/luminaiq/pg.env
+    command: ["postgres", "-c", "shared_buffers=128MB", "-c", "max_connections=60", "-c", "work_mem=8MB",
+              "-c", "maintenance_work_mem=128MB", "-c", "effective_cache_size=512MB"]
+    volumes:
+      - /opt/luminaiq/pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lumina -d lumina"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    image: ${API_IMAGE}
+    restart: unless-stopped
+    env_file: /opt/luminaiq/backend.env
+    environment:
+      PORT: "8000"
+      SELF_CHECK_ON_STARTUP: "true"
+    # No auto-reload in production (ENVIRONMENT may still say development)
+    command: ["uv", "run", "--no-sync", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000",
+              "--proxy-headers", "--forwarded-allow-ips", "*", "--timeout-keep-alive", "75"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+
+  caddy:
+    image: caddy:2.10
+    restart: unless-stopped
+    ports: ["80:80", "443:443", "443:443/udp"]
+    env_file: /opt/luminaiq/site.env
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - /opt/luminaiq/web:/srv/web:ro
+      - /opt/luminaiq/caddy-data:/data
+      - /opt/luminaiq/caddy-config:/config
+    depends_on: [api]

@@ -1,0 +1,99 @@
+# One-off: copy the Lumina IQ database and backend settings out of the expired Azure subscription
+# into the AWS account (private S3 bucket). Runs on a push of this file to the claude/move-to-aws branch
+# or by hand. It resets the Azure database admin password (the old one lived only on the dead
+# Container App) and opens the firewall to this runner for the copy only.
+name: AWS rescue (copy data out of Azure)
+
+on:
+  push:
+    branches: [claude/move-to-aws]
+    paths: [".github/workflows/aws-rescue.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: aws-rescue
+  cancel-in-progress: false
+
+env:
+  RG: ${{ vars.AZURE_RESOURCE_GROUP || 'luminaiq' }}
+  PG: ${{ vars.AZURE_PG_SERVER || 'luminaiq-db' }}
+  PG_DB: lumina
+  PG_ADMIN: luminaiq
+  BUCKET: luminaiq-backups-524554316555
+  AWS_REGION: ap-southeast-2
+
+jobs:
+  rescue:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::524554316555:role/luminaiq-github-deploy
+          aws-region: ap-southeast-2
+
+      - name: Keep the backend settings in AWS (values never printed)
+        env:
+          BACKEND_ENV: ${{ secrets.BACKEND_ENV }}
+          GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          ANDROID_API_URL: ${{ vars.ANDROID_API_URL }}
+          AZURE_API_URL: ${{ vars.AZURE_API_URL }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s\n' "$BACKEND_ENV" > /tmp/backend_env
+          { echo "GOOGLE_WEB_CLIENT_ID=$GOOGLE_WEB_CLIENT_ID"; echo "VITE_SUPABASE_URL=$VITE_SUPABASE_URL"
+            echo "VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY"; echo "ANDROID_API_URL=$ANDROID_API_URL"; echo "AZURE_API_URL=$AZURE_API_URL"; } > /tmp/repo_vars
+          aws s3 cp /tmp/backend_env "s3://$BUCKET/config/backend_env" --sse AES256 --only-show-errors
+          aws s3 cp /tmp/repo_vars "s3://$BUCKET/config/repo_vars" --sse AES256 --only-show-errors
+          echo "BACKEND_ENV lines: $(grep -c '=' /tmp/backend_env)"
+          rm -f /tmp/backend_env /tmp/repo_vars
+
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Database server state
+        run: |
+          az account show --query "{name:name,state:state}" -o table
+          az postgres flexible-server show -g "$RG" -n "$PG" --query "{state:state,host:fullyQualifiedDomainName,sku:sku.name,storageGb:storage.storageSizeGb,version:version}" -o json || true
+
+      - name: Start it if stopped
+        run: |
+          s=$(az postgres flexible-server show -g "$RG" -n "$PG" --query state -o tsv || true)
+          echo "state=$s"
+          if [ "$s" = "Stopped" ]; then az postgres flexible-server start -g "$RG" -n "$PG" -o none || echo "::warning::start failed"; fi
+
+      - name: Copy the database to S3
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq >/dev/null && sudo apt-get install -y -qq postgresql-client >/dev/null
+          pg_dump --version
+          PASS="$(openssl rand -base64 36 | tr -dc 'A-Za-z0-9' | head -c 32)Aa1"
+          echo "::add-mask::$PASS"
+          az postgres flexible-server update -g "$RG" -n "$PG" --admin-password "$PASS" -o none
+          IP=$(curl -s https://api.ipify.org)
+          RULE="gha-rescue-${GITHUB_RUN_ID}"
+          az postgres flexible-server firewall-rule create -g "$RG" -n "$PG" -r "$RULE" --start-ip-address "$IP" --end-ip-address "$IP" -o none
+          trap 'az postgres flexible-server firewall-rule delete -g "$RG" -n "$PG" -r "$RULE" --yes -o none || true' EXIT
+          HOST=$(az postgres flexible-server show -g "$RG" -n "$PG" --query fullyQualifiedDomainName -o tsv)
+          export PGPASSWORD="$PASS" PGSSLMODE=require
+          for i in $(seq 1 12); do psql -h "$HOST" -U "$PG_ADMIN" -d "$PG_DB" -Atc "select 1" >/dev/null 2>&1 && break; echo "waiting for the server..."; sleep 15; done
+          psql -h "$HOST" -U "$PG_ADMIN" -d "$PG_DB" -Atc "select pg_size_pretty(pg_database_size(current_database()))"
+          psql -h "$HOST" -U "$PG_ADMIN" -d "$PG_DB" -Atc "select relname||'='||n_live_tup from pg_stat_user_tables order by n_live_tup desc" > counts.txt
+          head -40 counts.txt
+          TS=$(date -u +%Y%m%dT%H%M%SZ)
+          pg_dump -h "$HOST" -U "$PG_ADMIN" -d "$PG_DB" -Fc --no-owner --no-acl -f lumina.dump
+          ls -lh lumina.dump
+          pg_restore -l lumina.dump | grep -c "TABLE DATA" || true
+          aws s3 cp lumina.dump "s3://$BUCKET/azure/lumina-$TS.dump" --sse AES256 --only-show-errors
+          aws s3 cp counts.txt "s3://$BUCKET/azure/lumina-$TS.counts.txt" --sse AES256 --only-show-errors
+          aws s3 cp lumina.dump "s3://$BUCKET/azure/lumina-latest.dump" --sse AES256 --only-show-errors
+          aws s3 cp counts.txt "s3://$BUCKET/azure/lumina-latest.counts.txt" --sse AES256 --only-show-errors
+          echo "Saved s3://$BUCKET/azure/lumina-$TS.dump"
