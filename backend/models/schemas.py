@@ -53,6 +53,8 @@ class DocumentUploadResponse(BaseModel):
     file_size: Optional[int] = None
     upload_status: str
     created_at: Optional[datetime] = None
+    # Marked ready but has no passages: its text was lost in the move, so it must be uploaded again
+    needs_reupload: bool = False
 
 
 class DocumentList(BaseModel):
