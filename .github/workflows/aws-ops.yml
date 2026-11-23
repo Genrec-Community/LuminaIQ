@@ -136,7 +136,7 @@ jobs:
           mkdir -p out && aws s3 cp --recursive "s3://$BUCKET/ops/out/" out/ --only-show-errors && aws s3 rm --recursive "s3://$BUCKET/ops/out/" --only-show-errors || true
       - name: Show script output
         if: env.TASK == 'script'
-        run: for f in out/*; do echo "===== $f ($(wc -c < "$f") bytes)"; case "$f" in *.md|*.txt) cat "$f" ;; *) head -c 3000 "$f" ;; esac; done
+        run: for f in out/*; do echo "===== $f ($(wc -c < "$f") bytes)"; cat "$f"; echo; done
       - uses: actions/upload-artifact@v4
         if: env.TASK == 'script'
         with:

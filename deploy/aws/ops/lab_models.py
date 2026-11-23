@@ -14,8 +14,8 @@ async def main():
     client = L.openai.AsyncOpenAI(base_url=cfg.base_url, api_key=cfg.api_key, timeout=300, max_retries=0)
     L.client_for = lambda c: client     # measure the model, not the app's 120 s timeout
     names = [m.id for m in (await client.models.list()).data]
-    cands = ["moonshotai.kimi-k2.5", "deepseek.v3.2", "qwen.qwen3-235b-a22b-2507"] + \
-            [n for n in names if "coder" in n][:2] + [n for n in names if "glm-4.7" in n and "flash" not in n][:1]
+    cands = ["moonshotai.kimi-k2.5", "deepseek.v3.2"] + \
+            [n for n in names if "coder" in n][:2]
     print("coder/glm models:", [n for n in names if "coder" in n or "glm" in n])
     prompt = S.VISUAL_PROMPT.format(topic="contact and non-contact forces", context=CTX)
     svc = L.llm_service
