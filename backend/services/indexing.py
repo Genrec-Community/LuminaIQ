@@ -10,7 +10,7 @@ from typing import Awaitable, Callable, List, Optional
 from config.settings import settings
 from services import vector_store
 from services.chunking import Chunk, chunk_document
-from services.embedding_service import embedding_service
+from services.embedding_service import embedding_service, embeddings_off
 from utils.logger import logger
 
 Progress = Optional[Callable[[int, str], Awaitable[None]]]
@@ -29,7 +29,11 @@ async def index_chunks(project_id: str, document_id: str, chunks: List[Chunk], o
     known = await vector_store.existing_vectors(c.content_hash for c in chunks)
     todo = [c for c in chunks if c.content_hash not in known]
     vectors = dict(known)
-    if todo:
+    if todo and embeddings_off():
+        # No embedding model: store the passages without vectors; search uses keywords only.
+        for c in todo:
+            vectors[c.content_hash] = None
+    elif todo:
         step = max(1, settings.EMBEDDING_BATCH_SIZE) * max(1, settings.MAX_GLOBAL_EMBEDDINGS)
         for start in range(0, len(todo), step):
             part = todo[start:start + step]
@@ -38,7 +42,8 @@ async def index_chunks(project_id: str, document_id: str, chunks: List[Chunk], o
             if on_progress:
                 done = min(len(todo), start + step)
                 await on_progress(int(done * 100 / len(todo)), f"Indexed {done}/{len(todo)} passages")
-    logger.info(f"[Indexing] {document_id}: {len(chunks)} passages ({len(chunks) - len(todo)} reused, {len(todo)} embedded)")
+    logger.info(f"[Indexing] {document_id}: {len(chunks)} passages ({len(chunks) - len(todo)} reused, "
+                f"{0 if embeddings_off() else len(todo)} embedded)")
     return await vector_store.replace_document_chunks(
         project_id, document_id, chunks, [vectors[c.content_hash] for c in chunks])
 

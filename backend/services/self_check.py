@@ -49,8 +49,10 @@ async def _llm_stream() -> str:
 
 
 async def _embedding() -> str:
-    from services.embedding_service import embedding_service
+    from services.embedding_service import embedding_service, embeddings_off
 
+    if embeddings_off():
+        return "off (EMBEDDING_PROVIDER=none): book search uses keywords only"
     vec = await embedding_service.generate_embedding("photosynthesis converts light into chemical energy")
     if len(vec) != settings.EMBEDDING_DIMENSION:
         raise RuntimeError(

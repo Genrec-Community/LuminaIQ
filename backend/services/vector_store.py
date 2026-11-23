@@ -61,7 +61,7 @@ async def existing_vectors(hashes: Iterable[str]) -> Dict[str, str]:
 async def replace_document_chunks(project_id: str, document_id: str, chunks: List, vectors: List) -> int:
     """
     Store a document's chunks (replacing any it had). `vectors[i]` is a list of
-    floats or a pgvector literal (reused from existing_vectors). Returns rows written.
+    floats, a pgvector literal (reused from existing_vectors), or None (no embedding model). Returns rows written.
     """
     if len(chunks) != len(vectors):
         raise ValueError("chunks and vectors differ in length")
@@ -77,7 +77,7 @@ async def replace_document_chunks(project_id: str, document_id: str, chunks: Lis
                                                content_hash, embedding)
                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s::vector)""",
                         [(project_id, document_id, c.index, c.page, c.heading or None, c.content, c.content_hash,
-                          v if isinstance(v, str) else _vec(v)) for c, v in zip(chunks, vectors)])
+                          v if (v is None or isinstance(v, str)) else _vec(v)) for c, v in zip(chunks, vectors)])
         return len(chunks)
 
     return await async_db(write)

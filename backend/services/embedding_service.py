@@ -29,6 +29,14 @@ def _record(tokens: int, latency_ms: int, ok: bool = True) -> None:
         pass
 
 
+
+class EmbeddingsOff(RuntimeError):
+    """Raised when no embedding model is configured; callers fall back to keyword search."""
+
+
+def embeddings_off() -> bool:
+    return (settings.EMBEDDING_PROVIDER or "").lower() == "none"
+
 class EmbeddingService:
     def __init__(self):
         self._client = None
@@ -130,6 +138,8 @@ class EmbeddingService:
         """Embeddings for many texts, in order. Empty strings become a single space."""
         if not texts:
             return []
+        if embeddings_off():
+            raise EmbeddingsOff("embeddings are switched off (EMBEDDING_PROVIDER=none)")
         clean = [t if t and t.strip() else " " for t in texts]
         size = max(1, settings.EMBEDDING_BATCH_SIZE)
         batches = [clean[i:i + size] for i in range(0, len(clean), size)]

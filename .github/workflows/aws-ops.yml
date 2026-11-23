@@ -6,6 +6,9 @@
 #   backup            take a database backup to S3 now
 #   set-embedding-dim change the vector columns to the deployed EMBEDDING_DIMENSION (empties chunks and
 #                     answer_cache: run reindex after)
+#   keypair           make the server's own key pair (once) and print its public key
+#   install-secret    decrypt deploy/aws/ops/secret.enc (encrypted to that public key) into
+#                     /opt/luminaiq/local.env, which deploy.sh adds to the settings
 name: AWS ops
 
 on:
@@ -18,7 +21,7 @@ on:
     inputs:
       task:
         type: choice
-        options: [status, migrate-supabase, reindex, backup, set-embedding-dim, bedrock-test]
+        options: [status, migrate-supabase, reindex, backup, set-embedding-dim, bedrock-test, keypair, install-secret]
         default: status
       dry_run:
         type: boolean
@@ -102,3 +105,14 @@ jobs:
         run: |
           B=$(base64 -w0 deploy/aws/ops/bedrock_test.py)
           .github/scripts/aws-run.sh "cd /opt/luminaiq && echo $B | base64 -d > /tmp/bt.py && docker compose cp /tmp/bt.py api:/tmp/bt.py && docker compose exec -T api uv run --no-sync python /tmp/bt.py"
+
+      - name: Server key pair
+        if: env.TASK == 'keypair'
+        run: |
+          .github/scripts/aws-run.sh "cd /opt/luminaiq && umask 077 && { [ -f ops.pem ] || openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out ops.pem 2>/dev/null; } && openssl pkey -in ops.pem -pubout"
+
+      - name: Install a secret
+        if: env.TASK == 'install-secret'
+        run: |
+          B=$(tr -d '\n' < deploy/aws/ops/secret.enc)
+          .github/scripts/aws-run.sh "cd /opt/luminaiq && umask 077 && echo $B | base64 -d | openssl pkeyutl -decrypt -inkey ops.pem -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 > local.env.new && mv local.env.new local.env && cut -d= -f1 local.env"

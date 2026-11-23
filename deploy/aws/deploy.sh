@@ -23,6 +23,8 @@ for name in $(aws ssm get-parameters-by-path --path /luminaiq/env/ --query "Para
   val=$(aws ssm get-parameter --name "$name" --with-decryption --query Parameter.Value --output text)
   echo "${name##*/}=$val" >> /tmp/ssm.env
 done
+# Secrets installed straight on the server (AWS ops "install-secret")
+[ -f /opt/luminaiq/local.env ] && cat /opt/luminaiq/local.env >> /tmp/ssm.env
 source /opt/luminaiq/pg.env
 echo "DATABASE_URL=postgresql://lumina:${POSTGRES_PASSWORD}@postgres:5432/lumina" >> /tmp/ssm.env
 python3 - /tmp/base.env /tmp/ssm.env /tmp/over.env > backend.env.new <<'PY'
