@@ -21,7 +21,7 @@ on:
     inputs:
       task:
         type: choice
-        options: [status, migrate-supabase, reindex, backup, set-embedding-dim, bedrock-test, keypair, install-secret]
+        options: [status, migrate-supabase, reindex, backup, set-embedding-dim, bedrock-test, keypair, install-secret, ai-check]
         default: status
       dry_run:
         type: boolean
@@ -116,3 +116,9 @@ jobs:
         run: |
           B=$(tr -d '\n' < deploy/aws/ops/secret.enc)
           .github/scripts/aws-run.sh "cd /opt/luminaiq && umask 077 && echo $B | base64 -d | openssl pkeyutl -decrypt -inkey ops.pem -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 > local.env.new && mv local.env.new local.env && cut -d= -f1 local.env"
+
+      - name: AI check
+        if: env.TASK == 'ai-check'
+        run: |
+          B=$(base64 -w0 deploy/aws/ops/ai_check.py)
+          .github/scripts/aws-run.sh "cd /opt/luminaiq && echo $B | base64 -d > /tmp/ac.py && docker compose cp /tmp/ac.py api:/app/ac_tmp.py && docker compose exec -T -w /app api uv run --no-sync python ac_tmp.py 2>&1 | tail -40; docker compose exec -T api rm -f /app/ac_tmp.py"
