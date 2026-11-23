@@ -281,7 +281,8 @@ Respond ONLY with the valid JSON array. Do not add any markdown formatting (like
         return questions
 
     async def submit_test(
-        self, test_id: str, answers: Dict[int, str], user_id: Optional[str] = None
+        self, test_id: str, answers: Dict[int, str], user_id: Optional[str] = None,
+        started_at: Optional[str] = None, duration_seconds: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Evaluate submitted test answers"""
         try:
@@ -323,6 +324,7 @@ Respond ONLY with the valid JSON array. Do not add any markdown formatting (like
             percentage = (score / total * 100) if total > 0 else 0
             if user_id:
                 await self._remember_answers(user_id, test, questions, feedback)
+                await self._record_attempt(user_id, test, questions, feedback, started_at, duration_seconds)
 
             return {
                 "score": score,
@@ -335,6 +337,17 @@ Respond ONLY with the valid JSON array. Do not add any markdown formatting (like
             logger.error(f"Error submitting test: {str(e)}")
             raise
 
+
+    @staticmethod
+    async def _record_attempt(user_id, test, questions, feedback, started_at, duration_seconds) -> None:
+        """One attempt row per submitted quiz (score, time taken), for product and outcome analytics."""
+        from services import product_analytics
+        responses = [{"topic": q.get("topic"), "chosen": f["user_answer"], "correct_answer": f["correct_answer"],
+                      "is_correct": f["is_correct"]} for q, f in zip(questions, feedback)]
+        await product_analytics.record_attempt(
+            user_id, "mcq", project_id=test.get("project_id"), source_id=test.get("id"),
+            topic=test.get("chapter_name"), difficulty=test.get("difficulty"), responses=responses,
+            question_count=len(questions), started_at=started_at, duration_seconds=duration_seconds)
 
     @staticmethod
     async def _remember_answers(user_id: str, test: Dict[str, Any], questions: List[Dict[str, Any]],

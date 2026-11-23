@@ -575,9 +575,30 @@ class DocumentService:
                 .eq("id", document_id)
                 .execute()
             )
+            if status in ("completed", "failed"):
+                await self._track_processing(document_id, status)
 
         except Exception as e:
             logger.error(f"Error updating document status: {str(e)}")
+
+    async def _track_processing(self, document_id: str, status: str) -> None:
+        """Funnel events: a book finished processing (or failed), and a learner's first ready book."""
+        try:
+            from services import product_analytics
+            rows = await async_db(lambda: self.client.pg.fetch(
+                """SELECT d.project_id, p.user_id, d.file_type,
+                          (SELECT count(*) FROM documents d2 JOIN projects p2 ON p2.id = d2.project_id
+                           WHERE p2.user_id = p.user_id AND d2.upload_status = 'completed') AS ready
+                   FROM documents d JOIN projects p ON p.id = d.project_id WHERE d.id = %s""", (document_id,)))
+            if not rows:
+                return
+            r = rows[0]
+            name = "upload_succeeded" if status == "completed" else "upload_failed"
+            await product_analytics.track_server(name, r["user_id"], r["project_id"], file_type=r.get("file_type"))
+            if status == "completed" and int(r.get("ready") or 0) == 1:
+                await product_analytics.track_server("first_document_processed", r["user_id"], r["project_id"])
+        except Exception as e:
+            logger.debug(f"processing event not tracked: {e}")
 
     async def delete_document(self, project_id: str, document_id: str):
         """Delete document from DB, Vector Store, and Storage (non-blocking)"""

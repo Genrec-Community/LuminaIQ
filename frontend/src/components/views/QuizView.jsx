@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { HelpCircle, FileText, LogOut, CheckSquare, X, ChevronDown, Loader2, BookMarked, Brain, Zap, Sparkles, ArrowLeft, Target, Trophy, AlertTriangle, Clock, Trash2, Eye, Plus } from 'lucide-react';
 import Markdown from '../Markdown';
 import { generateMCQ, generateSubjectiveTest, submitEvaluation, submitSubjectiveTest, generateNotes, recordPerformance, createCardsFromQuiz, getSuggestedTopic, getPerformance, getSavedQuizzes, getSavedQuiz, deleteSavedQuiz, submitMCQAnswers } from '../../api';
+import { track } from '../../utils/analytics';
 import { saveResume, loadResume } from '../../utils/resume';
 import { useToast } from '../../context/ToastContext';
 import { recordActivity } from '../../utils/studyActivity';
@@ -325,6 +326,15 @@ const QuizView = ({
             index: currentQuestionIndex, total: mcqTest.questions?.length || 0 } });
     }, [mcqUserAnswers, currentQuestionIndex, mcqTest, mcqSubmitted, quizMode, projectId]);
 
+    // Time taken and quiz starts, for the quiz analytics (attempts are saved on submit)
+    const quizStartedAt = useRef(null);
+    useEffect(() => {
+        if (!mcqTest?.test_id) return;
+        quizStartedAt.current = new Date().toISOString();
+        track('quiz_started', { questions: mcqTest.questions?.length || 0, difficulty: mcqDifficulty || null }, projectId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [mcqTest?.test_id]);
+
     const handleOptionSelect = (qIndex, option) => {
         if (mcqSubmitted) return;
         setMcqUserAnswers(prev => ({ ...prev, [qIndex]: option }));
@@ -335,7 +345,7 @@ const QuizView = ({
         // (mistakes and misconceptions for the learner model) and which old mistakes are now fixed
         saveResume({ [`quiz:${projectId}`]: null });
         setUnfinished(null);
-        if (mcqTest?.test_id) submitMCQAnswers(mcqTest.test_id, mcqUserAnswers).catch(() => {});
+        if (mcqTest?.test_id) submitMCQAnswers(mcqTest.test_id, mcqUserAnswers, quizStartedAt.current).catch(() => {});
         let score = 0;
         const feedbackData = [];
         

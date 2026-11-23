@@ -42,7 +42,7 @@ Anti-goals (a failure even if it "works"):
   backend change. RAG changes must also pass the eval in §6 (Phase 3).
 - **Migrations:**
   - One database (`DATABASE_URL`): `backend/db/schema/NNNN_name.sql`, applied in order on startup by `db/migrate.py`
-    (or `uv run python -m db.migrate`). `0001_init.sql` is the fresh-start schema; the latest is `0011_document_file_type.sql`, so the next file is `0012_`.
+    (or `uv run python -m db.migrate`). `0001_init.sql` is the fresh-start schema; the latest is `0014_product_data.sql` (0012 and 0013 are in open PRs), so the next file is `0015_`.
     Never edit an applied file; add a new one.
   - `backend/db/supabase_auth.sql` is the only SQL that runs in Supabase (the Google sign-up allowlist on `auth.users`).
 - **Database access:** services call `get_supabase_client().table(...)` / `.rpc(...)` as before. That now goes to our
@@ -494,6 +494,24 @@ Builder's calls:
   process (and again on a new day). Backfilled from earlier activity.
 - A sign-up is a user's first signed-in request (`app_users.created_at`).
 - Counts and learning data only: no chat text or memory notes appear on this page.
+
+### Follow-up (2026-11-17): product data for growth and investor reporting
+Schema `0014_product_data.sql`; backend `services/product_analytics.py`, `services/analytics_growth.py`,
+`api/v1/endpoints/events.py` (`/events/track`, `/attribution`, `/consent`, `/feedback`, `/data-request`);
+frontend `utils/analytics.js`, `AnalyticsTracker`, `ConsentGate`, `NpsPrompt`, `chat/AnswerRating`; the marketing
+site's `components/Visit.tsx` keeps the first touch in the same `lumina_first_touch` key.
+- **Events:** a fixed list of names (`EVENTS`); unknown names are dropped. No third-party trackers. Paths have ids
+  replaced (`/project/:id`), query strings dropped, and props never keep anything containing `@`.
+- **Attribution:** first touch (UTM tags, referrer host, landing page, `?ref=`, class invite) saved once at sign-up,
+  with a derived `channel`. Pre-sign-up events are linked to the user through the browser's `anon_id`.
+- **Consent (DPDP Act):** append-only and versioned (`TERMS_VERSION` etc.). Everyone agrees to the Terms and Privacy
+  Policy; Class 5–12 learners (levels `school`, `higher_secondary`) also need a parent's or guardian's declaration
+  (name, email). School-created accounts are covered by the school. Bumping a version asks everyone again.
+  Builder's call: a declaration, not yet a verified one (e.g. an emailed link to the parent); that's the next step.
+- **Quizzes:** `/mcq/submit` saves an attempt (score, time from `started_at`) and one row per question.
+- **Admin analytics:** new Investor view (learners, MAU/WAU, activation, D1/D7/D30, paid of activated, revenue,
+  AI cost per weekly active, 12-month charts, "copy summary"), plus acquisition, product funnel, quizzes, feedback.
+- `backend/db/supabase_storage.sql` makes the `documents` bucket private and removes the over-broad `texts` policies.
 
 ### Follow-up (2026-11-17): books up to 150 MB
 Supabase (free plan) refuses any storage object over 50 MB, so `utils/split_storage.py` stores a bigger file as

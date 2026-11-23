@@ -7,6 +7,7 @@ import { AFTER_LOGIN_KEY } from '../utils/afterLogin';
 import { Loader2, ArrowRight, Mail, Lock, User, School, ChevronDown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { apiErrorText, SCHOOL_PAUSED_KEY, warmUp } from '../api';
+import { track } from '../utils/analytics';
 
 const Login = () => {
     const navigate = useNavigate();
@@ -37,6 +38,8 @@ const Login = () => {
 
     // Wake the backend while they fill in the form
     React.useEffect(() => { warmUp(); }, []);
+    // Funnel: someone looking at the sign-up form (not just signing in)
+    React.useEffect(() => { if (!isLogin) track('signup_started'); }, [isLogin]);
 
     // A school-created student who was signed out because their school is paused
     React.useEffect(() => {

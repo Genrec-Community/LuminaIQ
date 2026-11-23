@@ -183,6 +183,8 @@ import { CommandPicker, CommandParamForm } from '../components/chat/ChatCommands
 import { ToolLoadingCard, ToolResultCard, ToolErrorCard } from '../components/chat/ToolResultCard';
 const DocumentReader = lazy(() => import('../components/chat/DocumentReader'));
 import ErrorBoundary from '../components/ErrorBoundary';
+import AnswerRating from '../components/chat/AnswerRating';
+import { track } from '../utils/analytics';
 
 
 // ── Chat time log helpers ───────────────────────────────────────────
@@ -1144,6 +1146,7 @@ const ProjectView = () => {
         setMessages(newMessages);
         setInputMessage('');
         setLoading(true);
+        track('chat_sent', { photo: Boolean(photo), deep: Boolean(deepMode) }, projectId);
 
         // Create a placeholder for the assistant's response
         setMessages(prev => [...prev, { role: 'assistant', content: '', sources: [] }]);
@@ -1886,6 +1889,11 @@ const ProjectView = () => {
                                                 {formatChatTime(msg.timestamp)}
                                                 {msg.role === 'assistant' && msg.completedAt && !String(msg.content || '').startsWith('Error:') && (
                                                     <> · answered in {Math.max(0.1, (new Date(msg.completedAt) - new Date(msg.timestamp)) / 1000).toFixed(1)}s</>
+                                                )}
+                                                {msg.role === 'assistant' && (!msg.type || msg.type === 'tool_command') && msg.content
+                                                    && (msg.completedAt || msg.id) && !String(msg.content).startsWith('Error:') && (
+                                                    <AnswerRating projectId={projectId}
+                                                        targetId={String(msg.id || `${threadId || projectId}:${msg.timestamp}`)} />
                                                 )}
                                             </div>
                                         )}

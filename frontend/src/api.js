@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { mindmapToTree } from './utils/mindmapTree';
 import { uploadToStorage, forgetPendingUpload } from './utils/resumableUpload';
+import { track } from './utils/analytics';
 import { emitLimit, isLimitDetail } from './utils/plan';
 
 // Fallback to localhost so a missing VITE_MAIN_API_URL env var doesn't silently
@@ -221,6 +222,8 @@ export const getProjects = async () => {
 };
 
 export const uploadDocument = async (projectId, file, onProgress, bookOptions = {}) => {
+    track('upload_started', { file_type: (file?.name || '').split('.').pop()?.toLowerCase() || null,
+                              size_mb: file?.size ? Math.round(file.size / 1048576) : null }, projectId);
     // Preferred: resumable upload straight to storage, then the backend fetches it
     try {
         const { path, key, parts } = await uploadToStorage(file, projectId, onProgress);
@@ -897,7 +900,8 @@ export const saveUserSettings = async (settings) => {
 };
 
 // --- Memory: "What Lumina remembers about you" ---
-export const submitMCQAnswers = async (testId, answers) => (await api.post('/mcq/submit', { test_id: testId, answers })).data;
+export const submitMCQAnswers = async (testId, answers, startedAt) =>
+    (await api.post('/mcq/submit', { test_id: testId, answers, started_at: startedAt || null })).data;
 export const getMemory = async () => (await api.get('/memory')).data;
 export const addMemory = async (content, kind = 'fact') => (await api.post('/memory', { content, kind })).data;
 export const editMemory = async (id, content) => (await api.patch(`/memory/${id}`, { content })).data;
@@ -1413,3 +1417,9 @@ export const getClassSettings = async (classId) => (await api.get(`/institutions
 
 export const updateClassSettings = async (classId, body) =>
     (await api.put(`/institutions/classes/${classId}/settings`, body)).data;
+
+// ---- Consent, feedback and data requests (backend: api/v1/endpoints/events.py)
+export const getConsent = async () => (await api.get('/events/consent')).data;
+export const giveConsent = async (body) => (await api.post('/events/consent', body)).data;
+export const sendFeedback = async (body) => (await api.post('/events/feedback', body)).data;
+export const requestMyData = async (kind, note) => (await api.post('/events/data-request', { kind, note })).data;

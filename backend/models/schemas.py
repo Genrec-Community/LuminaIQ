@@ -145,6 +145,8 @@ class MCQTestResponse(BaseModel):
 class MCQSubmitRequest(BaseModel):
     test_id: str
     answers: Dict[int, str]
+    started_at: Optional[str] = None        # when the student opened the quiz (for time taken)
+    duration_seconds: Optional[int] = None
 
 
 class MCQSubmitResponse(BaseModel):
