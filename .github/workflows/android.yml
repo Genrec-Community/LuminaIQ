@@ -24,6 +24,10 @@ on:
         description: "Version shown in the Play Store (e.g. 1.0.0)"
         required: false
         default: "1.0.0"
+      play_track:
+        description: "Google Play track to upload to (e.g. production). Empty = the testers' closed track"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -128,7 +132,7 @@ jobs:
         if: steps.play.outputs.enabled == '1'
         env:
           PLAY_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          PLAY_TRACK: ${{ vars.PLAY_TRACK }}
+          PLAY_TRACK: ${{ inputs.play_track || vars.PLAY_TRACK }}
         run: |
           pip install --quiet google-auth requests
           python3 - <<'PY'
