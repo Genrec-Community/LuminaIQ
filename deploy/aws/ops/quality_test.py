@@ -20,7 +20,10 @@ from api.deps import get_current_user
 from services.usage_service import current_plan
 
 pg = get_supabase_client().pg
-USER = str(uuid.uuid4())
+USER = "00000000-0000-4000-8000-00000000a1a1"     # fixed test account, never a real user
+# Leftovers from a run that was cut short
+pg.fetch("DELETE FROM projects WHERE (user_id = %s OR (name IN ('QT maths', 'QT science')"
+         " AND created_at > '2026-11-23 05:40+00' AND created_at < '2026-11-23 06:00+00'))", (USER,))
 STATE = {"plan": "free"}
 
 
