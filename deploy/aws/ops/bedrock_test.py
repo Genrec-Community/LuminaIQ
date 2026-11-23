@@ -29,3 +29,31 @@ try:
             print("QUOTA", q["Value"], q["Adjustable"], n)
 except Exception as e:
     print("quota check failed", str(e)[:160])
+
+# The newer OpenAI-compatible endpoint ("bedrock-mantle"), with the app's long-term Bedrock key.
+import os
+from openai import OpenAI
+key = os.environ.get("LLM_API_KEY", "")
+print("key set:", bool(key))
+for base in ("https://bedrock-mantle.ap-southeast-2.api.aws/v1",):
+    c = OpenAI(api_key=key, base_url=base, max_retries=0, timeout=60)
+    try:
+        print("mantle models:", [m.id for m in c.models.list().data][:40])
+    except Exception as e:
+        print("ERR mantle models", str(e)[:200])
+    for m in ("openai.gpt-oss-120b", "openai.gpt-oss-20b", "qwen.qwen3-32b", "deepseek.v3.1"):
+        try:
+            r = c.chat.completions.create(model=m, messages=[{"role": "user", "content": "Say hi in 3 words"}], max_tokens=60)
+            print("OK   mantle chat", m, (r.choices[0].message.content or "")[:60], r.usage)
+        except Exception as e:
+            print("ERR  mantle chat", m, str(e)[:200])
+        try:
+            r = c.responses.create(model=m, input="Say hi in 3 words", max_output_tokens=60)
+            print("OK   mantle responses", m, (r.output_text or "")[:60])
+        except Exception as e:
+            print("ERR  mantle responses", m, str(e)[:200])
+    try:
+        r = c.embeddings.create(model="amazon.titan-embed-text-v2", input="hello")
+        print("OK   mantle embed", len(r.data[0].embedding))
+    except Exception as e:
+        print("ERR  mantle embed", str(e)[:200])
