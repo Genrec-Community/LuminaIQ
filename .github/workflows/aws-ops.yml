@@ -21,7 +21,7 @@ on:
     inputs:
       task:
         type: choice
-        options: [status, migrate-supabase, reindex, backup, set-embedding-dim, bedrock-test, keypair, install-secret, ai-check, models-test]
+        options: [status, migrate-supabase, reindex, backup, set-embedding-dim, bedrock-test, keypair, install-secret, ai-check, models-test, script]
         default: status
       dry_run:
         type: boolean
@@ -61,6 +61,7 @@ jobs:
             T="${{ inputs.task }}"; A="dry_run=${{ inputs.dry_run }}"; B="reindex=${{ inputs.reindex }}"
           fi
           echo "TASK=$T" >> "$GITHUB_ENV"
+          [ "$T" = "script" ] && echo "SCRIPT=$A" >> "$GITHUB_ENV"
           DRY=true; RE=true
           for kv in $A $B; do case "$kv" in dry_run=*) DRY=${kv#*=} ;; reindex=*) RE=${kv#*=} ;; esac; done
           echo "DRY_RUN=$DRY" >> "$GITHUB_ENV"; echo "REINDEX=$RE" >> "$GITHUB_ENV"
@@ -122,6 +123,23 @@ jobs:
         run: |
           B=$(base64 -w0 deploy/aws/ops/ai_check.py)
           .github/scripts/aws-run.sh "cd /opt/luminaiq && echo $B | base64 -d > /tmp/ac.py && docker compose cp /tmp/ac.py api:/app/ac_tmp.py && docker compose exec -T -w /app api uv run --no-sync python ac_tmp.py 2>&1 | tail -40; docker compose exec -T api rm -f /app/ac_tmp.py"
+
+      # Runs deploy/aws/ops/<SCRIPT> in the api container; whatever it writes to /app/ops_out/ comes
+      # back as the "ops-output" artifact (SSM only returns the last 20 KB of printed output)
+      - name: Script
+        if: env.TASK == 'script'
+        env:
+          BUCKET: luminaiq-backups-524554316555
+        run: |
+          B=$(base64 -w0 "deploy/aws/ops/$SCRIPT")
+          .github/scripts/aws-run.sh "cd /opt/luminaiq && echo $B | base64 -d > /tmp/os.py && docker compose cp /tmp/os.py api:/app/os_tmp.py && docker compose exec -T -w /app api sh -c 'rm -rf /app/ops_out && mkdir -p /app/ops_out && uv run --no-sync python os_tmp.py' 2>&1 | tail -60; rm -rf /tmp/ops_out && docker compose cp api:/app/ops_out /tmp/ops_out && aws s3 cp --recursive /tmp/ops_out s3://$BUCKET/ops/out/ --sse AES256 --only-show-errors; docker compose exec -T api rm -rf /app/os_tmp.py /app/ops_out" 1800
+          mkdir -p out && aws s3 cp --recursive "s3://$BUCKET/ops/out/" out/ --only-show-errors && aws s3 rm --recursive "s3://$BUCKET/ops/out/" --only-show-errors || true
+      - uses: actions/upload-artifact@v4
+        if: env.TASK == 'script'
+        with:
+          name: ops-output
+          path: out/
+          retention-days: 3
 
       - name: Models test
         if: env.TASK == 'models-test'
