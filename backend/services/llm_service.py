@@ -142,22 +142,51 @@ def _request_plan() -> str:
         return ""
 
 
+def task_models() -> Dict[str, str]:
+    """LLM_TASK_MODELS parsed: {"chat": "...", "big:deep": "...", "vision": "..."}."""
+    out = {}
+    for part in (settings.LLM_TASK_MODELS or "").split(","):
+        if "=" in part:
+            k, v = part.split("=", 1)
+            if k.strip() and v.strip():
+                out[k.strip()] = v.strip()
+    return out
+
+
+def _with_model(cfg: ModelConfig, model: str) -> ModelConfig:
+    return ModelConfig(role=cfg.role, model=model, base_url=cfg.base_url, api_key=cfg.api_key,
+                       reasoning_effort=cfg.reasoning_effort)
+
+
 def resolve_model(task: str = "chat", plan: Optional[str] = None) -> ModelConfig:
     """
     The model for one call. Free users (and calls with no signed-in user, e.g.
     background jobs) always get the small model; paying users get the big one
     for Deep answers, Visual Lab builds and photo questions, when it's configured.
+    LLM_TASK_MODELS can then pick a different model per feature within that role.
     """
     plan = (plan if plan is not None else _request_plan()) or "free"
     big = big_config()
-    if task in BIG_TASKS and plan != "free" and big:
-        return big
-    return small_config()
+    cfg = big if (task in BIG_TASKS and plan != "free" and big) else small_config()
+    overrides = task_models()
+    model = overrides.get("vision") if task == "vision" else \
+        overrides.get(("big:" if cfg.role == "big" else "") + task)
+    return _with_model(cfg, model) if model else cfg
+
+
+def fallback_for(cfg: ModelConfig) -> Optional[ModelConfig]:
+    """The model to try once when cfg fails, or None."""
+    model = settings.FALLBACK_LLM_MODEL
+    if not model or model == cfg.model:
+        return None
+    return _with_model(small_config() if cfg.role == "small" else cfg, model)
 
 
 def vision_config(plan: Optional[str] = None) -> Optional[ModelConfig]:
     """The model that reads photos for this plan, or None when that model can't see images."""
     cfg = resolve_model("vision", plan)
+    if task_models().get("vision"):
+        return cfg      # a model named for photos is image-capable by definition
     able = settings.BIG_LLM_VISION if cfg.role == "big" else settings.SMALL_LLM_VISION
     return cfg if able else None
 
@@ -198,7 +227,7 @@ async def _create(client: openai.AsyncOpenAI, kwargs: dict):
     """
     chat.completions.create, adapting to provider quirks: reasoning models that
     refuse a temperature, providers that want max_completion_tokens, and ones
-    that don't accept stream_options.
+    that don't accept stream_options or a reasoning effort.
     """
     for _ in range(3):
         try:
@@ -211,6 +240,8 @@ async def _create(client: openai.AsyncOpenAI, kwargs: dict):
                 kwargs["max_completion_tokens"] = kwargs.pop("max_tokens")
             elif "stream_options" in msg and "stream_options" in kwargs:
                 kwargs.pop("stream_options")
+            elif "reasoning" in msg and "extra_body" in kwargs:   # only some models take an effort
+                kwargs.pop("extra_body")
             else:
                 raise
     return await client.chat.completions.create(**kwargs)
@@ -245,6 +276,16 @@ class LLMService:
                               task: Optional[str] = None) -> str:
         """One reply. deep=True asks for the big model (paid plans); light is kept for old callers."""
         cfg = resolve_model(_task(light, deep, task))
+        try:
+            return await self._complete(cfg, messages, temperature, max_tokens)
+        except Exception as e:
+            fb = fallback_for(cfg)
+            if not fb:
+                raise
+            logger.warning(f"[LLM] {cfg.model} failed ({str(e)[:160]}); using {fb.model}")
+            return await self._complete(fb, messages, temperature, max_tokens)
+
+    async def _complete(self, cfg: ModelConfig, messages, temperature: float, max_tokens: int) -> str:
         client = client_for(cfg)
         kwargs = self._kwargs(cfg, messages, temperature, max_tokens)
         started = time.perf_counter()
@@ -293,6 +334,21 @@ class LLMService:
                                      task: Optional[str] = None) -> AsyncIterator[str]:
         """The reply as it's generated (reasoning blocks removed)."""
         cfg = resolve_model(_task(False, deep, task))
+        sent = False
+        try:
+            async for piece in self._stream(cfg, messages, temperature, max_tokens):
+                sent = True
+                yield piece
+            return
+        except Exception as e:
+            fb = fallback_for(cfg)
+            if sent or not fb:      # half an answer already shown: don't start another
+                raise
+            logger.warning(f"[LLM] {cfg.model} failed ({str(e)[:160]}); using {fb.model}")
+        async for piece in self._stream(fb, messages, temperature, max_tokens):
+            yield piece
+
+    async def _stream(self, cfg: ModelConfig, messages, temperature: float, max_tokens: int) -> AsyncIterator[str]:
         client = client_for(cfg)
         kwargs = self._kwargs(cfg, messages, temperature, max_tokens)
         kwargs.update(stream=True, stream_options={"include_usage": True})

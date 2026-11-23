@@ -55,6 +55,11 @@ class Settings(BaseSettings):
     SMALL_LLM_VISION: bool = Field(default=False)
     BIG_LLM_VISION: bool = Field(default=False)
     LLM_TIMEOUT_SECONDS: float = 120.0
+    # Per-feature model choice on the same endpoint: "chat=model-a,generate=model-b,big:deep=model-c".
+    # A plain key applies to small-model calls, "big:" to big-model calls; "vision" always applies.
+    LLM_TASK_MODELS: str = Field(default="")
+    # Tried once when the chosen model fails (throttled, down, removed); same endpoint and key
+    FALLBACK_LLM_MODEL: str = Field(default="")
     # Older names, still read when the SMALL_LLM_* ones are empty
     LLM_API_KEY: str = Field(default="")
     LLM_BASE_URL: str = Field(default="")
