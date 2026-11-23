@@ -13,12 +13,12 @@ on:
     branches: [claude/move-to-aws]
     # Until this workflow is on main (manual runs need that), a push of deploy/aws/ops-task runs the
     # task written in it: "<task> [dry_run=true|false] [reindex=true|false]"
-    paths: ["deploy/aws/ops-task"]
+    paths: ["deploy/aws/ops-task", "deploy/aws/ops/**"]
   workflow_dispatch:
     inputs:
       task:
         type: choice
-        options: [status, migrate-supabase, reindex, backup, set-embedding-dim]
+        options: [status, migrate-supabase, reindex, backup, set-embedding-dim, bedrock-test]
         default: status
       dry_run:
         type: boolean
@@ -96,3 +96,9 @@ jobs:
         if: env.TASK == 'set-embedding-dim'
         run: |
           .github/scripts/aws-run.sh "cd /opt/luminaiq && D=\$(grep '^EMBEDDING_DIMENSION=' backend.env | cut -d= -f2) && echo dim=\$D && docker compose exec -T postgres psql -U lumina -d lumina -v ON_ERROR_STOP=1 -c \"TRUNCATE chunks, answer_cache; ALTER TABLE chunks ALTER COLUMN embedding TYPE vector(\$D); ALTER TABLE answer_cache ALTER COLUMN embedding TYPE vector(\$D);\" && docker compose restart api"
+
+      - name: Which Bedrock models work
+        if: env.TASK == 'bedrock-test'
+        run: |
+          B=$(base64 -w0 deploy/aws/ops/bedrock_test.py)
+          .github/scripts/aws-run.sh "cd /opt/luminaiq && echo $B | base64 -d > /tmp/bt.py && docker compose cp /tmp/bt.py api:/tmp/bt.py && docker compose exec -T api uv run --no-sync python /tmp/bt.py"
