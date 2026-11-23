@@ -12,3 +12,7 @@ with psycopg.connect(os.environ["DATABASE_URL"]) as c:
     print("jobs:", c.execute("SELECT kind, status, count(*) FROM jobs GROUP BY 1,2 ORDER BY 1,2").fetchall())
     print("chunks:", c.execute("SELECT count(*), count(DISTINCT document_id) FROM chunks").fetchone())
     print("recent job errors:", c.execute("SELECT left(coalesce(error,''),200) FROM jobs WHERE status='failed' ORDER BY updated_at DESC LIMIT 3").fetchall())
+with psycopg.connect(os.environ["DATABASE_URL"]) as c:
+    print("books:", c.execute("""SELECT count(*), count(*) FILTER (WHERE NOT EXISTS (SELECT 1 FROM chunks k WHERE k.document_id = d.id)),
+                                        count(DISTINCT d.project_id) FILTER (WHERE NOT EXISTS (SELECT 1 FROM chunks k WHERE k.document_id = d.id))
+                                 FROM documents d""").fetchone())
