@@ -562,6 +562,70 @@ export const generateNotes = async (projectId, noteType, topic, selectedDocument
 };
 
 
+/**
+ * Notes streamed as they're written: onText(fullTextSoFar) is called at most once a
+ * frame, so the first lines show within a couple of seconds instead of after the whole
+ * set of notes. Resolves to { content, note_id, title } like generateNotes. Falls back
+ * to generateNotes when the server doesn't offer streaming (an older backend).
+ */
+export const generateNotesStream = async (projectId, noteType, topic, selectedDocuments = [], onText = () => {}) => {
+    const body = { project_id: projectId, note_type: noteType, topic, selected_documents: selectedDocuments };
+    const response = await fetch(`${API_URL}/notes/generate/stream`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+        body: JSON.stringify(body),
+    });
+    if (response.status === 404 || response.status === 405) {
+        return generateNotes(projectId, noteType, topic, selectedDocuments);
+    }
+    if (!response.ok || !response.body) {
+        const errorText = await response.text().catch(() => '');
+        let detail = errorText;
+        try { detail = JSON.parse(errorText).detail || errorText; } catch { /* plain text */ }
+        if (response.status === 402 && isLimitDetail(detail)) emitLimit(detail);
+        const err = new Error((typeof detail === 'string' ? detail : detail?.message) || `HTTP error ${response.status}`);
+        err.response = { status: response.status, data: { detail } };
+        throw err;
+    }
+
+    let text = '';
+    let frame = 0;
+    const flush = () => { frame = 0; onText(text); };
+    const schedule = () => {
+        if (!frame) frame = (typeof requestAnimationFrame === 'function' ? requestAnimationFrame : (f) => setTimeout(f, 16))(flush);
+    };
+    let result = null;
+    const handle = (line) => {
+        if (!line.trim()) return;
+        let event;
+        try { event = JSON.parse(line); } catch { return; }
+        if (event.type === 'token') { text += event.text || ''; schedule(); }
+        else if (event.type === 'replace') { text = event.text || ''; schedule(); }
+        else if (event.type === 'done') { result = { content: text, note_id: event.note_id, title: event.title }; }
+        else if (event.type === 'error') { throw new Error(event.message || 'Notes generation failed'); }
+    };
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+        lines.forEach(handle);
+    }
+    handle(buffer + decoder.decode());
+    if (frame && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frame);
+    onText(text);
+    if (!result) {
+        if (!text) throw new Error('Notes generation was interrupted');
+        result = { content: text };
+    }
+    return result;
+};
+
 // ============== Saved Q&A (Subjective Tests) API ==============
 
 export const getSavedQATests = async (projectId) => {

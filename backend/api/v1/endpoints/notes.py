@@ -1,4 +1,7 @@
+import json
+
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import StreamingResponse
 from utils.rate_limit import rate_limit
 from utils.tools import require_tool
 from typing import Any, List
@@ -70,3 +73,35 @@ async def generate_notes(
         return {"content": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/generate/stream", dependencies=[Depends(rate_limit("generate")), Depends(require_tool("notes"))])
+async def generate_notes_stream(
+    request: NotesGenerateRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    The same notes as /generate, streamed as they're written (one JSON event per line:
+    token, replace, done, error). Auto-saves when finished, like /generate.
+    """
+    metered(current_user, "notes")
+    await usage.consume(current_user["id"], "tools")
+    level = (await levels.effective_for(current_user["id"])).get("level", "")
+
+    async def events():
+        async for event in notes_service.generate_notes_stream(
+            project_id=request.project_id,
+            note_type=request.note_type,
+            topic=request.topic,
+            selected_documents=request.selected_documents,
+            user_id=current_user["id"],
+            level=level,
+        ):
+            yield json.dumps(event) + "\n"
+
+    return StreamingResponse(
+        events(),
+        media_type="application/x-ndjson",
+        # Deliver text as it's generated instead of letting proxies buffer it
+        headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"},
+    )
