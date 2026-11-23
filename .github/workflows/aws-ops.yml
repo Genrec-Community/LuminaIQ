@@ -21,7 +21,7 @@ on:
     inputs:
       task:
         type: choice
-        options: [status, migrate-supabase, reindex, backup, set-embedding-dim, bedrock-test, keypair, install-secret, ai-check]
+        options: [status, migrate-supabase, reindex, backup, set-embedding-dim, bedrock-test, keypair, install-secret, ai-check, models-test]
         default: status
       dry_run:
         type: boolean
@@ -122,3 +122,9 @@ jobs:
         run: |
           B=$(base64 -w0 deploy/aws/ops/ai_check.py)
           .github/scripts/aws-run.sh "cd /opt/luminaiq && echo $B | base64 -d > /tmp/ac.py && docker compose cp /tmp/ac.py api:/app/ac_tmp.py && docker compose exec -T -w /app api uv run --no-sync python ac_tmp.py 2>&1 | tail -40; docker compose exec -T api rm -f /app/ac_tmp.py"
+
+      - name: Models test
+        if: env.TASK == 'models-test'
+        run: |
+          B=$(base64 -w0 deploy/aws/ops/models_test.py)
+          .github/scripts/aws-run.sh "cd /opt/luminaiq && echo $B | base64 -d > /tmp/mt.py && docker compose cp /tmp/mt.py api:/tmp/mt.py && docker compose exec -T api uv run --no-sync python /tmp/mt.py 2>&1 | tail -40" 900
