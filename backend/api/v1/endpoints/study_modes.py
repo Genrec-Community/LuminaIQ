@@ -445,7 +445,8 @@ async def visualize(request: VisualizeRequest, current_user: dict = Depends(get_
         # Simulations need real coding ability: always the Deep model (and they're
         # shared across students with the same book, so each is paid for once)
         raw = await llm_service.chat_completion(
-            [{"role": "user", "content": prompt}], temperature=0.4, max_tokens=12000, deep=True
+            [{"role": "user", "content": prompt}], temperature=0.4, max_tokens=12000, deep=True,
+            task="lab",     # its own model (LLM_TASK_MODELS big:lab), not the Deep-answer one
         )
     except Exception as e:
         raise _llm_error(e)

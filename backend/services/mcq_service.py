@@ -167,7 +167,9 @@ class MCQService:
         parsed = self._parse_mcq_response(response)
         if not parsed:
             raise Exception("Failed to parse MCQ questions from response")
-        return parsed
+        # Models tend to put the right answer first: reorder so it isn't always "A"
+        from services.shared_content import shuffle_options
+        return [shuffle_options(q) for q in parsed]
 
     @staticmethod
     def _mcq_prompt(topic: Optional[str], num_questions: int, difficulty: str, content: str, level: str) -> str:
