@@ -286,8 +286,9 @@ html.lenis, html.lenis body { height: auto; }
 /* Cursor follower: decorative, never replaces the native cursor */
 #cursor { position: fixed; left: 0; top: 0; z-index: 9980; pointer-events: none; display: grid; place-items: center; width: 0; height: 0; opacity: 0; }
 #cursor.is-ready { opacity: 1; }
-#cursor span { display: grid; place-items: center; min-width: 5rem; aspect-ratio: 1; border-radius: 50%; background: var(--lumina-ink); color: var(--lumina-on-ink); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.02em; transform: translate(-50%, -50%) scale(0); transition: transform 0.5s var(--lumina-ease); }
+#cursor span { display: grid; place-items: center; min-width: 5rem; aspect-ratio: 1; border-radius: 50%; background: var(--lumina-ink); color: var(--lumina-on-ink); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.02em; transform: translate(-50%, -50%) scale(0); transition: transform 0.5s var(--lumina-ease), background-color 0.3s var(--lumina-ease), color 0.3s var(--lumina-ease); }
 #cursor.is-active span { transform: translate(-50%, -50%) scale(1); }
+#cursor[data-tone="danger"] span { background: #dc2626; color: #ffffff; }
 @media (hover: none), (pointer: coarse) { #cursor { display: none; } }
 
 /* Logo: the curve mark + "Lumina" with an italic serif IQ */

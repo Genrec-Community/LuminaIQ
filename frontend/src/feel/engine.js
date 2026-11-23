@@ -9,6 +9,7 @@
 //   data-delay="0.1"               extra delay in seconds
 //   data-magnetic="0.3"            element leans toward the pointer (fine pointers only)
 //   data-cursor="Open"             the follower grows and shows this label
+//   data-cursor-tone="danger"      with data-cursor, tints the follower (e.g. red "Delete")
 // Everything is skipped under reduced motion; content is never hidden without JS.
 import Lenis from 'lenis';
 import { gsap } from 'gsap';
@@ -130,9 +131,16 @@ function pointerCraft() {
         }
         if (follower) {
             fx(e.clientX); fy(e.clientY);
-            const text = target?.closest('[data-cursor]')?.dataset.cursor || '';
+            // Nearest data-cursor wins, so a button inside a card can relabel the follower
+            const host = target?.closest('[data-cursor]');
+            const text = host?.dataset.cursor || '';
             follower.classList.toggle('is-active', !!text);
-            if (label && label.textContent !== text && text) label.textContent = text;
+            if (text) {
+                // Keep the last label and tone while shrinking out, so it doesn't flash
+                if (label && label.textContent !== text) label.textContent = text;
+                const tone = host.dataset.cursorTone || '';
+                if ((follower.dataset.tone || '') !== tone) follower.dataset.tone = tone;
+            }
         }
     }, { passive: true });
     document.addEventListener('pointerleave', () => follower?.classList.remove('is-active'));
