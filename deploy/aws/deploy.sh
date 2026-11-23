@@ -60,6 +60,9 @@ aws s3 sync "s3://$WEB/" web/ --delete --only-show-errors
 
 # Images
 aws ecr get-login-password | docker login --username AWS --password-stdin "${IMAGE%%/*}" >/dev/null
+# Old images fill the small disk: drop every image no container uses before pulling
+docker image prune -af >/dev/null 2>&1 || true
+docker builder prune -af >/dev/null 2>&1 || true
 docker pull -q "$IMAGE" >/dev/null
 export API_IMAGE="$IMAGE"
 echo "API_IMAGE=$IMAGE" > .env
@@ -72,5 +75,5 @@ for i in $(seq 1 40); do
   sleep 5
 done
 docker compose ps
-docker image prune -af --filter "until=72h" >/dev/null 2>&1 || true
+docker image prune -af >/dev/null 2>&1 || true
 [ "${code:-}" = "200" ] || { docker compose logs --tail 80 api; exit 1; }
